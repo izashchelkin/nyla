@@ -1,0 +1,16 @@
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
+cc_binary(
+    name = "wm",
+    srcs = glob(["*.cc", "*.h"]),
+    deps = [
+			"@abseil-cpp//absl/log:initialize",
+			"//nyla/keyboard",
+			"//nyla/spawn",
+			"//nyla/layout",
+    ],
+		defines = [
+			"ABSL_MIN_LOG_LEVEL=absl::LogSeverity::kInfo"
+		],
+		linkopts = ["-lxcb-util", "-lxcb"],
+)

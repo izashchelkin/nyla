@@ -1,0 +1,25 @@
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
+package(default_visibility = ["//nyla/wm:__pkg__"])
+
+cc_library(
+    name = "layout",
+    srcs = ["layout.cc"],
+    hdrs = ["layout.h", "rect.h"],
+    deps = [
+        "@abseil-cpp//absl/log",
+        "@abseil-cpp//absl/strings",
+    ],
+)
+
+cc_test(
+    name = "layout_test",
+    size = "small",
+    srcs = ["layout_test.cc"],
+    deps = [
+        ":layout",
+        "@abseil-cpp//absl/strings",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)
