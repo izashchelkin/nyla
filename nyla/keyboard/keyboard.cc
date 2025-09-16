@@ -1,10 +1,12 @@
 #include "nyla/keyboard/keyboard.h"
 
+#include <xcb/xproto.h>
+
+#include <algorithm>
 #include <cstdint>
 #include <span>
 
 #include "absl/cleanup/cleanup.h"
-#include "absl/log/log.h"
 #include "xcb/xcb.h"
 #include "xkbcommon/xkbcommon-x11.h"
 #include "xkbcommon/xkbcommon.h"
@@ -29,8 +31,18 @@ bool InitKeyboard(xcb_connection_t* conn) {
           minor_xkb_version_out >= kXkbMinMinorVersion);
 }
 
+bool Keybind::Resolve(xkb_keymap* keymap) {
+  xcb_keycode_t keycode = xkb_keymap_key_by_name(keymap, keyname_);
+  if (xkb_keycode_is_legal_x11(keycode)) {
+    keycode_ = keycode;
+    return true;
+  } else {
+    return false;
+  }
+}
+
 bool BindKeyboard(xcb_connection_t* conn, xcb_window_t root_window,
-                  xcb_mod_mask_t modifier, std::span<KeyBind> keybinds) {
+                  uint16_t modifier, std::span<Keybind> keybinds) {
   if (!modifier) return false;
 
   xkb_context* ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
@@ -50,14 +62,10 @@ bool BindKeyboard(xcb_connection_t* conn, xcb_window_t root_window,
 
   xcb_ungrab_key(conn, XCB_GRAB_ANY, root_window, XCB_MOD_MASK_ANY);
 
-  for (KeyBind& keybind : keybinds) {
-    xkb_keycode_t keycode = xkb_keymap_key_by_name(keymap, keybind.keyname);
-    if (!xkb_keycode_is_legal_x11(keycode)) {
-      return false;
-    }
-    keybind.keycode = keycode;
+  for (Keybind& keybind : keybinds) {
+    if (!keybind.Resolve(keymap)) return false;
 
-    xcb_grab_key(conn, 0, root_window, modifier, keybind.keycode,
+    xcb_grab_key(conn, 0, root_window, modifier, keybind.keycode(),
                  XCB_GRAB_MODE_ASYNC, XCB_GRAB_MODE_ASYNC);
     // TODO: locks
   }
@@ -66,12 +74,13 @@ bool BindKeyboard(xcb_connection_t* conn, xcb_window_t root_window,
   return true;
 }
 
-bool HandleKeyPress(xcb_keycode_t keycode, std::span<const KeyBind> keybinds) {
-  for (const auto& keybind : keybinds) {
-    if (keybind.keycode == keycode) {
-      keybind.action();
-      return true;
-    }
+bool HandleKeyPress(xcb_keycode_t keycode, std::span<const Keybind> keybinds) {
+  auto it = std::find_if(
+      keybinds.begin(), keybinds.end(),
+      [keycode](const auto& keybind) { return keybind.keycode() == keycode; });
+  if (it != keybinds.end()) {
+    it->RunAction();
+    return true;
   }
   return false;
 }

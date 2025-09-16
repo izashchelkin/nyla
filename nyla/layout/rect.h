@@ -6,8 +6,8 @@
 #include "absl/strings/str_format.h"
 
 struct Rect {
-  uint32_t x;
-  uint32_t y;
+  int32_t x;
+  int32_t y;
   uint32_t width;
   uint32_t height;
 };

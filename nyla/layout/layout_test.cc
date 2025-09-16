@@ -12,7 +12,7 @@ TEST(Layout, QHD) {
     return rect;
   };
 
-  EXPECT_THAT(LayoutComputeRectPlacements(GetScreen(), 1),
+  EXPECT_THAT(ComputeLayout(GetScreen(), 1),
               testing::ElementsAre(GetScreen()));
 }
 
@@ -22,7 +22,7 @@ TEST(Layout, UltraWideQHD) {
     return rect;
   };
 
-  EXPECT_THAT(LayoutComputeRectPlacements(GetScreen(), 1),
+  EXPECT_THAT(ComputeLayout(GetScreen(), 1),
               testing::ElementsAre(GetScreen()));
 }
 

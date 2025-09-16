@@ -8,9 +8,9 @@
 
 namespace nyla {
 
-enum class LayoutType { kColumns, kRows, /* kGrid, kFibonacciSpiral */ };
+enum class LayoutType { kColumns, kRows, kGrid, /* kFibonacciSpiral */ };
 
-std::vector<Rect> LayoutComputeRectPlacements(
+std::vector<Rect> ComputeLayout(
     const Rect& bounding_rect, uint32_t n,
     LayoutType layout_type = LayoutType::kColumns);
 
