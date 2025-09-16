@@ -21,7 +21,7 @@ class ClientStack {
   void HandleUnmapNotify(xcb_window_t window);
   void ApplyLayoutChanges(xcb_connection_t* conn,
                           const std::vector<Rect>& layout);
-  void MoveOffScreen(xcb_connection_t* conn);
+  void Hide(xcb_connection_t* conn, xcb_screen_t& screen);
 
   auto size() const { return stack_.size(); }
 
@@ -39,7 +39,7 @@ class ClientStackManager {
 
   void HandleMapRequest(xcb_connection_t* conn, xcb_window_t window);
   void HandleUnmapNotify(xcb_window_t window);
-  void ApplyLayoutChanges(xcb_connection_t* conn,
+  void ApplyLayoutChanges(xcb_connection_t* conn, xcb_screen_t& screen,
                           const std::vector<Rect>& layout);
 
   void NextStack();

@@ -1,18 +1,18 @@
-#include <xcb/xcb.h>
-#include <xcb/xcb_aux.h>
-#include <xcb/xcb_util.h>
-#include <xcb/xproto.h>
-
 #include <cstdint>
+#include <cstdlib>
 
 #include "absl/log/globals.h"
 #include "absl/log/initialize.h"
 #include "absl/log/log.h"
+#include "nyla/bar/bar.h"
 #include "nyla/keyboard/keyboard.h"
 #include "nyla/layout/layout.h"
 #include "nyla/spawn/spawn.h"
 #include "nyla/wm/client.h"
 #include "nyla/wm/utils.h"
+#include "xcb/xcb.h"
+#include "xcb/xcb_aux.h"
+#include "xcb/xproto.h"
 
 namespace nyla {
 
@@ -26,12 +26,12 @@ int Main(int argc, char** argv) {
     LOG(QFATAL) << "could not connect to X server";
   }
 
-  xcb_screen_t* screen = xcb_aux_get_screen(conn, iscreen);
+  xcb_screen_t screen = *xcb_aux_get_screen(conn, iscreen);
 
   if (xcb_request_check(
           conn,
           xcb_change_window_attributes_checked(
-              conn, screen->root, XCB_CW_EVENT_MASK,
+              conn, screen.root, XCB_CW_EVENT_MASK,
               (uint32_t[]){
                   XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT |
                   XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_KEY_RELEASE |
@@ -63,14 +63,21 @@ int Main(int argc, char** argv) {
     Spawn(kTermCmd);
   });
 
-  if (!BindKeyboard(conn, screen->root, modifier, keybinds))
+  if (!BindKeyboard(conn, screen.root, modifier, keybinds))
     LOG(QFATAL) << "could not bind keyboard";
   LOG(INFO) << "bind keyboard successful";
 
+  Bar bar;
+  if (!bar.Init(conn, screen)) {
+    LOG(QFATAL) << "could not init bar";
+  }
+  bar.Update(conn, screen, "HELLO WORLD!");
+
   while (is_running) {
-    std::vector<Rect>&& layout = ComputeLayout(
-        AsRect(screen), stack_manager.size(), stack_manager.layout_type());
-    stack_manager.ApplyLayoutChanges(conn, layout);
+    stack_manager.ApplyLayoutChanges(
+        conn, screen,
+        ComputeLayout(AsRect(screen), stack_manager.size(),
+                      stack_manager.layout_type()));
 
     xcb_flush(conn);
     xcb_generic_event_t* event = xcb_wait_for_event(conn);
@@ -102,6 +109,7 @@ int Main(int argc, char** argv) {
         }
       }
 
+      free(event);
       event = xcb_poll_for_event(conn);
     } while (event && is_running);
   }
