@@ -64,20 +64,20 @@ std::vector<Rect> ComputeLayout(const Rect& bounding_rect, uint32_t n,
       return {bounding_rect};  // no gaps!
   }
 
-  std::vector<Rect> rects;
-  rects.reserve(n);
+  std::vector<Rect> out;
+  out.reserve(n);
   switch (layout_type) {
     case LayoutType::kColumns:
-      ComputeColumns(bounding_rect, n, rects);
+      ComputeColumns(bounding_rect, n, out);
       break;
     case LayoutType::kRows:
-      ComputeRows(bounding_rect, n, rects);
+      ComputeRows(bounding_rect, n, out);
       break;
     case LayoutType::kGrid:
-      ComputeGrid(bounding_rect, n, rects);
+      ComputeGrid(bounding_rect, n, out);
       break;
   }
-  return rects;
+  return out;
 }
 
 }  // namespace nyla

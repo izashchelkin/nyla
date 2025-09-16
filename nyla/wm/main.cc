@@ -44,27 +44,20 @@ int Main(int argc, char** argv) {
   LOG(INFO) << "init keyboard successful";
 
   bool is_running = true;
-  LayoutType layout_type = LayoutType::kColumns;
+
+  ClientStackManager stack_manager;
 
   uint16_t modifier = XCB_MOD_MASK_4;
-
   std::vector<Keybind> keybinds;
   keybinds.reserve(3);
 
   keybinds.emplace_back("AD01", [&is_running] { is_running = false; });
-  keybinds.emplace_back("AD02", [&layout_type] {
-    switch (layout_type) {
-      case LayoutType::kColumns:
-        layout_type = LayoutType::kRows;
-        break;
-      case LayoutType::kRows:
-        layout_type = LayoutType::kGrid;
-        break;
-      case LayoutType::kGrid:
-        layout_type = LayoutType::kColumns;
-        break;
-    }
-  });
+  keybinds.emplace_back("AD02",
+                        [&stack_manager] { stack_manager.NextLayout(); });
+  keybinds.emplace_back("AD03",
+                        [&stack_manager] { stack_manager.PrevStack(); });
+  keybinds.emplace_back("AD04",
+                        [&stack_manager] { stack_manager.NextStack(); });
   keybinds.emplace_back("AD05", [] {
     static const char* const kTermCmd[] = {"ghostty", nullptr};
     Spawn(kTermCmd);
@@ -74,12 +67,10 @@ int Main(int argc, char** argv) {
     LOG(QFATAL) << "could not bind keyboard";
   LOG(INFO) << "bind keyboard successful";
 
-  ClientStack client_stack;
-
   while (is_running) {
-    std::vector<Rect>&& layout =
-        ComputeLayout(AsRect(screen), client_stack.size(), layout_type);
-    client_stack.ApplyLayoutChanges(conn, layout);
+    std::vector<Rect>&& layout = ComputeLayout(
+        AsRect(screen), stack_manager.size(), stack_manager.layout_type());
+    stack_manager.ApplyLayoutChanges(conn, layout);
 
     xcb_flush(conn);
     xcb_generic_event_t* event = xcb_wait_for_event(conn);
@@ -97,12 +88,12 @@ int Main(int argc, char** argv) {
           break;
         }
         case XCB_MAP_REQUEST: {
-          client_stack.HandleMapRequest(
+          stack_manager.HandleMapRequest(
               conn, reinterpret_cast<xcb_map_request_event_t*>(event)->window);
           break;
         }
         case XCB_UNMAP_NOTIFY: {
-          client_stack.HandleUnmapNotify(
+          stack_manager.HandleUnmapNotify(
               reinterpret_cast<xcb_unmap_notify_event_t*>(event)->window);
           break;
         }
