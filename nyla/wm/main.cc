@@ -1,5 +1,6 @@
 #include <cstdint>
 #include <cstdlib>
+#include <string_view>
 
 #include "absl/log/globals.h"
 #include "absl/log/initialize.h"
@@ -71,13 +72,29 @@ int Main(int argc, char** argv) {
   if (!bar.Init(conn, screen)) {
     LOG(QFATAL) << "could not init bar";
   }
-  bar.Update(conn, screen, "HELLO WORLD!");
 
   while (is_running) {
     stack_manager.ApplyLayoutChanges(
         conn, screen,
-        ComputeLayout(AsRect(screen), stack_manager.size(),
+        ComputeLayout(AsRect(screen, bar.height()), stack_manager.size(),
                       stack_manager.layout_type()));
+
+    std::string_view bar_text;
+    switch (stack_manager.layout_type()) {
+      case LayoutType::kColumns: {
+        bar_text = "C";
+        break;
+      }
+      case LayoutType::kRows: {
+        bar_text = "R";
+        break;
+      }
+      case LayoutType::kGrid: {
+        bar_text = "G";
+        break;
+      }
+    }
+    bar.Update(conn, screen, bar_text);
 
     xcb_flush(conn);
     xcb_generic_event_t* event = xcb_wait_for_event(conn);
