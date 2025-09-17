@@ -49,6 +49,7 @@ int Main(int argc, char** argv) {
               conn, screen.root, XCB_CW_EVENT_MASK,
               (uint32_t[]){
                   XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT |
+                  XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY |
                   XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_KEY_RELEASE |
                   XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE |
                   XCB_EVENT_MASK_BUTTON_MOTION}))) {
@@ -103,10 +104,6 @@ int Main(int argc, char** argv) {
        {.fd = tfd, .events = POLLIN}});
 
   while (is_running && !xcb_connection_has_error(conn)) {
-    std::vector<Rect>&& layout =
-        ComputeLayout(AsRect(screen, bar_manager.height()),
-                      stack_manager.size(), 2, stack_manager.layout_type());
-    stack_manager.ApplyLayoutChanges(conn, screen, layout);
     xcb_flush(conn);
 
     if (poll(fds.data(), fds.size(), -1) == -1) {
@@ -116,6 +113,11 @@ int Main(int argc, char** argv) {
 
     if (fds[0].revents & POLLIN) {
       ProcessXEvents(conn, is_running, stack_manager, modifier, keybinds);
+
+      std::vector<Rect>&& layout =
+          ComputeLayout(AsRect(screen, bar_manager.height()),
+                        stack_manager.size(), 2, stack_manager.layout_type());
+      stack_manager.ApplyLayoutChanges(conn, screen, layout);
     }
 
     if (fds[1].revents & POLLIN) {
@@ -154,7 +156,6 @@ static void ProcessXEvents(xcb_connection_t* conn, const bool& is_running,
         break;
       }
       case XCB_DESTROY_NOTIFY: {
-        LOG(INFO) << "DestroyNotify";
         stack_manager.UnmanageClient(
             reinterpret_cast<xcb_destroy_notify_event_t*>(event)->window);
         break;
