@@ -16,7 +16,7 @@
 
 namespace nyla {
 
-void ClientStack::HandleMapRequest(xcb_connection_t* conn,
+void ClientStack::ManageClient(xcb_connection_t* conn,
                                    xcb_window_t window) {
   xcb_map_window(conn, window);
 
@@ -25,7 +25,7 @@ void ClientStack::HandleMapRequest(xcb_connection_t* conn,
   if (is_new) stack_.emplace_back(Client{.window = window});
 }
 
-void ClientStack::HandleUnmapNotify(xcb_window_t window) {
+void ClientStack::UnmanageClient(xcb_window_t window) {
   auto it = std::ranges::find_if(
       stack_, [window](const auto& client) { return client.window == window; });
   if (it != stack_.end()) stack_.erase(it);
@@ -118,15 +118,15 @@ void ClientStack::FocusPrev(xcb_connection_t* conn,
 //
 //
 
-void ClientStackManager::HandleMapRequest(xcb_connection_t* conn,
+void ClientStackManager::ManageClient(xcb_connection_t* conn,
                                           xcb_window_t window) {
   CHECK_LT(active_stack_idx_, stacks_.size());
 
-  stacks_[active_stack_idx_].HandleMapRequest(conn, window);
+  stacks_[active_stack_idx_].ManageClient(conn, window);
 }
 
-void ClientStackManager::HandleUnmapNotify(xcb_window_t window) {
-  for (auto& stack : stacks_) stack.HandleUnmapNotify(window);
+void ClientStackManager::UnmanageClient(xcb_window_t window) {
+  for (auto& stack : stacks_) stack.UnmanageClient(window);
 }
 
 void ClientStackManager::ApplyLayoutChanges(xcb_connection_t* conn,

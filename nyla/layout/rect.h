@@ -27,8 +27,8 @@ inline bool operator==(const Rect& lhs, const Rect& rhs) {
 inline Rect ApplyMargin(const Rect& rect, uint32_t margin) {
   CHECK(2 * margin < rect.width && 2 * margin < rect.height);
 
-  return Rect{.x = static_cast<int32_t>(rect.x + margin),
-              .y = static_cast<int32_t>(rect.y + margin),
+  return Rect{.x = rect.x,
+              .y = rect.y,
               .width = rect.width - 2 * margin,
               .height = rect.height - 2 * margin};
 }

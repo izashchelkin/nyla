@@ -76,10 +76,10 @@ int Main(int argc, char** argv) {
     Spawn(kTermCmd);
   });
 
-  keybinds.emplace_back("AC01", [conn, &stack_manager, &screen] {
+  keybinds.emplace_back("AC03", [conn, &stack_manager, &screen] {
     stack_manager.FocusPrev(conn, screen);
   });
-  keybinds.emplace_back("AC02", [conn, &stack_manager, &screen] {
+  keybinds.emplace_back("AC04", [conn, &stack_manager, &screen] {
     stack_manager.FocusNext(conn, screen);
   });
 
@@ -144,13 +144,19 @@ static void ProcessXEvents(xcb_connection_t* conn, const bool& is_running,
         break;
       }
       case XCB_MAP_REQUEST: {
-        auto maprequest = reinterpret_cast<xcb_map_request_event_t*>(event);
-        stack_manager.HandleMapRequest(conn, maprequest->window);
+        stack_manager.ManageClient(
+            conn, reinterpret_cast<xcb_map_request_event_t*>(event)->window);
         break;
       }
       case XCB_UNMAP_NOTIFY: {
-        auto unmapnotify = reinterpret_cast<xcb_unmap_notify_event_t*>(event);
-        stack_manager.HandleUnmapNotify(unmapnotify->window);
+        stack_manager.UnmanageClient(
+            reinterpret_cast<xcb_unmap_notify_event_t*>(event)->window);
+        break;
+      }
+      case XCB_DESTROY_NOTIFY: {
+        LOG(INFO) << "DestroyNotify";
+        stack_manager.UnmanageClient(
+            reinterpret_cast<xcb_destroy_notify_event_t*>(event)->window);
         break;
       }
       case 0: {

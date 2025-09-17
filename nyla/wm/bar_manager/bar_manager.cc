@@ -1,9 +1,12 @@
 #include "nyla/wm/bar_manager/bar_manager.h"
 
 #include <cstdlib>
+#include <string>
 
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_format.h"
 #include "absl/time/clock.h"
+#include "absl/time/time.h"
 
 namespace nyla {
 
@@ -33,9 +36,11 @@ void BarManager::Update(xcb_connection_t *conn, xcb_screen_t &screen) {
   double load_avg[3];
   getloadavg(load_avg, std::size(load_avg));
 
-  bar_.Update(conn, screen,
-              absl::StrCat("nylawm [", load_avg[0], ", ", load_avg[1], ", ",
-                           load_avg[2], "] ", absl::Now()));
+  std::string bar_text = absl::StrFormat(
+      "nylawm [%.2f, %.2f, %.2f] %s", load_avg[0], load_avg[1], load_avg[2],
+      absl::FormatTime("%H:%M:%S %d.%m.%Y", absl::Now(),
+                       absl::LocalTimeZone()));
+  bar_.Update(conn, screen, bar_text);
 }
 
 }  // namespace nyla

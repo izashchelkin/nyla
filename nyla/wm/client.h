@@ -20,8 +20,8 @@ class ClientStack {
  public:
   ClientStack() : stack_{}, focus_idx_{0}, layout_type_{LayoutType::kGrid} {}
 
-  void HandleMapRequest(xcb_connection_t* conn, xcb_window_t window);
-  void HandleUnmapNotify(xcb_window_t window);
+  void ManageClient(xcb_connection_t* conn, xcb_window_t window);
+  void UnmanageClient(xcb_window_t window);
   void ApplyLayoutChanges(xcb_connection_t* conn,
                           const std::vector<Rect>& layout);
   void HideAll(xcb_connection_t* conn, xcb_screen_t& screen);
@@ -44,8 +44,8 @@ class ClientStackManager {
  public:
   ClientStackManager() : stacks_{3}, active_stack_idx_{0} {}
 
-  void HandleMapRequest(xcb_connection_t* conn, xcb_window_t window);
-  void HandleUnmapNotify(xcb_window_t window);
+  void ManageClient(xcb_connection_t* conn, xcb_window_t window);
+  void UnmanageClient(xcb_window_t window);
   void ApplyLayoutChanges(xcb_connection_t* conn, xcb_screen_t& screen,
                           const std::vector<Rect>& layout);
 

@@ -8,8 +8,8 @@
 
 namespace nyla {
 
-static void ComputeColumns(const Rect& bounding_rect, uint32_t n, uint32_t gaps,
-                           std::vector<Rect>& out) {
+static void ComputeColumns(const Rect& bounding_rect, uint32_t n,
+                           uint32_t margin, std::vector<Rect>& out) {
   uint32_t width = bounding_rect.width / n;
   for (uint32_t i = 0; i < n; ++i) {
     out.emplace_back(ApplyMargin(
@@ -17,11 +17,11 @@ static void ComputeColumns(const Rect& bounding_rect, uint32_t n, uint32_t gaps,
              .y = bounding_rect.y,
              .width = width,
              .height = bounding_rect.height},
-        gaps));
+        margin));
   }
 }
 
-static void ComputeRows(const Rect& bounding_rect, uint32_t n, uint32_t gaps,
+static void ComputeRows(const Rect& bounding_rect, uint32_t n, uint32_t margin,
                         std::vector<Rect>& out) {
   uint32_t height = bounding_rect.height / n;
   for (uint32_t i = 0; i < n; ++i) {
@@ -30,14 +30,14 @@ static void ComputeRows(const Rect& bounding_rect, uint32_t n, uint32_t gaps,
              .y = static_cast<int32_t>(bounding_rect.y + (i * height)),
              .width = bounding_rect.width,
              .height = height},
-        gaps));
+        margin));
   }
 }
 
-static void ComputeGrid(const Rect& bounding_rect, uint32_t n, uint32_t gaps,
+static void ComputeGrid(const Rect& bounding_rect, uint32_t n, uint32_t margin,
                         std::vector<Rect>& out) {
   if (n < 4) {
-    ComputeColumns(bounding_rect, n, gaps, out);
+    ComputeColumns(bounding_rect, n, margin, out);
     return;
   }
 
@@ -56,30 +56,30 @@ static void ComputeGrid(const Rect& bounding_rect, uint32_t n, uint32_t gaps,
                                                    ((i / num_cols) * height)),
                          .width = width,
                          .height = height},
-                    gaps));
+                    margin));
   }
 }
 
 std::vector<Rect> ComputeLayout(const Rect& bounding_rect, uint32_t n,
-                                uint32_t gaps, LayoutType layout_type) {
+                                uint32_t margin, LayoutType layout_type) {
   switch (n) {
     case 0:
       return {};
     case 1:
-      return {ApplyMargin(bounding_rect, gaps)};
+      return {ApplyMargin(bounding_rect, margin)};
   }
 
   std::vector<Rect> out;
   out.reserve(n);
   switch (layout_type) {
     case LayoutType::kColumns:
-      ComputeColumns(bounding_rect, n, gaps, out);
+      ComputeColumns(bounding_rect, n, margin, out);
       break;
     case LayoutType::kRows:
-      ComputeRows(bounding_rect, n, gaps, out);
+      ComputeRows(bounding_rect, n, margin, out);
       break;
     case LayoutType::kGrid:
-      ComputeGrid(bounding_rect, n, gaps, out);
+      ComputeGrid(bounding_rect, n, margin, out);
       break;
   }
   return out;
