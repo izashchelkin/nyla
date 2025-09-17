@@ -1,14 +1,21 @@
+#include <sys/poll.h>
+#include <sys/time.h>
+#include <sys/timerfd.h>
+#include <unistd.h>
+
+#include <array>
 #include <cstdint>
 #include <cstdlib>
-#include <string_view>
 
+#include "absl/cleanup/cleanup.h"
 #include "absl/log/globals.h"
 #include "absl/log/initialize.h"
 #include "absl/log/log.h"
-#include "nyla/bar/bar.h"
 #include "nyla/keyboard/keyboard.h"
 #include "nyla/layout/layout.h"
 #include "nyla/spawn/spawn.h"
+#include "nyla/timer/timer.h"
+#include "nyla/wm/bar_manager/bar_manager.h"
 #include "nyla/wm/client.h"
 #include "nyla/wm/utils.h"
 #include "xcb/xcb.h"
@@ -17,7 +24,13 @@
 
 namespace nyla {
 
+static void ProcessXEvents(xcb_connection_t* conn, const bool& is_running,
+                           ClientStackManager& stack_manager, uint16_t modifier,
+                           std::span<const Keybind> keybinds);
+
 int Main(int argc, char** argv) {
+  bool is_running = true;
+
   absl::InitializeLog();
   absl::SetStderrThreshold(absl::LogSeverityAtLeast::kInfo);
 
@@ -26,6 +39,7 @@ int Main(int argc, char** argv) {
   if (xcb_connection_has_error(conn)) {
     LOG(QFATAL) << "could not connect to X server";
   }
+  absl::Cleanup disconnecter = [conn] { xcb_disconnect(conn); };
 
   xcb_screen_t screen = *xcb_aux_get_screen(conn, iscreen);
 
@@ -43,8 +57,6 @@ int Main(int argc, char** argv) {
 
   if (!InitKeyboard(conn)) LOG(QFATAL) << "could not init keyboard";
   LOG(INFO) << "init keyboard successful";
-
-  bool is_running = true;
 
   ClientStackManager stack_manager;
 
@@ -68,70 +80,77 @@ int Main(int argc, char** argv) {
     LOG(QFATAL) << "could not bind keyboard";
   LOG(INFO) << "bind keyboard successful";
 
-  Bar bar;
-  if (!bar.Init(conn, screen)) {
+  BarManager bar_manager;
+  if (!bar_manager.Init(conn, screen)) {
     LOG(QFATAL) << "could not init bar";
   }
 
-  while (is_running) {
-    stack_manager.ApplyLayoutChanges(
-        conn, screen,
-        ComputeLayout(AsRect(screen, bar.height()), stack_manager.size(),
-                      stack_manager.layout_type()));
+  using namespace std::chrono_literals;
+  int tfd = MakeTimerFd(750ms);
 
-    std::string_view bar_text;
-    switch (stack_manager.layout_type()) {
-      case LayoutType::kColumns: {
-        bar_text = "C";
-        break;
-      }
-      case LayoutType::kRows: {
-        bar_text = "R";
-        break;
-      }
-      case LayoutType::kGrid: {
-        bar_text = "G";
-        break;
-      }
-    }
-    bar.Update(conn, screen, bar_text);
+  if (!tfd) LOG(QFATAL) << "MakeTimerFdMillis";
+  absl::Cleanup tfd_closer = [tfd] { close(tfd); };
 
+  auto fds = std::to_array<pollfd>(
+      {{.fd = xcb_get_file_descriptor(conn), .events = POLLIN},
+       {.fd = tfd, .events = POLLIN}});
+
+  while (is_running && !xcb_connection_has_error(conn)) {
+    std::vector<Rect>&& layout =
+        ComputeLayout(AsRect(screen, bar_manager.height()),
+                      stack_manager.size(), stack_manager.layout_type());
+    stack_manager.ApplyLayoutChanges(conn, screen, layout);
     xcb_flush(conn);
-    xcb_generic_event_t* event = xcb_wait_for_event(conn);
-    if (!event) {
-      LOG(ERROR) << "lost connection to X server";
+
+    if (poll(fds.data(), fds.size(), -1) == -1) {
+      PLOG(ERROR) << "poll";
       break;
     }
 
-    do {
-      switch (event->response_type & ~0x80) {
-        case XCB_KEY_PRESS: {
-          auto keypress = reinterpret_cast<xcb_key_press_event_t*>(event);
-          if (keypress->state == modifier)
-            HandleKeyPress(keypress->detail, keybinds);
-          break;
-        }
-        case XCB_MAP_REQUEST: {
-          stack_manager.HandleMapRequest(
-              conn, reinterpret_cast<xcb_map_request_event_t*>(event)->window);
-          break;
-        }
-        case XCB_UNMAP_NOTIFY: {
-          stack_manager.HandleUnmapNotify(
-              reinterpret_cast<xcb_unmap_notify_event_t*>(event)->window);
-          break;
-        }
-        case 0: {
-          LOG(FATAL) << "xcb error";
-        }
-      }
+    if (fds[0].revents & POLLIN) {
+      ProcessXEvents(conn, is_running, stack_manager, modifier, keybinds);
+    }
 
-      free(event);
-      event = xcb_poll_for_event(conn);
-    } while (event && is_running);
+    if (fds[1].revents & POLLIN) {
+      uint64_t expirations;
+      if (read(tfd, &expirations, sizeof(expirations)) >= 0)
+        bar_manager.Update(conn, screen);
+    }
   }
 
   return 0;
+}
+
+static void ProcessXEvents(xcb_connection_t* conn, const bool& is_running,
+                           ClientStackManager& stack_manager, uint16_t modifier,
+                           std::span<const Keybind> keybinds) {
+  while (is_running) {
+    xcb_generic_event_t* event = xcb_poll_for_event(conn);
+    if (!event) break;
+    absl::Cleanup event_freer = [event] { free(event); };
+
+    switch (event->response_type & ~0x80) {
+      case XCB_KEY_PRESS: {
+        auto keypress = reinterpret_cast<xcb_key_press_event_t*>(event);
+        if (keypress->state == modifier)
+          HandleKeyPress(keypress->detail, keybinds);
+        break;
+      }
+      case XCB_MAP_REQUEST: {
+        stack_manager.HandleMapRequest(
+            conn, reinterpret_cast<xcb_map_request_event_t*>(event)->window);
+        break;
+      }
+      case XCB_UNMAP_NOTIFY: {
+        stack_manager.HandleUnmapNotify(
+            reinterpret_cast<xcb_unmap_notify_event_t*>(event)->window);
+        break;
+      }
+      case 0: {
+        LOG(FATAL) << "xcb error";
+      }
+    }
+  }
 }
 
 }  // namespace nyla
