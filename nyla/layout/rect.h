@@ -3,6 +3,7 @@
 
 #include <cstdint>
 
+#include "absl/log/check.h"
 #include "absl/strings/str_format.h"
 
 struct Rect {
@@ -21,6 +22,15 @@ void AbslStringify(Sink& sink, const Rect& rect) {
 inline bool operator==(const Rect& lhs, const Rect& rhs) {
   return lhs.x == rhs.x && lhs.y == rhs.y && lhs.width == rhs.width &&
          lhs.height == rhs.height;
+}
+
+inline Rect ApplyMargin(const Rect& rect, uint32_t margin) {
+  CHECK(2 * margin < rect.width && 2 * margin < rect.height);
+
+  return Rect{.x = static_cast<int32_t>(rect.x + margin),
+              .y = static_cast<int32_t>(rect.y + margin),
+              .width = rect.width - 2 * margin,
+              .height = rect.height - 2 * margin};
 }
 
 #endif

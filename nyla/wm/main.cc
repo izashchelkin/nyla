@@ -76,6 +76,13 @@ int Main(int argc, char** argv) {
     Spawn(kTermCmd);
   });
 
+  keybinds.emplace_back("AC01", [conn, &stack_manager, &screen] {
+    stack_manager.FocusPrev(conn, screen);
+  });
+  keybinds.emplace_back("AC02", [conn, &stack_manager, &screen] {
+    stack_manager.FocusNext(conn, screen);
+  });
+
   if (!BindKeyboard(conn, screen.root, modifier, keybinds))
     LOG(QFATAL) << "could not bind keyboard";
   LOG(INFO) << "bind keyboard successful";
@@ -98,7 +105,7 @@ int Main(int argc, char** argv) {
   while (is_running && !xcb_connection_has_error(conn)) {
     std::vector<Rect>&& layout =
         ComputeLayout(AsRect(screen, bar_manager.height()),
-                      stack_manager.size(), stack_manager.layout_type());
+                      stack_manager.size(), 2, stack_manager.layout_type());
     stack_manager.ApplyLayoutChanges(conn, screen, layout);
     xcb_flush(conn);
 
@@ -137,13 +144,13 @@ static void ProcessXEvents(xcb_connection_t* conn, const bool& is_running,
         break;
       }
       case XCB_MAP_REQUEST: {
-        stack_manager.HandleMapRequest(
-            conn, reinterpret_cast<xcb_map_request_event_t*>(event)->window);
+        auto maprequest = reinterpret_cast<xcb_map_request_event_t*>(event);
+        stack_manager.HandleMapRequest(conn, maprequest->window);
         break;
       }
       case XCB_UNMAP_NOTIFY: {
-        stack_manager.HandleUnmapNotify(
-            reinterpret_cast<xcb_unmap_notify_event_t*>(event)->window);
+        auto unmapnotify = reinterpret_cast<xcb_unmap_notify_event_t*>(event);
+        stack_manager.HandleUnmapNotify(unmapnotify->window);
         break;
       }
       case 0: {

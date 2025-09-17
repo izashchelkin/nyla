@@ -1,16 +1,17 @@
 #include "nyla/wm/client.h"
 
+#include <bits/types/stack_t.h>
 #include <xcb/xcb.h>
 #include <xcb/xproto.h>
 
 #include <algorithm>
-#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <ranges>
 #include <utility>
 
 #include "absl/log/check.h"
+#include "absl/log/log.h"
 #include "nyla/layout/layout.h"
 
 namespace nyla {
@@ -34,22 +35,23 @@ void ClientStack::ApplyLayoutChanges(xcb_connection_t* conn,
                                      const std::vector<Rect>& layout) {
   CHECK_EQ(layout.size(), stack_.size());
 
-  constexpr uint16_t kValueMask = XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y |
-                                  XCB_CONFIG_WINDOW_WIDTH |
-                                  XCB_CONFIG_WINDOW_HEIGHT;
+  constexpr uint16_t kValueMask =
+      XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y | XCB_CONFIG_WINDOW_WIDTH |
+      XCB_CONFIG_WINDOW_HEIGHT | XCB_CONFIG_WINDOW_BORDER_WIDTH;
+  constexpr uint32_t KBorderWidth = 2;
 
   for (auto&& [rect, client] : std::ranges::views::zip(layout, stack_)) {
     if (rect == client.rect) continue;
     client.rect = rect;
 
-    auto value_list =
-        std::to_array({static_cast<uint32_t>(rect.x),
-                       static_cast<uint32_t>(rect.y), rect.width, rect.height});
-    xcb_configure_window(conn, client.window, kValueMask, value_list.data());
+    xcb_configure_window(conn, client.window, kValueMask,
+                         (uint32_t[]){static_cast<uint32_t>(rect.x),
+                                      static_cast<uint32_t>(rect.y), rect.width,
+                                      rect.height, KBorderWidth});
   }
 }
 
-void ClientStack::Hide(xcb_connection_t* conn, xcb_screen_t& screen) {
+void ClientStack::HideAll(xcb_connection_t* conn, xcb_screen_t& screen) {
   constexpr uint16_t kValueMask = XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y;
 
   for (auto& client : stack_) {
@@ -61,6 +63,60 @@ void ClientStack::Hide(xcb_connection_t* conn, xcb_screen_t& screen) {
     }
   }
 }
+
+void ClientStack::FocusNext(xcb_connection_t* conn,
+                            const xcb_screen_t& screen) {
+  if (stack_.empty()) {
+    focus_idx_ = 0;
+    xcb_set_input_focus(conn, XCB_INPUT_FOCUS_PARENT, screen.root,
+                        XCB_CURRENT_TIME);
+    return;
+  }
+
+  if (focus_idx_ < stack_.size()) {
+    xcb_change_window_attributes(conn, stack_[focus_idx_].window,
+                                 XCB_CW_BORDER_PIXEL, (uint32_t[]){0});
+  }
+
+  if (focus_idx_ >= stack_.size() - 1)
+    focus_idx_ = 0;
+  else
+    ++focus_idx_;
+
+  xcb_set_input_focus(conn, XCB_INPUT_FOCUS_PARENT, stack_[focus_idx_].window,
+                      XCB_CURRENT_TIME);
+  xcb_change_window_attributes(conn, stack_[focus_idx_].window,
+                               XCB_CW_BORDER_PIXEL, (uint32_t[]){0xFFFFFFFF});
+}
+
+void ClientStack::FocusPrev(xcb_connection_t* conn,
+                            const xcb_screen_t& screen) {
+  if (stack_.empty()) {
+    focus_idx_ = 0;
+    xcb_set_input_focus(conn, XCB_INPUT_FOCUS_PARENT, screen.root,
+                        XCB_CURRENT_TIME);
+    return;
+  }
+
+  if (focus_idx_ < stack_.size()) {
+    xcb_change_window_attributes(conn, stack_[focus_idx_].window,
+                                 XCB_CW_BORDER_PIXEL, (uint32_t[]){0});
+  }
+
+  if (focus_idx_ > 0)
+    --focus_idx_;
+  else
+    focus_idx_ = stack_.size() - 1;
+
+  xcb_set_input_focus(conn, XCB_INPUT_FOCUS_PARENT, stack_[focus_idx_].window,
+                      XCB_CURRENT_TIME);
+  xcb_change_window_attributes(conn, stack_[focus_idx_].window,
+                               XCB_CW_BORDER_PIXEL, (uint32_t[]){0xFFFFFFFF});
+}
+
+//
+//
+//
 
 void ClientStackManager::HandleMapRequest(xcb_connection_t* conn,
                                           xcb_window_t window) {
@@ -77,7 +133,7 @@ void ClientStackManager::ApplyLayoutChanges(xcb_connection_t* conn,
                                             xcb_screen_t& screen,
                                             const std::vector<Rect>& layout) {
   for (size_t i = 0; i < stacks_.size(); ++i)
-    if (i != active_stack_idx_) stacks_[i].Hide(conn, screen);
+    if (i != active_stack_idx_) stacks_[i].HideAll(conn, screen);
 
   active_stack().ApplyLayoutChanges(conn, layout);
 }
@@ -109,6 +165,16 @@ void ClientStackManager::NextLayout() {
 
   LayoutType& layout_type = active_stack().layout_type();
   layout_type = get_next_layout(layout_type);
+}
+
+void ClientStackManager::FocusNext(xcb_connection_t* conn,
+                                   const xcb_screen_t& screen) {
+  active_stack().FocusNext(conn, screen);
+}
+
+void ClientStackManager::FocusPrev(xcb_connection_t* conn,
+                                   const xcb_screen_t& screen) {
+  active_stack().FocusPrev(conn, screen);
 }
 
 }  // namespace nyla

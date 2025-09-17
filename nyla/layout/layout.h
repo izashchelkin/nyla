@@ -16,6 +16,7 @@ enum class LayoutType {
 };
 
 std::vector<Rect> ComputeLayout(const Rect& bounding_rect, uint32_t n,
+                                uint32_t gaps,
                                 LayoutType layout_type = LayoutType::kColumns);
 
 }  // namespace nyla
