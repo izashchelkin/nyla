@@ -1,5 +1,4 @@
-#ifndef NYLA_BAR_H
-#define NYLA_BAR_H
+#pragma once
 
 #include <cstdint>
 #include <string_view>
@@ -27,5 +26,3 @@ class Bar {
 };
 
 }  // namespace nyla
-
-#endif

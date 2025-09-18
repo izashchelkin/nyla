@@ -1,5 +1,4 @@
-#ifndef NYLA_LAYOUT_H
-#define NYLA_LAYOUT_H
+#pragma once
 
 #include <cstdint>
 #include <vector>
@@ -15,10 +14,10 @@ enum class LayoutType {
   /* kFibonacciSpiral */
 };
 
+void CycleLayoutType(LayoutType& layout);
+
 std::vector<Rect> ComputeLayout(const Rect& bounding_rect, uint32_t n,
                                 uint32_t padding,
                                 LayoutType layout_type = LayoutType::kColumns);
 
 }  // namespace nyla
-
-#endif

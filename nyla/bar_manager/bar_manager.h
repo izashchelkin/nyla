@@ -1,5 +1,4 @@
-#ifndef NYLA_WM_BAR_MANAGER_H
-#define NYLA_WM_BAR_MANAGER_H
+#pragma once
 
 #include <cstdint>
 
@@ -21,5 +20,3 @@ class BarManager {
 };
 
 }  // namespace nyla
-
-#endif

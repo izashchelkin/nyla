@@ -1,5 +1,4 @@
-#ifndef NYLA_PROTOCOLS_H
-#define NYLA_PROTOCOLS_H
+#pragma once
 
 #include <string_view>
 
@@ -19,8 +18,6 @@ struct Atoms {
 Atoms InternAtoms(xcb_connection_t* conn);
 
 void WMDeleteWindow(xcb_connection_t* conn, xcb_window_t window,
-                      const Atoms& atoms);
+                    const Atoms& atoms);
 
 }  // namespace nyla
-
-#endif

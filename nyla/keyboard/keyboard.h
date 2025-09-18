@@ -1,5 +1,4 @@
-#ifndef NYLA_X11_KEYBOARD_H
-#define NYLA_X11_KEYBOARD_H
+#pragma once
 
 #include <xcb/xcb.h>
 #include <xcb/xproto.h>
@@ -35,5 +34,3 @@ bool BindKeyboard(xcb_connection_t* conn, xcb_window_t root_window,
 bool HandleKeyPress(xcb_keycode_t keycode, std::span<const Keybind> keybinds);
 
 }  // namespace nyla
-
-#endif

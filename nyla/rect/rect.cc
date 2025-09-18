@@ -4,11 +4,6 @@
 
 namespace nyla {
 
-bool operator==(const Rect& lhs, const Rect& rhs) {
-  return lhs.x_ == rhs.x_ && lhs.y_ == rhs.y_ && lhs.width_ == rhs.width_ &&
-         lhs.height_ == rhs.height_;
-}
-
 Rect ApplyPadding(const Rect& rect, uint32_t padding) {
   CHECK(rect.width() > 2 * padding && rect.height() > 2 * padding);
 

@@ -1,5 +1,4 @@
-#ifndef NYLA_TIMER_H
-#define NYLA_TIMER_H
+#pragma once
 
 #include <chrono>
 
@@ -8,5 +7,3 @@ namespace nyla {
 int MakeTimerFd(std::chrono::duration<double> interval);
 
 }
-
-#endif

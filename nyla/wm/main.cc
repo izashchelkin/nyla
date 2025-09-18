@@ -12,7 +12,7 @@
 #include "absl/log/initialize.h"
 #include "absl/log/log.h"
 #include "nyla/bar_manager/bar_manager.h"
-#include "nyla/client_manager/client.h"
+#include "nyla/client_manager/client_manager.h"
 #include "nyla/keyboard/keyboard.h"
 #include "nyla/layout/layout.h"
 #include "nyla/protocols/protocols.h"
@@ -26,7 +26,7 @@
 namespace nyla {
 
 static void ProcessXEvents(xcb_connection_t* conn, const bool& is_running,
-                           ClientStackManager& stack_manager, uint16_t modifier,
+                           ClientManager& stack_manager, uint16_t modifier,
                            std::span<const Keybind> keybinds);
 
 int Main(int argc, char** argv) {
@@ -62,7 +62,7 @@ int Main(int argc, char** argv) {
 
   Atoms atoms = InternAtoms(conn);
 
-  ClientStackManager stack_manager;
+  ClientManager stack_manager;
 
   uint16_t modifier = XCB_MOD_MASK_4;
   std::vector<Keybind> keybinds;
@@ -85,10 +85,8 @@ int Main(int argc, char** argv) {
   });
 
   keybinds.emplace_back("AB02", [conn, &stack_manager, &atoms] {
-    LOG(INFO) << "HERE";
-
     if (stack_manager.size() > 0)
-      WMDeleteWindow(conn, stack_manager.FocusedWindow(), atoms);
+      WMDeleteWindow(conn, stack_manager.GetFocusedWindow(), atoms);
   });
 
   if (!BindKeyboard(conn, screen.root, modifier, keybinds))
@@ -139,7 +137,7 @@ int Main(int argc, char** argv) {
 }
 
 static void ProcessXEvents(xcb_connection_t* conn, const bool& is_running,
-                           ClientStackManager& stack_manager, uint16_t modifier,
+                           ClientManager& stack_manager, uint16_t modifier,
                            std::span<const Keybind> keybinds) {
   while (is_running) {
     xcb_generic_event_t* event = xcb_poll_for_event(conn);

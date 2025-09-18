@@ -8,6 +8,18 @@
 
 namespace nyla {
 
+void CycleLayoutType(LayoutType& layout) {
+  switch (layout) {
+    case LayoutType::kColumns:
+      layout = LayoutType::kRows;
+    case LayoutType::kRows:
+      layout = LayoutType::kGrid;
+    case LayoutType::kGrid:
+      layout = LayoutType::kColumns;
+  }
+  std::unreachable();
+}
+
 static void ComputeColumns(const Rect& bounding_rect, uint32_t n,
                            uint32_t padding, std::vector<Rect>& out) {
   uint32_t width = bounding_rect.width() / n;

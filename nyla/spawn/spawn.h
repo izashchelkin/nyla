@@ -1,5 +1,4 @@
-#ifndef NYLA_SPAWN_H
-#define NYLA_SPAWN_H
+#pragma once
 
 #include <span>
 
@@ -8,5 +7,3 @@ namespace nyla {
 bool Spawn(std::span<const char* const> cmd);
 
 }
-
-#endif

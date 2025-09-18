@@ -1,5 +1,4 @@
-#ifndef NYLA_RECT_H
-#define NYLA_RECT_H
+#pragma once
 
 #include <cstdint>
 
@@ -14,7 +13,18 @@ class Rect {
   Rect(uint32_t width, uint32_t height) : Rect{0, 0, width, height} {}
   Rect() : Rect{0, 0, 0, 0} {}
 
-  friend bool operator==(const Rect& lhs, const Rect& rhs);
+  void operator=(const Rect& rhs) {
+    this->x_ = rhs.x_;
+    this->y_ = rhs.y_;
+    this->width_ = rhs.width_;
+    this->height_ = rhs.height_;
+  }
+
+  bool operator==(const Rect& rhs) const {
+    return this->x_ == rhs.x_ && this->y_ == rhs.y_ &&
+           this->width_ == rhs.width_ && this->height_ == rhs.height_;
+  }
+  bool operator!=(const Rect& rhs) const { return !(*this == rhs); }
 
   template <typename Sink>
   friend void AbslStringify(Sink& sink, const Rect& rect);
@@ -48,5 +58,3 @@ Rect ApplyPadding(const Rect& rect, uint32_t padding);
 Rect ApplyMarginTop(const Rect& rect, uint32_t margin_top);
 
 }  // namespace nyla
-
-#endif
