@@ -9,5 +9,6 @@ cc_library(
     deps = [
 			"@abseil-cpp//absl/log:log",
 			"//nyla/layout",
+			"//nyla/uid",
 		],
 )

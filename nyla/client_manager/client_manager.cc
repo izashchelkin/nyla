@@ -2,6 +2,7 @@
 
 #include <cstddef>
 
+#include "absl/log/log.h"
 #include "nyla/client_manager/client_stack.h"
 #include "nyla/layout/layout.h"
 #include "xcb/xcb.h"
@@ -73,49 +74,53 @@ void ClientManager::PrevStack() {
 
 void ClientManager::NextLayout() { CycleLayoutType(stack().layout_type); }
 
-static void FocusInternal(xcb_connection_t* conn, const xcb_screen_t& screen,
-                          ClientStack& stack, size_t idelta) {
-  if (stack.clients.empty()) {
-    stack.ifocus = 0;
+void ClientManager::SetFocus(xcb_connection_t* conn, const xcb_screen_t& screen,
+                             size_t idelta, bool asc) {
+  if (stack().clients.empty()) {
+    stack().focused = {};
     xcb_set_input_focus(conn, XCB_INPUT_FOCUS_PARENT, screen.root,
                         XCB_CURRENT_TIME);
-    return;
+  } else {
+    ClientIndexUid old_focused = stack().focused;
+    bool changed = false;
+
+    bool old_accessible = old_focused.index < stack().clients.size();
+    if (old_focused.uid && old_accessible) {
+      LOG(INFO) << stack().focused.index << " " << idelta;
+      stack().focused.index = (asc ? (stack().focused.index + idelta)
+                                   : (stack().focused.index - idelta)) %
+                              stack().clients.size();
+      LOG(INFO) << stack().focused.index;
+      stack().focused.uid = stack().clients[stack().focused.index].uid;
+      changed = stack().focused.uid != old_focused.uid;
+    } else {
+      stack().focused.index = 0;
+      stack().focused.uid = stack().clients[0].uid;
+      changed = true;
+    }
+
+    if (changed && old_accessible) {
+      xcb_change_window_attributes(
+          conn, stack().clients[old_focused.index].window, XCB_CW_BORDER_PIXEL,
+          (uint32_t[]){screen.black_pixel});
+    }
+
+    if (changed || !idelta) {
+      xcb_window_t focused_window =
+          stack().clients[stack().focused.index].window;
+      xcb_set_input_focus(conn, XCB_INPUT_FOCUS_PARENT, focused_window,
+                          XCB_CURRENT_TIME);
+      xcb_change_window_attributes(conn, focused_window, XCB_CW_BORDER_PIXEL,
+                                   (uint32_t[]){screen.white_pixel});
+    }
   }
-
-  size_t old_ifocus = stack.ifocus;
-  stack.ifocus = (stack.ifocus + idelta) % stack.clients.size();
-
-  if (old_ifocus != stack.ifocus && old_ifocus < stack.clients.size()) {
-    xcb_change_window_attributes(conn, stack.clients[old_ifocus].window,
-                                 XCB_CW_BORDER_PIXEL,
-                                 (uint32_t[]){screen.black_pixel});
-  }
-
-  xcb_window_t focused_window = stack.clients[stack.ifocus].window;
-  xcb_set_input_focus(conn, XCB_INPUT_FOCUS_PARENT, focused_window,
-                      XCB_CURRENT_TIME);
-  xcb_change_window_attributes(conn, focused_window, XCB_CW_BORDER_PIXEL,
-                               (uint32_t[]){screen.white_pixel});
-}
-
-void ClientManager::RegainFocus(xcb_connection_t* conn,
-                                const xcb_screen_t& screen) {
-  FocusInternal(conn, screen, stack(), 0);
-}
-
-void ClientManager::FocusNext(xcb_connection_t* conn,
-                              const xcb_screen_t& screen) {
-  FocusInternal(conn, screen, stack(), 1);
-}
-
-void ClientManager::FocusPrev(xcb_connection_t* conn,
-                              const xcb_screen_t& screen) {
-  FocusInternal(conn, screen, stack(), -1);
 }
 
 xcb_window_t ClientManager::GetFocusedWindow() {
-  CHECK_LT(stack().ifocus, stack().clients.size());
-  return stack().clients[stack().ifocus].window;
+  if (!stack().focused.uid) return 0;
+
+  CHECK_LT(stack().focused.index, stack().clients.size());
+  return stack().clients[stack().focused.index].window;
 }
 
 }  // namespace nyla

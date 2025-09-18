@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
+
 #include "absl/log/check.h"
 #include "nyla/client_manager/client_stack.h"
 #include "nyla/layout/layout.h"
@@ -24,9 +27,8 @@ class ClientManager {
 
   void NextLayout();
 
-  void RegainFocus(xcb_connection_t* conn, const xcb_screen_t& screen);
-  void FocusNext(xcb_connection_t* conn, const xcb_screen_t& screen);
-  void FocusPrev(xcb_connection_t* conn, const xcb_screen_t& screen);
+  void SetFocus(xcb_connection_t* conn, const xcb_screen_t& screen,
+                size_t idelta = 0, bool asc = true);
 
   xcb_window_t GetFocusedWindow();
 

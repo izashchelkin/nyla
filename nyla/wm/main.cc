@@ -25,8 +25,9 @@
 
 namespace nyla {
 
-static void ProcessXEvents(xcb_connection_t* conn, const bool& is_running,
-                           ClientManager& stack_manager, uint16_t modifier,
+static void ProcessXEvents(xcb_connection_t* conn, const xcb_screen_t& screen,
+                           const bool& is_running, ClientManager& stack_manager,
+                           uint16_t modifier,
                            std::span<const Keybind> keybinds);
 
 int Main(int argc, char** argv) {
@@ -78,15 +79,15 @@ int Main(int argc, char** argv) {
 
   keybinds.emplace_back("AC02", [] { Spawn({{"dmenu_run", nullptr}}); });
   keybinds.emplace_back("AC03", [conn, &stack_manager, &screen] {
-    stack_manager.FocusPrev(conn, screen);
+    stack_manager.SetFocus(conn, screen, 1, false);
   });
   keybinds.emplace_back("AC04", [conn, &stack_manager, &screen] {
-    stack_manager.FocusNext(conn, screen);
+    stack_manager.SetFocus(conn, screen, 1, true);
   });
 
   keybinds.emplace_back("AB02", [conn, &stack_manager, &atoms] {
-    if (stack_manager.size() > 0)
-      WMDeleteWindow(conn, stack_manager.GetFocusedWindow(), atoms);
+    xcb_window_t win = stack_manager.GetFocusedWindow();
+    if (win) WMDeleteWindow(conn, win, atoms);
   });
 
   if (!BindKeyboard(conn, screen.root, modifier, keybinds))
@@ -117,7 +118,8 @@ int Main(int argc, char** argv) {
     }
 
     if (fds[0].revents & POLLIN) {
-      ProcessXEvents(conn, is_running, stack_manager, modifier, keybinds);
+      ProcessXEvents(conn, screen, is_running, stack_manager, modifier,
+                     keybinds);
 
       std::vector<Rect>&& layout = ComputeLayout(
           ApplyMarginTop(Rect(screen.width_in_pixels, screen.height_in_pixels),
@@ -136,8 +138,9 @@ int Main(int argc, char** argv) {
   return 0;
 }
 
-static void ProcessXEvents(xcb_connection_t* conn, const bool& is_running,
-                           ClientManager& stack_manager, uint16_t modifier,
+static void ProcessXEvents(xcb_connection_t* conn, const xcb_screen_t& screen,
+                           const bool& is_running, ClientManager& stack_manager,
+                           uint16_t modifier,
                            std::span<const Keybind> keybinds) {
   while (is_running) {
     xcb_generic_event_t* event = xcb_poll_for_event(conn);
@@ -156,19 +159,27 @@ static void ProcessXEvents(xcb_connection_t* conn, const bool& is_running,
             conn, reinterpret_cast<xcb_map_request_event_t*>(event)->window);
         break;
       }
+      case XCB_MAP_NOTIFY: {
+        stack_manager.SetFocus(conn, screen);
+        break;
+      }
       case XCB_UNMAP_NOTIFY: {
         stack_manager.UnmanageClient(
             reinterpret_cast<xcb_unmap_notify_event_t*>(event)->window);
+
+        stack_manager.SetFocus(conn, screen);
         break;
       }
       case XCB_DESTROY_NOTIFY: {
         stack_manager.UnmanageClient(
             reinterpret_cast<xcb_destroy_notify_event_t*>(event)->window);
+
+        stack_manager.SetFocus(conn, screen);
         break;
       }
       case XCB_FOCUS_IN: {
-        auto _ = reinterpret_cast<xcb_focus_in_event_t*>(event);
         // TODO:
+        auto _ = reinterpret_cast<xcb_focus_in_event_t*>(event);
         break;
       }
       case 0: {

@@ -6,5 +6,4 @@ cc_library(
     name = "keyboard",
     srcs = glob(["*.cc"]),
     hdrs = glob(["*.h"]),
-		linkopts = ["-lxkbcommon-x11", "-lxkbcommon", "-lxcb-xkb"],
 )

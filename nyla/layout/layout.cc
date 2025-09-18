@@ -12,12 +12,17 @@ void CycleLayoutType(LayoutType& layout) {
   switch (layout) {
     case LayoutType::kColumns:
       layout = LayoutType::kRows;
+      break;
     case LayoutType::kRows:
       layout = LayoutType::kGrid;
+      break;
     case LayoutType::kGrid:
       layout = LayoutType::kColumns;
+      break;
+
+    default:
+      std::unreachable();
   }
-  std::unreachable();
 }
 
 static void ComputeColumns(const Rect& bounding_rect, uint32_t n,

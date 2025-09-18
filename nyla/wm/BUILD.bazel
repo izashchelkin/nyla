@@ -18,5 +18,11 @@ cc_binary(
 		defines = [
 			"ABSL_MIN_LOG_LEVEL=absl::LogSeverity::kInfo"
 		],
-		linkopts = ["-lxcb-util", "-lxcb"],
+		linkopts = [
+			"-lxcb",
+			"-lxcb-util",
+			"-lxcb-xkb",
+			"-lxkbcommon",
+			"-lxkbcommon-x11",
+		],
 )
