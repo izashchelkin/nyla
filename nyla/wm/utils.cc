@@ -4,11 +4,12 @@
 #include <cstdint>
 
 #include "nyla/layout/rect.h"
+#include "xcb/xcb.h"
 #include "xcb/xproto.h"
 
 namespace nyla {
 
-Rect AsRect(xcb_screen_t& screen, uint16_t bar_height) {
+Rect GetBoundingRect(xcb_screen_t& screen, uint16_t bar_height) {
   return {
       .y = bar_height,
       .width = screen.width_in_pixels,

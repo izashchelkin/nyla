@@ -29,6 +29,8 @@ class ClientStack {
   void FocusNext(xcb_connection_t* conn, const xcb_screen_t& screen);
   void FocusPrev(xcb_connection_t* conn, const xcb_screen_t& screen);
 
+  xcb_window_t FocusedWindow();
+
   size_t size() const { return stack_.size(); }
 
   LayoutType& layout_type() { return layout_type_; };
@@ -42,7 +44,7 @@ class ClientStack {
 
 class ClientStackManager {
  public:
-  ClientStackManager() : stacks_{3}, active_stack_idx_{0} {}
+  ClientStackManager() : stacks_{9}, active_stack_idx_{0} {}
 
   void ManageClient(xcb_connection_t* conn, xcb_window_t window);
   void UnmanageClient(xcb_window_t window);
@@ -56,6 +58,8 @@ class ClientStackManager {
 
   void FocusNext(xcb_connection_t* conn, const xcb_screen_t& screen);
   void FocusPrev(xcb_connection_t* conn, const xcb_screen_t& screen);
+
+  xcb_window_t FocusedWindow();
 
   auto size() const { return active_stack().size(); }
   auto layout_type() const { return active_stack().layout_type(); }

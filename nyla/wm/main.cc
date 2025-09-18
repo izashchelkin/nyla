@@ -17,6 +17,7 @@
 #include "nyla/timer/timer.h"
 #include "nyla/wm/bar_manager/bar_manager.h"
 #include "nyla/wm/client.h"
+#include "nyla/wm/protocols.h"
 #include "nyla/wm/utils.h"
 #include "xcb/xcb.h"
 #include "xcb/xcb_aux.h"
@@ -59,11 +60,12 @@ int Main(int argc, char** argv) {
   if (!InitKeyboard(conn)) LOG(QFATAL) << "could not init keyboard";
   LOG(INFO) << "init keyboard successful";
 
+  Atoms atoms = InternAtoms(conn);
+
   ClientStackManager stack_manager;
 
   uint16_t modifier = XCB_MOD_MASK_4;
   std::vector<Keybind> keybinds;
-  keybinds.reserve(3);
 
   keybinds.emplace_back("AD01", [&is_running] { is_running = false; });
   keybinds.emplace_back("AD02",
@@ -72,16 +74,21 @@ int Main(int argc, char** argv) {
                         [&stack_manager] { stack_manager.PrevStack(); });
   keybinds.emplace_back("AD04",
                         [&stack_manager] { stack_manager.NextStack(); });
-  keybinds.emplace_back("AD05", [] {
-    static const char* const kTermCmd[] = {"ghostty", nullptr};
-    Spawn(kTermCmd);
-  });
+  keybinds.emplace_back("AD05", [] { Spawn({{"ghostty", nullptr}}); });
 
+  keybinds.emplace_back("AC02", [] { Spawn({{"dmenu_run", nullptr}}); });
   keybinds.emplace_back("AC03", [conn, &stack_manager, &screen] {
     stack_manager.FocusPrev(conn, screen);
   });
   keybinds.emplace_back("AC04", [conn, &stack_manager, &screen] {
     stack_manager.FocusNext(conn, screen);
+  });
+
+  keybinds.emplace_back("AB02", [conn, &stack_manager, &atoms] {
+		LOG(INFO) << "HERE";
+
+    if (stack_manager.size() > 0)
+      SendDeleteWindow(conn, stack_manager.FocusedWindow(), atoms);
   });
 
   if (!BindKeyboard(conn, screen.root, modifier, keybinds))
@@ -115,7 +122,7 @@ int Main(int argc, char** argv) {
       ProcessXEvents(conn, is_running, stack_manager, modifier, keybinds);
 
       std::vector<Rect>&& layout =
-          ComputeLayout(AsRect(screen, bar_manager.height()),
+          ComputeLayout(GetBoundingRect(screen, bar_manager.height()),
                         stack_manager.size(), 2, stack_manager.layout_type());
       stack_manager.ApplyLayoutChanges(conn, screen, layout);
     }
@@ -123,7 +130,7 @@ int Main(int argc, char** argv) {
     if (fds[1].revents & POLLIN) {
       uint64_t expirations;
       if (read(tfd, &expirations, sizeof(expirations)) >= 0)
-        bar_manager.Update(conn, screen);
+        bar_manager.Update(conn, screen);  // TODO: also on Expose
     }
   }
 

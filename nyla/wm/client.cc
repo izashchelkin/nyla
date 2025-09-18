@@ -11,13 +11,11 @@
 #include <utility>
 
 #include "absl/log/check.h"
-#include "absl/log/log.h"
 #include "nyla/layout/layout.h"
 
 namespace nyla {
 
-void ClientStack::ManageClient(xcb_connection_t* conn,
-                                   xcb_window_t window) {
+void ClientStack::ManageClient(xcb_connection_t* conn, xcb_window_t window) {
   xcb_map_window(conn, window);
 
   bool is_new = std::ranges::none_of(
@@ -114,12 +112,17 @@ void ClientStack::FocusPrev(xcb_connection_t* conn,
                                XCB_CW_BORDER_PIXEL, (uint32_t[]){0xFFFFFFFF});
 }
 
+xcb_window_t ClientStack::FocusedWindow() {
+  CHECK_LT(focus_idx_, stack_.size());
+  return stack_[focus_idx_].window;
+}
+
 //
 //
 //
 
 void ClientStackManager::ManageClient(xcb_connection_t* conn,
-                                          xcb_window_t window) {
+                                      xcb_window_t window) {
   CHECK_LT(active_stack_idx_, stacks_.size());
 
   stacks_[active_stack_idx_].ManageClient(conn, window);
@@ -141,13 +144,19 @@ void ClientStackManager::ApplyLayoutChanges(xcb_connection_t* conn,
 void ClientStackManager::NextStack() {
   CHECK_LT(active_stack_idx_, stacks_.size());
 
-  if (active_stack_idx_ < stacks_.size() - 1) ++active_stack_idx_;
+  if (active_stack_idx_ < stacks_.size() - 1)
+    ++active_stack_idx_;
+  else
+    active_stack_idx_ = 0;
 }
 
 void ClientStackManager::PrevStack() {
   CHECK_LT(active_stack_idx_, stacks_.size());
 
-  if (active_stack_idx_ > 0) --active_stack_idx_;
+  if (active_stack_idx_ > 0)
+    --active_stack_idx_;
+  else
+    active_stack_idx_ = stacks_.size() - 1;
 }
 
 void ClientStackManager::NextLayout() {
@@ -175,6 +184,10 @@ void ClientStackManager::FocusNext(xcb_connection_t* conn,
 void ClientStackManager::FocusPrev(xcb_connection_t* conn,
                                    const xcb_screen_t& screen) {
   active_stack().FocusPrev(conn, screen);
+}
+
+xcb_window_t ClientStackManager::FocusedWindow() {
+  return active_stack().FocusedWindow();
 }
 
 }  // namespace nyla
