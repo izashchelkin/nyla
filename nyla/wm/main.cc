@@ -110,6 +110,9 @@ int Main(int argc, char** argv) {
        {.fd = tfd, .events = POLLIN}});
 
   while (is_running && !xcb_connection_has_error(conn)) {
+		// TODO:
+    stack_manager.SetFocus(conn, screen);
+
     xcb_flush(conn);
 
     if (poll(fds.data(), fds.size(), -1) == -1) {
@@ -160,21 +163,16 @@ static void ProcessXEvents(xcb_connection_t* conn, const xcb_screen_t& screen,
         break;
       }
       case XCB_MAP_NOTIFY: {
-        stack_manager.SetFocus(conn, screen);
         break;
       }
       case XCB_UNMAP_NOTIFY: {
         stack_manager.UnmanageClient(
             reinterpret_cast<xcb_unmap_notify_event_t*>(event)->window);
-
-        stack_manager.SetFocus(conn, screen);
         break;
       }
       case XCB_DESTROY_NOTIFY: {
         stack_manager.UnmanageClient(
             reinterpret_cast<xcb_destroy_notify_event_t*>(event)->window);
-
-        stack_manager.SetFocus(conn, screen);
         break;
       }
       case XCB_FOCUS_IN: {
