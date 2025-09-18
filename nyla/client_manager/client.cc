@@ -1,6 +1,5 @@
-#include "nyla/wm/client.h"
+#include "nyla/client_manager/client.h"
 
-#include <bits/types/stack_t.h>
 #include <xcb/xcb.h>
 #include <xcb/xproto.h>
 
@@ -12,6 +11,7 @@
 
 #include "absl/log/check.h"
 #include "nyla/layout/layout.h"
+#include "nyla/rect/rect.h"
 
 namespace nyla {
 
@@ -42,10 +42,11 @@ void ClientStack::ApplyLayoutChanges(xcb_connection_t* conn,
     if (rect == client.rect) continue;
     client.rect = rect;
 
-    xcb_configure_window(conn, client.window, kValueMask,
-                         (uint32_t[]){static_cast<uint32_t>(rect.x),
-                                      static_cast<uint32_t>(rect.y), rect.width,
-                                      rect.height, KBorderWidth});
+    xcb_configure_window(
+        conn, client.window, kValueMask,
+        (uint32_t[]){static_cast<uint32_t>(rect.x()),
+                     static_cast<uint32_t>(rect.y()), rect.width(),
+                     rect.height(), KBorderWidth});
   }
 }
 

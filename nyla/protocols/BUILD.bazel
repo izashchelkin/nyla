@@ -1,15 +1,14 @@
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 
-package(default_visibility = ["//nyla/wm:__subpackages__", "//nyla/client_manager:__subpackages__"])
+package(default_visibility = ["//nyla/wm:__subpackages__"])
 
 cc_library(
-    name = "layout",
+    name = "protocols",
     srcs = glob(["*.cc"]),
     hdrs = glob(["*.h"]),
     deps = [
         "@abseil-cpp//absl/log",
         "@abseil-cpp//absl/strings",
-        "//nyla/rect",
     ],
 )
 

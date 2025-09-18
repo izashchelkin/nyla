@@ -1,4 +1,4 @@
-#include "nyla/wm/protocols.h"
+#include "nyla/protocols/protocols.h"
 
 #include <string_view>
 
@@ -23,8 +23,8 @@ Atoms InternAtoms(xcb_connection_t* conn) {
   };
 }
 
-void SendDeleteWindow(xcb_connection_t* conn, xcb_window_t window,
-                      const Atoms& atoms) {
+void WMDeleteWindow(xcb_connection_t* conn, xcb_window_t window,
+                    const Atoms& atoms) {
   xcb_client_message_event_t event;
   event.response_type = XCB_CLIENT_MESSAGE;
   event.window = window;

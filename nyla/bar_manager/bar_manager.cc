@@ -1,4 +1,4 @@
-#include "nyla/wm/bar_manager/bar_manager.h"
+#include "nyla/bar_manager/bar_manager.h"
 
 #include <cstdlib>
 #include <string>

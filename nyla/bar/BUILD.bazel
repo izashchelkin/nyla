@@ -1,6 +1,6 @@
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 
-package(default_visibility = ["//nyla/wm:__subpackages__"])
+package(default_visibility = ["//nyla/bar_manager:__subpackages__"])
 
 cc_library(
     name = "bar",

@@ -11,14 +11,14 @@
 #include "absl/log/globals.h"
 #include "absl/log/initialize.h"
 #include "absl/log/log.h"
+#include "nyla/bar_manager/bar_manager.h"
+#include "nyla/client_manager/client.h"
 #include "nyla/keyboard/keyboard.h"
 #include "nyla/layout/layout.h"
+#include "nyla/protocols/protocols.h"
+#include "nyla/rect/rect.h"
 #include "nyla/spawn/spawn.h"
 #include "nyla/timer/timer.h"
-#include "nyla/wm/bar_manager/bar_manager.h"
-#include "nyla/wm/client.h"
-#include "nyla/wm/protocols.h"
-#include "nyla/wm/utils.h"
 #include "xcb/xcb.h"
 #include "xcb/xcb_aux.h"
 #include "xcb/xproto.h"
@@ -85,10 +85,10 @@ int Main(int argc, char** argv) {
   });
 
   keybinds.emplace_back("AB02", [conn, &stack_manager, &atoms] {
-		LOG(INFO) << "HERE";
+    LOG(INFO) << "HERE";
 
     if (stack_manager.size() > 0)
-      SendDeleteWindow(conn, stack_manager.FocusedWindow(), atoms);
+      WMDeleteWindow(conn, stack_manager.FocusedWindow(), atoms);
   });
 
   if (!BindKeyboard(conn, screen.root, modifier, keybinds))
@@ -101,7 +101,7 @@ int Main(int argc, char** argv) {
   }
 
   using namespace std::chrono_literals;
-  int tfd = MakeTimerFd(750ms);
+  int tfd = MakeTimerFd(501ms);
 
   if (!tfd) LOG(QFATAL) << "MakeTimerFdMillis";
   absl::Cleanup tfd_closer = [tfd] { close(tfd); };
@@ -121,9 +121,10 @@ int Main(int argc, char** argv) {
     if (fds[0].revents & POLLIN) {
       ProcessXEvents(conn, is_running, stack_manager, modifier, keybinds);
 
-      std::vector<Rect>&& layout =
-          ComputeLayout(GetBoundingRect(screen, bar_manager.height()),
-                        stack_manager.size(), 2, stack_manager.layout_type());
+      std::vector<Rect>&& layout = ComputeLayout(
+          ApplyMarginTop(Rect(screen.width_in_pixels, screen.height_in_pixels),
+                         bar_manager.height()),
+          stack_manager.size(), 2, stack_manager.layout_type());
       stack_manager.ApplyLayoutChanges(conn, screen, layout);
     }
 
@@ -165,6 +166,11 @@ static void ProcessXEvents(xcb_connection_t* conn, const bool& is_running,
       case XCB_DESTROY_NOTIFY: {
         stack_manager.UnmanageClient(
             reinterpret_cast<xcb_destroy_notify_event_t*>(event)->window);
+        break;
+      }
+      case XCB_FOCUS_IN: {
+        auto _ = reinterpret_cast<xcb_focus_in_event_t*>(event);
+        // TODO:
         break;
       }
       case 0: {

@@ -18,7 +18,7 @@ struct Atoms {
 
 Atoms InternAtoms(xcb_connection_t* conn);
 
-void SendDeleteWindow(xcb_connection_t* conn, xcb_window_t window,
+void WMDeleteWindow(xcb_connection_t* conn, xcb_window_t window,
                       const Atoms& atoms);
 
 }  // namespace nyla

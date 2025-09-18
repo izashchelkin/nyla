@@ -2,16 +2,18 @@ load("@rules_cc//cc:cc_library.bzl", "cc_library")
 
 cc_binary(
     name = "wm",
-    srcs = glob(["*.cc", "*.h"]),
+    srcs = glob(["*.cc"]),
     deps = [
 			"@abseil-cpp//absl/log:initialize",
 			"@abseil-cpp//absl/log:check",
 			"@abseil-cpp//absl/log:log",
+			"//nyla/bar_manager",
+			"//nyla/client_manager",
 			"//nyla/keyboard",
 			"//nyla/layout",
+			"//nyla/protocols",
 			"//nyla/spawn",
 			"//nyla/timer",
-			"//nyla/wm/bar_manager",
     ],
 		defines = [
 			"ABSL_MIN_LOG_LEVEL=absl::LogSeverity::kInfo"

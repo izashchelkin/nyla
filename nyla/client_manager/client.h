@@ -5,7 +5,7 @@
 
 #include "absl/log/check.h"
 #include "nyla/layout/layout.h"
-#include "nyla/layout/rect.h"
+#include "nyla/rect/rect.h"
 #include "xcb/xcb.h"
 #include "xcb/xproto.h"
 

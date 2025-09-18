@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <vector>
 
-#include "nyla/layout/rect.h"
+#include "nyla/rect/rect.h"
 
 namespace nyla {
 
@@ -16,7 +16,7 @@ enum class LayoutType {
 };
 
 std::vector<Rect> ComputeLayout(const Rect& bounding_rect, uint32_t n,
-                                uint32_t margin,
+                                uint32_t padding,
                                 LayoutType layout_type = LayoutType::kColumns);
 
 }  // namespace nyla
