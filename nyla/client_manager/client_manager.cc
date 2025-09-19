@@ -3,7 +3,6 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "absl/log/log.h"
 #include "nyla/client_manager/client_stack.h"
 #include "nyla/layout/layout.h"
 #include "xcb/xcb.h"
@@ -13,6 +12,8 @@ namespace nyla {
 
 void ClientManager::ManageClient(xcb_connection_t* conn, xcb_window_t window) {
   xcb_map_window(conn, window);
+  xcb_change_window_attributes(conn, window, XCB_CW_EVENT_MASK,
+                               (uint32_t[]){XCB_EVENT_MASK_ENTER_WINDOW});
 
   bool is_new = std::ranges::none_of(
       stack().clients,
@@ -76,8 +77,8 @@ void ClientManager::PrevStack() {
 
 void ClientManager::NextLayout() { CycleLayoutType(stack().layout_type); }
 
-void ClientManager::SetFocus(xcb_connection_t* conn, const xcb_screen_t& screen,
-                             ssize_t idelta) {
+void ClientManager::MoveFocus(xcb_connection_t* conn,
+                              const xcb_screen_t& screen, ssize_t idelta) {
   if (stack().clients.empty()) {
     stack().focused = {};
     xcb_set_input_focus(conn, XCB_INPUT_FOCUS_PARENT, screen.root,
@@ -113,6 +114,32 @@ void ClientManager::SetFocus(xcb_connection_t* conn, const xcb_screen_t& screen,
                           XCB_CURRENT_TIME);
       xcb_change_window_attributes(conn, focused_window, XCB_CW_BORDER_PIXEL,
                                    (uint32_t[]){screen.white_pixel});
+    }
+  }
+}
+
+void ClientManager::FocusWindow(xcb_connection_t* conn,
+                                const xcb_screen_t& screen,
+                                xcb_window_t window) {
+  xcb_window_t old_focused_window =
+      stack().clients[stack().focused.index].window;
+  if (old_focused_window == window) return;
+
+  for (size_t i = 0; i < stack().clients.size(); ++i) {
+    auto& client = stack().clients[i];
+    if (client.window == window) {
+      xcb_change_window_attributes(conn, old_focused_window,
+                                   XCB_CW_BORDER_PIXEL,
+                                   (uint32_t[]){screen.black_pixel});
+
+      stack().focused.index = i;
+      stack().focused.uid = client.uid;
+
+      xcb_set_input_focus(conn, XCB_INPUT_FOCUS_PARENT, client.window,
+                          XCB_CURRENT_TIME);
+      xcb_change_window_attributes(conn, client.window, XCB_CW_BORDER_PIXEL,
+                                   (uint32_t[]){screen.white_pixel});
+      return;
     }
   }
 }

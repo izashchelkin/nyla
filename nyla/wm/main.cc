@@ -54,7 +54,7 @@ int Main(int argc, char** argv) {
                   XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY |
                   XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_KEY_RELEASE |
                   XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE |
-                  XCB_EVENT_MASK_BUTTON_MOTION}))) {
+                  XCB_EVENT_MASK_POINTER_MOTION}))) {
     LOG(QFATAL) << "another wm is already running";
   }
 
@@ -79,10 +79,10 @@ int Main(int argc, char** argv) {
 
   keybinds.emplace_back("AC02", [] { Spawn({{"dmenu_run", nullptr}}); });
   keybinds.emplace_back("AC03", [conn, &stack_manager, &screen] {
-    stack_manager.SetFocus(conn, screen, -1);
+    stack_manager.MoveFocus(conn, screen, -1);
   });
   keybinds.emplace_back("AC04", [conn, &stack_manager, &screen] {
-    stack_manager.SetFocus(conn, screen, 1);
+    stack_manager.MoveFocus(conn, screen, 1);
   });
 
   keybinds.emplace_back("AB02", [conn, &stack_manager, &atoms] {
@@ -111,7 +111,7 @@ int Main(int argc, char** argv) {
 
   while (is_running && !xcb_connection_has_error(conn)) {
     // TODO:
-    stack_manager.SetFocus(conn, screen);
+    stack_manager.MoveFocus(conn, screen);
 
     xcb_flush(conn);
 
@@ -173,6 +173,12 @@ static void ProcessXEvents(xcb_connection_t* conn, const xcb_screen_t& screen,
       case XCB_DESTROY_NOTIFY: {
         stack_manager.UnmanageClient(
             reinterpret_cast<xcb_destroy_notify_event_t*>(event)->window);
+        break;
+      }
+      case XCB_ENTER_NOTIFY: {
+        auto enternotify = reinterpret_cast<xcb_enter_notify_event_t*>(event);
+        if (enternotify->event != screen.root)
+          stack_manager.FocusWindow(conn, screen, enternotify->event);
         break;
       }
       case XCB_FOCUS_IN: {

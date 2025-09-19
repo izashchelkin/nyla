@@ -26,9 +26,10 @@ class ClientManager {
 
   void NextLayout();
 
-  void SetFocus(xcb_connection_t* conn, const xcb_screen_t& screen,
-                ssize_t idelta = 0);
-
+  void MoveFocus(xcb_connection_t* conn, const xcb_screen_t& screen,
+                 ssize_t idelta = 0);
+  void FocusWindow(xcb_connection_t* conn, const xcb_screen_t& screen,
+                   xcb_window_t window);
   xcb_window_t GetFocusedWindow();
 
   size_t size() const { return stack().clients.size(); }
