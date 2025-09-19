@@ -79,10 +79,10 @@ int Main(int argc, char** argv) {
 
   keybinds.emplace_back("AC02", [] { Spawn({{"dmenu_run", nullptr}}); });
   keybinds.emplace_back("AC03", [conn, &stack_manager, &screen] {
-    stack_manager.SetFocus(conn, screen, 1, false);
+    stack_manager.SetFocus(conn, screen, -1);
   });
   keybinds.emplace_back("AC04", [conn, &stack_manager, &screen] {
-    stack_manager.SetFocus(conn, screen, 1, true);
+    stack_manager.SetFocus(conn, screen, 1);
   });
 
   keybinds.emplace_back("AB02", [conn, &stack_manager, &atoms] {
@@ -110,7 +110,7 @@ int Main(int argc, char** argv) {
        {.fd = tfd, .events = POLLIN}});
 
   while (is_running && !xcb_connection_has_error(conn)) {
-		// TODO:
+    // TODO:
     stack_manager.SetFocus(conn, screen);
 
     xcb_flush(conn);

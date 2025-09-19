@@ -1,6 +1,7 @@
 #include "nyla/client_manager/client_manager.h"
 
 #include <cstddef>
+#include <cstdint>
 
 #include "absl/log/log.h"
 #include "nyla/client_manager/client_stack.h"
@@ -69,13 +70,14 @@ void ClientManager::NextStack() {
 
 void ClientManager::PrevStack() {
   CHECK_LT(istack_, stacks_.size());
-  istack_ = (istack_ - 1) % stacks_.size();
+  istack_ =
+      (static_cast<ssize_t>(istack_) - 1 + stacks_.size()) % stacks_.size();
 }
 
 void ClientManager::NextLayout() { CycleLayoutType(stack().layout_type); }
 
 void ClientManager::SetFocus(xcb_connection_t* conn, const xcb_screen_t& screen,
-                             size_t idelta, bool asc) {
+                             ssize_t idelta) {
   if (stack().clients.empty()) {
     stack().focused = {};
     xcb_set_input_focus(conn, XCB_INPUT_FOCUS_PARENT, screen.root,
@@ -86,11 +88,10 @@ void ClientManager::SetFocus(xcb_connection_t* conn, const xcb_screen_t& screen,
 
     bool old_accessible = old_focused.index < stack().clients.size();
     if (old_focused.uid && old_accessible) {
-      LOG(INFO) << stack().focused.index << " " << idelta;
-      stack().focused.index = (asc ? (stack().focused.index + idelta)
-                                   : (stack().focused.index - idelta)) %
+      stack().focused.index = (static_cast<ssize_t>(stack().focused.index) +
+                               idelta + stack().clients.size()) %
                               stack().clients.size();
-      LOG(INFO) << stack().focused.index;
+
       stack().focused.uid = stack().clients[stack().focused.index].uid;
       changed = stack().focused.uid != old_focused.uid;
     } else {
