@@ -7,13 +7,10 @@ cc_binary(
 			"@abseil-cpp//absl/log:initialize",
 			"@abseil-cpp//absl/log:check",
 			"@abseil-cpp//absl/log:log",
-			"//nyla/bar_manager",
-			"//nyla/client_manager",
-			"//nyla/keyboard",
+			"//nyla/managers",
 			"//nyla/layout",
 			"//nyla/protocols",
-			"//nyla/spawn",
-			"//nyla/timer",
+			"//nyla/commons",
     ],
 		defines = [
 			"ABSL_MIN_LOG_LEVEL=absl::LogSeverity::kInfo"

@@ -1,4 +1,4 @@
-#include "nyla/bar/bar.h"
+#include "nyla/managers/bar.h"
 
 #include <cstdint>
 #include <cstring>

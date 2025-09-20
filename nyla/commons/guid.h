@@ -4,8 +4,8 @@
 
 namespace nyla {
 
-using Uid = uint64_t;
+using guid_t = uint64_t;
 
-Uid NextUid();
+guid_t NextGuid();
 
 }  // namespace nyla

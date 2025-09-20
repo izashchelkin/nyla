@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <vector>
 
-#include "nyla/rect/rect.h"
+#include "nyla/commons/rect.h"
 
 namespace nyla {
 

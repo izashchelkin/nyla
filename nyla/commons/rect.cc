@@ -1,4 +1,4 @@
-#include "nyla/rect/rect.h"
+#include "nyla/commons/rect.h"
 
 #include "absl/log/check.h"
 

@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include "nyla/bar/bar.h"
+#include "nyla/managers/bar.h"
 
 namespace nyla {
 

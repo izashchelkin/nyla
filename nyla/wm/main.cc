@@ -11,14 +11,15 @@
 #include "absl/log/globals.h"
 #include "absl/log/initialize.h"
 #include "absl/log/log.h"
-#include "nyla/bar_manager/bar_manager.h"
-#include "nyla/client_manager/client_manager.h"
-#include "nyla/keyboard/keyboard.h"
+#include "nyla/commons/rect.h"
+#include "nyla/commons/spawn.h"
+#include "nyla/commons/timer.h"
 #include "nyla/layout/layout.h"
-#include "nyla/protocols/protocols.h"
-#include "nyla/rect/rect.h"
-#include "nyla/spawn/spawn.h"
-#include "nyla/timer/timer.h"
+#include "nyla/managers/bar_manager.h"
+#include "nyla/managers/client_manager.h"
+#include "nyla/managers/keyboard.h"
+#include "nyla/protocols/atoms.h"
+#include "nyla/protocols/wm_protocols.h"
 #include "xcb/xcb.h"
 #include "xcb/xcb_aux.h"
 #include "xcb/xproto.h"
@@ -27,8 +28,8 @@ namespace nyla {
 
 static void ProcessXEvents(xcb_connection_t* conn, const xcb_screen_t& screen,
                            const bool& is_running, ClientManager& stack_manager,
-                           uint16_t modifier,
-                           std::span<const Keybind> keybinds);
+                           uint16_t modifier, std::span<const Keybind> keybinds,
+                           const Atoms& atoms);
 
 int Main(int argc, char** argv) {
   bool is_running = true;
@@ -62,33 +63,37 @@ int Main(int argc, char** argv) {
   LOG(INFO) << "init keyboard successful";
 
   Atoms atoms = InternAtoms(conn);
-
-  ClientManager stack_manager;
+  FocusManager focus_manager;
+  ClientManager client_manager;
 
   uint16_t modifier = XCB_MOD_MASK_4;
   std::vector<Keybind> keybinds;
 
   keybinds.emplace_back("AD01", [&is_running] { is_running = false; });
   keybinds.emplace_back("AD02",
-                        [&stack_manager] { stack_manager.NextLayout(); });
+                        [&client_manager] { client_manager.NextLayout(); });
   keybinds.emplace_back("AD03",
-                        [&stack_manager] { stack_manager.PrevStack(); });
+                        [&client_manager] { client_manager.PrevStack(); });
   keybinds.emplace_back("AD04",
-                        [&stack_manager] { stack_manager.NextStack(); });
+                        [&client_manager] { client_manager.NextStack(); });
   keybinds.emplace_back("AD05", [] { Spawn({{"ghostty", nullptr}}); });
 
   keybinds.emplace_back("AC02", [] { Spawn({{"dmenu_run", nullptr}}); });
-  keybinds.emplace_back("AC03", [conn, &stack_manager, &screen] {
-    stack_manager.MoveFocus(conn, screen, -1);
+  keybinds.emplace_back("AC03", [conn, &client_manager, &screen] {
+    client_manager.MoveFocus(conn, screen, -1);
   });
-  keybinds.emplace_back("AC04", [conn, &stack_manager, &screen] {
-    stack_manager.MoveFocus(conn, screen, 1);
+  keybinds.emplace_back("AC04", [conn, &client_manager, &screen] {
+    client_manager.MoveFocus(conn, screen, 1);
   });
 
-  keybinds.emplace_back("AB02", [conn, &stack_manager, &atoms] {
-    xcb_window_t win = stack_manager.GetFocusedWindow();
-    if (win) WMDeleteWindow(conn, win, atoms);
+  keybinds.emplace_back("AB02", [conn, &client_manager, &atoms] {
+    xcb_window_t window = client_manager.GetFocusedWindow();
+    if (window) {
+      Send_WM_Delete_Window(conn, window, atoms);
+    }
   });
+
+  keybinds.emplace_back("AB05", [conn, &client_manager, &atoms] {});
 
   if (!BindKeyboard(conn, screen.root, modifier, keybinds))
     LOG(QFATAL) << "could not bind keyboard";
@@ -110,9 +115,6 @@ int Main(int argc, char** argv) {
        {.fd = tfd, .events = POLLIN}});
 
   while (is_running && !xcb_connection_has_error(conn)) {
-    // TODO:
-    stack_manager.MoveFocus(conn, screen);
-
     xcb_flush(conn);
 
     if (poll(fds.data(), fds.size(), -1) == -1) {
@@ -121,14 +123,14 @@ int Main(int argc, char** argv) {
     }
 
     if (fds[0].revents & POLLIN) {
-      ProcessXEvents(conn, screen, is_running, stack_manager, modifier,
-                     keybinds);
+      ProcessXEvents(conn, screen, is_running, client_manager, modifier,
+                     keybinds, atoms);
 
       std::vector<Rect>&& layout = ComputeLayout(
           ApplyMarginTop(Rect(screen.width_in_pixels, screen.height_in_pixels),
                          bar_manager.height()),
-          stack_manager.size(), 2, stack_manager.layout_type());
-      stack_manager.ApplyLayoutChanges(conn, screen, layout);
+          client_manager.size(), 2, client_manager.layout_type());
+      client_manager.ApplyLayoutChanges(conn, screen, layout);
     }
 
     if (fds[1].revents & POLLIN) {
@@ -143,14 +145,14 @@ int Main(int argc, char** argv) {
 
 static void ProcessXEvents(xcb_connection_t* conn, const xcb_screen_t& screen,
                            const bool& is_running, ClientManager& stack_manager,
-                           uint16_t modifier,
-                           std::span<const Keybind> keybinds) {
+                           uint16_t modifier, std::span<const Keybind> keybinds,
+                           const Atoms& atoms) {
   while (is_running) {
     xcb_generic_event_t* event = xcb_poll_for_event(conn);
     if (!event) break;
     absl::Cleanup event_freer = [event] { free(event); };
 
-    switch (event->response_type & ~0x80) {
+    switch (event->response_type & 0x7F) {
       case XCB_KEY_PRESS: {
         auto keypress = reinterpret_cast<xcb_key_press_event_t*>(event);
         if (keypress->state == modifier)
@@ -159,20 +161,28 @@ static void ProcessXEvents(xcb_connection_t* conn, const xcb_screen_t& screen,
       }
       case XCB_MAP_REQUEST: {
         stack_manager.ManageClient(
-            conn, reinterpret_cast<xcb_map_request_event_t*>(event)->window);
+            conn, reinterpret_cast<xcb_map_request_event_t*>(event)->window,
+            atoms);
+        break;
+      }
+      case XCB_PROPERTY_NOTIFY: {
+        // TODO:
         break;
       }
       case XCB_MAP_NOTIFY: {
+        // TODO:
         break;
       }
       case XCB_UNMAP_NOTIFY: {
         stack_manager.UnmanageClient(
             reinterpret_cast<xcb_unmap_notify_event_t*>(event)->window);
+        stack_manager.MoveFocus(conn, screen);
         break;
       }
       case XCB_DESTROY_NOTIFY: {
         stack_manager.UnmanageClient(
             reinterpret_cast<xcb_destroy_notify_event_t*>(event)->window);
+        stack_manager.MoveFocus(conn, screen);
         break;
       }
       case XCB_ENTER_NOTIFY: {
@@ -182,9 +192,8 @@ static void ProcessXEvents(xcb_connection_t* conn, const xcb_screen_t& screen,
         break;
       }
       case XCB_FOCUS_IN: {
-        // TODO:
         auto _ = reinterpret_cast<xcb_focus_in_event_t*>(event);
-        break;
+				// TODO:
       }
       case 0: {
         LOG(FATAL) << "xcb error";
