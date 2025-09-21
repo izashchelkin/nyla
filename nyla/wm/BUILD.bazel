@@ -2,12 +2,12 @@ load("@rules_cc//cc:cc_library.bzl", "cc_library")
 
 cc_binary(
     name = "wm",
-    srcs = glob(["*.cc"]),
+    srcs = glob(["*.cc", "*.h"]),
     deps = [
 			"@abseil-cpp//absl/log:initialize",
 			"@abseil-cpp//absl/log:check",
 			"@abseil-cpp//absl/log:log",
-			"//nyla/managers",
+			"@abseil-cpp//absl/container:flat_hash_map",
 			"//nyla/layout",
 			"//nyla/protocols",
 			"//nyla/commons",

@@ -1,4 +1,4 @@
-#include "nyla/managers/keyboard.h"
+#include "nyla/wm/keyboard.h"
 
 #include <xcb/xproto.h>
 
