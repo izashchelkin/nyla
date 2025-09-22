@@ -28,8 +28,7 @@
 namespace nyla {
 
 static void ProcessXEvents(WMState& wm_state, const bool& is_running,
-                           uint16_t modifier,
-                           std::span<const Keybind> keybinds);
+                           uint16_t modifier, std::span<Keybind> keybinds);
 
 int Main(int argc, char** argv) {
   bool is_running = true;
@@ -145,8 +144,7 @@ int Main(int argc, char** argv) {
 }
 
 static void ProcessXEvents(WMState& wm_state, const bool& is_running,
-                           uint16_t modifier,
-                           std::span<const Keybind> keybinds) {
+                           uint16_t modifier, std::span<Keybind> keybinds) {
   while (is_running) {
     xcb_generic_event_t* event = xcb_poll_for_event(wm_state.conn);
     if (!event) break;
@@ -183,6 +181,17 @@ static void ProcessXEvents(WMState& wm_state, const bool& is_running,
       case XCB_MAP_NOTIFY: {
         break;
       }
+      case XCB_MAPPING_NOTIFY: {
+        // auto mappingnotify =
+        //     reinterpret_cast<xcb_mapping_notify_event_t*>(event);
+
+        if (!BindKeyboard(wm_state.conn, wm_state.screen.root, modifier,
+                          keybinds))
+          LOG(QFATAL) << "could not bind keyboard";
+        LOG(INFO) << "bind keyboard successful";
+
+        break;
+      }
       case XCB_UNMAP_NOTIFY: {
         UnmanageClient(
             wm_state,
@@ -205,7 +214,7 @@ static void ProcessXEvents(WMState& wm_state, const bool& is_running,
       case XCB_FOCUS_IN: {
         auto focusin = reinterpret_cast<xcb_focus_in_event_t*>(event);
         if (focusin->mode != XCB_NOTIFY_MODE_NORMAL) {
-          LOG(INFO) << "??? focus in mode : " << int(focusin->mode);
+          // LOG(INFO) << "??? focus in mode : " << int(focusin->mode);
           break;
         }
 
@@ -219,7 +228,7 @@ static void ProcessXEvents(WMState& wm_state, const bool& is_running,
             xcb_query_tree_reply_t* reply = xcb_query_tree_reply(
                 wm_state.conn, xcb_query_tree(wm_state.conn, window), nullptr);
             if (!reply) {
-              LOG(ERROR) << "??? null reply";
+              // LOG(ERROR) << "??? null reply";
               break;
             }
 
@@ -233,7 +242,7 @@ static void ProcessXEvents(WMState& wm_state, const bool& is_running,
         xcb_window_t active_client_window =
             wm_state.stacks[wm_state.active_stack_idx].active_client_window;
 
-        LOG(INFO) << "focusin " << active_client_window << " =?= " << window;
+        // LOG(INFO) << "focusin " << active_client_window << " =?= " << window;
 
         if (active_client_window != window) {
           SetInputFocus(wm_state, active_client_window);

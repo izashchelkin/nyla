@@ -23,7 +23,8 @@ void SetInputFocus(WMState& wm_state, xcb_window_t window) {
   else
     window = wm_state.screen.root;
 
-  xcb_set_input_focus(wm_state.conn, XCB_NONE, window, XCB_CURRENT_TIME);
+  xcb_set_input_focus(wm_state.conn, XCB_INPUT_FOCUS_POINTER_ROOT, window,
+                      XCB_CURRENT_TIME);
 }
 
 void ManageClient(WMState& wm_state, xcb_window_t window) {
@@ -171,7 +172,7 @@ void MoveClientFocus(WMState& wm_state, ssize_t idelta) {
   if (stack.client_windows.empty()) return;
 
   if (stack.active_client_window) {
-		// TODO: DEBUG THIS!!!
+    // TODO: DEBUG THIS!!!
 
     if (stack.client_windows.size() < 2) return;
 
