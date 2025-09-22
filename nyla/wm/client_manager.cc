@@ -17,14 +17,21 @@
 
 namespace nyla {
 
-void SetInputFocus(WMState& wm_state, xcb_window_t window) {
-  if (window)
-    Send_WM_Take_Focus(wm_state.conn, window, wm_state.atoms, XCB_CURRENT_TIME);
-  else
-    window = wm_state.screen.root;
+void SetInputFocus(WMState& wm_state, xcb_window_t window,
+                   xcb_timestamp_t time) {
+  if (!window || !wm_state.clients.contains(window)) {
+    xcb_set_input_focus(wm_state.conn, XCB_INPUT_FOCUS_POINTER_ROOT,
+                        wm_state.screen.root, time);
+    return;
+  }
 
-  xcb_set_input_focus(wm_state.conn, XCB_INPUT_FOCUS_POINTER_ROOT, window,
-                      XCB_CURRENT_TIME);
+  const Client& client = wm_state.clients.at(window);
+
+  xcb_set_input_focus(wm_state.conn, XCB_INPUT_FOCUS_POINTER_ROOT,
+                      client.input ? window : wm_state.screen.root, time);
+
+  if (client.wm_take_focus)
+    Send_WM_Take_Focus(wm_state.conn, window, wm_state.atoms, time);
 }
 
 void ManageClient(WMState& wm_state, xcb_window_t window) {
@@ -73,6 +80,14 @@ void UnmanageClient(WMState& wm_state, xcb_window_t window) {
       stack.active_client_window = XCB_WINDOW_NONE;
 
       if (istack == wm_state.active_stack_idx) {
+        if (stack.client_windows.empty()) {
+          xcb_set_input_focus(wm_state.conn, XCB_INPUT_FOCUS_POINTER_ROOT,
+                              wm_state.screen.root, XCB_CURRENT_TIME);
+        } else {
+          stack.active_client_window = stack.client_windows[0];
+          SetInputFocus(wm_state, stack.active_client_window, XCB_CURRENT_TIME);
+          BorderActive(wm_state, stack.active_client_window);
+        }
       }
     }
     return;
@@ -116,7 +131,7 @@ void ApplyLayoutChanges(WMState& wm_state, const std::vector<Rect>& layout) {
   }
 }
 
-void NextStack(WMState& wm_state) {
+void NextStack(WMState& wm_state, xcb_timestamp_t time) {
   CHECK_LT(wm_state.active_stack_idx, wm_state.stacks.size());
   if (wm_state.stacks[wm_state.active_stack_idx].active_client_window) {
     xcb_change_window_attributes(
@@ -132,12 +147,12 @@ void NextStack(WMState& wm_state) {
       wm_state.stacks[wm_state.active_stack_idx].active_client_window;
   if (!window) window = wm_state.screen.root;
 
-  SetInputFocus(wm_state, window);
+  SetInputFocus(wm_state, window, time);
   xcb_change_window_attributes(wm_state.conn, window, XCB_CW_BORDER_PIXEL,
                                (uint32_t[]){wm_state.screen.white_pixel});
 }
 
-void PrevStack(WMState& wm_state) {
+void PrevStack(WMState& wm_state, xcb_timestamp_t time) {
   CHECK_LT(wm_state.active_stack_idx, wm_state.stacks.size());
   if (wm_state.stacks[wm_state.active_stack_idx].active_client_window) {
     xcb_change_window_attributes(
@@ -154,7 +169,7 @@ void PrevStack(WMState& wm_state) {
       wm_state.stacks[wm_state.active_stack_idx].active_client_window;
   if (!window) window = wm_state.screen.root;
 
-  SetInputFocus(wm_state, window);
+  SetInputFocus(wm_state, window, time);
   xcb_change_window_attributes(wm_state.conn, window, XCB_CW_BORDER_PIXEL,
                                (uint32_t[]){wm_state.screen.white_pixel});
 }
@@ -164,7 +179,21 @@ void NextLayout(WMState& wm_state) {
   CycleLayoutType(wm_state.stacks[wm_state.active_stack_idx].layout_type);
 }
 
-void MoveClientFocus(WMState& wm_state, ssize_t idelta) {
+void BorderNormal(WMState& wm_state, xcb_window_t window) {
+  if (window) {
+    xcb_change_window_attributes(wm_state.conn, window, XCB_CW_BORDER_PIXEL,
+                                 (uint32_t[]){wm_state.screen.black_pixel});
+  }
+}
+
+void BorderActive(WMState& wm_state, xcb_window_t window) {
+  if (window) {
+    xcb_change_window_attributes(wm_state.conn, window, XCB_CW_BORDER_PIXEL,
+                                 (uint32_t[]){wm_state.screen.white_pixel});
+  }
+}
+
+void MoveClientFocus(WMState& wm_state, ssize_t idelta, xcb_timestamp_t time) {
   CHECK_LT(wm_state.active_stack_idx, wm_state.stacks.size());
   CHECK_LT(static_cast<size_t>(std::abs(idelta)), wm_state.stacks.size());
 
@@ -176,9 +205,7 @@ void MoveClientFocus(WMState& wm_state, ssize_t idelta) {
 
     if (stack.client_windows.size() < 2) return;
 
-    xcb_change_window_attributes(wm_state.conn, stack.active_client_window,
-                                 XCB_CW_BORDER_PIXEL,
-                                 (uint32_t[]){wm_state.screen.black_pixel});
+    BorderNormal(wm_state, stack.active_client_window);
 
     size_t iactive = 0;
     for (; iactive < stack.client_windows.size(); ++iactive) {
@@ -194,10 +221,8 @@ void MoveClientFocus(WMState& wm_state, ssize_t idelta) {
     stack.active_client_window = stack.client_windows[0];
   }
 
-  SetInputFocus(wm_state, stack.active_client_window);
-  xcb_change_window_attributes(wm_state.conn, stack.active_client_window,
-                               XCB_CW_BORDER_PIXEL,
-                               (uint32_t[]){wm_state.screen.white_pixel});
+  SetInputFocus(wm_state, stack.active_client_window, time);
+  BorderActive(wm_state, stack.active_client_window);
 }
 
 void FocusWindow(xcb_connection_t* conn, const xcb_screen_t& screen,

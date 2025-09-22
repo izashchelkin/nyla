@@ -6,6 +6,7 @@
 #include "absl/strings/str_format.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
+#include "xcb/xproto.h"
 
 namespace nyla {
 
@@ -13,11 +14,12 @@ bool Bar::Init(xcb_connection_t *conn, xcb_screen_t &screen) {
   window_ = xcb_generate_id(conn);
 
   if (xcb_request_check(
-          conn, xcb_create_window_checked(
-                    conn, XCB_COPY_FROM_PARENT, window_, screen.root, 0, 0,
-                    screen.width_in_pixels, height_, 0,
-                    XCB_WINDOW_CLASS_INPUT_OUTPUT, screen.root_visual,
-                    XCB_CW_BACK_PIXEL, (uint32_t[]){screen.black_pixel}))) {
+          conn,
+          xcb_create_window_checked(
+              conn, XCB_COPY_FROM_PARENT, window_, screen.root, 0, 0,
+              screen.width_in_pixels, height_, 0, XCB_WINDOW_CLASS_INPUT_OUTPUT,
+              screen.root_visual, XCB_CW_BACK_PIXEL | XCB_CW_OVERRIDE_REDIRECT,
+              (uint32_t[]){screen.black_pixel, true}))) {
     LOG(ERROR) << "could not create bar window";
     return false;
   }

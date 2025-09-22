@@ -37,10 +37,14 @@ struct WMState {
 void ManageClient(WMState& wm_state, xcb_window_t window);
 void UnmanageClient(WMState& wm_state, xcb_window_t window);
 void ApplyLayoutChanges(WMState& wm_state, const std::vector<Rect>& layout);
-void NextStack(WMState& wm_state);
-void PrevStack(WMState& wm_state);
+void NextStack(WMState& wm_state, xcb_timestamp_t time);
+void PrevStack(WMState& wm_state, xcb_timestamp_t time);
 void NextLayout(WMState& wm_state);
-void MoveClientFocus(WMState& wm_state, ssize_t idelta);
-void SetInputFocus(WMState& wm_state, xcb_window_t window);
+void MoveClientFocus(WMState& wm_state, ssize_t idelta, xcb_timestamp_t time);
+void SetInputFocus(WMState& wm_state, xcb_window_t window,
+                   xcb_timestamp_t time);
+
+void BorderActive(WMState& wm_state, xcb_window_t window);
+void BorderNormal(WMState& wm_state, xcb_window_t window);
 
 }  // namespace nyla

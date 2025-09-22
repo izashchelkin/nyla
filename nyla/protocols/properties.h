@@ -21,11 +21,13 @@ PropertyStruct FetchPropertyStruct(xcb_connection_t* conn, xcb_window_t window,
 
   auto reply = FetchPropertyInternal(conn, window, property, type,
                                      sizeof(PropertyStruct) >> 2);
+  if (!reply) return {};
   absl::Cleanup reply_freer = [reply] { free(reply); };
 
   if (xcb_get_property_value_length(reply) != sizeof(PropertyStruct) ||
       reply->bytes_after != 0) {
-    LOG(FATAL) << "FetchPropertyStruct: invalid reply length";
+    LOG(ERROR) << "FetchPropertyStruct: invalid reply length";
+    return {};
   }
   return *static_cast<PropertyStruct*>(xcb_get_property_value(reply));
 }
@@ -37,6 +39,7 @@ std::vector<Element> FetchPropertyList(xcb_connection_t* conn,
                                        const xcb_atom_t type) {
   auto reply = FetchPropertyInternal(conn, window, property, type,
                                      std::numeric_limits<uint32_t>::max());
+  if (!reply) return {};
   absl::Cleanup reply_freer = [reply] { free(reply); };
 
   return std::vector<Element>(

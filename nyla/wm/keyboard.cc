@@ -74,12 +74,13 @@ bool BindKeyboard(xcb_connection_t* conn, xcb_window_t root_window,
   return true;
 }
 
-bool HandleKeyPress(xcb_keycode_t keycode, std::span<const Keybind> keybinds) {
+bool HandleKeyPress(xcb_keycode_t keycode, std::span<const Keybind> keybinds,
+                    xcb_timestamp_t time) {
   auto it = std::find_if(
       keybinds.begin(), keybinds.end(),
       [keycode](const auto& keybind) { return keybind.keycode() == keycode; });
   if (it != keybinds.end()) {
-    it->RunAction();
+    it->RunAction(time);
     return true;
   }
   return false;

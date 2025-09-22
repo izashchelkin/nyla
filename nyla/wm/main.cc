@@ -4,6 +4,7 @@
 #include <unistd.h>
 
 #include <array>
+#include <chrono>
 #include <cstdint>
 #include <cstdlib>
 
@@ -71,17 +72,40 @@ int Main(int argc, char** argv) {
   uint16_t modifier = XCB_MOD_MASK_4;
   std::vector<Keybind> keybinds;
 
-  keybinds.emplace_back("AD01", [&is_running] { is_running = false; });
-  keybinds.emplace_back("AD02", [&wm_state] { NextLayout(wm_state); });
-  keybinds.emplace_back("AD03", [&wm_state] { PrevStack(wm_state); });
-  keybinds.emplace_back("AD04", [&wm_state] { NextStack(wm_state); });
-  keybinds.emplace_back("AD05", [] { Spawn({{"ghostty", nullptr}}); });
+  keybinds.emplace_back("AD01", [&is_running](xcb_timestamp_t time) {
+    static xcb_timestamp_t last_quit_ts = 0;
+    if (!last_quit_ts) {
+      last_quit_ts = time;
+      return;
+    }
+    int64_t diff = time - last_quit_ts;
+    if (diff > 1000L || diff < 900L) {
+      LOG(INFO) << time << " " << last_quit_ts << " " << diff;
+      last_quit_ts = 0L;
+      return;
+    }
+    is_running = false;
+  });
 
-  keybinds.emplace_back("AC02", [] { Spawn({{"dmenu_run", nullptr}}); });
-  keybinds.emplace_back("AC03", [&wm_state] { MoveClientFocus(wm_state, -1); });
-  keybinds.emplace_back("AC04", [&wm_state] { MoveClientFocus(wm_state, 1); });
+  keybinds.emplace_back(
+      "AD02", [&wm_state](xcb_timestamp_t time) { NextLayout(wm_state); });
+  keybinds.emplace_back(
+      "AD03", [&wm_state](xcb_timestamp_t time) { PrevStack(wm_state, time); });
+  keybinds.emplace_back(
+      "AD04", [&wm_state](xcb_timestamp_t time) { NextStack(wm_state, time); });
+  keybinds.emplace_back(
+      "AD05", [](xcb_timestamp_t time) { Spawn({{"ghostty", nullptr}}); });
 
-  keybinds.emplace_back("AB02", [&wm_state] {
+  keybinds.emplace_back(
+      "AC02", [](xcb_timestamp_t time) { Spawn({{"dmenu_run", nullptr}}); });
+  keybinds.emplace_back("AC03", [&wm_state](xcb_timestamp_t time) {
+    MoveClientFocus(wm_state, -1, time);
+  });
+  keybinds.emplace_back("AC04", [&wm_state](xcb_timestamp_t time) {
+    MoveClientFocus(wm_state, 1, time);
+  });
+
+  keybinds.emplace_back("AB02", [&wm_state](xcb_timestamp_t time) {
     CHECK_LT(wm_state.active_stack_idx, wm_state.stacks.size());
     const auto& stack = wm_state.stacks[wm_state.active_stack_idx];
     if (stack.active_client_window) {
@@ -161,7 +185,7 @@ static void ProcessXEvents(WMState& wm_state, const bool& is_running,
       case XCB_KEY_PRESS: {
         auto keypress = reinterpret_cast<xcb_key_press_event_t*>(event);
         if (keypress->state == modifier)
-          HandleKeyPress(keypress->detail, keybinds);
+          HandleKeyPress(keypress->detail, keybinds, keypress->time);
         break;
       }
       case XCB_PROPERTY_NOTIFY: {
@@ -172,13 +196,22 @@ static void ProcessXEvents(WMState& wm_state, const bool& is_running,
         xcb_map_window(
             wm_state.conn,
             reinterpret_cast<xcb_map_request_event_t*>(event)->window);
-
-        ManageClient(
-            wm_state,
-            reinterpret_cast<xcb_unmap_notify_event_t*>(event)->window);
         break;
       }
       case XCB_MAP_NOTIFY: {
+        auto mapnotify = reinterpret_cast<xcb_map_notify_event_t*>(event);
+        if (!mapnotify->override_redirect) {
+          xcb_window_t window =
+              reinterpret_cast<xcb_unmap_notify_event_t*>(event)->window;
+          ManageClient(wm_state, window);
+
+          CHECK_LT(wm_state.active_stack_idx, wm_state.stacks.size());
+          auto& stack = wm_state.stacks[wm_state.active_stack_idx];
+          BorderNormal(wm_state, stack.active_client_window);
+          stack.active_client_window = window;
+          SetInputFocus(wm_state, window, XCB_CURRENT_TIME);
+          BorderActive(wm_state, window);
+        }
         break;
       }
       case XCB_MAPPING_NOTIFY: {
@@ -245,7 +278,7 @@ static void ProcessXEvents(WMState& wm_state, const bool& is_running,
         // LOG(INFO) << "focusin " << active_client_window << " =?= " << window;
 
         if (active_client_window != window) {
-          SetInputFocus(wm_state, active_client_window);
+          SetInputFocus(wm_state, active_client_window, XCB_CURRENT_TIME);
         }
 
         break;
