@@ -40,6 +40,7 @@ void ApplyLayoutChanges(WMState& wm_state, const std::vector<Rect>& layout);
 void NextStack(WMState& wm_state);
 void PrevStack(WMState& wm_state);
 void NextLayout(WMState& wm_state);
-void MoveFocus(WMState& wm_state, ssize_t idelta);
+void MoveClientFocus(WMState& wm_state, ssize_t idelta);
+void SetInputFocus(WMState& wm_state, xcb_window_t window);
 
 }  // namespace nyla
