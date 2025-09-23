@@ -1,23 +1,20 @@
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 
+package(default_visibility = ["//visibility:public"])
+
 cc_binary(
-    name = "wm",
+    name = "fs",
     srcs = glob(["*.cc", "*.h"]),
+    # hdrs = glob(["*.h"]),
+		local_defines = [
+			"FUSE_USE_VERSION=316"
+		],
     deps = [
+      "@libfuse",
 			"@abseil-cpp//absl/log:initialize",
 			"@abseil-cpp//absl/log:check",
 			"@abseil-cpp//absl/log:log",
 			"@abseil-cpp//absl/container:flat_hash_map",
-			"//nyla/commons",
-			"//nyla/fs",
-			"//nyla/layout",
-			"//nyla/protocols",
     ],
-		linkopts = [
-			"-lxcb",
-			"-lxcb-util",
-			"-lxcb-xkb",
-			"-lxkbcommon",
-			"-lxkbcommon-x11",
-		],
 )
+

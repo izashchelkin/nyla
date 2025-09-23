@@ -1,2 +1,2 @@
 Style:
-  QuotedHeaders: ["nyla/.*", "absl/.*", "xcb/.*"]
+  QuotedHeaders: ["nyla/.*", "absl/.*", "xcb/.*", "fuse/.*"]
