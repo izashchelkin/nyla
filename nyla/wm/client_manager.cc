@@ -67,6 +67,8 @@ void ManageClient(WMState& wm_state, xcb_window_t window) {
 }
 
 void UnmanageClient(WMState& wm_state, xcb_window_t window) {
+  wm_state.clients.erase(window);
+
   for (size_t istack = 0; istack < wm_state.stacks.size(); ++istack) {
     ClientStack& stack = wm_state.stacks[istack];
 

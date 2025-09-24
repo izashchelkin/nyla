@@ -2,11 +2,11 @@ load("@rules_cc//cc:cc_library.bzl", "cc_library")
 
 package(default_visibility = ["//visibility:public"])
 
-cc_binary(
+cc_library(
     name = "fs",
     srcs = glob(["*.cc", "*.h"]),
-    # hdrs = glob(["*.h"]),
-		local_defines = [
+    hdrs = glob(["*.h"]),
+		defines  = [
 			"FUSE_USE_VERSION=316"
 		],
     deps = [

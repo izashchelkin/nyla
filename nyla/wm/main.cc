@@ -13,9 +13,12 @@
 #include "absl/log/globals.h"
 #include "absl/log/initialize.h"
 #include "absl/log/log.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/str_format.h"
 #include "nyla/commons/rect.h"
 #include "nyla/commons/spawn.h"
 #include "nyla/commons/timer.h"
+#include "nyla/fs/nylafs.h"
 #include "nyla/layout/layout.h"
 #include "nyla/protocols/atoms.h"
 #include "nyla/protocols/wm_protocols.h"
@@ -131,9 +134,28 @@ int Main(int argc, char** argv) {
   if (!tfd) LOG(QFATAL) << "MakeTimerFdMillis";
   absl::Cleanup tfd_closer = [tfd] { close(tfd); };
 
-  auto fds = std::to_array<pollfd>(
-      {{.fd = xcb_get_file_descriptor(conn), .events = POLLIN},
-       {.fd = tfd, .events = POLLIN}});
+  std::vector<pollfd> fds;
+  fds.emplace_back(
+      pollfd{.fd = xcb_get_file_descriptor(conn), .events = POLLIN});
+  fds.emplace_back(pollfd{.fd = tfd, .events = POLLIN});
+
+  NylaFs nylafs;
+  if (nylafs.Init()) {
+    fds.emplace_back(pollfd{.fd = nylafs.GetFd(), .events = POLLIN});
+
+    nylafs.Register({"clients", [&] {
+                       std::string out;
+                       for (const auto& [client_window, client] :
+                            wm_state.clients) {
+                         absl::StrAppendFormat(&out, "window=%v rect=%v\n",
+                                               client_window, client.rect);
+                       }
+                       return out;
+                     }});
+
+  } else {
+    LOG(ERROR) << "could not start NylaFS, continuing anyway...";
+  }
 
   while (is_running && !xcb_connection_has_error(conn)) {
     xcb_flush(conn);
@@ -161,6 +183,10 @@ int Main(int argc, char** argv) {
       uint64_t expirations;
       if (read(tfd, &expirations, sizeof(expirations)) >= 0)
         bar_manager.Update(conn, screen);  // TODO: also on Expose
+    }
+
+    if (fds.size() > 2 && fds[2].revents & POLLIN) {
+      nylafs.Process();
     }
   }
 
@@ -202,7 +228,7 @@ static void ProcessXEvents(WMState& wm_state, const bool& is_running,
         auto mapnotify = reinterpret_cast<xcb_map_notify_event_t*>(event);
         if (!mapnotify->override_redirect) {
           xcb_window_t window =
-              reinterpret_cast<xcb_unmap_notify_event_t*>(event)->window;
+              reinterpret_cast<xcb_map_notify_event_t*>(event)->window;
           ManageClient(wm_state, window);
 
           CHECK_LT(wm_state.active_stack_idx, wm_state.stacks.size());
