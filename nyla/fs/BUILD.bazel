@@ -4,17 +4,19 @@ package(default_visibility = ["//visibility:public"])
 
 cc_library(
     name = "fs",
-    srcs = glob(["*.cc", "*.h"]),
+    srcs = glob([
+        "*.cc",
+        "*.h",
+    ]),
     hdrs = glob(["*.h"]),
-		defines  = [
-			"FUSE_USE_VERSION=316"
-		],
+    defines = [
+        "FUSE_USE_VERSION=316",
+    ],
     deps = [
-      "@libfuse",
-			"@abseil-cpp//absl/log:initialize",
-			"@abseil-cpp//absl/log:check",
-			"@abseil-cpp//absl/log:log",
-			"@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/log:check",
+        "@abseil-cpp//absl/log:initialize",
+        "@abseil-cpp//absl/log:log",
+        "@libfuse",
     ],
 )
-

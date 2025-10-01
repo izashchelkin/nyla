@@ -11,4 +11,3 @@ cc_library(
         "@abseil-cpp//absl/strings",
     ],
 )
-
