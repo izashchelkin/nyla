@@ -20,6 +20,10 @@
 
 namespace nyla {
 
+static void ClearZoom(WMState& wm_state) {
+  for (auto& stack : wm_state.stacks) stack.zoomed_in = false;
+}
+
 static bool FetchClientProperties(WMState& wm_state, xcb_window_t client_window,
                                   Client& client) {
   auto wm_hints = FetchPropertyStruct<WM_Hints>(
@@ -115,6 +119,7 @@ void ManageClient(WMState& wm_state, xcb_window_t client_window) {
       return;
     }
 
+    ClearZoom(wm_state);
     stack.client_windows.emplace_back(client_window);
   }
 }
@@ -150,33 +155,42 @@ void UnmanageClient(WMState& wm_state, xcb_window_t window) {
 }
 
 static void ConfigureClient(xcb_connection_t* conn, xcb_window_t client_window,
-                            Client& client, const Rect& new_rect) {
+                            Client& client, const Rect& new_rect, bool above) {
   uint16_t mask = 0;
   mask |= XCB_CONFIG_WINDOW_X;
   mask |= XCB_CONFIG_WINDOW_Y;
   mask |= XCB_CONFIG_WINDOW_WIDTH;
   mask |= XCB_CONFIG_WINDOW_HEIGHT;
   mask |= XCB_CONFIG_WINDOW_BORDER_WIDTH;
+  if (above) mask |= XCB_CONFIG_WINDOW_STACK_MODE;
 
   struct {
     Rect rect;
     uint32_t border_width;
-  } values = {new_rect, 2};
-  static_assert(sizeof(values) == 20);
+    uint32_t stack_mode;
+  } values = {new_rect, 2, XCB_STACK_MODE_ABOVE};
+  static_assert(sizeof(values) == 6 * 4);
 
   xcb_configure_window(conn, client_window, mask, &values);
   client.wants_configure_notify = IsSameWH(client.rect, new_rect);
 }
 
-void ApplyLayoutChanges(WMState& wm_state, const std::vector<Rect>& layout) {
+void ApplyLayoutChanges(WMState& wm_state, const Rect& screen_rect,
+                        uint32_t padding) {
   ClientStack& stack = wm_state.stacks[wm_state.active_stack_idx];
+  std::vector<Rect> layout = ComputeLayout(
+      screen_rect, stack.client_windows.size(), padding, stack.layout_type);
   CHECK_EQ(layout.size(), stack.client_windows.size());
 
-  for (const auto& [rect, client_window] :
+  for (auto [layout_rect, client_window] :
        std::ranges::views::zip(layout, stack.client_windows)) {
     Client& client = wm_state.clients.at(client_window);
+
+    Rect rect = (client_window == stack.active_client_window && stack.zoomed_in)
+                    ? ApplyPadding(screen_rect, padding)
+                    : layout_rect;
     if (rect != client.rect) {
-      ConfigureClient(wm_state.conn, client_window, client, rect);
+      ConfigureClient(wm_state.conn, client_window, client, rect, true);
       client.rect = rect;
     }
   }
@@ -191,7 +205,7 @@ void ApplyLayoutChanges(WMState& wm_state, const std::vector<Rect>& layout) {
         new_rect.x() = wm_state.screen.width_in_pixels;
         new_rect.y() = wm_state.screen.height_in_pixels;
 
-        ConfigureClient(wm_state.conn, client_window, client, new_rect);
+        ConfigureClient(wm_state.conn, client_window, client, new_rect, false);
         client.rect = Rect{};
       }
     }
@@ -199,6 +213,8 @@ void ApplyLayoutChanges(WMState& wm_state, const std::vector<Rect>& layout) {
 }
 
 void NextStack(WMState& wm_state, xcb_timestamp_t time) {
+  ClearZoom(wm_state);
+
   CHECK_LT(wm_state.active_stack_idx, wm_state.stacks.size());
   if (wm_state.stacks[wm_state.active_stack_idx].active_client_window) {
     xcb_change_window_attributes(
@@ -220,6 +236,8 @@ void NextStack(WMState& wm_state, xcb_timestamp_t time) {
 }
 
 void PrevStack(WMState& wm_state, xcb_timestamp_t time) {
+  ClearZoom(wm_state);
+
   CHECK_LT(wm_state.active_stack_idx, wm_state.stacks.size());
   if (wm_state.stacks[wm_state.active_stack_idx].active_client_window) {
     xcb_change_window_attributes(
@@ -242,6 +260,8 @@ void PrevStack(WMState& wm_state, xcb_timestamp_t time) {
 }
 
 void NextLayout(WMState& wm_state) {
+  ClearZoom(wm_state);
+
   CHECK_LT(wm_state.active_stack_idx, wm_state.stacks.size());
   CycleLayoutType(wm_state.stacks[wm_state.active_stack_idx].layout_type);
 }
@@ -261,6 +281,8 @@ void BorderActive(WMState& wm_state, xcb_window_t window) {
 }
 
 void MoveClientFocus(WMState& wm_state, ssize_t idelta, xcb_timestamp_t time) {
+  ClearZoom(wm_state);
+
   CHECK_LT(wm_state.active_stack_idx, wm_state.stacks.size());
   CHECK_LT(static_cast<size_t>(std::abs(idelta)), wm_state.stacks.size());
 

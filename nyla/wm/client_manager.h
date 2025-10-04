@@ -23,6 +23,7 @@ struct Client {
 struct ClientStack {
   std::vector<xcb_window_t> client_windows;
   xcb_window_t active_client_window;
+  bool zoomed_in;
 
   LayoutType layout_type;
 };
@@ -39,7 +40,8 @@ struct WMState {
 void ManageClientsStartup(WMState& wm_state);
 void ManageClient(WMState& wm_state, xcb_window_t window);
 void UnmanageClient(WMState& wm_state, xcb_window_t window);
-void ApplyLayoutChanges(WMState& wm_state, const std::vector<Rect>& layout);
+void ApplyLayoutChanges(WMState& wm_state, const Rect& screen_rect,
+                        uint32_t padding);
 void NextStack(WMState& wm_state, xcb_timestamp_t time);
 void PrevStack(WMState& wm_state, xcb_timestamp_t time);
 void NextLayout(WMState& wm_state);

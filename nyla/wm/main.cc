@@ -77,21 +77,6 @@ int Main(int argc, char** argv) {
   uint16_t modifier = XCB_MOD_MASK_4;
   std::vector<Keybind> keybinds;
 
-  keybinds.emplace_back("AD01", [&is_running](xcb_timestamp_t time) {
-    static xcb_timestamp_t last_quit_ts = 0;
-    if (!last_quit_ts) {
-      last_quit_ts = time;
-      return;
-    }
-    int64_t diff = time - last_quit_ts;
-    if (diff > 1000L || diff < 900L) {
-      LOG(INFO) << time << " " << last_quit_ts << " " << diff;
-      last_quit_ts = 0L;
-      return;
-    }
-    is_running = false;
-  });
-
   keybinds.emplace_back(
       "AD02", [&wm_state](xcb_timestamp_t time) { NextLayout(wm_state); });
   keybinds.emplace_back(
@@ -108,6 +93,11 @@ int Main(int argc, char** argv) {
   });
   keybinds.emplace_back("AC04", [&wm_state](xcb_timestamp_t time) {
     MoveClientFocus(wm_state, 1, time);
+  });
+  keybinds.emplace_back("AC05", [&](xcb_timestamp_t time) {
+    CHECK_LT(wm_state.active_stack_idx, wm_state.stacks.size());
+    auto& stack = wm_state.stacks[wm_state.active_stack_idx];
+    stack.zoomed_in = !stack.zoomed_in;
   });
 
   keybinds.emplace_back("AB02", [&wm_state](xcb_timestamp_t time) {
@@ -173,15 +163,10 @@ int Main(int argc, char** argv) {
   xcb_ungrab_server(conn);
 
   while (is_running && !xcb_connection_has_error(conn)) {
-    CHECK_LT(wm_state.active_stack_idx, wm_state.stacks.size());
-    const auto& stack = wm_state.stacks[wm_state.active_stack_idx];
-
-    ApplyLayoutChanges(
-        wm_state,
-        ComputeLayout(ApplyMarginTop(
-                          Rect(screen.width_in_pixels, screen.height_in_pixels),
-                          bar_manager.height()),
-                      stack.client_windows.size(), 2, stack.layout_type));
+    auto screen_rect =
+        ApplyMarginTop(Rect(screen.width_in_pixels, screen.height_in_pixels),
+                       bar_manager.height());
+    ApplyLayoutChanges(wm_state, screen_rect, 2);
 
     for (auto& [client_window, client] : wm_state.clients) {
       if (client.wants_configure_notify) {
