@@ -24,6 +24,7 @@ xcb_atom_t InternAtom(xcb_connection_t* conn, std::string_view name,
 
 Atoms InternAtoms(xcb_connection_t* conn) {
   return Atoms{
+      .compound_text = InternAtom(conn, "COMPOUND_TEXT"),
       .wm_delete_window = InternAtom(conn, "WM_DELETE_WINDOW"),
       .wm_name = InternAtom(conn, "WM_NAME"),
       .wm_protocols = InternAtom(conn, "WM_PROTOCOLS"),

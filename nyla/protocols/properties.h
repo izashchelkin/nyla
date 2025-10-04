@@ -36,7 +36,7 @@ std::optional<PropertyStruct> FetchPropertyStruct(xcb_connection_t* conn,
 }
 
 template <typename Element>
-std::optional<std::vector<Element>> FetchPropertyList(xcb_connection_t* conn,
+std::optional<std::vector<Element>> FetchPropertyVector(xcb_connection_t* conn,
                                                       xcb_window_t window,
                                                       const xcb_atom_t property,
                                                       const xcb_atom_t type) {

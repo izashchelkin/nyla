@@ -11,6 +11,7 @@ xcb_atom_t InternAtom(xcb_connection_t* conn, std::string_view name,
                       bool only_if_exists = false);
 
 struct Atoms {
+  xcb_atom_t compound_text;
   xcb_atom_t wm_delete_window;
   xcb_atom_t wm_name;
   xcb_atom_t wm_protocols;

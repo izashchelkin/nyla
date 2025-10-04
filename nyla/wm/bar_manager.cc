@@ -59,7 +59,8 @@ bool BarManager::Init(xcb_connection_t *conn, xcb_screen_t &screen) {
   return bar_.Init(conn, screen);
 }
 
-void BarManager::Update(xcb_connection_t *conn, xcb_screen_t &screen) {
+void BarManager::Update(xcb_connection_t *conn, xcb_screen_t &screen,
+                        std::string_view active_client_name) {
   // std::string_view bar_text;
   //
   // switch (stack_manager.layout_type()) {
@@ -82,9 +83,9 @@ void BarManager::Update(xcb_connection_t *conn, xcb_screen_t &screen) {
   getloadavg(load_avg, std::size(load_avg));
 
   std::string bar_text = absl::StrFormat(
-      "nylawm [%.2f, %.2f, %.2f] %s", load_avg[0], load_avg[1], load_avg[2],
-      absl::FormatTime("%H:%M:%S %d.%m.%Y", absl::Now(),
-                       absl::LocalTimeZone()));
+      "nylawm [%.2f, %.2f, %.2f] %s %v", load_avg[0], load_avg[1], load_avg[2],
+      absl::FormatTime("%H:%M:%S %d.%m.%Y", absl::Now(), absl::LocalTimeZone()),
+      active_client_name);
   bar_.Update(conn, screen, bar_text);
 }
 

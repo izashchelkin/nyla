@@ -18,7 +18,6 @@
 #include "nyla/commons/spawn.h"
 #include "nyla/commons/timer.h"
 #include "nyla/fs/nylafs.h"
-#include "nyla/layout/layout.h"
 #include "nyla/protocols/atoms.h"
 #include "nyla/protocols/send.h"
 #include "nyla/protocols/wm_protocols.h"
@@ -97,7 +96,7 @@ int Main(int argc, char** argv) {
   keybinds.emplace_back("AC05", [&](xcb_timestamp_t time) {
     CHECK_LT(wm_state.active_stack_idx, wm_state.stacks.size());
     auto& stack = wm_state.stacks[wm_state.active_stack_idx];
-    stack.zoomed_in = !stack.zoomed_in;
+    stack.zoom = !stack.zoom;
   });
 
   keybinds.emplace_back("AB02", [&wm_state](xcb_timestamp_t time) {
@@ -137,24 +136,28 @@ int Main(int argc, char** argv) {
   if (nylafs.Init()) {
     fds.emplace_back(pollfd{.fd = nylafs.GetFd(), .events = POLLIN});
 
-    nylafs.Register(
-        {"clients",
-         [&] {
-           std::string out;
-           for (const auto& [client_window, client] : wm_state.clients) {
-             absl::StrAppendFormat(&out,
-                                   "name=%v window=%v rect=%v input=%v "
-                                   "wm_take_focus=%v wm_delete_window=%v\n",
-                                   client.name, client_window, client.rect,
-                                   client.input, client.wm_take_focus,
-                                   client.wm_delete_window);
-           }
-           return out;
-         },
-         [] {}});
+    nylafs.Register(NylaFsDynamicFile{
+        "clients",
+        [&wm_state] {
+          std::string out;
+          for (const auto& [client_window, client] : wm_state.clients) {
+            absl::StrAppendFormat(&out,
+                                  "name=%v window=%v rect=%v input=%v "
+                                  "wm_take_focus=%v wm_delete_window=%v\n",
+                                  client.name, client_window, client.rect,
+                                  client.input, client.wm_take_focus,
+                                  client.wm_delete_window);
+          }
+          return out;
+        },
+        [] {},
+    });
 
-    nylafs.Register({"quit", [] { return "quit\n"; },
-                     [&is_running] { is_running = false; }});
+    nylafs.Register(NylaFsDynamicFile{
+        "quit",
+        [] { return "quit\n"; },
+        [&is_running] { is_running = false; },
+    });
 
   } else {
     LOG(ERROR) << "could not start NylaFS, continuing anyway...";
@@ -190,8 +193,14 @@ int Main(int argc, char** argv) {
 
     if (fds[1].revents & POLLIN) {
       uint64_t expirations;
-      if (read(tfd, &expirations, sizeof(expirations)) >= 0)
-        bar_manager.Update(conn, screen);  // TODO: also on Expose
+      if (read(tfd, &expirations, sizeof(expirations)) >= 0) {
+        auto it = GetActiveClient(wm_state);
+        std::string active_client_name = it != wm_state.clients.end()
+                                             ? it->second.name
+                                             : "nyla: no active client";
+        bar_manager.Update(conn, screen,
+                           active_client_name);  // TODO: also on Expose
+      }
     }
 
     if (fds.size() > 2 && fds[2].revents & POLLIN) {

@@ -3,6 +3,7 @@
 #include <cstddef>
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/log/check.h"
 #include "nyla/commons/rect.h"
 #include "nyla/layout/layout.h"
 #include "nyla/protocols/atoms.h"
@@ -23,9 +24,9 @@ struct Client {
 struct ClientStack {
   std::vector<xcb_window_t> client_windows;
   xcb_window_t active_client_window;
-  bool zoomed_in;
-
   LayoutType layout_type;
+  bool zoom;
+  bool follow;
 };
 
 struct WMState {
@@ -36,6 +37,21 @@ struct WMState {
   std::vector<ClientStack> stacks;
   size_t active_stack_idx;
 };
+
+inline ClientStack& GetActiveStack(WMState& wm_state) {
+  CHECK_LT(wm_state.active_stack_idx, wm_state.stacks.size());
+  return wm_state.stacks[wm_state.active_stack_idx];
+}
+
+inline xcb_window_t GetActiveWindow(WMState& wm_state) {
+  return GetActiveStack(wm_state).active_client_window;
+}
+
+inline decltype(WMState::clients)::iterator GetActiveClient(WMState& wm_state) {
+  xcb_window_t window = GetActiveWindow(wm_state);
+  if (!window) return wm_state.clients.end();
+  return wm_state.clients.find(window);
+}
 
 void ManageClientsStartup(WMState& wm_state);
 void ManageClient(WMState& wm_state, xcb_window_t window);

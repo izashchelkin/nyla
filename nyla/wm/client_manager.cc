@@ -21,7 +21,7 @@
 namespace nyla {
 
 static void ClearZoom(WMState& wm_state) {
-  for (auto& stack : wm_state.stacks) stack.zoomed_in = false;
+  for (auto& stack : wm_state.stacks) stack.zoom = false;
 }
 
 static bool FetchClientProperties(WMState& wm_state, xcb_window_t client_window,
@@ -30,7 +30,7 @@ static bool FetchClientProperties(WMState& wm_state, xcb_window_t client_window,
       wm_state.conn, client_window, XCB_ATOM_WM_HINTS, XCB_ATOM_WM_HINTS);
   if (!wm_hints) return false;
 
-  auto wm_protocols = FetchPropertyList<xcb_atom_t>(
+  auto wm_protocols = FetchPropertyVector<xcb_atom_t>(
       wm_state.conn, client_window, wm_state.atoms.wm_protocols, XCB_ATOM_ATOM);
   if (!wm_protocols) return false;
 
@@ -39,20 +39,16 @@ static bool FetchClientProperties(WMState& wm_state, xcb_window_t client_window,
   client.wm_delete_window = false;
   client.wm_take_focus = false;
 
-  if (wm_protocols.has_value()) {
-    for (xcb_atom_t atom : wm_protocols.value()) {
-      if (atom == wm_state.atoms.wm_delete_window)
-        client.wm_delete_window = true;
-      if (atom == wm_state.atoms.wm_take_focus) client.wm_take_focus = true;
-    }
+  for (xcb_atom_t atom : *wm_protocols) {
+    if (atom == wm_state.atoms.wm_delete_window) client.wm_delete_window = true;
+    if (atom == wm_state.atoms.wm_take_focus) client.wm_take_focus = true;
   }
 
-  auto name = FetchPropertyList<char>(wm_state.conn, client_window,
-                                      wm_state.atoms.wm_name, XCB_ATOM_STRING);
-  if (name.has_value())
-    client.name = {name->data(), name->size()};
-  else
-    client.name = "nyla-unknown";
+  auto name = FetchPropertyVector<char>(wm_state.conn, client_window,
+                                        wm_state.atoms.wm_name, XCB_ATOM_ANY);
+  if (!name) return false;
+
+  client.name = std::string_view{name->data(), name->size()};
 
   return true;
 }
@@ -76,7 +72,7 @@ void ManageClientsStartup(WMState& wm_state) {
     absl::Cleanup attr_reply_freer = [attr_reply] { free(attr_reply); };
 
     if (attr_reply->override_redirect) continue;
-    if (attr_reply->map_state != XCB_MAP_STATE_VIEWABLE) continue;
+    if (attr_reply->map_state == XCB_MAP_STATE_UNMAPPED) continue;
 
     ManageClient(wm_state, client_window);
   }
@@ -111,8 +107,7 @@ void ManageClient(WMState& wm_state, xcb_window_t client_window) {
       inserted) {
     auto& [client_window, client] = *it;
 
-    CHECK_LT(wm_state.active_stack_idx, wm_state.stacks.size());
-    ClientStack& stack = wm_state.stacks[wm_state.active_stack_idx];
+    ClientStack& stack = GetActiveStack(wm_state);
 
     if (!FetchClientProperties(wm_state, client_window, client)) {
       LOG(WARNING) << "window gone?";
@@ -177,7 +172,7 @@ static void ConfigureClient(xcb_connection_t* conn, xcb_window_t client_window,
 
 void ApplyLayoutChanges(WMState& wm_state, const Rect& screen_rect,
                         uint32_t padding) {
-  ClientStack& stack = wm_state.stacks[wm_state.active_stack_idx];
+  ClientStack& stack = GetActiveStack(wm_state);
   std::vector<Rect> layout = ComputeLayout(
       screen_rect, stack.client_windows.size(), padding, stack.layout_type);
   CHECK_EQ(layout.size(), stack.client_windows.size());
@@ -186,7 +181,7 @@ void ApplyLayoutChanges(WMState& wm_state, const Rect& screen_rect,
        std::ranges::views::zip(layout, stack.client_windows)) {
     Client& client = wm_state.clients.at(client_window);
 
-    Rect rect = (client_window == stack.active_client_window && stack.zoomed_in)
+    Rect rect = (client_window == stack.active_client_window && stack.zoom)
                     ? ApplyPadding(screen_rect, padding)
                     : layout_rect;
     if (rect != client.rect) {
@@ -212,58 +207,34 @@ void ApplyLayoutChanges(WMState& wm_state, const Rect& screen_rect,
   }
 }
 
-void NextStack(WMState& wm_state, xcb_timestamp_t time) {
+static void ChangeStack(WMState& wm_state, xcb_timestamp_t time,
+                        auto compute_next) {
   ClearZoom(wm_state);
-
-  CHECK_LT(wm_state.active_stack_idx, wm_state.stacks.size());
-  if (wm_state.stacks[wm_state.active_stack_idx].active_client_window) {
-    xcb_change_window_attributes(
-        wm_state.conn,
-        wm_state.stacks[wm_state.active_stack_idx].active_client_window,
-        XCB_CW_BORDER_PIXEL, (uint32_t[]){wm_state.screen.black_pixel});
-  }
+  BorderNormal(wm_state, GetActiveWindow(wm_state));
 
   wm_state.active_stack_idx =
-      (wm_state.active_stack_idx + 1) % wm_state.stacks.size();
+      compute_next(wm_state.active_stack_idx + wm_state.stacks.size()) %
+      wm_state.stacks.size();
 
-  xcb_window_t window =
-      wm_state.stacks[wm_state.active_stack_idx].active_client_window;
+  xcb_window_t window = GetActiveWindow(wm_state);
+  BorderActive(wm_state, window);
   if (!window) window = wm_state.screen.root;
-
   SetInputFocus(wm_state, window, time);
-  xcb_change_window_attributes(wm_state.conn, window, XCB_CW_BORDER_PIXEL,
-                               (uint32_t[]){wm_state.screen.white_pixel});
+}
+
+void NextStack(WMState& wm_state, xcb_timestamp_t time) {
+  ChangeStack(wm_state, time, [](auto idx) { return idx + 1; });
 }
 
 void PrevStack(WMState& wm_state, xcb_timestamp_t time) {
-  ClearZoom(wm_state);
-
-  CHECK_LT(wm_state.active_stack_idx, wm_state.stacks.size());
-  if (wm_state.stacks[wm_state.active_stack_idx].active_client_window) {
-    xcb_change_window_attributes(
-        wm_state.conn,
-        wm_state.stacks[wm_state.active_stack_idx].active_client_window,
-        XCB_CW_BORDER_PIXEL, (uint32_t[]){wm_state.screen.black_pixel});
-  }
-
-  wm_state.active_stack_idx =
-      (wm_state.active_stack_idx + wm_state.stacks.size() - 1) %
-      wm_state.stacks.size();
-
-  xcb_window_t window =
-      wm_state.stacks[wm_state.active_stack_idx].active_client_window;
-  if (!window) window = wm_state.screen.root;
-
-  SetInputFocus(wm_state, window, time);
-  xcb_change_window_attributes(wm_state.conn, window, XCB_CW_BORDER_PIXEL,
-                               (uint32_t[]){wm_state.screen.white_pixel});
+  ChangeStack(wm_state, time, [](auto idx) { return idx - 1; });
 }
 
 void NextLayout(WMState& wm_state) {
   ClearZoom(wm_state);
 
-  CHECK_LT(wm_state.active_stack_idx, wm_state.stacks.size());
-  CycleLayoutType(wm_state.stacks[wm_state.active_stack_idx].layout_type);
+  ClientStack& stack = GetActiveStack(wm_state);
+  CycleLayoutType(stack.layout_type);
 }
 
 void BorderNormal(WMState& wm_state, xcb_window_t window) {

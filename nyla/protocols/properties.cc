@@ -12,7 +12,7 @@ xcb_get_property_reply_t* FetchPropertyInternal(xcb_connection_t* conn,
       xcb_get_property(conn, false, window, property, type, 0, long_length),
       nullptr);
 
-  if (reply->type != type) {
+  if (type != XCB_ATOM_ANY && reply->type != type) {
     LOG(ERROR) << "FetchPropertyInternal: mismatched types (expected: " << type
                << ", but got: " << reply->type << ")";
     free(reply);
