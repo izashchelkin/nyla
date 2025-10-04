@@ -24,8 +24,22 @@ static void ClearZoom(WMState& wm_state) {
   for (auto& stack : wm_state.stacks) stack.zoom = false;
 }
 
-static bool FetchClientProperties(WMState& wm_state, xcb_window_t client_window,
-                                  Client& client) {
+static void SetNormalBorder(WMState& wm_state, xcb_window_t window) {
+  if (window) {
+    xcb_change_window_attributes(wm_state.conn, window, XCB_CW_BORDER_PIXEL,
+                                 (uint32_t[]){wm_state.screen.black_pixel});
+  }
+}
+
+static void SetActiveBorder(WMState& wm_state, xcb_window_t window) {
+  if (window) {
+    xcb_change_window_attributes(wm_state.conn, window, XCB_CW_BORDER_PIXEL,
+                                 (uint32_t[]){wm_state.screen.white_pixel});
+  }
+}
+
+static bool UpdateClientProperties(WMState& wm_state,
+                                   xcb_window_t client_window, Client& client) {
   auto wm_hints = FetchPropertyStruct<WM_Hints>(
       wm_state.conn, client_window, XCB_ATOM_WM_HINTS, XCB_ATOM_WM_HINTS);
   if (!wm_hints) return false;
@@ -53,6 +67,51 @@ static bool FetchClientProperties(WMState& wm_state, xcb_window_t client_window,
   return true;
 }
 
+static void SetInputFocus(WMState& wm_state, xcb_window_t window,
+                          xcb_timestamp_t time) {
+  if (!window || !wm_state.clients.contains(window)) {
+    xcb_set_input_focus(wm_state.conn, XCB_INPUT_FOCUS_POINTER_ROOT,
+                        wm_state.screen.root, time);
+    return;
+  }
+
+  const Client& client = wm_state.clients.at(window);
+
+  xcb_set_input_focus(wm_state.conn, XCB_INPUT_FOCUS_POINTER_ROOT,
+                      client.input ? window : wm_state.screen.root, time);
+
+  if (client.wm_take_focus)
+    Send_WM_Take_Focus(wm_state.conn, window, wm_state.atoms, time);
+}
+
+void CheckFocusTheft(WMState& wm_state) {
+  auto reply = xcb_get_input_focus_reply(
+      wm_state.conn, xcb_get_input_focus(wm_state.conn), nullptr);
+  xcb_window_t window = reply->focus;
+  free(reply);
+
+  if (!wm_state.clients.contains(window)) {
+    for (;;) {
+      xcb_query_tree_reply_t* reply = xcb_query_tree_reply(
+          wm_state.conn, xcb_query_tree(wm_state.conn, window), nullptr);
+      if (!reply) {
+        // LOG(ERROR) << "??? null reply";
+        break;
+      }
+
+      absl::Cleanup reply_freer = [reply] { free(reply); };
+      if (reply->parent == reply->root) break;
+      window = reply->parent;
+    }
+  }
+
+  // LOG(INFO) << "focusin " << active_client_window << " =?= " << window;
+
+  xcb_window_t active_client_window = GetActiveWindow(wm_state);
+  if (active_client_window != window)
+    SetInputFocus(wm_state, active_client_window, XCB_CURRENT_TIME);
+}
+
 void ManageClientsStartup(WMState& wm_state) {
   xcb_query_tree_reply_t* tree_reply = xcb_query_tree_reply(
       wm_state.conn, xcb_query_tree(wm_state.conn, wm_state.screen.root),
@@ -74,30 +133,13 @@ void ManageClientsStartup(WMState& wm_state) {
     if (attr_reply->override_redirect) continue;
     if (attr_reply->map_state == XCB_MAP_STATE_UNMAPPED) continue;
 
-    ManageClient(wm_state, client_window);
+    ManageClient(wm_state, client_window, false);
   }
 
   free(tree_reply);
 }
 
-void SetInputFocus(WMState& wm_state, xcb_window_t window,
-                   xcb_timestamp_t time) {
-  if (!window || !wm_state.clients.contains(window)) {
-    xcb_set_input_focus(wm_state.conn, XCB_INPUT_FOCUS_POINTER_ROOT,
-                        wm_state.screen.root, time);
-    return;
-  }
-
-  const Client& client = wm_state.clients.at(window);
-
-  xcb_set_input_focus(wm_state.conn, XCB_INPUT_FOCUS_POINTER_ROOT,
-                      client.input ? window : wm_state.screen.root, time);
-
-  if (client.wm_take_focus)
-    Send_WM_Take_Focus(wm_state.conn, window, wm_state.atoms, time);
-}
-
-void ManageClient(WMState& wm_state, xcb_window_t client_window) {
+void ManageClient(WMState& wm_state, xcb_window_t client_window, bool focus) {
   xcb_change_window_attributes(wm_state.conn, client_window, XCB_CW_EVENT_MASK,
                                (uint32_t[]){XCB_EVENT_MASK_ENTER_WINDOW,
                                             XCB_EVENT_MASK_PROPERTY_CHANGE});
@@ -109,13 +151,25 @@ void ManageClient(WMState& wm_state, xcb_window_t client_window) {
 
     ClientStack& stack = GetActiveStack(wm_state);
 
-    if (!FetchClientProperties(wm_state, client_window, client)) {
-      LOG(WARNING) << "window gone?";
+    if (!UpdateClientProperties(wm_state, client_window, client)) {
+      LOG(WARNING) << "window gonsky?";
       return;
     }
 
     ClearZoom(wm_state);
     stack.client_windows.emplace_back(client_window);
+
+    if (focus) {
+      xcb_window_t active_window = GetActiveWindow(wm_state);
+
+      if (active_window != client_window) {
+        SetNormalBorder(wm_state, active_window);
+
+        stack.active_client_window = client_window;
+        SetInputFocus(wm_state, client_window, XCB_CURRENT_TIME);
+        SetActiveBorder(wm_state, client_window);
+      }
+    }
   }
 }
 
@@ -141,7 +195,7 @@ void UnmanageClient(WMState& wm_state, xcb_window_t window) {
         } else {
           stack.active_client_window = stack.client_windows[0];
           SetInputFocus(wm_state, stack.active_client_window, XCB_CURRENT_TIME);
-          BorderActive(wm_state, stack.active_client_window);
+          SetActiveBorder(wm_state, stack.active_client_window);
         }
       }
     }
@@ -208,16 +262,16 @@ void ApplyLayoutChanges(WMState& wm_state, const Rect& screen_rect,
 }
 
 static void ChangeStack(WMState& wm_state, xcb_timestamp_t time,
-                        auto compute_next) {
+                        auto compute_idx) {
   ClearZoom(wm_state);
-  BorderNormal(wm_state, GetActiveWindow(wm_state));
+  SetNormalBorder(wm_state, GetActiveWindow(wm_state));
 
   wm_state.active_stack_idx =
-      compute_next(wm_state.active_stack_idx + wm_state.stacks.size()) %
+      compute_idx(wm_state.active_stack_idx + wm_state.stacks.size()) %
       wm_state.stacks.size();
 
   xcb_window_t window = GetActiveWindow(wm_state);
-  BorderActive(wm_state, window);
+  SetActiveBorder(wm_state, window);
   if (!window) window = wm_state.screen.root;
   SetInputFocus(wm_state, window, time);
 }
@@ -230,34 +284,11 @@ void PrevStack(WMState& wm_state, xcb_timestamp_t time) {
   ChangeStack(wm_state, time, [](auto idx) { return idx - 1; });
 }
 
-void NextLayout(WMState& wm_state) {
+static void ChangeFocus(WMState& wm_state, xcb_timestamp_t time,
+                        auto compute_idx) {
   ClearZoom(wm_state);
 
   ClientStack& stack = GetActiveStack(wm_state);
-  CycleLayoutType(stack.layout_type);
-}
-
-void BorderNormal(WMState& wm_state, xcb_window_t window) {
-  if (window) {
-    xcb_change_window_attributes(wm_state.conn, window, XCB_CW_BORDER_PIXEL,
-                                 (uint32_t[]){wm_state.screen.black_pixel});
-  }
-}
-
-void BorderActive(WMState& wm_state, xcb_window_t window) {
-  if (window) {
-    xcb_change_window_attributes(wm_state.conn, window, XCB_CW_BORDER_PIXEL,
-                                 (uint32_t[]){wm_state.screen.white_pixel});
-  }
-}
-
-void MoveClientFocus(WMState& wm_state, ssize_t idelta, xcb_timestamp_t time) {
-  ClearZoom(wm_state);
-
-  CHECK_LT(wm_state.active_stack_idx, wm_state.stacks.size());
-  CHECK_LT(static_cast<size_t>(std::abs(idelta)), wm_state.stacks.size());
-
-  ClientStack& stack = wm_state.stacks[wm_state.active_stack_idx];
   if (stack.client_windows.empty()) return;
 
   if (stack.active_client_window) {
@@ -265,7 +296,7 @@ void MoveClientFocus(WMState& wm_state, ssize_t idelta, xcb_timestamp_t time) {
 
     if (stack.client_windows.size() < 2) return;
 
-    BorderNormal(wm_state, stack.active_client_window);
+    SetNormalBorder(wm_state, stack.active_client_window);
 
     size_t iactive = 0;
     for (; iactive < stack.client_windows.size(); ++iactive) {
@@ -273,7 +304,7 @@ void MoveClientFocus(WMState& wm_state, ssize_t idelta, xcb_timestamp_t time) {
     }
     CHECK_LT(iactive, stack.client_windows.size());
 
-    iactive = (iactive + stack.client_windows.size() + idelta) %
+    iactive = compute_idx(iactive + stack.client_windows.size()) %
               stack.client_windows.size();
 
     stack.active_client_window = stack.client_windows[iactive];
@@ -282,7 +313,20 @@ void MoveClientFocus(WMState& wm_state, ssize_t idelta, xcb_timestamp_t time) {
   }
 
   SetInputFocus(wm_state, stack.active_client_window, time);
-  BorderActive(wm_state, stack.active_client_window);
+  SetActiveBorder(wm_state, stack.active_client_window);
+}
+
+void NextFocus(WMState& wm_state, xcb_timestamp_t time) {
+  ChangeFocus(wm_state, time, [](auto idx) { return idx + 1; });
+}
+
+void PrevFocus(WMState& wm_state, xcb_timestamp_t time) {
+  ChangeFocus(wm_state, time, [](auto idx) { return idx - 1; });
+}
+
+void NextLayout(WMState& wm_state) {
+  ClearZoom(wm_state);
+  CycleLayoutType(GetActiveStack(wm_state).layout_type);
 }
 
 }  // namespace nyla

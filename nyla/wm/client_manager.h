@@ -54,18 +54,18 @@ inline decltype(WMState::clients)::iterator GetActiveClient(WMState& wm_state) {
 }
 
 void ManageClientsStartup(WMState& wm_state);
-void ManageClient(WMState& wm_state, xcb_window_t window);
+void ManageClient(WMState& wm_state, xcb_window_t client_window, bool focus);
 void UnmanageClient(WMState& wm_state, xcb_window_t window);
+
 void ApplyLayoutChanges(WMState& wm_state, const Rect& screen_rect,
                         uint32_t padding);
+
+void NextFocus(WMState& wm_state, xcb_timestamp_t time);
+void PrevFocus(WMState& wm_state, xcb_timestamp_t time);
+
 void NextStack(WMState& wm_state, xcb_timestamp_t time);
 void PrevStack(WMState& wm_state, xcb_timestamp_t time);
-void NextLayout(WMState& wm_state);
-void MoveClientFocus(WMState& wm_state, ssize_t idelta, xcb_timestamp_t time);
-void SetInputFocus(WMState& wm_state, xcb_window_t window,
-                   xcb_timestamp_t time);
 
-void BorderActive(WMState& wm_state, xcb_window_t window);
-void BorderNormal(WMState& wm_state, xcb_window_t window);
+void NextLayout(WMState& wm_state);
 
 }  // namespace nyla

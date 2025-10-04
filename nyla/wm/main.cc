@@ -87,16 +87,12 @@ int Main(int argc, char** argv) {
 
   keybinds.emplace_back(
       "AC02", [](xcb_timestamp_t time) { Spawn({{"dmenu_run", nullptr}}); });
-  keybinds.emplace_back("AC03", [&wm_state](xcb_timestamp_t time) {
-    MoveClientFocus(wm_state, -1, time);
-  });
-  keybinds.emplace_back("AC04", [&wm_state](xcb_timestamp_t time) {
-    MoveClientFocus(wm_state, 1, time);
-  });
+  keybinds.emplace_back(
+      "AC03", [&wm_state](xcb_timestamp_t time) { PrevFocus(wm_state, time); });
+  keybinds.emplace_back(
+      "AC04", [&wm_state](xcb_timestamp_t time) { NextFocus(wm_state, time); });
   keybinds.emplace_back("AC05", [&](xcb_timestamp_t time) {
-    CHECK_LT(wm_state.active_stack_idx, wm_state.stacks.size());
-    auto& stack = wm_state.stacks[wm_state.active_stack_idx];
-    stack.zoom = !stack.zoom;
+    GetActiveStack(wm_state).zoom ^= 1;
   });
 
   keybinds.emplace_back("AB02", [&wm_state](xcb_timestamp_t time) {
@@ -256,14 +252,7 @@ static void ProcessXEvents(WMState& wm_state, const bool& is_running,
         if (!mapnotify->override_redirect) {
           xcb_window_t window =
               reinterpret_cast<xcb_map_notify_event_t*>(event)->window;
-          ManageClient(wm_state, window);
-
-          CHECK_LT(wm_state.active_stack_idx, wm_state.stacks.size());
-          auto& stack = wm_state.stacks[wm_state.active_stack_idx];
-          BorderNormal(wm_state, stack.active_client_window);
-          stack.active_client_window = window;
-          SetInputFocus(wm_state, window, XCB_CURRENT_TIME);
-          BorderActive(wm_state, window);
+          ManageClient(wm_state, window, true);
         }
         break;
       }
@@ -302,36 +291,6 @@ static void ProcessXEvents(WMState& wm_state, const bool& is_running,
         if (focusin->mode != XCB_NOTIFY_MODE_NORMAL) {
           // LOG(INFO) << "??? focus in mode : " << int(focusin->mode);
           break;
-        }
-
-        auto reply = xcb_get_input_focus_reply(
-            wm_state.conn, xcb_get_input_focus(wm_state.conn), nullptr);
-        xcb_window_t window = reply->focus;
-        free(reply);
-
-        if (!wm_state.clients.contains(window)) {
-          for (;;) {
-            xcb_query_tree_reply_t* reply = xcb_query_tree_reply(
-                wm_state.conn, xcb_query_tree(wm_state.conn, window), nullptr);
-            if (!reply) {
-              // LOG(ERROR) << "??? null reply";
-              break;
-            }
-
-            absl::Cleanup reply_freer = [reply] { free(reply); };
-            if (reply->parent == reply->root) break;
-            window = reply->parent;
-          }
-        }
-
-        CHECK_LT(wm_state.active_stack_idx, wm_state.stacks.size());
-        xcb_window_t active_client_window =
-            wm_state.stacks[wm_state.active_stack_idx].active_client_window;
-
-        // LOG(INFO) << "focusin " << active_client_window << " =?= " << window;
-
-        if (active_client_window != window) {
-          SetInputFocus(wm_state, active_client_window, XCB_CURRENT_TIME);
         }
 
         break;
