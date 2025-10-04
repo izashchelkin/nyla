@@ -3,10 +3,13 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
-#include <utility>
+#include <ctime>
+#include <span>
 #include <vector>
 
 #include "absl/log/check.h"
+#include "absl/log/log.h"
+#include "nyla/commons/rect.h"
 #include "nyla/layout/layout.h"
 #include "nyla/protocols/atoms.h"
 #include "nyla/protocols/properties.h"
@@ -16,6 +19,66 @@
 #include "xcb/xproto.h"
 
 namespace nyla {
+
+static bool FetchClientProperties(WMState& wm_state, xcb_window_t client_window,
+                                  Client& client) {
+  auto wm_hints = FetchPropertyStruct<WM_Hints>(
+      wm_state.conn, client_window, XCB_ATOM_WM_HINTS, XCB_ATOM_WM_HINTS);
+  if (!wm_hints) return false;
+
+  auto wm_protocols = FetchPropertyList<xcb_atom_t>(
+      wm_state.conn, client_window, wm_state.atoms.wm_protocols, XCB_ATOM_ATOM);
+  if (!wm_protocols) return false;
+
+  client.input = wm_hints->input;
+
+  client.wm_delete_window = false;
+  client.wm_take_focus = false;
+
+  if (wm_protocols.has_value()) {
+    for (xcb_atom_t atom : wm_protocols.value()) {
+      if (atom == wm_state.atoms.wm_delete_window)
+        client.wm_delete_window = true;
+      if (atom == wm_state.atoms.wm_take_focus) client.wm_take_focus = true;
+    }
+  }
+
+  auto name = FetchPropertyList<char>(wm_state.conn, client_window,
+                                      wm_state.atoms.wm_name, XCB_ATOM_STRING);
+  if (name.has_value())
+    client.name = {name->data(), name->size()};
+  else
+    client.name = "nyla-unknown";
+
+  return true;
+}
+
+void ManageClientsStartup(WMState& wm_state) {
+  xcb_query_tree_reply_t* tree_reply = xcb_query_tree_reply(
+      wm_state.conn, xcb_query_tree(wm_state.conn, wm_state.screen.root),
+      nullptr);
+  if (!tree_reply) return;
+
+  std::span<xcb_window_t> children = {
+      xcb_query_tree_children(tree_reply),
+      static_cast<size_t>(xcb_query_tree_children_length(tree_reply))};
+
+  for (xcb_window_t client_window : children) {
+    xcb_get_window_attributes_reply_t* attr_reply =
+        xcb_get_window_attributes_reply(
+            wm_state.conn,
+            xcb_get_window_attributes(wm_state.conn, client_window), nullptr);
+    if (!attr_reply) continue;
+    absl::Cleanup attr_reply_freer = [attr_reply] { free(attr_reply); };
+
+    if (attr_reply->override_redirect) continue;
+    if (attr_reply->map_state != XCB_MAP_STATE_VIEWABLE) continue;
+
+    ManageClient(wm_state, client_window);
+  }
+
+  free(tree_reply);
+}
 
 void SetInputFocus(WMState& wm_state, xcb_window_t window,
                    xcb_timestamp_t time) {
@@ -34,35 +97,25 @@ void SetInputFocus(WMState& wm_state, xcb_window_t window,
     Send_WM_Take_Focus(wm_state.conn, window, wm_state.atoms, time);
 }
 
-void ManageClient(WMState& wm_state, xcb_window_t window) {
-  xcb_change_window_attributes(wm_state.conn, window, XCB_CW_EVENT_MASK,
+void ManageClient(WMState& wm_state, xcb_window_t client_window) {
+  xcb_change_window_attributes(wm_state.conn, client_window, XCB_CW_EVENT_MASK,
                                (uint32_t[]){XCB_EVENT_MASK_ENTER_WINDOW,
                                             XCB_EVENT_MASK_PROPERTY_CHANGE});
 
-  if (auto res = wm_state.clients.try_emplace(window, Client{}); res.second) {
+  if (auto [it, inserted] =
+          wm_state.clients.try_emplace(client_window, Client{});
+      inserted) {
+    auto& [client_window, client] = *it;
+
     CHECK_LT(wm_state.active_stack_idx, wm_state.stacks.size());
     ClientStack& stack = wm_state.stacks[wm_state.active_stack_idx];
-    stack.client_windows.emplace_back(window);
 
-    Client& client = res.first->second;
-
-    client.input =
-        FetchPropertyStruct<WM_Hints>(wm_state.conn, window, XCB_ATOM_WM_HINTS,
-                                      XCB_ATOM_WM_HINTS)
-            .input;
-
-    for (const xcb_atom_t& protocol_atom : FetchPropertyList<xcb_atom_t>(
-             wm_state.conn, window, wm_state.atoms.wm_protocols,
-             XCB_ATOM_ATOM)) {
-      if (protocol_atom == wm_state.atoms.wm_delete_window) {
-        client.wm_delete_window = true;
-        continue;
-      }
-      if (protocol_atom == wm_state.atoms.wm_take_focus) {
-        client.wm_take_focus = true;
-        continue;
-      }
+    if (!FetchClientProperties(wm_state, client_window, client)) {
+      LOG(WARNING) << "window gone?";
+      return;
     }
+
+    stack.client_windows.emplace_back(client_window);
   }
 }
 
@@ -96,6 +149,25 @@ void UnmanageClient(WMState& wm_state, xcb_window_t window) {
   }
 }
 
+static void ConfigureClient(xcb_connection_t* conn, xcb_window_t client_window,
+                            Client& client, const Rect& new_rect) {
+  uint16_t mask = 0;
+  mask |= XCB_CONFIG_WINDOW_X;
+  mask |= XCB_CONFIG_WINDOW_Y;
+  mask |= XCB_CONFIG_WINDOW_WIDTH;
+  mask |= XCB_CONFIG_WINDOW_HEIGHT;
+  mask |= XCB_CONFIG_WINDOW_BORDER_WIDTH;
+
+  struct {
+    Rect rect;
+    uint32_t border_width;
+  } values = {new_rect, 2};
+  static_assert(sizeof(values) == 20);
+
+  xcb_configure_window(conn, client_window, mask, &values);
+  client.wants_configure_notify = IsSameWH(client.rect, new_rect);
+}
+
 void ApplyLayoutChanges(WMState& wm_state, const std::vector<Rect>& layout) {
   ClientStack& stack = wm_state.stacks[wm_state.active_stack_idx];
   CHECK_EQ(layout.size(), stack.client_windows.size());
@@ -103,17 +175,9 @@ void ApplyLayoutChanges(WMState& wm_state, const std::vector<Rect>& layout) {
   for (const auto& [rect, client_window] :
        std::ranges::views::zip(layout, stack.client_windows)) {
     Client& client = wm_state.clients.at(client_window);
-
     if (rect != client.rect) {
+      ConfigureClient(wm_state.conn, client_window, client, rect);
       client.rect = rect;
-
-      xcb_configure_window(
-          wm_state.conn, client_window,
-          XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y | XCB_CONFIG_WINDOW_WIDTH |
-              XCB_CONFIG_WINDOW_HEIGHT | XCB_CONFIG_WINDOW_BORDER_WIDTH,
-          (uint32_t[]){static_cast<uint32_t>(rect.x()),
-                       static_cast<uint32_t>(rect.y()), rect.width(),
-                       rect.height(), 2});
     }
   }
 
@@ -123,11 +187,12 @@ void ApplyLayoutChanges(WMState& wm_state, const std::vector<Rect>& layout) {
     for (xcb_window_t client_window : wm_state.stacks[istack].client_windows) {
       Client& client = wm_state.clients.at(client_window);
       if (client.rect != Rect{}) {
+        Rect new_rect = client.rect;
+        new_rect.x() = wm_state.screen.width_in_pixels;
+        new_rect.y() = wm_state.screen.height_in_pixels;
+
+        ConfigureClient(wm_state.conn, client_window, client, new_rect);
         client.rect = Rect{};
-        xcb_configure_window(wm_state.conn, client_window,
-                             XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y,
-                             (uint32_t[]){wm_state.screen.width_in_pixels,
-                                          wm_state.screen.height_in_pixels});
       }
     }
   }
@@ -225,40 +290,6 @@ void MoveClientFocus(WMState& wm_state, ssize_t idelta, xcb_timestamp_t time) {
 
   SetInputFocus(wm_state, stack.active_client_window, time);
   BorderActive(wm_state, stack.active_client_window);
-}
-
-void FocusWindow(xcb_connection_t* conn, const xcb_screen_t& screen,
-                 xcb_window_t window) {
-  // xcb_window_t old_focused_window =
-  //     stack().clients[stack().focused.index].window;
-  // if (old_focused_window == window) return;
-  //
-  // for (size_t i = 0; i < stack().clients.size(); ++i) {
-  //   auto& client = stack().clients[i];
-  //   if (client.window == window) {
-  //     xcb_change_window_attributes(conn, old_focused_window,
-  //                                  XCB_CW_BORDER_PIXEL,
-  //                                  (uint32_t[]){screen.black_pixel});
-  //
-  //     stack().focused.index = i;
-  //     stack().focused.uid = client.guid;
-  //
-  //     xcb_set_input_focus(conn, XCB_INPUT_FOCUS_PARENT, client.window,
-  //                         XCB_CURRENT_TIME);
-  //     xcb_change_window_attributes(conn, client.window, XCB_CW_BORDER_PIXEL,
-  //                                  (uint32_t[]){screen.white_pixel});
-  //     return;
-  //   }
-  // }
-}
-
-xcb_window_t GetFocusedWindow() {
-  return 0;
-
-  // if (!stack().focused.uid) return 0;
-  //
-  // CHECK_LT(stack().focused.index, stack().clients.size());
-  // return stack().clients[stack().focused.index].window;
 }
 
 }  // namespace nyla

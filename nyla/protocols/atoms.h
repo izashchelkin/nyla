@@ -12,6 +12,7 @@ xcb_atom_t InternAtom(xcb_connection_t* conn, std::string_view name,
 
 struct Atoms {
   xcb_atom_t wm_delete_window;
+  xcb_atom_t wm_name;
   xcb_atom_t wm_protocols;
   xcb_atom_t wm_state;
   xcb_atom_t wm_take_focus;

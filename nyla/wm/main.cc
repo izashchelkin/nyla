@@ -13,7 +13,6 @@
 #include "absl/log/globals.h"
 #include "absl/log/initialize.h"
 #include "absl/log/log.h"
-#include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "nyla/commons/rect.h"
 #include "nyla/commons/spawn.h"
@@ -21,6 +20,7 @@
 #include "nyla/fs/nylafs.h"
 #include "nyla/layout/layout.h"
 #include "nyla/protocols/atoms.h"
+#include "nyla/protocols/send.h"
 #include "nyla/protocols/wm_protocols.h"
 #include "nyla/wm/bar_manager.h"
 #include "nyla/wm/client_manager.h"
@@ -46,6 +46,8 @@ int Main(int argc, char** argv) {
     LOG(QFATAL) << "could not connect to X server";
   }
   absl::Cleanup disconnecter = [conn] { xcb_disconnect(conn); };
+
+  xcb_grab_server(conn);
 
   xcb_screen_t screen = *xcb_aux_get_screen(conn, iscreen);
 
@@ -134,6 +136,8 @@ int Main(int argc, char** argv) {
   if (!tfd) LOG(QFATAL) << "MakeTimerFdMillis";
   absl::Cleanup tfd_closer = [tfd] { close(tfd); };
 
+  ManageClientsStartup(wm_state);
+
   std::vector<pollfd> fds;
   fds.emplace_back(
       pollfd{.fd = xcb_get_file_descriptor(conn), .events = POLLIN});
@@ -143,21 +147,51 @@ int Main(int argc, char** argv) {
   if (nylafs.Init()) {
     fds.emplace_back(pollfd{.fd = nylafs.GetFd(), .events = POLLIN});
 
-    nylafs.Register({"clients", [&] {
-                       std::string out;
-                       for (const auto& [client_window, client] :
-                            wm_state.clients) {
-                         absl::StrAppendFormat(&out, "window=%v rect=%v\n",
-                                               client_window, client.rect);
-                       }
-                       return out;
-                     }});
+    nylafs.Register(
+        {"clients",
+         [&] {
+           std::string out;
+           for (const auto& [client_window, client] : wm_state.clients) {
+             absl::StrAppendFormat(&out,
+                                   "name=%v window=%v rect=%v input=%v "
+                                   "wm_take_focus=%v wm_delete_window=%v\n",
+                                   client.name, client_window, client.rect,
+                                   client.input, client.wm_take_focus,
+                                   client.wm_delete_window);
+           }
+           return out;
+         },
+         [] {}});
+
+    nylafs.Register({"quit", [] { return "quit\n"; },
+                     [&is_running] { is_running = false; }});
 
   } else {
     LOG(ERROR) << "could not start NylaFS, continuing anyway...";
   }
 
+  xcb_ungrab_server(conn);
+
   while (is_running && !xcb_connection_has_error(conn)) {
+    CHECK_LT(wm_state.active_stack_idx, wm_state.stacks.size());
+    const auto& stack = wm_state.stacks[wm_state.active_stack_idx];
+
+    ApplyLayoutChanges(
+        wm_state,
+        ComputeLayout(ApplyMarginTop(
+                          Rect(screen.width_in_pixels, screen.height_in_pixels),
+                          bar_manager.height()),
+                      stack.client_windows.size(), 2, stack.layout_type));
+
+    for (auto& [client_window, client] : wm_state.clients) {
+      if (client.wants_configure_notify) {
+        SendConfigureNotify(conn, client_window, wm_state.screen.root,
+                            client.rect.x(), client.rect.y(),
+                            client.rect.width(), client.rect.height(), 2);
+        client.wants_configure_notify = false;
+      }
+    }
+
     xcb_flush(conn);
 
     if (poll(fds.data(), fds.size(), -1) == -1) {
@@ -167,16 +201,6 @@ int Main(int argc, char** argv) {
 
     if (fds[0].revents & POLLIN) {
       ProcessXEvents(wm_state, is_running, modifier, keybinds);
-
-      CHECK_LT(wm_state.active_stack_idx, wm_state.stacks.size());
-      const auto& stack = wm_state.stacks[wm_state.active_stack_idx];
-
-      ApplyLayoutChanges(
-          wm_state,
-          ComputeLayout(ApplyMarginTop(Rect(screen.width_in_pixels,
-                                            screen.height_in_pixels),
-                                       bar_manager.height()),
-                        stack.client_windows.size(), 2, stack.layout_type));
     }
 
     if (fds[1].revents & POLLIN) {
@@ -216,6 +240,15 @@ static void ProcessXEvents(WMState& wm_state, const bool& is_running,
       }
       case XCB_PROPERTY_NOTIFY: {
         // TODO:
+        break;
+      }
+      case XCB_CONFIGURE_REQUEST: {
+        auto configurerequest =
+            reinterpret_cast<xcb_configure_request_event_t*>(event);
+        auto it = wm_state.clients.find(configurerequest->window);
+        if (it != wm_state.clients.end()) {
+          it->second.wants_configure_notify = true;
+        }
         break;
       }
       case XCB_MAP_REQUEST: {

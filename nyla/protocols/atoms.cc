@@ -25,6 +25,7 @@ xcb_atom_t InternAtom(xcb_connection_t* conn, std::string_view name,
 Atoms InternAtoms(xcb_connection_t* conn) {
   return Atoms{
       .wm_delete_window = InternAtom(conn, "WM_DELETE_WINDOW"),
+      .wm_name = InternAtom(conn, "WM_NAME"),
       .wm_protocols = InternAtom(conn, "WM_PROTOCOLS"),
       .wm_state = InternAtom(conn, "WM_STATE"),
       .wm_take_focus = InternAtom(conn, "WM_TAKE_FOCUS"),

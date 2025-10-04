@@ -13,9 +13,10 @@ xcb_get_property_reply_t* FetchPropertyInternal(xcb_connection_t* conn,
       nullptr);
 
   if (reply->type != type) {
-    LOG(ERROR) << "FetchPropertyInternal: mismatched type";
-		free(reply);
-		return nullptr;
+    LOG(ERROR) << "FetchPropertyInternal: mismatched types (expected: " << type
+               << ", but got: " << reply->type << ")";
+    free(reply);
+    return nullptr;
   }
 
   return reply;

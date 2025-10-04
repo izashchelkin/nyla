@@ -12,9 +12,11 @@ namespace nyla {
 
 class NylaFsDynamicFile {
  public:
-  NylaFsDynamicFile(const char *name, std::function<std::string()> get_content)
+  NylaFsDynamicFile(const char *name, std::function<std::string()> get_content,
+                    std::function<void()> notify_read)
       : name_{name},
         get_content_{get_content},
+        notify_read_(notify_read),
         content_time_{},
         content_cache_{},
         inode_{} {}
@@ -32,7 +34,7 @@ class NylaFsDynamicFile {
         std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::steady_clock::now().time_since_epoch());
 
-    if (!content_time_.count() || (now - content_time_).count() > 100L) {
+    if (!content_time_.count() || (now - content_time_).count() > 10L) {
       content_time_ = now;
       content_cache_ = get_content_();
     }
@@ -40,11 +42,14 @@ class NylaFsDynamicFile {
     return content_cache_;
   }
 
+  void notify_read() const { notify_read_(); }
+
   fuse_entry_param AsFuseEntryParam();
 
  private:
   const char *name_;
   std::function<std::string()> get_content_;
+  std::function<void()> notify_read_;
   std::chrono::milliseconds content_time_;
   std::string content_cache_;
   fuse_ino_t inode_;

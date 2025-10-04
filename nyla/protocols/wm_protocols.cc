@@ -1,5 +1,6 @@
 #include "nyla/protocols/wm_protocols.h"
 
+#include "nyla/protocols/send.h"
 #include "xcb/xcb.h"
 
 namespace nyla {

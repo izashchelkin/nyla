@@ -1,5 +1,4 @@
 #include "nyla/protocols/atoms.h"
-#include "nyla/protocols/client_message.h"
 #include "xcb/xcb.h"
 #include "xcb/xproto.h"
 

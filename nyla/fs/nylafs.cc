@@ -136,6 +136,7 @@ void NylaFs::HandleRead(fuse_req_t req, fuse_ino_t inode, size_t size,
     fuse_reply_err(req, ENOENT);
   } else {
     FuseReplyBufSlice(req, it->get_content(), offset, size);
+    it->notify_read();
   }
 }
 
@@ -239,6 +240,8 @@ bool NylaFs::Init() {
 }
 
 void NylaFs::Register(const NylaFsDynamicFile &file) {
+  LOG(INFO) << "registered dynamic file " << file.name();
+
   files_.emplace_back(file).inode() = next_inode_++;
 }
 

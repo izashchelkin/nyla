@@ -47,11 +47,18 @@ class Rect {
   uint32_t width_;
   uint32_t height_;
 };
+static_assert(sizeof(Rect) == 16);
 
 template <typename Sink>
 void AbslStringify(Sink& sink, const Rect& rect) {
   absl::Format(&sink, "%dx%d at (%d, %d)", rect.width_, rect.height_, rect.x_,
                rect.y_);
+}
+
+inline bool IsSameWH(const Rect& lhs, const Rect& rhs) {
+  if (lhs.width() != rhs.width()) return false;
+  if (lhs.height() != rhs.height()) return false;
+  return true;
 }
 
 Rect ApplyPadding(const Rect& rect, uint32_t padding);

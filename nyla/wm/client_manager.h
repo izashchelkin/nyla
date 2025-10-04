@@ -13,9 +13,11 @@ namespace nyla {
 
 struct Client {
   Rect rect;
+  std::string name;
   bool input;
   bool wm_take_focus;
   bool wm_delete_window;
+  bool wants_configure_notify;
 };
 
 struct ClientStack {
@@ -34,6 +36,7 @@ struct WMState {
   size_t active_stack_idx;
 };
 
+void ManageClientsStartup(WMState& wm_state);
 void ManageClient(WMState& wm_state, xcb_window_t window);
 void UnmanageClient(WMState& wm_state, xcb_window_t window);
 void ApplyLayoutChanges(WMState& wm_state, const std::vector<Rect>& layout);
