@@ -88,9 +88,9 @@ void CheckFocusTheft(WMState& wm_state) {
     }
   }
 
+  xcb_window_t active_client_window = GetActiveWindow(wm_state);
   // LOG(INFO) << "focusin " << active_client_window << " =?= " << window;
 
-  xcb_window_t active_client_window = GetActiveWindow(wm_state);
   if (active_client_window != window)
     SetInputFocus(wm_state, active_client_window, XCB_CURRENT_TIME);
 }

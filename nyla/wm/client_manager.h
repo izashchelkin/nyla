@@ -68,6 +68,7 @@ inline xcb_window_t GetActiveWindow(WMState& wm_state) {
 }
 
 std::string GetActiveClientBarText(WMState& wm_state);
+void CheckFocusTheft(WMState& wm_state);
 
 void ManageClientsStartup(WMState& wm_state);
 void ManageClient(WMState& wm_state, xcb_window_t client_window, bool focus);

@@ -319,6 +319,7 @@ static void ProcessXEvents(WMState& wm_state, const bool& is_running,
           break;
         }
 
+        CheckFocusTheft(wm_state);
         break;
       }
       case 0: {
