@@ -62,6 +62,7 @@ inline bool IsSameWH(const Rect& lhs, const Rect& rhs) {
 }
 
 Rect ApplyPadding(const Rect& rect, uint32_t padding);
+Rect ApplyMargin(const Rect& rect, uint32_t margin);
 Rect ApplyMarginTop(const Rect& rect, uint32_t margin_top);
 
 }  // namespace nyla

@@ -30,7 +30,7 @@ static void ApplyBorderColor(xcb_connection_t* conn, xcb_window_t window,
   if (window) {
     xcb_change_window_attributes(conn, window, XCB_CW_BORDER_PIXEL, &color);
   }
-};
+}
 
 static void ApplyNormalBorder(WMState& wm_state) {
   ApplyBorderColor(wm_state.conn, GetActiveWindow(wm_state),
@@ -123,10 +123,13 @@ static bool UpdateClientProperties(WMState& wm_state,
 
   auto transient_for = FetchProperty<xcb_window_t>(
       wm_state.conn, client_window, XCB_ATOM_WM_TRANSIENT_FOR, XCB_ATOM_WINDOW);
-  if (!transient_for) return false;
 
-  if (*transient_for && wm_state.clients.contains(*transient_for)) {
-    client.transient_for = *transient_for;
+  if (transient_for && *transient_for) {
+    if (wm_state.clients.contains(*transient_for)) {
+      client.transient_for = *transient_for;
+    } else {
+      LOG(WARNING) << "invalid transient_for " << *transient_for;
+    }
   }
 
   return true;
@@ -142,6 +145,8 @@ static xcb_window_t FindNonTransient(WMState& wm_state,
     if (!next) return transient_for;
     transient_for = next;
   }
+
+  LOG(WARNING) << "could not find non-transient_for " << transient_for;
   return 0;
 }
 
@@ -241,17 +246,17 @@ void UnmanageClient(WMState& wm_state, xcb_window_t window) {
   if (it == wm_state.clients.end()) return;
 
   auto& client = it->second;
-  if (client.subwindows.empty()) {
-    if (client.transient_for) {
-      auto& subwindows = wm_state.clients.at(client.transient_for).subwindows;
-      auto it = std::ranges::find(subwindows, client.transient_for);
-      CHECK(it != subwindows.end());
-      subwindows.erase(it);
-    }
+
+  if (client.transient_for) {
+    CHECK(client.subwindows.empty());
+    auto& subwindows = wm_state.clients.at(client.transient_for).subwindows;
+    auto it = std::ranges::find(subwindows, window);
+    CHECK(it != subwindows.end());
+    subwindows.erase(it);
   } else {
-    CHECK(!client.transient_for);
-    for (xcb_window_t window : client.subwindows)
-      wm_state.clients.at(window).transient_for = 0;
+    for (xcb_window_t subwindow : client.subwindows) {
+      wm_state.clients.at(subwindow).transient_for = 0;
+    }
   }
 
   wm_state.clients.erase(it);
@@ -318,9 +323,25 @@ void ApplyLayoutChanges(WMState& wm_state, const Rect& screen_rect,
     Rect rect = (client_window == stack.active_window && stack.zoom)
                     ? ApplyPadding(screen_rect, padding)
                     : layout_rect;
+
+    bool force_reconfigure_subwindows = false;
     if (rect != client.rect) {
       ConfigureClient(wm_state.conn, client_window, client, rect, true);
       client.rect = rect;
+      force_reconfigure_subwindows = true;
+    }
+
+    std::vector<Rect> sublayout =
+        ComputeLayout(ApplyMargin(rect, 10), client.subwindows.size(), padding,
+                      LayoutType::kGrid);
+    for (auto [sublayout_rect, subwindow] :
+         std::ranges::views::zip(sublayout, client.subwindows)) {
+      Client& subclient = wm_state.clients.at(subwindow);
+      if (force_reconfigure_subwindows || sublayout_rect != subclient.rect) {
+        ConfigureClient(wm_state.conn, subwindow, subclient, sublayout_rect,
+                        true);
+        client.rect = rect;
+      }
     }
   }
 

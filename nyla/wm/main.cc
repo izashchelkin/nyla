@@ -7,6 +7,7 @@
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
+#include <string>
 
 #include "absl/cleanup/cleanup.h"
 #include "absl/log/check.h"
@@ -138,12 +139,35 @@ int Main(int argc, char** argv) {
         [&wm_state] {
           std::string out;
           for (const auto& [client_window, client] : wm_state.clients) {
+            std::string_view indent = [&client]() {
+              if (client.transient_for) return "  T  ";
+              if (!client.subwindows.empty()) return "  S  ";
+              return "";
+            }();
+
+            std::string transient_for_name;
+            if (client.transient_for) {
+              auto it = wm_state.clients.find(client.transient_for);
+              if (it == wm_state.clients.end()) {
+                transient_for_name =
+                    "invalid " + std::to_string(client.transient_for);
+              } else {
+                transient_for_name = it->second.name + " " +
+                                     std::to_string(client.transient_for);
+              }
+            } else {
+              transient_for_name = "none";
+            }
+
             absl::StrAppendFormat(
                 &out,
-                "window=%v\nname=%v\nrect=%v\nwm_transient_for=%v\ninput=%v\n"
-                "wm_take_focus=%v\nwm_delete_window=%v\nsubwindows=%v\n\n",
-                client_window, client.name, client.rect, client.transient_for,
-                client.input, client.wm_take_focus, client.wm_delete_window,
+                "%swindow=%x\n%sname=%v\n%srect=%v\n%swm_"
+                "transient_for=%v\n%sinput=%v\n"
+                "%swm_take_focus=%v\n%swm_delete_window=%v\n%"
+                "ssubwindows=%v\n\n",
+                indent, client_window, indent, client.name, indent, client.rect,
+                indent, transient_for_name, indent, client.input, indent,
+                client.wm_take_focus, indent, client.wm_delete_window, indent,
                 absl::StrJoin(client.subwindows, ", "));
           }
           return out;

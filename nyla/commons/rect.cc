@@ -18,4 +18,11 @@ Rect ApplyMarginTop(const Rect& rect, uint32_t margin_top) {
               rect.height() - margin_top);
 }
 
+Rect ApplyMargin(const Rect& rect, uint32_t margin) {
+  CHECK(rect.width() > 2 * margin && rect.height() > 2 * margin);
+
+  return Rect(rect.x() + margin, rect.y() + margin, rect.width() - 2 * margin,
+              rect.height() - 2 * margin);
+}
+
 }  // namespace nyla
