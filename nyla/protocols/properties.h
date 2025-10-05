@@ -16,10 +16,10 @@ xcb_get_property_reply_t* FetchPropertyInternal(xcb_connection_t* conn,
                                                 const uint32_t long_length);
 
 template <typename PropertyStruct>
-std::optional<PropertyStruct> FetchPropertyStruct(xcb_connection_t* conn,
-                                                  xcb_window_t window,
-                                                  const xcb_atom_t property,
-                                                  const xcb_atom_t type) {
+std::optional<PropertyStruct> FetchProperty(xcb_connection_t* conn,
+                                            xcb_window_t window,
+                                            const xcb_atom_t property,
+                                            const xcb_atom_t type) {
   static_assert((sizeof(PropertyStruct) % 4) == 0);
 
   auto reply = FetchPropertyInternal(conn, window, property, type,
@@ -36,10 +36,9 @@ std::optional<PropertyStruct> FetchPropertyStruct(xcb_connection_t* conn,
 }
 
 template <typename Element>
-std::optional<std::vector<Element>> FetchPropertyVector(xcb_connection_t* conn,
-                                                      xcb_window_t window,
-                                                      const xcb_atom_t property,
-                                                      const xcb_atom_t type) {
+std::optional<std::vector<Element>> FetchPropertyVector(
+    xcb_connection_t* conn, xcb_window_t window, const xcb_atom_t property,
+    const xcb_atom_t type) {
   auto reply = FetchPropertyInternal(conn, window, property, type,
                                      std::numeric_limits<uint32_t>::max());
   if (!reply) return std::make_optional<std::vector<Element>>();

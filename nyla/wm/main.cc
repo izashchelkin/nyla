@@ -14,6 +14,7 @@
 #include "absl/log/initialize.h"
 #include "absl/log/log.h"
 #include "absl/strings/str_format.h"
+#include "absl/strings/str_join.h"
 #include "nyla/commons/rect.h"
 #include "nyla/commons/spawn.h"
 #include "nyla/commons/timer.h"
@@ -48,12 +49,12 @@ int Main(int argc, char** argv) {
 
   xcb_grab_server(conn);
 
-  xcb_screen_t screen = *xcb_aux_get_screen(conn, iscreen);
+  xcb_screen_t* screen = xcb_aux_get_screen(conn, iscreen);
 
   if (xcb_request_check(
           conn,
           xcb_change_window_attributes_checked(
-              conn, screen.root, XCB_CW_EVENT_MASK,
+              conn, screen->root, XCB_CW_EVENT_MASK,
               (uint32_t[]){
                   XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT |
                   XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY |
@@ -70,7 +71,10 @@ int Main(int argc, char** argv) {
   WMState wm_state{};
   wm_state.conn = conn;
   wm_state.screen = screen;
-  wm_state.atoms = InternAtoms(conn);
+  wm_state.atoms = [conn] {
+    static Atoms atoms = InternAtoms(conn);
+    return &atoms;
+  }();
   wm_state.stacks.resize(9);
 
   uint16_t modifier = XCB_MOD_MASK_4;
@@ -96,17 +100,14 @@ int Main(int argc, char** argv) {
   });
 
   keybinds.emplace_back("AB02", [&wm_state](xcb_timestamp_t time) {
-    CHECK_LT(wm_state.active_stack_idx, wm_state.stacks.size());
-    const auto& stack = wm_state.stacks[wm_state.active_stack_idx];
-    if (stack.active_client_window) {
-      Send_WM_Delete_Window(wm_state.conn, stack.active_client_window,
-                            wm_state.atoms);
-    }
+    xcb_window_t active_window = GetActiveWindow(wm_state);
+    if (active_window)
+      Send_WM_Delete_Window(wm_state.conn, active_window, wm_state.atoms);
   });
 
   // keybinds.emplace_back("AB05", [conn, &client_manager, &atoms] {});
 
-  if (!BindKeyboard(conn, screen.root, modifier, keybinds))
+  if (!BindKeyboard(conn, screen->root, modifier, keybinds))
     LOG(QFATAL) << "could not bind keyboard";
   LOG(INFO) << "bind keyboard successful";
 
@@ -137,12 +138,13 @@ int Main(int argc, char** argv) {
         [&wm_state] {
           std::string out;
           for (const auto& [client_window, client] : wm_state.clients) {
-            absl::StrAppendFormat(&out,
-                                  "name=%v window=%v rect=%v input=%v "
-                                  "wm_take_focus=%v wm_delete_window=%v\n",
-                                  client.name, client_window, client.rect,
-                                  client.input, client.wm_take_focus,
-                                  client.wm_delete_window);
+            absl::StrAppendFormat(
+                &out,
+                "window=%v\nname=%v\nrect=%v\nwm_transient_for=%v\ninput=%v\n"
+                "wm_take_focus=%v\nwm_delete_window=%v\nsubwindows=%v\n\n",
+                client_window, client.name, client.rect, client.transient_for,
+                client.input, client.wm_take_focus, client.wm_delete_window,
+                absl::StrJoin(client.subwindows, ", "));
           }
           return out;
         },
@@ -163,13 +165,13 @@ int Main(int argc, char** argv) {
 
   while (is_running && !xcb_connection_has_error(conn)) {
     auto screen_rect =
-        ApplyMarginTop(Rect(screen.width_in_pixels, screen.height_in_pixels),
+        ApplyMarginTop(Rect(screen->width_in_pixels, screen->height_in_pixels),
                        bar_manager.height());
     ApplyLayoutChanges(wm_state, screen_rect, 2);
 
     for (auto& [client_window, client] : wm_state.clients) {
       if (client.wants_configure_notify) {
-        SendConfigureNotify(conn, client_window, wm_state.screen.root,
+        SendConfigureNotify(conn, client_window, wm_state.screen->root,
                             client.rect.x(), client.rect.y(),
                             client.rect.width(), client.rect.height(), 2);
         client.wants_configure_notify = false;
@@ -190,12 +192,9 @@ int Main(int argc, char** argv) {
     if (fds[1].revents & POLLIN) {
       uint64_t expirations;
       if (read(tfd, &expirations, sizeof(expirations)) >= 0) {
-        auto it = GetActiveClient(wm_state);
-        std::string active_client_name = it != wm_state.clients.end()
-                                             ? it->second.name
-                                             : "nyla: no active client";
-        bar_manager.Update(conn, screen,
-                           active_client_name);  // TODO: also on Expose
+        bar_manager.Update(
+            conn, screen,
+            GetActiveClientBarText(wm_state));  // TODO: also on Expose
       }
     }
 
@@ -260,7 +259,7 @@ static void ProcessXEvents(WMState& wm_state, const bool& is_running,
         // auto mappingnotify =
         //     reinterpret_cast<xcb_mapping_notify_event_t*>(event);
 
-        if (!BindKeyboard(wm_state.conn, wm_state.screen.root, modifier,
+        if (!BindKeyboard(wm_state.conn, wm_state.screen->root, modifier,
                           keybinds))
           LOG(QFATAL) << "could not bind keyboard";
         LOG(INFO) << "bind keyboard successful";

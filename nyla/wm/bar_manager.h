@@ -12,9 +12,9 @@ class Bar {
  public:
   Bar(uint16_t height) : height_{height}, window_{}, gc_{} {}
 
-  bool Init(xcb_connection_t *conn, xcb_screen_t &screen);
+  bool Init(xcb_connection_t *conn, xcb_screen_t *screen);
 
-  void Update(xcb_connection_t *conn, xcb_screen_t &screen,
+  void Update(xcb_connection_t *conn, xcb_screen_t *screen,
               std::string_view msg);
 
   uint16_t height() { return height_; }
@@ -29,8 +29,8 @@ class BarManager {
  public:
   BarManager() : bar_{24} {}
 
-  bool Init(xcb_connection_t *conn, xcb_screen_t &screen);
-  void Update(xcb_connection_t *conn, xcb_screen_t &screen,
+  bool Init(xcb_connection_t *conn, xcb_screen_t *screen);
+  void Update(xcb_connection_t *conn, xcb_screen_t *screen,
               std::string_view active_client_name);
 
   uint16_t height() { return bar_.height(); }

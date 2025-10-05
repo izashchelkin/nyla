@@ -12,46 +12,59 @@
 
 namespace nyla {
 
+struct ClientStack {
+  LayoutType layout_type;
+  bool zoom;
+  bool follow;
+
+  std::vector<xcb_window_t> windows;
+  xcb_window_t active_window;
+};
+
 struct Client {
   Rect rect;
   std::string name;
+
   bool input;
   bool wm_take_focus;
   bool wm_delete_window;
   bool wants_configure_notify;
-};
 
-struct ClientStack {
-  std::vector<xcb_window_t> client_windows;
-  xcb_window_t active_client_window;
-  LayoutType layout_type;
-  bool zoom;
-  bool follow;
+  xcb_window_t transient_for;
+  std::vector<xcb_window_t> subwindows;
+  xcb_window_t active_subwindow;
 };
 
 struct WMState {
   xcb_connection_t* conn;
-  xcb_screen_t screen;
-  Atoms atoms;
+  xcb_screen_t* screen;
+  Atoms* atoms;
+
   absl::flat_hash_map<xcb_window_t, Client> clients;
+
   std::vector<ClientStack> stacks;
   size_t active_stack_idx;
 };
 
 inline ClientStack& GetActiveStack(WMState& wm_state) {
   CHECK_LT(wm_state.active_stack_idx, wm_state.stacks.size());
-  return wm_state.stacks[wm_state.active_stack_idx];
+  return wm_state.stacks.at(wm_state.active_stack_idx);
 }
 
 inline xcb_window_t GetActiveWindow(WMState& wm_state) {
-  return GetActiveStack(wm_state).active_client_window;
+  const ClientStack& stack = GetActiveStack(wm_state);
+  if (!stack.active_window) return 0;
+
+  const Client& client = wm_state.clients.at(stack.active_window);
+  CHECK(!client.transient_for);
+
+  if (!client.active_subwindow) return stack.active_window;
+
+  CHECK(wm_state.clients.contains(client.active_subwindow));
+  return client.active_subwindow;
 }
 
-inline decltype(WMState::clients)::iterator GetActiveClient(WMState& wm_state) {
-  xcb_window_t window = GetActiveWindow(wm_state);
-  if (!window) return wm_state.clients.end();
-  return wm_state.clients.find(window);
-}
+std::string GetActiveClientBarText(WMState& wm_state);
 
 void ManageClientsStartup(WMState& wm_state);
 void ManageClient(WMState& wm_state, xcb_window_t client_window, bool focus);

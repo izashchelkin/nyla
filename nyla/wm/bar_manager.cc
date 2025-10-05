@@ -10,16 +10,16 @@
 
 namespace nyla {
 
-bool Bar::Init(xcb_connection_t *conn, xcb_screen_t &screen) {
+bool Bar::Init(xcb_connection_t *conn, xcb_screen_t *screen) {
   window_ = xcb_generate_id(conn);
 
   if (xcb_request_check(
-          conn,
-          xcb_create_window_checked(
-              conn, XCB_COPY_FROM_PARENT, window_, screen.root, 0, 0,
-              screen.width_in_pixels, height_, 0, XCB_WINDOW_CLASS_INPUT_OUTPUT,
-              screen.root_visual, XCB_CW_BACK_PIXEL | XCB_CW_OVERRIDE_REDIRECT,
-              (uint32_t[]){screen.black_pixel, true}))) {
+          conn, xcb_create_window_checked(
+                    conn, XCB_COPY_FROM_PARENT, window_, screen->root, 0, 0,
+                    screen->width_in_pixels, height_, 0,
+                    XCB_WINDOW_CLASS_INPUT_OUTPUT, screen->root_visual,
+                    XCB_CW_BACK_PIXEL | XCB_CW_OVERRIDE_REDIRECT,
+                    (uint32_t[]){screen->black_pixel, true}))) {
     LOG(ERROR) << "could not create bar window";
     return false;
   }
@@ -41,7 +41,7 @@ bool Bar::Init(xcb_connection_t *conn, xcb_screen_t &screen) {
           xcb_create_gc_checked(
               conn, gc_, window_,
               XCB_GC_FOREGROUND | XCB_GC_BACKGROUND | XCB_GC_FONT,
-              (uint32_t[]){screen.white_pixel, screen.black_pixel, font}))) {
+              (uint32_t[]){screen->white_pixel, screen->black_pixel, font}))) {
     LOG(ERROR) << "could not create bar GC";
     return false;
   }
@@ -49,17 +49,17 @@ bool Bar::Init(xcb_connection_t *conn, xcb_screen_t &screen) {
   return true;
 }
 
-void Bar::Update(xcb_connection_t *conn, xcb_screen_t &screen,
+void Bar::Update(xcb_connection_t *conn, xcb_screen_t *screen,
                  std::string_view msg) {
-  xcb_clear_area(conn, 0, window_, 0, 0, screen.width_in_pixels, height_);
+  xcb_clear_area(conn, 0, window_, 0, 0, screen->width_in_pixels, height_);
   xcb_image_text_8(conn, msg.size(), window_, gc_, 8, 16, msg.data());
 }
 
-bool BarManager::Init(xcb_connection_t *conn, xcb_screen_t &screen) {
+bool BarManager::Init(xcb_connection_t *conn, xcb_screen_t *screen) {
   return bar_.Init(conn, screen);
 }
 
-void BarManager::Update(xcb_connection_t *conn, xcb_screen_t &screen,
+void BarManager::Update(xcb_connection_t *conn, xcb_screen_t *screen,
                         std::string_view active_client_name) {
   // std::string_view bar_text;
   //
