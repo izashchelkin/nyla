@@ -26,6 +26,7 @@
 #include "nyla/wm/bar_manager.h"
 #include "nyla/wm/client_manager.h"
 #include "nyla/wm/keyboard.h"
+#include "nyla/wm/x11.h"
 #include "xcb/xcb.h"
 #include "xcb/xcb_aux.h"
 #include "xcb/xproto.h"
@@ -98,6 +99,7 @@ int Main(int argc, char** argv) {
       "AC04", [&wm_state](xcb_timestamp_t time) { NextFocus(wm_state, time); });
   keybinds.emplace_back("AC05", [&](xcb_timestamp_t time) {
     GetActiveStack(wm_state).zoom ^= 1;
+    wm_state.layout_dirty = true;
   });
 
   keybinds.emplace_back("AB02", [&wm_state](xcb_timestamp_t time) {
@@ -166,9 +168,9 @@ int Main(int argc, char** argv) {
                 "%swm_take_focus=%v\n%swm_delete_window=%v\n%"
                 "ssubwindows=%v\n\n",
                 indent, client_window, indent, client.name, indent, client.rect,
-                indent, transient_for_name, indent, client.input, indent,
-                client.wm_take_focus, indent, client.wm_delete_window, indent,
-                absl::StrJoin(client.subwindows, ", "));
+                indent, transient_for_name, indent, client.wm_hints_input,
+                indent, client.wm_take_focus, indent, client.wm_delete_window,
+                indent, absl::StrJoin(client.subwindows, ", "));
           }
           return out;
         },
@@ -188,7 +190,7 @@ int Main(int argc, char** argv) {
   xcb_ungrab_server(conn);
 
   while (is_running && !xcb_connection_has_error(conn)) {
-    auto screen_rect =
+    Rect screen_rect =
         ApplyMarginTop(Rect(screen->width_in_pixels, screen->height_in_pixels),
                        bar_manager.height());
     ApplyLayoutChanges(wm_state, screen_rect, 2);
@@ -283,10 +285,11 @@ static void ProcessXEvents(WMState& wm_state, const bool& is_running,
         // auto mappingnotify =
         //     reinterpret_cast<xcb_mapping_notify_event_t*>(event);
 
-        if (!BindKeyboard(wm_state.conn, wm_state.screen->root, modifier,
-                          keybinds))
-          LOG(QFATAL) << "could not bind keyboard";
-        LOG(INFO) << "bind keyboard successful";
+        if (BindKeyboard(wm_state.conn, wm_state.screen->root, modifier,
+                         keybinds))
+          LOG(INFO) << "bind keyboard successful";
+        else
+          LOG(ERROR) << "could not bind keyboard";
 
         break;
       }
@@ -319,7 +322,10 @@ static void ProcessXEvents(WMState& wm_state, const bool& is_running,
         break;
       }
       case 0: {
-        LOG(FATAL) << "xcb error";
+        auto error = reinterpret_cast<xcb_generic_error_t*>(event);
+        LOG(ERROR) << "xcb error: "
+                   << static_cast<X11ErrorCode>(error->error_code)
+                   << " sequence: " << error->sequence;
       }
     }
   }

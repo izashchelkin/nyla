@@ -25,9 +25,10 @@ struct Client {
   Rect rect;
   std::string name;
 
-  bool input;
+  bool wm_hints_input;
   bool wm_take_focus;
   bool wm_delete_window;
+
   bool wants_configure_notify;
 
   xcb_window_t transient_for;
@@ -39,6 +40,8 @@ struct WMState {
   xcb_connection_t* conn;
   xcb_screen_t* screen;
   Atoms* atoms;
+
+  bool layout_dirty;
 
   absl::flat_hash_map<xcb_window_t, Client> clients;
 

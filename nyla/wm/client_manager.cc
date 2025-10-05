@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <ctime>
+#include <ios>
 #include <iterator>
 #include <span>
 #include <vector>
@@ -23,6 +24,7 @@ namespace nyla {
 
 static void ClearZoom(WMState& wm_state) {
   GetActiveStack(wm_state).zoom = false;
+  wm_state.layout_dirty = true;
 }
 
 static void ApplyBorderColor(xcb_connection_t* conn, xcb_window_t window,
@@ -38,8 +40,7 @@ static void ApplyNormalBorder(WMState& wm_state) {
 }
 
 static void ApplyActiveBorder(WMState& wm_state) {
-  ApplyBorderColor(wm_state.conn, GetActiveWindow(wm_state),
-                   wm_state.screen->white_pixel);
+  ApplyBorderColor(wm_state.conn, GetActiveWindow(wm_state), 0xff5c00);
 }
 
 static void MoveActiveBorder(WMState& wm_state, xcb_window_t window) {
@@ -59,7 +60,8 @@ static void SetInputFocus(WMState& wm_state, xcb_window_t window,
   const Client& client = wm_state.clients.at(window);
 
   xcb_set_input_focus(wm_state.conn, XCB_INPUT_FOCUS_POINTER_ROOT,
-                      client.input ? window : wm_state.screen->root, time);
+                      client.wm_hints_input ? window : wm_state.screen->root,
+                      time);
 
   if (client.wm_take_focus)
     Send_WM_Take_Focus(wm_state.conn, window, wm_state.atoms, time);
@@ -93,46 +95,52 @@ void CheckFocusTheft(WMState& wm_state) {
     SetInputFocus(wm_state, active_client_window, XCB_CURRENT_TIME);
 }
 
-static bool UpdateClientProperties(WMState& wm_state,
+static void UpdateClientProperties(WMState& wm_state,
                                    xcb_window_t client_window, Client& client) {
-  auto wm_hints = FetchProperty<WM_Hints>(wm_state.conn, client_window,
-                                          XCB_ATOM_WM_HINTS, XCB_ATOM_WM_HINTS);
-  if (!wm_hints) return false;
-
-  auto wm_protocols = FetchPropertyVector<xcb_atom_t>(
-      wm_state.conn, client_window, wm_state.atoms->wm_protocols,
-      XCB_ATOM_ATOM);
-  if (!wm_protocols) return false;
-
-  client.input = wm_hints->input;
+  if (auto wm_hints = FetchProperty<WM_Hints>(
+          wm_state.conn, client_window, XCB_ATOM_WM_HINTS, XCB_ATOM_WM_HINTS);
+      wm_hints) {
+    client.wm_hints_input = wm_hints->input;
+  } else {
+    client.wm_hints_input = false;
+  }
 
   client.wm_delete_window = false;
   client.wm_take_focus = false;
-
-  for (xcb_atom_t atom : *wm_protocols) {
-    if (atom == wm_state.atoms->wm_delete_window)
-      client.wm_delete_window = true;
-    if (atom == wm_state.atoms->wm_take_focus) client.wm_take_focus = true;
-  }
-
-  auto name = FetchPropertyVector<char>(wm_state.conn, client_window,
-                                        wm_state.atoms->wm_name, XCB_ATOM_ANY);
-  if (!name) return false;
-
-  client.name = std::string_view{name->data(), name->size()};
-
-  auto transient_for = FetchProperty<xcb_window_t>(
-      wm_state.conn, client_window, XCB_ATOM_WM_TRANSIENT_FOR, XCB_ATOM_WINDOW);
-
-  if (transient_for && *transient_for) {
-    if (wm_state.clients.contains(*transient_for)) {
-      client.transient_for = *transient_for;
-    } else {
-      LOG(WARNING) << "invalid transient_for " << *transient_for;
+  if (auto wm_protocols = FetchPropertyVector<xcb_atom_t>(
+          wm_state.conn, client_window, wm_state.atoms->wm_protocols,
+          XCB_ATOM_ATOM);
+      wm_protocols) {
+    for (xcb_atom_t atom : *wm_protocols) {
+      if (atom == wm_state.atoms->wm_delete_window)
+        client.wm_delete_window = true;
+      if (atom == wm_state.atoms->wm_take_focus) client.wm_take_focus = true;
     }
   }
 
-  return true;
+  if (auto name = FetchPropertyVector<char>(
+          wm_state.conn, client_window, wm_state.atoms->wm_name, XCB_ATOM_ANY);
+      name) {
+    client.name = std::string_view{name->data(), name->size()};
+  } else {
+    client.name = "";
+  }
+
+  client.transient_for = 0;
+  if (auto transient_for = FetchProperty<xcb_window_t>(
+          wm_state.conn, client_window, XCB_ATOM_WM_TRANSIENT_FOR,
+          XCB_ATOM_WINDOW);
+      transient_for) {
+    auto main_window = *transient_for;
+    if (main_window) {
+      if (wm_state.clients.contains(main_window)) {
+        client.transient_for = main_window;
+      } else {
+        LOG(WARNING) << "Invalid WM_TRANSIENT_FOR=" << std::hex << main_window
+                     << " on " << std::hex << client_window;
+      }
+    }
+  }
 }
 
 static xcb_window_t FindNonTransient(WMState& wm_state,
@@ -146,7 +154,8 @@ static xcb_window_t FindNonTransient(WMState& wm_state,
     transient_for = next;
   }
 
-  LOG(WARNING) << "could not find non-transient_for " << transient_for;
+  LOG(WARNING) << "Could not find logical parent via WM_TRANSIENT_FOR "
+               << transient_for;
   return 0;
 }
 
@@ -198,6 +207,8 @@ void ManageClientsStartup(WMState& wm_state) {
     stack.windows.emplace_back(client_window);
   }
 
+  wm_state.layout_dirty = true;
+
   free(tree_reply);
 }
 
@@ -205,19 +216,14 @@ void ManageClient(WMState& wm_state, xcb_window_t client_window, bool focus) {
   if (auto [it, inserted] =
           wm_state.clients.try_emplace(client_window, Client{});
       inserted) {
+    wm_state.layout_dirty = true;
+
     xcb_change_window_attributes(wm_state.conn, client_window,
                                  XCB_CW_EVENT_MASK,
                                  (uint32_t[]){XCB_EVENT_MASK_ENTER_WINDOW,
                                               XCB_EVENT_MASK_PROPERTY_CHANGE});
     auto& [_, client] = *it;
-
-    if (!UpdateClientProperties(wm_state, client_window, client)) {
-      LOG(WARNING) << "window gonsky?";
-      wm_state.clients.erase(client_window);
-      return;
-    }
-
-    ClientStack& stack = GetActiveStack(wm_state);
+    UpdateClientProperties(wm_state, client_window, client);
 
     if (client.transient_for) {
       client.transient_for = FindNonTransient(wm_state, client.transient_for);
@@ -228,7 +234,9 @@ void ManageClient(WMState& wm_state, xcb_window_t client_window, bool focus) {
       }
     }
 
+    ClientStack& stack = GetActiveStack(wm_state);
     stack.windows.emplace_back(client_window);
+    ClearZoom(wm_state);
 
     if (focus) {
       xcb_window_t active_window = GetActiveWindow(wm_state);
@@ -267,6 +275,8 @@ void UnmanageClient(WMState& wm_state, xcb_window_t window) {
     auto it = std::ranges::find_if(
         stack.windows, [window](xcb_window_t elem) { return elem == window; });
     if (it == stack.windows.end()) continue;
+
+    wm_state.layout_dirty = true;
     stack.windows.erase(it);
 
     if (stack.active_window == window) {
@@ -279,8 +289,7 @@ void UnmanageClient(WMState& wm_state, xcb_window_t window) {
         } else {
           stack.active_window = stack.windows[0];
           SetInputFocus(wm_state, stack.active_window, XCB_CURRENT_TIME);
-          ApplyBorderColor(wm_state.conn, stack.active_window,
-                           wm_state.screen->white_pixel);
+          ApplyActiveBorder(wm_state);
         }
       }
     }
@@ -289,21 +298,21 @@ void UnmanageClient(WMState& wm_state, xcb_window_t window) {
 }
 
 static void ConfigureClient(xcb_connection_t* conn, xcb_window_t client_window,
-                            Client& client, const Rect& new_rect, bool above) {
+                            Client& client, const Rect& new_rect) {
   uint16_t mask = 0;
   mask |= XCB_CONFIG_WINDOW_X;
   mask |= XCB_CONFIG_WINDOW_Y;
   mask |= XCB_CONFIG_WINDOW_WIDTH;
   mask |= XCB_CONFIG_WINDOW_HEIGHT;
   mask |= XCB_CONFIG_WINDOW_BORDER_WIDTH;
-  if (above) mask |= XCB_CONFIG_WINDOW_STACK_MODE;
+  // mask |= XCB_CONFIG_WINDOW_STACK_MODE;
 
   struct {
     Rect rect;
     uint32_t border_width;
-    uint32_t stack_mode;
-  } values = {new_rect, 2, XCB_STACK_MODE_ABOVE};
-  static_assert(sizeof(values) == 6 * 4);
+    // uint32_t stack_mode;
+  } values = {new_rect, 2};
+  static_assert(sizeof(values) == 5 * 4);
 
   xcb_configure_window(conn, client_window, mask, &values);
   client.wants_configure_notify = IsSameWH(client.rect, new_rect);
@@ -311,61 +320,79 @@ static void ConfigureClient(xcb_connection_t* conn, xcb_window_t client_window,
 
 void ApplyLayoutChanges(WMState& wm_state, const Rect& screen_rect,
                         uint32_t padding) {
-  ClientStack& stack = GetActiveStack(wm_state);
-  std::vector<Rect> layout = ComputeLayout(screen_rect, stack.windows.size(),
-                                           padding, stack.layout_type);
-  CHECK_EQ(layout.size(), stack.windows.size());
-
-  for (auto [layout_rect, client_window] :
-       std::ranges::views::zip(layout, stack.windows)) {
-    Client& client = wm_state.clients.at(client_window);
-
-    Rect rect = (client_window == stack.active_window && stack.zoom)
-                    ? ApplyPadding(screen_rect, padding)
-                    : layout_rect;
-
-    bool force_reconfigure_subwindows = false;
-    if (rect != client.rect) {
-      ConfigureClient(wm_state.conn, client_window, client, rect, true);
-      client.rect = rect;
-      force_reconfigure_subwindows = true;
-    }
-
-    std::vector<Rect> sublayout =
-        ComputeLayout(ApplyMargin(rect, 10), client.subwindows.size(), padding,
-                      LayoutType::kGrid);
-    for (auto [sublayout_rect, subwindow] :
-         std::ranges::views::zip(sublayout, client.subwindows)) {
-      Client& subclient = wm_state.clients.at(subwindow);
-      if (force_reconfigure_subwindows || sublayout_rect != subclient.rect) {
-        ConfigureClient(wm_state.conn, subwindow, subclient, sublayout_rect,
-                        true);
-        client.rect = rect;
-      }
-    }
-  }
+  if (!wm_state.layout_dirty) return;
 
   auto hide = [&wm_state](xcb_window_t client_window, Client& client) {
-    if (client.rect != Rect{}) {
-      Rect new_rect = client.rect;
-      new_rect.x() = wm_state.screen->width_in_pixels;
-      new_rect.y() = wm_state.screen->height_in_pixels;
+    if (client.rect.x() == wm_state.screen->width_in_pixels &&
+        client.rect.y() == wm_state.screen->height_in_pixels)
+      return;
 
-      ConfigureClient(wm_state.conn, client_window, client, new_rect, false);
-      client.rect = Rect{};
-    }
+    client.rect.x() = wm_state.screen->width_in_pixels;
+    client.rect.y() = wm_state.screen->height_in_pixels;
+    ConfigureClient(wm_state.conn, client_window, client, client.rect);
   };
+
+  auto hide_all = [&wm_state, hide](xcb_window_t client_window,
+                                    Client& client) {
+    hide(client_window, client);
+    for (xcb_window_t subwindow : client.subwindows)
+      hide(subwindow, wm_state.clients.at(subwindow));
+  };
+
+  auto configure_windows =
+      [&wm_state, padding](Rect bounding_rect, std::span<xcb_window_t> windows,
+                           LayoutType layout_type, auto visitor) {
+        std::vector<Rect> layout =
+            ComputeLayout(bounding_rect, windows.size(), padding, layout_type);
+        CHECK_EQ(layout.size(), windows.size());
+
+        for (auto [rect, client_window] :
+             std::ranges::views::zip(layout, windows)) {
+          Client& client = wm_state.clients.at(client_window);
+          if (rect != client.rect) {
+            ConfigureClient(wm_state.conn, client_window, client, rect);
+            client.rect = rect;
+          }
+
+          visitor(client);
+        }
+      };
+
+  auto configure_subwindows = [configure_windows](Client& client) {
+    configure_windows(ApplyMargin(client.rect, 20), client.subwindows,
+                      LayoutType::kRows, [](Client& client) {});
+  };
+
+  ClientStack& stack = GetActiveStack(wm_state);
+  if (stack.zoom) {
+    for (xcb_window_t client_window : stack.windows) {
+      Client& client = wm_state.clients.at(client_window);
+
+      if (client_window != stack.active_window) {
+        hide_all(client_window, client);
+      } else {
+        Rect rect = ApplyPadding(screen_rect, padding);
+        if (client.rect != rect) {
+          ConfigureClient(wm_state.conn, client_window, client, rect);
+          client.rect = rect;
+        }
+
+        configure_subwindows(client);
+      }
+    }
+  } else {
+    configure_windows(screen_rect, stack.windows, stack.layout_type,
+                      configure_subwindows);
+  }
 
   for (size_t istack = 0; istack < wm_state.stacks.size(); ++istack) {
     if (istack == wm_state.active_stack_idx) continue;
 
-    for (xcb_window_t client_window : wm_state.stacks[istack].windows) {
-      Client& client = wm_state.clients.at(client_window);
-      hide(client_window, client);
-      for (xcb_window_t subwindow : client.subwindows)
-        hide(subwindow, wm_state.clients.at(subwindow));
-    }
+    for (xcb_window_t client_window : wm_state.stacks[istack].windows)
+      hide_all(client_window, wm_state.clients.at(client_window));
   }
+
+  wm_state.layout_dirty = false;
 }
 
 static void ChangeStack(WMState& wm_state, xcb_timestamp_t time,
@@ -381,6 +408,8 @@ static void ChangeStack(WMState& wm_state, xcb_timestamp_t time,
   xcb_window_t window = GetActiveWindow(wm_state);
   if (!window) window = wm_state.screen->root;
   SetInputFocus(wm_state, window, time);
+
+  wm_state.layout_dirty = true;
 }
 
 void NextStack(WMState& wm_state, xcb_timestamp_t time) {
@@ -429,6 +458,7 @@ void PrevFocus(WMState& wm_state, xcb_timestamp_t time) {
 void NextLayout(WMState& wm_state) {
   ClearZoom(wm_state);
   CycleLayoutType(GetActiveStack(wm_state).layout_type);
+  wm_state.layout_dirty = true;
 }
 
 std::string GetActiveClientBarText(WMState& wm_state) {
