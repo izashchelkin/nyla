@@ -85,18 +85,18 @@ int Main(int argc, char** argv) {
   keybinds.emplace_back(
       "AD02", [&wm_state](xcb_timestamp_t time) { NextLayout(wm_state); });
   keybinds.emplace_back(
-      "AD03", [&wm_state](xcb_timestamp_t time) { PrevStack(wm_state, time); });
+      "AD03", [&wm_state](xcb_timestamp_t time) { MoveStackPrev(wm_state, time); });
   keybinds.emplace_back(
-      "AD04", [&wm_state](xcb_timestamp_t time) { NextStack(wm_state, time); });
+      "AD04", [&wm_state](xcb_timestamp_t time) { MoveStackNext(wm_state, time); });
   keybinds.emplace_back(
       "AD05", [](xcb_timestamp_t time) { Spawn({{"ghostty", nullptr}}); });
 
   keybinds.emplace_back(
       "AC02", [](xcb_timestamp_t time) { Spawn({{"dmenu_run", nullptr}}); });
   keybinds.emplace_back(
-      "AC03", [&wm_state](xcb_timestamp_t time) { MovePrev(wm_state, time); });
+      "AC03", [&wm_state](xcb_timestamp_t time) { MoveLocalPrev(wm_state, time); });
   keybinds.emplace_back(
-      "AC04", [&wm_state](xcb_timestamp_t time) { MoveNext(wm_state, time); });
+      "AC04", [&wm_state](xcb_timestamp_t time) { MoveLocalNext(wm_state, time); });
   keybinds.emplace_back("AC05",
                         [&](xcb_timestamp_t time) { ToggleZoom(wm_state); });
 

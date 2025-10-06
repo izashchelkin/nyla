@@ -42,7 +42,7 @@ static void ApplyBorderDefault(WMState& wm_state, const ClientStack& stack) {
 
 static void ApplyBorderActive(WMState& wm_state, const ClientStack& stack) {
   ApplyBorder(wm_state.conn, stack.active_window,
-              stack.follow ? Color::kActiveFollow : Color::kActive);
+              wm_state.follow ? Color::kActiveFollow : Color::kActive);
 }
 
 static void SetInputFocus(WMState& wm_state, xcb_window_t window,
@@ -269,7 +269,9 @@ void ManageClient(WMState& wm_state, xcb_window_t client_window, bool focus) {
     stack.windows.emplace_back(client_window);
 
     if (focus && stack.active_window != client_window) {
-      SetInputFocus(wm_state, client_window, XCB_CURRENT_TIME);
+      ApplyBorderDefault(wm_state, stack);
+      stack.active_window = client_window;
+      SetInputFocus(wm_state, stack.active_window, XCB_CURRENT_TIME);
       ApplyBorderActive(wm_state, stack);
     }
   }
@@ -432,37 +434,63 @@ void ApplyLayoutChanges(WMState& wm_state, const Rect& screen_rect,
   wm_state.layout_dirty = false;
 }
 
-static void ChangeStack(WMState& wm_state, xcb_timestamp_t time,
-                        auto compute_idx) {
-  ApplyBorderDefault(wm_state, GetActiveStack(wm_state));
+static void MoveStack(WMState& wm_state, xcb_timestamp_t time,
+                      auto compute_idx) {
+  size_t iold = wm_state.active_stack_idx;
+  size_t inew =
+      compute_idx(iold + wm_state.stacks.size()) % wm_state.stacks.size();
 
-  wm_state.active_stack_idx =
-      compute_idx(wm_state.active_stack_idx + wm_state.stacks.size()) %
-      wm_state.stacks.size();
+  if (iold == inew) return;
 
-  const ClientStack& stack = GetActiveStack(wm_state);
-  ApplyBorderActive(wm_state, stack);
+  ClientStack& oldstack = GetActiveStack(wm_state);
+  wm_state.active_stack_idx = inew;
+  ClientStack& newstack = GetActiveStack(wm_state);
 
-  xcb_window_t window = stack.active_window;
-  if (!window) window = wm_state.screen->root;
-  SetInputFocus(wm_state, window, time);
+  if (wm_state.follow) {
+    if (oldstack.active_window) {
+      newstack.active_window = oldstack.active_window;
+      newstack.windows.emplace_back(oldstack.active_window);
+
+      auto it = std::ranges::find(oldstack.windows, oldstack.active_window);
+      CHECK_NE(it, oldstack.windows.end());
+      oldstack.windows.erase(it);
+
+      if (oldstack.windows.empty())
+        oldstack.active_window = 0;
+      else
+        oldstack.active_window = oldstack.windows.at(0);
+    }
+  } else {
+    ApplyBorderDefault(wm_state, oldstack);
+
+    xcb_window_t window = newstack.active_window;
+    if (!window) window = wm_state.screen->root;
+    SetInputFocus(wm_state, window, time);
+
+    ApplyBorderActive(wm_state, newstack);
+  }
 
   wm_state.layout_dirty = true;
 }
 
-void NextStack(WMState& wm_state, xcb_timestamp_t time) {
-  ChangeStack(wm_state, time, [](auto idx) { return idx + 1; });
+void MoveStackNext(WMState& wm_state, xcb_timestamp_t time) {
+  MoveStack(wm_state, time, [](auto idx) { return idx + 1; });
 }
 
-void PrevStack(WMState& wm_state, xcb_timestamp_t time) {
-  ChangeStack(wm_state, time, [](auto idx) { return idx - 1; });
+void MoveStackPrev(WMState& wm_state, xcb_timestamp_t time) {
+  MoveStack(wm_state, time, [](auto idx) { return idx - 1; });
 }
 
-static void Move(WMState& wm_state, xcb_timestamp_t time, auto compute_idx) {
+static void MoveLocal(WMState& wm_state, xcb_timestamp_t time,
+                      auto compute_idx) {
   ClientStack& stack = GetActiveStack(wm_state);
   ClearZoom(wm_state, stack);
 
-  if (stack.windows.size() < 2) return;
+  if (stack.windows.empty()) return;
+
+  if (stack.active_window && stack.windows.size() < 2) {
+    return;
+  }
 
   if (stack.active_window) {
     auto it = std::ranges::find(stack.windows, stack.active_window);
@@ -474,7 +502,7 @@ static void Move(WMState& wm_state, xcb_timestamp_t time, auto compute_idx) {
 
     if (iold == inew) return;
 
-    if (stack.follow) {
+    if (wm_state.follow) {
       std::iter_swap(stack.windows.begin() + iold,
                      stack.windows.begin() + inew);
       wm_state.layout_dirty = true;
@@ -485,7 +513,7 @@ static void Move(WMState& wm_state, xcb_timestamp_t time, auto compute_idx) {
       SetInputFocus(wm_state, stack.active_window, time);
     }
   } else {
-    if (!stack.follow) {
+    if (!wm_state.follow) {
       stack.active_window = stack.windows.at(0);
       ApplyBorderActive(wm_state, stack);
       SetInputFocus(wm_state, stack.active_window, time);
@@ -493,12 +521,12 @@ static void Move(WMState& wm_state, xcb_timestamp_t time, auto compute_idx) {
   }
 }
 
-void MoveNext(WMState& wm_state, xcb_timestamp_t time) {
-  Move(wm_state, time, [](auto idx) { return idx + 1; });
+void MoveLocalNext(WMState& wm_state, xcb_timestamp_t time) {
+  MoveLocal(wm_state, time, [](auto idx) { return idx + 1; });
 }
 
-void MovePrev(WMState& wm_state, xcb_timestamp_t time) {
-  Move(wm_state, time, [](auto idx) { return idx - 1; });
+void MoveLocalPrev(WMState& wm_state, xcb_timestamp_t time) {
+  MoveLocal(wm_state, time, [](auto idx) { return idx - 1; });
 }
 
 void NextLayout(WMState& wm_state) {
@@ -526,8 +554,8 @@ void CloseActive(WMState& wm_state) {
 void ToggleZoom(WMState& wm_state) {
   ClientStack& stack = GetActiveStack(wm_state);
   stack.zoom ^= 1;
-  if (stack.follow) {
-    stack.follow = false;
+  if (wm_state.follow) {
+    wm_state.follow = false;
     ApplyBorderActive(wm_state, stack);
   }
   wm_state.layout_dirty = true;
@@ -535,11 +563,11 @@ void ToggleZoom(WMState& wm_state) {
 
 void ToggleFollow(WMState& wm_state) {
   ClientStack& stack = GetActiveStack(wm_state);
-  if (stack.follow) {
+  if (wm_state.follow) {
     ClearZoom(wm_state, stack);
-    stack.follow = false;
+    wm_state.follow = false;
   } else {
-    stack.follow = true;
+    wm_state.follow = true;
   }
   ApplyBorderActive(wm_state, stack);
 }

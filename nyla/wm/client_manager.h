@@ -16,7 +16,6 @@ namespace nyla {
 struct ClientStack {
   LayoutType layout_type;
   bool zoom;
-  bool follow;
 
   std::vector<xcb_window_t> windows;
   xcb_window_t active_window;
@@ -45,6 +44,7 @@ struct WMState {
   Atoms* atoms;
 
   bool layout_dirty;
+  bool follow;
 
   absl::flat_hash_map<xcb_window_t, Client> clients;
 
@@ -72,11 +72,11 @@ void ToggleFollow(WMState& wm_state);
 void ApplyLayoutChanges(WMState& wm_state, const Rect& screen_rect,
                         uint32_t padding);
 
-void MoveNext(WMState& wm_state, xcb_timestamp_t time);
-void MovePrev(WMState& wm_state, xcb_timestamp_t time);
+void MoveLocalNext(WMState& wm_state, xcb_timestamp_t time);
+void MoveLocalPrev(WMState& wm_state, xcb_timestamp_t time);
 
-void NextStack(WMState& wm_state, xcb_timestamp_t time);
-void PrevStack(WMState& wm_state, xcb_timestamp_t time);
+void MoveStackNext(WMState& wm_state, xcb_timestamp_t time);
+void MoveStackPrev(WMState& wm_state, xcb_timestamp_t time);
 
 void NextLayout(WMState& wm_state);
 
