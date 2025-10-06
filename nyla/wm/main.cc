@@ -140,6 +140,10 @@ int Main(int argc, char** argv) {
         "clients",
         [&wm_state] {
           std::string out;
+
+          absl::StrAppendFormat(&out, "active window = %x\n\n",
+                                GetActiveWindow(wm_state));
+
           for (const auto& [client_window, client] : wm_state.clients) {
             std::string_view indent = [&client]() {
               if (client.transient_for) return "  T  ";
