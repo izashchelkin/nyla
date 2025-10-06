@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/log/check.h"
@@ -28,6 +29,9 @@ struct Client {
   bool wm_hints_input;
   bool wm_take_focus;
   bool wm_delete_window;
+
+  uint32_t max_width;
+  uint32_t max_height;
 
   bool wants_configure_notify;
 

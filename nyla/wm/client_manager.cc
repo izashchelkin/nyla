@@ -73,30 +73,48 @@ void CheckFocusTheft(WMState& wm_state) {
   xcb_window_t window = reply->focus;
   free(reply);
 
+  if (!window) return;
+
+  const xcb_window_t active_client_window = GetActiveWindow(wm_state);
+
+  auto restore_input_focus = [&wm_state, active_client_window] {
+    SetInputFocus(
+        wm_state, active_client_window,
+        XCB_CURRENT_TIME);  // TODO: use SERVERTIME? <-- requires extension
+  };
+
   if (!wm_state.clients.contains(window)) {
     for (;;) {
       xcb_query_tree_reply_t* reply = xcb_query_tree_reply(
           wm_state.conn, xcb_query_tree(wm_state.conn, window), nullptr);
+
       if (!reply) {
-        // LOG(ERROR) << "??? null reply";
-        break;
+        LOG(ERROR) << "xcb_query_tree_reply failed for " << window;
+        restore_input_focus();
+        return;
       }
 
-      absl::Cleanup reply_freer = [reply] { free(reply); };
-      if (reply->parent == reply->root) break;
-      window = reply->parent;
+      xcb_window_t parent = reply->parent;
+      free(reply);
+
+      if (!parent && parent == wm_state.screen->root) break;
+      window = parent;
     }
   }
 
-  xcb_window_t active_client_window = GetActiveWindow(wm_state);
-  if (active_client_window != window) {
-    // if (window) {
-    // LOG(INFO) << "detected focus theft: " << active_client_window
-    //           << " != " << window;
-    // }
+  if (active_client_window == window) return;
 
-    SetInputFocus(wm_state, active_client_window, XCB_CURRENT_TIME);
+  Client& client = wm_state.clients.at(window);
+  if (client.transient_for) {
+    if (client.transient_for == active_client_window) return;
+
+    Client& active_client = wm_state.clients.at(window);
+    if (client.transient_for == active_client.transient_for) return;
   }
+
+  LOG(WARNING) << "Restoring focus back to " << std::hex << active_client_window
+               << " (changed by " << std::hex << window << ")";
+  restore_input_focus();
 }
 
 static void UpdateClientProperties(WMState& wm_state,
@@ -107,6 +125,17 @@ static void UpdateClientProperties(WMState& wm_state,
     client.wm_hints_input = wm_hints->input;
   } else {
     client.wm_hints_input = false;
+  }
+
+  if (auto wm_normal_hints = FetchProperty<WM_Normal_Hints>(
+          wm_state.conn, client_window, XCB_ATOM_WM_NORMAL_HINTS,
+          XCB_ATOM_WM_SIZE_HINTS);
+      wm_normal_hints) {
+    client.max_width = std::max(0, wm_normal_hints->max_width);
+    client.max_height = std::max(0, wm_normal_hints->max_height);
+  } else {
+    client.max_width = 0;
+    client.max_height = 0;
   }
 
   client.wm_delete_window = false;
@@ -353,6 +382,18 @@ void ApplyLayoutChanges(WMState& wm_state, const Rect& screen_rect,
         for (auto [rect, client_window] :
              std::ranges::views::zip(layout, windows)) {
           Client& client = wm_state.clients.at(client_window);
+
+          if (client.max_width) {
+            uint32_t new_width = std::min(client.max_width, rect.width());
+            rect.x() += (rect.width() - new_width) / 2;
+            rect.width() = new_width;
+          }
+          if (client.max_height) {
+            uint32_t new_height = std::min(client.max_height, rect.height());
+            rect.y() += (rect.height() - new_height) / 2;
+            rect.height() = new_height;
+          }
+
           if (rect != client.rect) {
             ConfigureClient(wm_state.conn, client_window, client, rect);
             client.rect = rect;

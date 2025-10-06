@@ -27,9 +27,10 @@ std::optional<PropertyStruct> FetchProperty(xcb_connection_t* conn,
   if (!reply) return std::make_optional<PropertyStruct>();
   absl::Cleanup reply_freer = [reply] { free(reply); };
 
-  if (xcb_get_property_value_length(reply) != sizeof(PropertyStruct) ||
-      reply->bytes_after != 0) {
-    LOG(ERROR) << "FetchPropertyStruct: invalid reply length";
+  int len = xcb_get_property_value_length(reply);
+  if (len != sizeof(PropertyStruct) /*|| reply->bytes_after != 0*/) {
+    LOG(ERROR) << "FetchPropertyStruct: invalid reply length (expected: "
+               << sizeof(PropertyStruct) << ", but got: " << len << ")";
     return {};
   }
   return *static_cast<PropertyStruct*>(xcb_get_property_value(reply));
