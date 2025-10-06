@@ -37,7 +37,6 @@ struct Client {
 
   xcb_window_t transient_for;
   std::vector<xcb_window_t> subwindows;
-  xcb_window_t active_subwindow;
 };
 
 struct WMState {
@@ -58,19 +57,6 @@ inline ClientStack& GetActiveStack(WMState& wm_state) {
   return wm_state.stacks.at(wm_state.active_stack_idx);
 }
 
-inline xcb_window_t GetActiveWindow(WMState& wm_state) {
-  const ClientStack& stack = GetActiveStack(wm_state);
-  if (!stack.active_window) return 0;
-
-  const Client& client = wm_state.clients.at(stack.active_window);
-  CHECK(!client.transient_for);
-
-  if (!client.active_subwindow) return stack.active_window;
-
-  CHECK(wm_state.clients.contains(client.active_subwindow));
-  return client.active_subwindow;
-}
-
 std::string GetActiveClientBarText(WMState& wm_state);
 void CheckFocusTheft(WMState& wm_state);
 
@@ -78,11 +64,16 @@ void ManageClientsStartup(WMState& wm_state);
 void ManageClient(WMState& wm_state, xcb_window_t client_window, bool focus);
 void UnmanageClient(WMState& wm_state, xcb_window_t window);
 
+void CloseActive(WMState& wm_state);
+
+void ToggleZoom(WMState& wm_state);
+void ToggleFollow(WMState& wm_state);
+
 void ApplyLayoutChanges(WMState& wm_state, const Rect& screen_rect,
                         uint32_t padding);
 
-void NextFocus(WMState& wm_state, xcb_timestamp_t time);
-void PrevFocus(WMState& wm_state, xcb_timestamp_t time);
+void MoveNext(WMState& wm_state, xcb_timestamp_t time);
+void MovePrev(WMState& wm_state, xcb_timestamp_t time);
 
 void NextStack(WMState& wm_state, xcb_timestamp_t time);
 void PrevStack(WMState& wm_state, xcb_timestamp_t time);

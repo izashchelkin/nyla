@@ -94,21 +94,16 @@ int Main(int argc, char** argv) {
   keybinds.emplace_back(
       "AC02", [](xcb_timestamp_t time) { Spawn({{"dmenu_run", nullptr}}); });
   keybinds.emplace_back(
-      "AC03", [&wm_state](xcb_timestamp_t time) { PrevFocus(wm_state, time); });
+      "AC03", [&wm_state](xcb_timestamp_t time) { MovePrev(wm_state, time); });
   keybinds.emplace_back(
-      "AC04", [&wm_state](xcb_timestamp_t time) { NextFocus(wm_state, time); });
-  keybinds.emplace_back("AC05", [&](xcb_timestamp_t time) {
-    GetActiveStack(wm_state).zoom ^= 1;
-    wm_state.layout_dirty = true;
-  });
+      "AC04", [&wm_state](xcb_timestamp_t time) { MoveNext(wm_state, time); });
+  keybinds.emplace_back("AC05",
+                        [&](xcb_timestamp_t time) { ToggleZoom(wm_state); });
 
-  keybinds.emplace_back("AB02", [&wm_state](xcb_timestamp_t time) {
-    xcb_window_t active_window = GetActiveWindow(wm_state);
-    if (active_window)
-      Send_WM_Delete_Window(wm_state.conn, active_window, wm_state.atoms);
-  });
-
-  // keybinds.emplace_back("AB05", [conn, &client_manager, &atoms] {});
+  keybinds.emplace_back(
+      "AB02", [&wm_state](xcb_timestamp_t time) { CloseActive(wm_state); });
+  keybinds.emplace_back(
+      "AB04", [&wm_state](xcb_timestamp_t) { ToggleFollow(wm_state); });
 
   if (!BindKeyboard(conn, screen->root, modifier, keybinds))
     LOG(QFATAL) << "could not bind keyboard";
@@ -141,8 +136,10 @@ int Main(int argc, char** argv) {
         [&wm_state] {
           std::string out;
 
+          const ClientStack& stack = GetActiveStack(wm_state);
+
           absl::StrAppendFormat(&out, "active window = %x\n\n",
-                                GetActiveWindow(wm_state));
+                                stack.active_window);
 
           for (const auto& [client_window, client] : wm_state.clients) {
             std::string_view indent = [&client]() {
