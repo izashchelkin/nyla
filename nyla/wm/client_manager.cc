@@ -450,6 +450,7 @@ static void MoveStack(WMState& wm_state, xcb_timestamp_t time,
     if (oldstack.active_window) {
       newstack.active_window = oldstack.active_window;
       newstack.windows.emplace_back(oldstack.active_window);
+      newstack.zoom = false;
 
       auto it = std::ranges::find(oldstack.windows, oldstack.active_window);
       CHECK_NE(it, oldstack.windows.end());
