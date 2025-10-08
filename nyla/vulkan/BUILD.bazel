@@ -1,0 +1,15 @@
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
+cc_binary(
+    name = "vulkan",
+    srcs = glob([
+        "*.cc",
+        "*.h",
+    ]),
+    deps = [
+        "//third_party/vulkansdk",
+        "//third_party/vulkansdk:volk",
+        "@abseil-cpp//absl/log",
+        "@abseil-cpp//absl/log:check",
+    ],
+)

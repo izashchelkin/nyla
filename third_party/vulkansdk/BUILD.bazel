@@ -1,0 +1,22 @@
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
+cc_library(
+    name = "vulkansdk",
+    hdrs = glob([
+        "vulkansdk/x86_64/include/**/*.h",
+    ]),
+    strip_include_prefix = "vulkansdk/x86_64/include/",
+    visibility = ["//visibility:public"],
+    deps = [],
+)
+
+cc_library(
+    name = "volk",
+    srcs = glob([
+        "vulkansdk/x86_64/include/volk/volk.c",
+    ]),
+    visibility = ["//visibility:public"],
+    deps = [
+        "vulkansdk",
+    ],
+)
