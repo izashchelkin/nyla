@@ -310,8 +310,9 @@ void UnmanageClient(WMState& wm_state, xcb_window_t window) {
         stack.windows, [window](xcb_window_t elem) { return elem == window; });
     if (it == stack.windows.end()) continue;
 
-    wm_state.layout_dirty = true;
+    stack.zoom = false;
     stack.windows.erase(it);
+    wm_state.layout_dirty = true;
 
     if (stack.active_window == window) {
       stack.active_window = 0;
