@@ -309,6 +309,7 @@ void UnmanageClient(WMState& wm_state, xcb_window_t window) {
 
     if (stack.active_window == window) {
       stack.active_window = 0;
+      wm_state.follow = false;
 
       if (istack == wm_state.active_stack_idx) {
         if (stack.windows.empty()) {
@@ -555,21 +556,19 @@ void CloseActive(WMState& wm_state) {
 void ToggleZoom(WMState& wm_state) {
   ClientStack& stack = GetActiveStack(wm_state);
   stack.zoom ^= 1;
-  if (wm_state.follow) {
-    wm_state.follow = false;
-    ApplyBorderActive(wm_state, stack);
-  }
   wm_state.layout_dirty = true;
 }
 
 void ToggleFollow(WMState& wm_state) {
   ClientStack& stack = GetActiveStack(wm_state);
-  if (wm_state.follow) {
-    ClearZoom(wm_state, stack);
+  if (!stack.active_window) {
     wm_state.follow = false;
-  } else {
-    wm_state.follow = true;
+    return;
   }
+
+  wm_state.follow ^= 1;
+  if (!wm_state.follow) ClearZoom(wm_state, stack);
+
   ApplyBorderActive(wm_state, stack);
 }
 
