@@ -94,7 +94,7 @@ void CheckFocusTheft(WMState& wm_state) {
       xcb_window_t parent = reply->parent;
       free(reply);
 
-      if (!parent && parent == wm_state.screen->root) break;
+      if (!parent || parent == wm_state.screen->root) break;
       window = parent;
     }
   }
