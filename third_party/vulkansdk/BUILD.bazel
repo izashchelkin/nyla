@@ -15,6 +15,10 @@ cc_library(
     srcs = glob([
         "vulkansdk/x86_64/include/volk/volk.c",
     ]),
+    defines = [
+        "VK_USE_PLATFORM_XCB_KHR",
+        "VK_KHR_xcb_surface",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         "vulkansdk",
