@@ -101,7 +101,13 @@ void CheckFocusTheft(WMState& wm_state) {
 
   if (active_client_window == window) return;
 
-  Client& client = wm_state.clients.at(window);
+  auto it = wm_state.clients.find(window);
+  if (it == wm_state.clients.end()) {
+    restore_input_focus();
+    return;
+  }
+
+  const auto& [_, client] = *it;
   if (client.transient_for) {
     if (client.transient_for == active_client_window) return;
 
