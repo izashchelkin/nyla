@@ -125,6 +125,8 @@ static void UpdateClientProperties(WMState& wm_state,
   if (auto wm_hints = FetchProperty<WM_Hints>(
           wm_state.conn, client_window, XCB_ATOM_WM_HINTS, XCB_ATOM_WM_HINTS);
       wm_hints) {
+    Initialize(*wm_hints);
+
     client.wm_hints_input = wm_hints->input;
   } else {
     client.wm_hints_input = false;
@@ -134,6 +136,8 @@ static void UpdateClientProperties(WMState& wm_state,
           wm_state.conn, client_window, XCB_ATOM_WM_NORMAL_HINTS,
           XCB_ATOM_WM_SIZE_HINTS);
       wm_normal_hints) {
+    Initialize(*wm_normal_hints);
+
     client.max_width = std::max(0, wm_normal_hints->max_width);
     client.max_height = std::max(0, wm_normal_hints->max_height);
   } else {

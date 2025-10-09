@@ -84,19 +84,23 @@ int Main(int argc, char** argv) {
 
   keybinds.emplace_back(
       "AD02", [&wm_state](xcb_timestamp_t time) { NextLayout(wm_state); });
-  keybinds.emplace_back(
-      "AD03", [&wm_state](xcb_timestamp_t time) { MoveStackPrev(wm_state, time); });
-  keybinds.emplace_back(
-      "AD04", [&wm_state](xcb_timestamp_t time) { MoveStackNext(wm_state, time); });
+  keybinds.emplace_back("AD03", [&wm_state](xcb_timestamp_t time) {
+    MoveStackPrev(wm_state, time);
+  });
+  keybinds.emplace_back("AD04", [&wm_state](xcb_timestamp_t time) {
+    MoveStackNext(wm_state, time);
+  });
   keybinds.emplace_back(
       "AD05", [](xcb_timestamp_t time) { Spawn({{"ghostty", nullptr}}); });
 
   keybinds.emplace_back(
       "AC02", [](xcb_timestamp_t time) { Spawn({{"dmenu_run", nullptr}}); });
-  keybinds.emplace_back(
-      "AC03", [&wm_state](xcb_timestamp_t time) { MoveLocalPrev(wm_state, time); });
-  keybinds.emplace_back(
-      "AC04", [&wm_state](xcb_timestamp_t time) { MoveLocalNext(wm_state, time); });
+  keybinds.emplace_back("AC03", [&wm_state](xcb_timestamp_t time) {
+    MoveLocalPrev(wm_state, time);
+  });
+  keybinds.emplace_back("AC04", [&wm_state](xcb_timestamp_t time) {
+    MoveLocalNext(wm_state, time);
+  });
   keybinds.emplace_back("AC05",
                         [&](xcb_timestamp_t time) { ToggleZoom(wm_state); });
 
@@ -167,11 +171,12 @@ int Main(int argc, char** argv) {
                 "%swindow=%x\n%sname=%v\n%srect=%v\n%swm_"
                 "transient_for=%v\n%sinput=%v\n"
                 "%swm_take_focus=%v\n%swm_delete_window=%v\n%"
-                "ssubwindows=%v\n\n",
+                "ssubwindows=%v\n%smax_dimensions=%vx%v\n\n",
                 indent, client_window, indent, client.name, indent, client.rect,
                 indent, transient_for_name, indent, client.wm_hints_input,
                 indent, client.wm_take_focus, indent, client.wm_delete_window,
-                indent, absl::StrJoin(client.subwindows, ", "));
+                indent, absl::StrJoin(client.subwindows, ", "), indent,
+                client.max_width, client.max_height);
           }
           return out;
         },

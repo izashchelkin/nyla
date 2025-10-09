@@ -8,6 +8,15 @@
 namespace nyla {
 
 struct WM_Hints {
+  static constexpr uint32_t kInputHint = 1;
+  static constexpr uint32_t kStateHint = 1 << 1;
+  static constexpr uint32_t kIconPixmapHint = 1 << 2;
+  static constexpr uint32_t kIconWindowHint = 1 << 3;
+  static constexpr uint32_t kIconPositionHint = 1 << 4;
+  static constexpr uint32_t kIconMaskHint = 1 << 5;
+  static constexpr uint32_t kWindowGroupHint = 1 << 6;
+  static constexpr uint32_t kMessageHint = 1 << 8;
+
   uint32_t flags;
   bool input;
   uint32_t initial_state;
@@ -20,6 +29,8 @@ struct WM_Hints {
 };
 static_assert(sizeof(WM_Hints) == 9 * 4);
 
+void Initialize(WM_Hints& h);
+
 template <typename Sink>
 void AbslStringify(Sink& sink, const WM_Hints& h) {
   absl::Format(
@@ -31,6 +42,13 @@ void AbslStringify(Sink& sink, const WM_Hints& h) {
 }
 
 struct WM_Normal_Hints {
+  static constexpr uint32_t kPMinSize = 1 << 4;
+  static constexpr uint32_t kPMaxSize = 1 << 5;
+  static constexpr uint32_t kPResizeInc = 1 << 6;
+  static constexpr uint32_t kPAspect = 1 << 7;
+  static constexpr uint32_t kPBaseSize = 1 << 8;
+  static constexpr uint32_t kPWinGravity = 1 << 9;
+
   uint32_t flags;
   uint32_t pad[4];
   int32_t min_width, min_height;
@@ -44,6 +62,8 @@ struct WM_Normal_Hints {
   xcb_gravity_t win_gravity;
 };
 static_assert(sizeof(WM_Normal_Hints) == 18 * 4);
+
+void Initialize(WM_Normal_Hints& h);
 
 template <typename Sink>
 void AbslStringify(Sink& sink, const WM_Normal_Hints& h) {
