@@ -36,48 +36,60 @@ struct Client {
 
   xcb_window_t transient_for;
   std::vector<xcb_window_t> subwindows;
+
+  absl::flat_hash_map<xcb_atom_t, xcb_get_property_cookie_t> property_cookies;
 };
 
-struct WMState {
-  xcb_connection_t* conn;
-  xcb_screen_t* screen;
-  Atoms* atoms;
+template <typename Key, typename Val>
+using Map = absl::flat_hash_map<Key, Val>;
 
-  bool layout_dirty;
-  bool follow;
+extern xcb_connection_t* wm_conn;
+extern xcb_screen_t* wm_screen;
+extern Atoms atoms;
 
-  absl::flat_hash_map<xcb_window_t, Client> clients;
+extern bool wm_layout_dirty;
+extern bool wm_follow;
 
-  std::vector<ClientStack> stacks;
-  size_t active_stack_idx;
-};
+extern Map<xcb_window_t, Client> wm_clients;
+extern std::vector<xcb_window_t> wm_pending_clients;
 
-inline ClientStack& GetActiveStack(WMState& wm_state) {
-  CHECK_LT(wm_state.active_stack_idx, wm_state.stacks.size());
-  return wm_state.stacks.at(wm_state.active_stack_idx);
+using WMPropertyChangeHandler = void (*)(xcb_window_t, Client&,
+                                         xcb_get_property_reply_t*);
+extern Map<xcb_atom_t, WMPropertyChangeHandler> wm_property_change_handlers;
+
+extern std::vector<ClientStack> wm_stacks;
+extern size_t wm_active_stack_idx;
+
+//
+
+void InitializeWM();
+
+inline ClientStack& GetActiveStack() {
+  CHECK_LT(wm_active_stack_idx, wm_stacks.size());
+  return wm_stacks.at(wm_active_stack_idx);
 }
 
-std::string GetActiveClientBarText(WMState& wm_state);
-void CheckFocusTheft(WMState& wm_state);
+std::string GetActiveClientBarText();
+void CheckFocusTheft();
 
-void ManageClientsStartup(WMState& wm_state);
-void ManageClient(WMState& wm_state, xcb_window_t client_window, bool focus);
-void UnmanageClient(WMState& wm_state, xcb_window_t window);
+void ManageClientsStartup();
+void ManageClient(xcb_window_t client_window);
+void UnmanageClient(xcb_window_t window);
+void ProcessPendingClients();
 
-void CloseActive(WMState& wm_state);
+void CloseActive();
 
-void ToggleZoom(WMState& wm_state);
-void ToggleFollow(WMState& wm_state);
+void ToggleZoom();
+void ToggleFollow();
 
-void ApplyLayoutChanges(WMState& wm_state, const Rect& screen_rect,
-                        uint32_t padding);
+void ApplyLayoutChanges(const Rect& screen_rect, uint32_t padding);
 
-void MoveLocalNext(WMState& wm_state, xcb_timestamp_t time);
-void MoveLocalPrev(WMState& wm_state, xcb_timestamp_t time);
+void MoveLocalNext(xcb_timestamp_t time);
+void MoveLocalPrev(xcb_timestamp_t time);
 
-void MoveStackNext(WMState& wm_state, xcb_timestamp_t time);
-void MoveStackPrev(WMState& wm_state, xcb_timestamp_t time);
+void MoveStackNext(xcb_timestamp_t time);
+void MoveStackPrev(xcb_timestamp_t time);
 
-void NextLayout(WMState& wm_state);
+void NextLayout();
 
 }  // namespace nyla

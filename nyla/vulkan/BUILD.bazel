@@ -15,8 +15,8 @@ cc_binary(
     ],
     deps = [
         "//third_party/vulkansdk",
-        "//third_party/vulkansdk:volk",
         "@abseil-cpp//absl/log",
         "@abseil-cpp//absl/log:check",
+        "@abseil-cpp//absl/log:initialize",
     ],
 )

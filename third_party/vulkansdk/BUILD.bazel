@@ -1,26 +1,12 @@
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 
-cc_library(
+cc_import(
     name = "vulkansdk",
     hdrs = glob([
         "vulkansdk/x86_64/include/**/*.h",
     ]),
+    shared_library = "vulkansdk/x86_64/lib/libvulkan.so.1",
     strip_include_prefix = "vulkansdk/x86_64/include/",
     visibility = ["//visibility:public"],
     deps = [],
-)
-
-cc_library(
-    name = "volk",
-    srcs = glob([
-        "vulkansdk/x86_64/include/volk/volk.c",
-    ]),
-    defines = [
-        "VK_USE_PLATFORM_XCB_KHR",
-        "VK_KHR_xcb_surface",
-    ],
-    visibility = ["//visibility:public"],
-    deps = [
-        "vulkansdk",
-    ],
 )

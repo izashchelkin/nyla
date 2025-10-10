@@ -1,13 +1,16 @@
 #include "nyla/vulkan/vulkan.h"
 
-#include <sys/socket.h>
+#define VK_USE_PLATFORM_XCB_KHR
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <iostream>
 
 #include "absl/log/check.h"
-#include "volk/volk.h"
+#include "absl/log/globals.h"
+#include "absl/log/initialize.h"
+#include "vulkan/vulkan.h"
 #include "xcb/xcb.h"
 #include "xcb/xcb_aux.h"
 #include "xcb/xproto.h"
@@ -15,6 +18,9 @@
 namespace nyla {}  // namespace nyla
 
 int main() {
+  absl::InitializeLog();
+  absl::SetStderrThreshold(absl::LogSeverityAtLeast::kInfo);
+
   int iscreen;
   xcb_connection_t* conn = xcb_connect(nullptr, &iscreen);
   xcb_screen_t* screen = xcb_aux_get_screen(conn, iscreen);
@@ -32,11 +38,9 @@ int main() {
 
   //
 
-  VkResult res = volkInitialize();
-  CHECK(res == VK_SUCCESS);
-
   auto instance_extensions = std::to_array({
       VK_KHR_XCB_SURFACE_EXTENSION_NAME,
+      VK_KHR_SURFACE_EXTENSION_NAME,
   });
   VkInstanceCreateInfo instance_create_info{
       .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
@@ -44,10 +48,9 @@ int main() {
       .ppEnabledExtensionNames = instance_extensions.data(),
   };
   VkInstance instance;
-  res = vkCreateInstance(&instance_create_info, nullptr, &instance);
+  VkResult res = vkCreateInstance(&instance_create_info, nullptr, &instance);
   CHECK(res == VK_SUCCESS);
-
-  volkLoadInstance(instance);
+  std::cerr << "created instance\n";
 
   uint32_t num_phys_devices = 1;
   VkPhysicalDevice phys_device;
@@ -86,6 +89,7 @@ int main() {
 
   VkDevice device;
   res = vkCreateDevice(phys_device, &device_create_info, nullptr, &device);
+  std::cerr << "created device\n";
   CHECK(res == VK_SUCCESS);
 
   VkQueue queue;
@@ -97,8 +101,42 @@ int main() {
       .window = window,
   };
 
-  VkSurfaceKHR_T* surface;
+  VkSurfaceKHR surface;
   res =
       vkCreateXcbSurfaceKHR(instance, &surface_create_info, nullptr, &surface);
   CHECK(res == VK_SUCCESS);
+  std::cerr << "created surface\n";
+
+  VkSurfaceCapabilitiesKHR surface_capabilities{};
+  res = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(phys_device, surface,
+                                                  &surface_capabilities);
+  CHECK(res == VK_SUCCESS);
+
+  std::vector<VkSurfaceFormatKHR> surface_formats;
+  uint32_t surface_format_count = 0;
+  vkGetPhysicalDeviceSurfaceFormatsKHR(phys_device, surface,
+                                       &surface_format_count, nullptr);
+  CHECK(surface_format_count);
+
+  surface_formats.resize(surface_format_count);
+  vkGetPhysicalDeviceSurfaceFormatsKHR(
+      phys_device, surface, &surface_format_count, surface_formats.data());
+
+  auto it = std::find_if(
+      surface_formats.begin(), surface_formats.end(),
+      [](const auto surface_format) {
+        return surface_format.format == VK_FORMAT_B8G8R8A8_SRGB &&
+               surface_format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+      });
+  CHECK(it != surface_formats.end());
+
+  std::vector<VkPresentModeKHR> present_modes;
+  uint32_t present_mode_count = 0;
+  vkGetPhysicalDeviceSurfacePresentModesKHR(phys_device, surface,
+                                            &present_mode_count, nullptr);
+  CHECK(present_mode_count);
+
+  present_modes.resize(present_mode_count);
+  vkGetPhysicalDeviceSurfacePresentModesKHR(
+      phys_device, surface, &present_mode_count, present_modes.data());
 }

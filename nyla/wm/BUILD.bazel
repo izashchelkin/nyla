@@ -2,10 +2,12 @@ load("@rules_cc//cc:cc_library.bzl", "cc_library")
 
 cc_binary(
     name = "wm",
-    srcs = glob([
-        "*.cc",
-        "*.h",
-    ]),
+    srcs = glob(
+        [
+            "*.cc",
+            "*.h",
+        ],
+    ),
     linkopts = [
         "-lxcb",
         "-lxcb-util",

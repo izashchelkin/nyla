@@ -15,7 +15,7 @@ struct WM_Hints {
   static constexpr uint32_t kIconPositionHint = 1 << 4;
   static constexpr uint32_t kIconMaskHint = 1 << 5;
   static constexpr uint32_t kWindowGroupHint = 1 << 6;
-  static constexpr uint32_t kMessageHint = 1 << 8;
+  static constexpr uint32_t kUrgencyHint = 1 << 8;
 
   uint32_t flags;
   bool input;
