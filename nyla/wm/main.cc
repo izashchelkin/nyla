@@ -3,18 +3,14 @@
 #include <sys/timerfd.h>
 #include <unistd.h>
 
-#include <array>
 #include <chrono>
 #include <cstdint>
-#include <string>
 
 #include "absl/cleanup/cleanup.h"
 #include "absl/log/check.h"
 #include "absl/log/globals.h"
 #include "absl/log/initialize.h"
 #include "absl/log/log.h"
-#include "absl/strings/str_format.h"
-#include "absl/strings/str_join.h"
 #include "nyla/commons/spawn.h"
 #include "nyla/commons/timer.h"
 #include "nyla/fs/nylafs.h"
@@ -115,59 +111,10 @@ int Main(int argc, char** argv) {
   if (nylafs.Init()) {
     fds.emplace_back(pollfd{.fd = nylafs.GetFd(), .events = POLLIN});
 
-    nylafs.Register(NylaFsDynamicFile{
-        "clients",
-        [] {
-          std::string out;
+    nylafs.Register(NylaFsDynamicFile{"clients", DumpClients, [] {}});
 
-          const WindowStack& stack = GetActiveStack();
-
-          absl::StrAppendFormat(&out, "active window = %x\n\n",
-                                stack.active_window);
-
-          for (const auto& [client_window, client] : wm_clients) {
-            std::string_view indent = [&client]() {
-              if (client.transient_for) return "  T  ";
-              if (!client.subwindows.empty()) return "  S  ";
-              return "";
-            }();
-
-            std::string transient_for_name;
-            if (client.transient_for) {
-              auto it = wm_clients.find(client.transient_for);
-              if (it == wm_clients.end()) {
-                transient_for_name =
-                    "invalid " + std::to_string(client.transient_for);
-              } else {
-                transient_for_name = it->second.name + " " +
-                                     std::to_string(client.transient_for);
-              }
-            } else {
-              transient_for_name = "none";
-            }
-
-            absl::StrAppendFormat(
-                &out,
-                "%swindow=%x\n%sname=%v\n%srect=%v\n%swm_"
-                "transient_for=%v\n%sinput=%v\n"
-                "%swm_take_focus=%v\n%swm_delete_window=%v\n%"
-                "ssubwindows=%v\n%smax_dimensions=%vx%v\n\n",
-                indent, client_window, indent, client.name, indent, client.rect,
-                indent, transient_for_name, indent, client.wm_hints_input,
-                indent, client.wm_take_focus, indent, client.wm_delete_window,
-                indent, absl::StrJoin(client.subwindows, ", "), indent,
-                client.max_width, client.max_height);
-          }
-          return out;
-        },
-        [] {},
-    });
-
-    nylafs.Register(NylaFsDynamicFile{
-        "quit",
-        [] { return "quit\n"; },
-        [&is_running] { is_running = false; },
-    });
+    nylafs.Register(NylaFsDynamicFile{"quit", [] { return "quit\n"; },
+                                      [&is_running] { is_running = false; }});
 
   } else {
     LOG(ERROR) << "could not start NylaFS, continuing anyway...";
