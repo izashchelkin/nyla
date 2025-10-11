@@ -22,8 +22,8 @@ xcb_atom_t InternAtom(xcb_connection_t* conn, std::string_view name,
   LOG(FATAL) << "could not intern atom " << name;
 }
 
-Atoms InternAtoms(xcb_connection_t* conn) {
-  return Atoms{
+X11Atoms InternAtoms(xcb_connection_t* conn) {
+  return X11Atoms{
       .compound_text = InternAtom(conn, "COMPOUND_TEXT"),
       .wm_delete_window = InternAtom(conn, "WM_DELETE_WINDOW"),
       .wm_name = InternAtom(conn, "WM_NAME"),

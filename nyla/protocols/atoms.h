@@ -10,7 +10,7 @@ namespace nyla {
 xcb_atom_t InternAtom(xcb_connection_t* conn, std::string_view name,
                       bool only_if_exists = false);
 
-struct Atoms {
+struct X11Atoms {
   xcb_atom_t compound_text;
   xcb_atom_t wm_delete_window;
   xcb_atom_t wm_name;
@@ -19,6 +19,6 @@ struct Atoms {
   xcb_atom_t wm_take_focus;
 };
 
-Atoms InternAtoms(xcb_connection_t* conn);
+X11Atoms InternAtoms(xcb_connection_t* conn);
 
 }  // namespace nyla

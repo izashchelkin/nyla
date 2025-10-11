@@ -8,12 +8,13 @@
 #include "nyla/commons/rect.h"
 #include "nyla/layout/layout.h"
 #include "nyla/protocols/atoms.h"
+#include "nyla/wm/keyboard.h"
 #include "xcb/xcb.h"
 #include "xcb/xproto.h"
 
 namespace nyla {
 
-struct ClientStack {
+struct WindowStack {
   LayoutType layout_type;
   bool zoom;
 
@@ -40,12 +41,18 @@ struct Client {
   absl::flat_hash_map<xcb_atom_t, xcb_get_property_cookie_t> property_cookies;
 };
 
+template <typename Sink>
+void AbslStringify(Sink& sink, const Client& c) {
+  absl::Format(&sink, "Window{ rect=%v, input=%v, take_focus=%v }", c.rect,
+               c.wm_hints_input, c.wm_take_focus);
+}
+
 template <typename Key, typename Val>
 using Map = absl::flat_hash_map<Key, Val>;
 
 extern xcb_connection_t* wm_conn;
 extern xcb_screen_t* wm_screen;
-extern Atoms atoms;
+extern X11Atoms atoms;
 
 extern bool wm_layout_dirty;
 extern bool wm_follow;
@@ -57,17 +64,19 @@ using WMPropertyChangeHandler = void (*)(xcb_window_t, Client&,
                                          xcb_get_property_reply_t*);
 extern Map<xcb_atom_t, WMPropertyChangeHandler> wm_property_change_handlers;
 
-extern std::vector<ClientStack> wm_stacks;
+extern std::vector<WindowStack> wm_stacks;
 extern size_t wm_active_stack_idx;
 
 //
 
-void InitializeWM();
-
-inline ClientStack& GetActiveStack() {
+inline WindowStack& GetActiveStack() {
   CHECK_LT(wm_active_stack_idx, wm_stacks.size());
   return wm_stacks.at(wm_active_stack_idx);
 }
+
+void InitializeWM();
+void ProcessWMEvents(const bool& is_running, uint16_t modifier,
+                     std::span<Keybind> keybinds);
 
 std::string GetActiveClientBarText();
 void CheckFocusTheft();

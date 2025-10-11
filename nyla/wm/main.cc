@@ -6,8 +6,6 @@
 #include <array>
 #include <chrono>
 #include <cstdint>
-#include <cstdlib>
-#include <limits>
 #include <string>
 
 #include "absl/cleanup/cleanup.h"
@@ -25,17 +23,13 @@
 #include "nyla/protocols/send.h"
 #include "nyla/protocols/wm_protocols.h"
 #include "nyla/wm/bar_manager.h"
-#include "nyla/wm/client_manager.h"
 #include "nyla/wm/keyboard.h"
-#include "nyla/wm/x11.h"
+#include "nyla/wm/window_manager.h"
 #include "xcb/xcb.h"
 #include "xcb/xcb_aux.h"
 #include "xcb/xproto.h"
 
 namespace nyla {
-
-static void ProcessXEvents(const bool& is_running, uint16_t modifier,
-                           std::span<Keybind> keybinds);
 
 int Main(int argc, char** argv) {
   bool is_running = true;
@@ -71,7 +65,7 @@ int Main(int argc, char** argv) {
   LOG(INFO) << "init keyboard successful";
 
   atoms = InternAtoms(wm_conn);
-	InitializeWM();
+  InitializeWM();
 
   uint16_t modifier = XCB_MOD_MASK_4;
   std::vector<Keybind> keybinds;
@@ -126,7 +120,7 @@ int Main(int argc, char** argv) {
         [] {
           std::string out;
 
-          const ClientStack& stack = GetActiveStack();
+          const WindowStack& stack = GetActiveStack();
 
           absl::StrAppendFormat(&out, "active window = %x\n\n",
                                 stack.active_window);
@@ -224,7 +218,7 @@ int Main(int argc, char** argv) {
     }
 
     if (fds[0].revents & POLLIN) {
-      ProcessXEvents(is_running, modifier, keybinds);
+      ProcessWMEvents(is_running, modifier, keybinds);
     }
 
     if (fds[1].revents & POLLIN) {
@@ -241,104 +235,6 @@ int Main(int argc, char** argv) {
   }
 
   return 0;
-}
-
-static void ProcessXEvents(const bool& is_running, uint16_t modifier,
-                           std::span<Keybind> keybinds) {
-  while (is_running) {
-    xcb_generic_event_t* event = xcb_poll_for_event(wm_conn);
-    if (!event) break;
-    absl::Cleanup event_freer = [event] { free(event); };
-
-    bool is_synthethic = event->response_type & 0x80;
-    uint8_t event_type = event->response_type & 0x7F;
-
-    if (is_synthethic && event_type != XCB_CLIENT_MESSAGE) {
-      // continue;
-    }
-
-    switch (event_type) {
-      case XCB_KEY_PRESS: {
-        auto keypress = reinterpret_cast<xcb_key_press_event_t*>(event);
-        if (keypress->state == modifier)
-          HandleKeyPress(keypress->detail, keybinds, keypress->time);
-        break;
-      }
-      case XCB_PROPERTY_NOTIFY: {
-        auto propertynotify =
-            reinterpret_cast<xcb_property_notify_event_t*>(event);
-
-        xcb_window_t client_window = propertynotify->window;
-        auto client_it = wm_clients.find(client_window);
-        if (client_it == wm_clients.end()) break;
-
-        xcb_atom_t property = propertynotify->atom;
-        auto handler_it = wm_property_change_handlers.find(property);
-        if (handler_it == wm_property_change_handlers.end()) break;
-
-        xcb_get_property_cookie_t cookie = xcb_get_property(
-            wm_conn, false, client_window, property, XCB_ATOM_ANY, 0,
-            std::numeric_limits<uint32_t>::max());
-        client_it->second.property_cookies[property] = cookie;
-        break;
-      }
-      case XCB_CONFIGURE_REQUEST: {
-        auto configurerequest =
-            reinterpret_cast<xcb_configure_request_event_t*>(event);
-        auto it = wm_clients.find(configurerequest->window);
-        if (it != wm_clients.end()) {
-          it->second.wants_configure_notify = true;
-        }
-        break;
-      }
-      case XCB_MAP_REQUEST: {
-        xcb_map_window(
-            wm_conn, reinterpret_cast<xcb_map_request_event_t*>(event)->window);
-        break;
-      }
-      case XCB_MAP_NOTIFY: {
-        auto mapnotify = reinterpret_cast<xcb_map_notify_event_t*>(event);
-        if (!mapnotify->override_redirect) {
-          xcb_window_t window =
-              reinterpret_cast<xcb_map_notify_event_t*>(event)->window;
-          ManageClient(window);
-        }
-        break;
-      }
-      case XCB_MAPPING_NOTIFY: {
-        if (BindKeyboard(wm_conn, wm_screen->root, modifier, keybinds))
-          LOG(INFO) << "bind keyboard successful";
-        else
-          LOG(ERROR) << "could not bind keyboard";
-
-        break;
-      }
-      case XCB_UNMAP_NOTIFY: {
-        UnmanageClient(
-            reinterpret_cast<xcb_unmap_notify_event_t*>(event)->window);
-        break;
-      }
-      case XCB_DESTROY_NOTIFY: {
-        UnmanageClient(
-            reinterpret_cast<xcb_destroy_notify_event_t*>(event)->window);
-        break;
-      }
-      case XCB_FOCUS_IN: {
-        if (reinterpret_cast<xcb_focus_in_event_t*>(event)->mode ==
-            XCB_NOTIFY_MODE_NORMAL) {
-          CheckFocusTheft();
-        }
-
-        break;
-      }
-      case 0: {
-        auto error = reinterpret_cast<xcb_generic_error_t*>(event);
-        LOG(ERROR) << "xcb error: "
-                   << static_cast<X11ErrorCode>(error->error_code)
-                   << " sequence: " << error->sequence;
-      }
-    }
-  }
 }
 
 }  // namespace nyla
