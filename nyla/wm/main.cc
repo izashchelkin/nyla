@@ -15,7 +15,6 @@
 #include "absl/log/log.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_join.h"
-#include "nyla/commons/rect.h"
 #include "nyla/commons/spawn.h"
 #include "nyla/commons/timer.h"
 #include "nyla/fs/nylafs.h"
@@ -45,12 +44,12 @@ int Main(int argc, char** argv) {
 
   xcb_grab_server(wm_conn);
 
-  wm_screen = xcb_aux_get_screen(wm_conn, iscreen);
+  wm_screen = *xcb_aux_get_screen(wm_conn, iscreen);
 
   if (xcb_request_check(
           wm_conn,
           xcb_change_window_attributes_checked(
-              wm_conn, wm_screen->root, XCB_CW_EVENT_MASK,
+              wm_conn, wm_screen.root, XCB_CW_EVENT_MASK,
               (uint32_t[]){
                   XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT |
                   XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY |
@@ -89,7 +88,7 @@ int Main(int argc, char** argv) {
   keybinds.emplace_back("AB02", [](xcb_timestamp_t time) { CloseActive(); });
   keybinds.emplace_back("AB04", [](xcb_timestamp_t) { ToggleFollow(); });
 
-  if (!BindKeyboard(wm_conn, wm_screen->root, modifier, keybinds))
+  if (!BindKeyboard(wm_conn, wm_screen.root, modifier, keybinds))
     LOG(QFATAL) << "could not bind keyboard";
   LOG(INFO) << "bind keyboard successful";
 
@@ -97,6 +96,7 @@ int Main(int argc, char** argv) {
   if (!bar_manager.Init(wm_conn, wm_screen)) {
     LOG(QFATAL) << "could not init bar";
   }
+  wm_bar_height = bar_manager.height();
 
   using namespace std::chrono_literals;
   int tfd = MakeTimerFd(501ms);
@@ -178,37 +178,7 @@ int Main(int argc, char** argv) {
   while (is_running && !xcb_connection_has_error(wm_conn)) {
     xcb_flush(wm_conn);
 
-    for (auto& [client_window, client] : wm_clients) {
-      for (auto& [property, cookie] : client.property_cookies) {
-        xcb_get_property_reply_t* reply =
-            xcb_get_property_reply(wm_conn, cookie, nullptr);
-
-        auto handler_it = wm_property_change_handlers.find(property);
-        if (handler_it == wm_property_change_handlers.end()) {
-          LOG(ERROR) << "missing property change handler " << property;
-          continue;
-        }
-
-        handler_it->second(client_window, client, reply);
-      }
-      client.property_cookies.clear();
-    }
-
-    ProcessPendingClients();
-
-    Rect screen_rect = ApplyMarginTop(
-        Rect(wm_screen->width_in_pixels, wm_screen->height_in_pixels),
-        bar_manager.height());
-    ApplyLayoutChanges(screen_rect, 2);
-
-    for (auto& [client_window, client] : wm_clients) {
-      if (client.wants_configure_notify) {
-        SendConfigureNotify(wm_conn, client_window, wm_screen->root,
-                            client.rect.x(), client.rect.y(),
-                            client.rect.width(), client.rect.height(), 2);
-        client.wants_configure_notify = false;
-      }
-    }
+    ProcessWM();
 
     xcb_flush(wm_conn);
 

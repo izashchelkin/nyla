@@ -51,9 +51,10 @@ template <typename Key, typename Val>
 using Map = absl::flat_hash_map<Key, Val>;
 
 extern xcb_connection_t* wm_conn;
-extern xcb_screen_t* wm_screen;
+extern xcb_screen_t wm_screen;
 extern X11Atoms atoms;
 
+extern uint32_t wm_bar_height;
 extern bool wm_bar_dirty;
 extern bool wm_layout_dirty;
 extern bool wm_follow;
@@ -78,14 +79,13 @@ inline WindowStack& GetActiveStack() {
 void InitializeWM();
 void ProcessWMEvents(const bool& is_running, uint16_t modifier,
                      std::span<Keybind> keybinds);
+void ProcessWM();
 
 std::string GetActiveClientBarText();
-void CheckFocusTheft();
 
 void ManageClientsStartup();
 void ManageClient(xcb_window_t client_window);
 void UnmanageClient(xcb_window_t window);
-void ProcessPendingClients();
 
 void CloseActive();
 
