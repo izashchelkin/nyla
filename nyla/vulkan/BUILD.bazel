@@ -18,5 +18,6 @@ cc_binary(
         "@abseil-cpp//absl/log",
         "@abseil-cpp//absl/log:check",
         "@abseil-cpp//absl/log:initialize",
+        # "@rules_cc//cc/runfiles",
     ],
 )
