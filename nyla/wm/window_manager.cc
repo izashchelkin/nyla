@@ -398,6 +398,8 @@ static void MoveStack(xcb_timestamp_t time, auto compute_idx) {
 
   if (iold == inew) return;
 
+  wm_bar_dirty = true;
+
   WindowStack& oldstack = GetActiveStack();
   wm_active_stack_idx = inew;
   WindowStack& newstack = GetActiveStack();
