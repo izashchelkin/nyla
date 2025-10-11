@@ -136,26 +136,8 @@ static void Handle_WM_Transient_For(xcb_window_t client_window, Client& client,
 
   if (reply->type != XCB_ATOM_WINDOW) return;
 
-  xcb_window_t transient_for =
+  client.transient_for =
       *reinterpret_cast<xcb_window_t*>(xcb_get_property_value(reply));
-  if (!transient_for) return;
-
-  for (int i = 0; i < 10; ++i) {
-    auto it = wm_clients.find(transient_for);
-    if (it == wm_clients.end()) break;
-
-    xcb_window_t next = it->second.transient_for;
-    if (!next) break;
-    transient_for = next;
-  }
-  client.transient_for = transient_for;
-  // LOG(INFO) << client_window << " transient_for" << transient_for;
-
-  if (!client.transient_for) {
-    LOG(WARNING) << "Invalid WM_TRANSIENT_FOR=" << std::hex << transient_for
-                 << " on " << std::hex << client_window;
-    return;
-  }
 }
 
 void InitializeWM() {
@@ -334,10 +316,29 @@ void ProcessPendingClients() {
   WindowStack& stack = GetActiveStack();
   ClearZoom(stack);
 
+  for (xcb_window_t client_window : wm_pending_clients) {
+    auto& client = wm_clients.at(client_window);
+
+    if (client.transient_for) {
+      bool found = false;
+      for (int i = 0; i < 10; ++i) {
+        auto it = wm_clients.find(client.transient_for);
+        if (it == wm_clients.end()) break;
+
+        xcb_window_t next_transient = it->second.transient_for;
+        if (!next_transient) {
+          found = true;
+          break;
+        }
+        client.transient_for = next_transient;
+      }
+      if (!found) client.transient_for = 0;
+    }
+  }
+
   bool focused = false;
   for (xcb_window_t client_window : wm_pending_clients) {
     const auto& client = wm_clients.at(client_window);
-
     if (client.transient_for) {
       Client& parent = wm_clients.at(client.transient_for);
       parent.subwindows.push_back(client_window);

@@ -223,9 +223,9 @@ int Main(int argc, char** argv) {
 
     if (wm_bar_dirty || fds[1].revents & POLLIN) {
       uint64_t expirations;
-      if (wm_bar_dirty || read(tfd, &expirations, sizeof(expirations)) >= 0) {
-        bar_manager.Update(wm_conn, wm_screen,
-                           GetActiveClientBarText());  // TODO: also on Expose
+      if (read(tfd, &expirations, sizeof(expirations)) >= 0 || wm_bar_dirty) {
+        // TODO: also on Expose
+        bar_manager.Update(wm_conn, wm_screen, GetActiveClientBarText());
         wm_bar_dirty = false;
       }
     }
