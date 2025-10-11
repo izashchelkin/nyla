@@ -75,6 +75,9 @@ static void Handle_WM_Hints(xcb_window_t client_window, Client& client,
   // LOG(INFO) << wm_hints;
 
   client.wm_hints_input = wm_hints.input;
+
+  // if (wm_hints.urgent() && !client.urgent) indicator?
+  client.urgent = wm_hints.urgent();
 }
 
 static void Handle_WM_Normal_Hints(xcb_window_t client_window, Client& client,

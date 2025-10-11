@@ -31,6 +31,7 @@ struct Client {
   uint32_t max_width;
   uint32_t max_height;
 
+  bool urgent;
   bool wants_configure_notify;
 
   xcb_window_t transient_for;
@@ -51,7 +52,6 @@ extern X11Atoms atoms;
 
 extern uint32_t wm_bar_height;
 extern bool wm_bar_dirty;
-
 
 //
 

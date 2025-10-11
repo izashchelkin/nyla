@@ -26,6 +26,8 @@ struct WM_Hints {
   int32_t icon_y;
   xcb_pixmap_t icon_mask;
   xcb_window_t window_group;
+
+  bool urgent() const { return flags & WM_Hints::kUrgencyHint; }
 };
 static_assert(sizeof(WM_Hints) == 9 * 4);
 
