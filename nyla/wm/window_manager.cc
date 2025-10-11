@@ -31,6 +31,7 @@ X11Atoms atoms;
 xcb_connection_t* wm_conn;
 xcb_screen_t* wm_screen;
 
+bool wm_bar_dirty;
 bool wm_layout_dirty;
 bool wm_follow;
 
@@ -192,27 +193,29 @@ static void ApplyBorderActive(const WindowStack& stack) {
               wm_follow ? Color::kActiveFollow : Color::kActive);
 }
 
-static void SetInputFocus(xcb_window_t client_window, xcb_timestamp_t time) {
-  if (client_window) {
-    if (auto it = wm_clients.find(client_window); it != wm_clients.end()) {
-      const auto& client = it->second;
+static void Activate(const WindowStack& stack, xcb_timestamp_t time) {
+  wm_bar_dirty = true;
 
-      xcb_window_t immediate_focus =
-          client.wm_hints_input ? client_window : wm_screen->root;
+  if (!stack.active_window) goto revert_to_root;
 
-      LOG(INFO) << "SetInputFocus to " << immediate_focus << " for "
-                << client_window;
+  if (auto it = wm_clients.find(stack.active_window); it != wm_clients.end()) {
+    ApplyBorderActive(stack);
 
-      xcb_set_input_focus(wm_conn, XCB_INPUT_FOCUS_NONE, immediate_focus, time);
+    const auto& client = it->second;
 
-      if (client.wm_take_focus) {
-        Send_WM_Take_Focus(wm_conn, client_window, atoms, time);
-      }
+    xcb_window_t immediate_focus =
+        client.wm_hints_input ? stack.active_window : wm_screen->root;
 
-      return;
+    xcb_set_input_focus(wm_conn, XCB_INPUT_FOCUS_NONE, immediate_focus, time);
+
+    if (client.wm_take_focus) {
+      Send_WM_Take_Focus(wm_conn, stack.active_window, atoms, time);
     }
+
+    return;
   }
 
+revert_to_root:
   xcb_set_input_focus(wm_conn, XCB_INPUT_FOCUS_NONE, wm_screen->root, time);
 }
 
@@ -227,10 +230,9 @@ void CheckFocusTheft() {
   const WindowStack& stack = GetActiveStack();
   const xcb_window_t active_client_window = stack.active_window;
 
-  auto restore_input_focus = [active_client_window] {
-    SetInputFocus(
-        active_client_window,
-        XCB_CURRENT_TIME);  // TODO: use SERVERTIME? <-- requires extension
+  auto restore_input_focus = [&stack] {
+    Activate(stack,
+             XCB_CURRENT_TIME);  // TODO: use SERVERTIME? <-- requires extension
   };
 
   if (!wm_clients.contains(window)) {
@@ -300,16 +302,14 @@ void ManageClientsStartup() {
 
 static void FetchClientProperty(xcb_window_t client_window, Client& client,
                                 xcb_atom_t property) {
+  if (!wm_property_change_handlers.contains(property)) return;
+
   auto cookie = xcb_get_property_unchecked(
       wm_conn, false, client_window, property, XCB_ATOM_ANY, 0,
       std::numeric_limits<uint32_t>::max());
 
   auto it = client.property_cookies.find(property);
-  if (it != client.property_cookies.end()) {
-    LOG(WARNING) << "discarding reply for property " << property;
-    xcb_discard_reply(wm_conn, it->second.sequence);
-    it->second = cookie;
-  } else {
+  if (it == client.property_cookies.end()) {
     client.property_cookies.try_emplace(property, cookie);
   }
 }
@@ -338,8 +338,6 @@ void ProcessPendingClients() {
   for (xcb_window_t client_window : wm_pending_clients) {
     const auto& client = wm_clients.at(client_window);
 
-    LOG(INFO) << "processed pending " << client;
-
     if (client.transient_for) {
       Client& parent = wm_clients.at(client.transient_for);
       parent.subwindows.push_back(client_window);
@@ -349,8 +347,7 @@ void ProcessPendingClients() {
       if (!focused) {
         ApplyBorderDefault(stack);
         stack.active_window = client_window;
-        SetInputFocus(stack.active_window, XCB_CURRENT_TIME);
-        ApplyBorderActive(stack);
+        Activate(stack, XCB_CURRENT_TIME);
         focused = true;
       }
     }
@@ -403,9 +400,8 @@ void UnmanageClient(xcb_window_t window) {
           xcb_set_input_focus(wm_conn, XCB_INPUT_FOCUS_POINTER_ROOT,
                               wm_screen->root, XCB_CURRENT_TIME);
         } else {
-          stack.active_window = stack.windows[0];
-          SetInputFocus(stack.active_window, XCB_CURRENT_TIME);
-          ApplyBorderActive(stack);
+          stack.active_window = stack.windows.front();
+          Activate(stack, XCB_CURRENT_TIME);
         }
       }
     }
@@ -547,12 +543,7 @@ static void MoveStack(xcb_timestamp_t time, auto compute_idx) {
     }
   } else {
     ApplyBorderDefault(oldstack);
-
-    xcb_window_t window = newstack.active_window;
-    if (!window) window = wm_screen->root;
-    SetInputFocus(window, time);
-
-    ApplyBorderActive(newstack);
+    Activate(newstack, time);
   }
 
   wm_layout_dirty = true;
@@ -593,14 +584,12 @@ static void MoveLocal(xcb_timestamp_t time, auto compute_idx) {
     } else {
       ApplyBorderDefault(stack);
       stack.active_window = stack.windows.at(inew);
-      ApplyBorderActive(stack);
-      SetInputFocus(stack.active_window, time);
+      Activate(stack, time);
     }
   } else {
     if (!wm_follow) {
       stack.active_window = stack.windows.at(0);
-      ApplyBorderActive(stack);
-      SetInputFocus(stack.active_window, time);
+      Activate(stack, time);
     }
   }
 }

@@ -221,11 +221,12 @@ int Main(int argc, char** argv) {
       ProcessWMEvents(is_running, modifier, keybinds);
     }
 
-    if (fds[1].revents & POLLIN) {
+    if (wm_bar_dirty || fds[1].revents & POLLIN) {
       uint64_t expirations;
-      if (read(tfd, &expirations, sizeof(expirations)) >= 0) {
+      if (wm_bar_dirty || read(tfd, &expirations, sizeof(expirations)) >= 0) {
         bar_manager.Update(wm_conn, wm_screen,
                            GetActiveClientBarText());  // TODO: also on Expose
+        wm_bar_dirty = false;
       }
     }
 

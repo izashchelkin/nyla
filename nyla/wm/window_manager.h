@@ -54,6 +54,7 @@ extern xcb_connection_t* wm_conn;
 extern xcb_screen_t* wm_screen;
 extern X11Atoms atoms;
 
+extern bool wm_bar_dirty;
 extern bool wm_layout_dirty;
 extern bool wm_follow;
 
