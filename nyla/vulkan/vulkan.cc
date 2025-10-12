@@ -42,6 +42,15 @@ static std::vector<char> ReadFile(const std::string& filename) {
   return buffer;
 }
 
+static VKAPI_ATTR VkBool32 VKAPI_CALL
+DebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
+              VkDebugUtilsMessageTypeFlagsEXT message_type,
+              const VkDebugUtilsMessengerCallbackDataEXT* callback_data,
+              void* user_data) {
+  LOG(ERROR) << "validation layer: " << callback_data->pMessage;
+  return VK_FALSE;
+}
+
 static VkShaderModule CreateShaderModule(VkDevice device,
                                          const std::vector<char>& code) {
   VkShaderModuleCreateInfo shader_module_info{};
@@ -131,23 +140,44 @@ int main() {
 
   VkInstance instance = []() {
     auto instance_extensions = std::to_array({
-        VK_KHR_XCB_SURFACE_EXTENSION_NAME,
         VK_KHR_SURFACE_EXTENSION_NAME,
+        VK_KHR_XCB_SURFACE_EXTENSION_NAME,
+        VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
     });
 
     auto validation_layers = std::to_array({
         "VK_LAYER_KHRONOS_validation",
     });
 
-    VkInstanceCreateInfo create_info{};
-    create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-    create_info.enabledExtensionCount = instance_extensions.size();
-    create_info.ppEnabledExtensionNames = instance_extensions.data();
-    create_info.enabledLayerCount = validation_layers.size();
-    create_info.ppEnabledExtensionNames = validation_layers.data();
+    VkDebugUtilsMessengerCreateInfoEXT debug_messenger_create_info{};
+    debug_messenger_create_info.sType =
+        VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+    debug_messenger_create_info.messageSeverity =
+        VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+    debug_messenger_create_info.messageType =
+        VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+    debug_messenger_create_info.pfnUserCallback = DebugCallback;
+
+    VkInstanceCreateInfo instance_create_info{};
+    instance_create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+    instance_create_info.enabledExtensionCount = instance_extensions.size();
+    instance_create_info.ppEnabledExtensionNames = instance_extensions.data();
+    instance_create_info.enabledLayerCount = validation_layers.size();
+    instance_create_info.ppEnabledLayerNames = validation_layers.data();
+    instance_create_info.pNext = &debug_messenger_create_info;
 
     VkInstance instance;
-    CHECK_EQ(vkCreateInstance(&create_info, nullptr, &instance), VK_SUCCESS);
+    CHECK_EQ(vkCreateInstance(&instance_create_info, nullptr, &instance),
+             VK_SUCCESS);
+
+    VkDebugUtilsMessengerEXT debug_messenger;
+    reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
+        vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT"))(
+        instance, &debug_messenger_create_info, nullptr, &debug_messenger);
 
     return instance;
   }();
@@ -187,6 +217,7 @@ int main() {
 
     auto device_extensions = std::to_array({
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+        VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
     });
 
     VkDeviceCreateInfo device_create_info{};
