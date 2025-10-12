@@ -814,6 +814,11 @@ void ProcessWMEvents(const bool& is_running, uint16_t modifier,
         if (focusin->mode == XCB_NOTIFY_MODE_NORMAL) CheckFocusTheft();
         break;
       }
+      case XCB_EXPOSE: {
+        auto expose = reinterpret_cast<xcb_expose_event_t*>(event);
+        if (expose->window == wm_bar_window) wm_bar_dirty = true;
+        break;
+      }
       case 0: {
         auto error = reinterpret_cast<xcb_generic_error_t*>(event);
         LOG(ERROR) << "xcb error: "
