@@ -1,7 +1,9 @@
 #include "nyla/vulkan/vulkan.h"
 
+#include <unistd.h>
 #include <xkbcommon/xkbcommon.h>
 
+#include <cstdio>
 #include <cstdlib>
 #include <fstream>
 #include <limits>
@@ -308,20 +310,6 @@ int main() {
       .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
   };
 
-  VkViewport viewport{
-      .x = 0.0f,
-      .y = 0.0f,
-      .width = static_cast<float>(extent.width),
-      .height = static_cast<float>(extent.height),
-      .minDepth = 0.0f,
-      .maxDepth = 1.0f,
-  };
-
-  VkRect2D scissor{
-      .offset = {0, 0},
-      .extent = extent,
-  };
-
   VkPipelineViewportStateCreateInfo viewport_state_create_info{
       .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
       .viewportCount = 1,
@@ -432,4 +420,88 @@ int main() {
   CHECK(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1,
                                   &pipeline_create_info, nullptr,
                                   &graphics_pipeline) == VK_SUCCESS);
+
+  std::vector<VkFramebuffer> swapchain_fbs(swapchain_image_views.size());
+
+  for (size_t i = 0; i < swapchain_image_views.size(); ++i) {
+    VkImageView attachments[] = {swapchain_image_views[i]};
+    VkFramebufferCreateInfo fb_create_info{
+        .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+        .renderPass = render_pass,
+        .attachmentCount = 1,
+        .pAttachments = attachments,
+        .width = extent.width,
+        .height = extent.height,
+        .layers = 1,
+    };
+    CHECK(vkCreateFramebuffer(device, &fb_create_info, nullptr,
+                              &swapchain_fbs[i]) == VK_SUCCESS);
+  }
+
+  VkCommandPoolCreateInfo command_pool_create_info{
+      .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+      .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+      .queueFamilyIndex = queue_family_index,
+  };
+
+  VkCommandPool command_pool;
+  CHECK(vkCreateCommandPool(device, &command_pool_create_info, nullptr,
+                            &command_pool) == VK_SUCCESS);
+
+  VkCommandBufferAllocateInfo command_buffer_alloc_info{
+      .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+      .commandPool = command_pool,
+      .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+      .commandBufferCount = 1,
+  };
+
+  VkCommandBuffer command_buffer;
+  CHECK(vkAllocateCommandBuffers(device, &command_buffer_alloc_info,
+                                 &command_buffer) == VK_SUCCESS);
+
+  VkCommandBufferBeginInfo command_buffer_begin_info{
+      .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+  };
+  CHECK(vkBeginCommandBuffer(command_buffer, &command_buffer_begin_info) ==
+        VK_SUCCESS);
+
+  VkClearValue clear_color = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
+  VkRenderPassBeginInfo render_pass_begin_info{
+      .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+      .renderPass = render_pass,
+      .framebuffer = swapchain_fbs[0],
+      .renderArea =
+          {
+              .offset = {0, 0},
+              .extent = extent,
+          },
+      .clearValueCount = 1,
+      .pClearValues = &clear_color,
+  };
+
+  vkCmdBeginRenderPass(command_buffer, &render_pass_begin_info,
+                       VK_SUBPASS_CONTENTS_INLINE);
+
+  vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                    graphics_pipeline);
+
+  VkViewport viewport{
+      .x = 0.0f,
+      .y = 0.0f,
+      .width = static_cast<float>(extent.width),
+      .height = static_cast<float>(extent.height),
+      .minDepth = 0.0f,
+      .maxDepth = 1.0f,
+  };
+  vkCmdSetViewport(command_buffer, 0, 1, &viewport);
+
+  VkRect2D scissor{
+      .offset = {0, 0},
+      .extent = extent,
+  };
+  vkCmdSetScissor(command_buffer, 0, 1, &scissor);
+
+  vkCmdDraw(command_buffer, 3, 1, 0, 0);
+
+  getc(stdin);
 }
