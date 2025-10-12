@@ -64,13 +64,14 @@ static WindowStack& GetActiveStack() {
 
 static void Handle_WM_Hints(xcb_window_t client_window, Client& client,
                             xcb_get_property_reply_t* reply) {
-  if (!reply) {
-    LOG(ERROR) << "property fetch error";
-    return;
-  }
+  if (!reply) return;
 
-  if (xcb_get_property_value_length(reply) != sizeof(WM_Hints)) {
-    LOG(ERROR) << "invalid property size " << xcb_get_property_value_length(reply) << " expected: " << sizeof(WM_Hints);
+  uint32_t length = xcb_get_property_value_length(reply);
+  if (!length) return;
+
+  if (length != sizeof(WM_Hints)) {
+    LOG(ERROR) << "invalid property size " << length
+               << " expected: " << sizeof(WM_Hints);
     return;
   }
 
@@ -86,13 +87,14 @@ static void Handle_WM_Hints(xcb_window_t client_window, Client& client,
 
 static void Handle_WM_Normal_Hints(xcb_window_t client_window, Client& client,
                                    xcb_get_property_reply_t* reply) {
-  if (!reply) {
-    LOG(ERROR) << "property fetch error";
-    return;
-  }
+  if (!reply) return;
 
-  if (xcb_get_property_value_length(reply) != sizeof(WM_Normal_Hints)) {
-    LOG(ERROR) << "invalid property size";
+  uint32_t length = xcb_get_property_value_length(reply);
+  if (!length) return;
+
+  if (length != sizeof(WM_Normal_Hints)) {
+    LOG(ERROR) << "invalid property size " << length
+               << " expected: " << sizeof(WM_Normal_Hints);
     return;
   }
 
@@ -119,15 +121,8 @@ static void Handle_WM_Name(xcb_window_t client_window, Client& client,
 
 static void Handle_WM_Protocols(xcb_window_t client_window, Client& client,
                                 xcb_get_property_reply_t* reply) {
-  if (!reply) {
-    LOG(ERROR) << "property fetch error";
-    return;
-  }
-
-  if (reply->type != XCB_ATOM_ATOM) {
-    LOG(ERROR) << "invalid property type " << reply->type;
-    return;
-  }
+  if (!reply) return;
+  if (reply->type != XCB_ATOM_ATOM) return;
 
   client.wm_delete_window = false;
   client.wm_take_focus = false;
@@ -152,9 +147,10 @@ static void Handle_WM_Protocols(xcb_window_t client_window, Client& client,
 
 static void Handle_WM_Transient_For(xcb_window_t client_window, Client& client,
                                     xcb_get_property_reply_t* reply) {
-  if (client.transient_for != 0) return;
-
+  if (!reply || !reply->length) return;
   if (reply->type != XCB_ATOM_WINDOW) return;
+
+  if (client.transient_for != 0) return;
 
   client.transient_for =
       *reinterpret_cast<xcb_window_t*>(xcb_get_property_value(reply));
@@ -589,8 +585,10 @@ void ProcessWM() {
     ClearZoom(stack);
 
     for (xcb_window_t client_window : wm_pending_clients) {
-      auto& client = wm_clients.at(client_window);
+      auto it = wm_clients.find(client_window);
+      if (it == wm_clients.end()) continue;
 
+      auto& [_, client] = *it;
       if (client.transient_for) {
         bool found = false;
         for (int i = 0; i < 10; ++i) {
