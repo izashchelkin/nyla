@@ -57,6 +57,55 @@ static VkShaderModule CreateShaderModule(VkDevice device,
   return module;
 }
 
+static void RecordCommandBuffer(VkCommandBuffer command_buffer,
+                                VkRenderPass render_pass,
+                                VkFramebuffer framebuffer, VkExtent2D extent,
+                                VkPipeline graphics_pipeline) {
+  VkCommandBufferBeginInfo command_buffer_begin_info{
+      .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+  };
+  CHECK(vkBeginCommandBuffer(command_buffer, &command_buffer_begin_info) ==
+        VK_SUCCESS);
+
+  VkClearValue clear_color = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
+  VkRenderPassBeginInfo render_pass_begin_info{
+      .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+      .renderPass = render_pass,
+      .framebuffer = framebuffer,
+      .renderArea =
+          {
+              .offset = {0, 0},
+              .extent = extent,
+          },
+      .clearValueCount = 1,
+      .pClearValues = &clear_color,
+  };
+
+  vkCmdBeginRenderPass(command_buffer, &render_pass_begin_info,
+                       VK_SUBPASS_CONTENTS_INLINE);
+
+  vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                    graphics_pipeline);
+
+  VkViewport viewport{
+      .x = 0.0f,
+      .y = 0.0f,
+      .width = static_cast<float>(extent.width),
+      .height = static_cast<float>(extent.height),
+      .minDepth = 0.0f,
+      .maxDepth = 1.0f,
+  };
+  vkCmdSetViewport(command_buffer, 0, 1, &viewport);
+
+  VkRect2D scissor{
+      .offset = {0, 0},
+      .extent = extent,
+  };
+  vkCmdSetScissor(command_buffer, 0, 1, &scissor);
+
+  vkCmdDraw(command_buffer, 3, 1, 0, 0);
+}
+
 int main() {
   absl::InitializeLog();
   absl::SetStderrThreshold(absl::LogSeverityAtLeast::kInfo);
@@ -458,50 +507,42 @@ int main() {
   VkCommandBuffer command_buffer;
   CHECK(vkAllocateCommandBuffers(device, &command_buffer_alloc_info,
                                  &command_buffer) == VK_SUCCESS);
-
-  VkCommandBufferBeginInfo command_buffer_begin_info{
-      .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+  VkSemaphoreCreateInfo semaphore_create_info{
+      .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
   };
-  CHECK(vkBeginCommandBuffer(command_buffer, &command_buffer_begin_info) ==
+
+  VkSemaphore image_available_semaphore;
+  CHECK(vkCreateSemaphore(device, &semaphore_create_info, nullptr,
+                          &image_available_semaphore) == VK_SUCCESS);
+
+  VkSemaphore render_finished_semaphore;
+  CHECK(vkCreateSemaphore(device, &semaphore_create_info, nullptr,
+                          &render_finished_semaphore) == VK_SUCCESS);
+
+  VkFenceCreateInfo fence_info{
+      .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+      .flags = VK_FENCE_CREATE_SIGNALED_BIT,
+  };
+
+  VkFence in_flight_fence;
+  CHECK(vkCreateFence(device, &fence_info, nullptr, &in_flight_fence) ==
         VK_SUCCESS);
 
-  VkClearValue clear_color = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
-  VkRenderPassBeginInfo render_pass_begin_info{
-      .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-      .renderPass = render_pass,
-      .framebuffer = swapchain_fbs[0],
-      .renderArea =
-          {
-              .offset = {0, 0},
-              .extent = extent,
-          },
-      .clearValueCount = 1,
-      .pClearValues = &clear_color,
-  };
+  for (;;) {
+    CHECK(vkWaitForFences(device, 1, &in_flight_fence, VK_TRUE,
+                          std::numeric_limits<uint64_t>::max()) == VK_SUCCESS);
 
-  vkCmdBeginRenderPass(command_buffer, &render_pass_begin_info,
-                       VK_SUBPASS_CONTENTS_INLINE);
+    vkResetFences(device, 1, &in_flight_fence);
 
-  vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                    graphics_pipeline);
+    uint32_t image_index;
+    CHECK(vkAcquireNextImageKHR(device, swapchain,
+                                std::numeric_limits<uint64_t>::max(),
+                                image_available_semaphore, VK_NULL_HANDLE,
+                                &image_index) == VK_SUCCESS);
 
-  VkViewport viewport{
-      .x = 0.0f,
-      .y = 0.0f,
-      .width = static_cast<float>(extent.width),
-      .height = static_cast<float>(extent.height),
-      .minDepth = 0.0f,
-      .maxDepth = 1.0f,
-  };
-  vkCmdSetViewport(command_buffer, 0, 1, &viewport);
+    vkResetCommandBuffer(command_buffer, 0);
 
-  VkRect2D scissor{
-      .offset = {0, 0},
-      .extent = extent,
-  };
-  vkCmdSetScissor(command_buffer, 0, 1, &scissor);
-
-  vkCmdDraw(command_buffer, 3, 1, 0, 0);
-
-  getc(stdin);
+    RecordCommandBuffer(command_buffer, render_pass, swapchain_fbs.at(image_index),
+                        extent, graphics_pipeline);
+  }
 }
