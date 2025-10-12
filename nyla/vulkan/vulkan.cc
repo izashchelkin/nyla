@@ -135,10 +135,16 @@ int main() {
         VK_KHR_SURFACE_EXTENSION_NAME,
     });
 
+    auto validation_layers = std::to_array({
+        "VK_LAYER_KHRONOS_validation",
+    });
+
     VkInstanceCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     create_info.enabledExtensionCount = instance_extensions.size();
     create_info.ppEnabledExtensionNames = instance_extensions.data();
+    create_info.enabledLayerCount = validation_layers.size();
+    create_info.ppEnabledExtensionNames = validation_layers.data();
 
     VkInstance instance;
     CHECK_EQ(vkCreateInstance(&create_info, nullptr, &instance), VK_SUCCESS);

@@ -450,7 +450,9 @@ static void MoveStack(xcb_timestamp_t time, auto compute_idx) {
     if (oldstack.active_window) {
       newstack.active_window = oldstack.active_window;
       newstack.windows.emplace_back(oldstack.active_window);
+
       newstack.zoom = false;
+      oldstack.zoom = false;
 
       auto it = std::ranges::find(oldstack.windows, oldstack.active_window);
       CHECK_NE(it, oldstack.windows.end());
@@ -536,8 +538,13 @@ std::string GetActiveClientBarText() {
 
 void CloseActive() {
   WindowStack& stack = GetActiveStack();
-  if (stack.active_window)
+  if (!stack.active_window) return;
+
+  static absl::Time last = absl::InfinitePast();
+  if (absl::Now() - last >= absl::Milliseconds(100)) {
     Send_WM_Delete_Window(wm_conn, stack.active_window, atoms);
+  }
+  last = absl::Now();
 }
 
 void ToggleZoom() {
