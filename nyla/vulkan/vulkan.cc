@@ -104,6 +104,10 @@ static void RecordCommandBuffer(VkCommandBuffer command_buffer,
   vkCmdSetScissor(command_buffer, 0, 1, &scissor);
 
   vkCmdDraw(command_buffer, 3, 1, 0, 0);
+
+  vkCmdEndRenderPass(command_buffer);
+
+	CHECK_EQ(vkEndCommandBuffer(command_buffer), VK_SUCCESS);
 }
 
 int main() {
@@ -434,12 +438,23 @@ int main() {
       .pColorAttachments = &color_attachment_ref,
   };
 
+  VkSubpassDependency dependency{
+      .srcSubpass = VK_SUBPASS_EXTERNAL,
+      .dstSubpass = 0,
+      .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+      .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+      .srcAccessMask = 0,
+      .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+  };
+
   VkRenderPassCreateInfo render_pass_create_info{
       .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
       .attachmentCount = 1,
       .pAttachments = &color_attachment,
       .subpassCount = 1,
       .pSubpasses = &subpass,
+      .dependencyCount = 1,
+      .pDependencies = &dependency,
   };
 
   VkRenderPass render_pass;
@@ -540,9 +555,37 @@ int main() {
                                 image_available_semaphore, VK_NULL_HANDLE,
                                 &image_index) == VK_SUCCESS);
 
-    vkResetCommandBuffer(command_buffer, 0);
+    CHECK(vkResetCommandBuffer(command_buffer, 0) == VK_SUCCESS);
 
-    RecordCommandBuffer(command_buffer, render_pass, swapchain_fbs.at(image_index),
-                        extent, graphics_pipeline);
+    RecordCommandBuffer(command_buffer, render_pass,
+                        swapchain_fbs.at(image_index), extent,
+                        graphics_pipeline);
+
+    VkSemaphore wait_semaphores[] = {image_available_semaphore};
+    VkPipelineStageFlags wait_stages[] = {
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+    VkSemaphore signal_semaphores[] = {render_finished_semaphore};
+    VkSubmitInfo submit_info{
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+        .waitSemaphoreCount = 1,
+        .pWaitSemaphores = wait_semaphores,
+        .pWaitDstStageMask = wait_stages,
+        .commandBufferCount = 1,
+        .pCommandBuffers = &command_buffer,
+        .signalSemaphoreCount = 1,
+        .pSignalSemaphores = signal_semaphores,
+    };
+
+    CHECK(vkQueueSubmit(queue, 1, &submit_info, in_flight_fence) == VK_SUCCESS);
+
+    VkPresentInfoKHR present_info{
+        .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+        .waitSemaphoreCount = 1,
+        .pWaitSemaphores = signal_semaphores,
+        .swapchainCount = 1,
+        .pSwapchains = &swapchain,
+        .pImageIndices = &image_index,
+    };
+    CHECK(vkQueuePresentKHR(queue, &present_info) == VK_SUCCESS);
   }
 }
