@@ -17,7 +17,6 @@
 #include "nyla/protocols/atoms.h"
 #include "nyla/protocols/send.h"
 #include "nyla/protocols/wm_protocols.h"
-#include "nyla/wm/bar_manager.h"
 #include "nyla/wm/keyboard.h"
 #include "nyla/wm/window_manager.h"
 #include "xcb/xcb.h"
@@ -88,12 +87,6 @@ int Main(int argc, char** argv) {
     LOG(QFATAL) << "could not bind keyboard";
   LOG(INFO) << "bind keyboard successful";
 
-  BarManager bar_manager;
-  if (!bar_manager.Init(wm_conn, wm_screen)) {
-    LOG(QFATAL) << "could not init bar";
-  }
-  wm_bar_height = bar_manager.height();
-
   using namespace std::chrono_literals;
   int tfd = MakeTimerFd(501ms);
 
@@ -138,13 +131,14 @@ int Main(int argc, char** argv) {
       ProcessWMEvents(is_running, modifier, keybinds);
     }
 
-    if (wm_bar_dirty || fds[1].revents & POLLIN) {
-      uint64_t expirations;
-      if (read(tfd, &expirations, sizeof(expirations)) >= 0 || wm_bar_dirty) {
-        // TODO: also on Expose
-        bar_manager.Update(wm_conn, wm_screen, GetActiveClientBarText());
-        wm_bar_dirty = false;
+    const bool update_bar = fds[1].revents & POLLIN;
+    if (update_bar || wm_bar_dirty) {
+      if (update_bar) {
+        uint64_t expirations;
+        read(tfd, &expirations, sizeof(expirations));
       }
+
+      UpdateBar();
     }
 
     if (fds.size() > 2 && fds[2].revents & POLLIN) {

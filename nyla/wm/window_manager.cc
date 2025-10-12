@@ -36,20 +36,24 @@ X11Atoms atoms;
 xcb_connection_t* wm_conn;
 xcb_screen_t wm_screen;
 
-uint32_t wm_bar_height;
+static uint32_t wm_bar_height = 20;
+static xcb_window_t wm_bar_window;
+static xcb_gcontext_t wm_bar_gc;
 bool wm_bar_dirty;
-bool wm_layout_dirty;
-bool wm_follow;
-bool wm_border_dirty;
 
-Map<xcb_window_t, Client> wm_clients;
-std::vector<xcb_window_t> wm_pending_clients;
+static bool wm_layout_dirty;
+static bool wm_follow;
+static bool wm_border_dirty;
 
-Map<xcb_atom_t, void (*)(xcb_window_t, Client&, xcb_get_property_reply_t*)>
+static Map<xcb_window_t, Client> wm_clients;
+static std::vector<xcb_window_t> wm_pending_clients;
+
+static Map<xcb_atom_t,
+           void (*)(xcb_window_t, Client&, xcb_get_property_reply_t*)>
     wm_property_change_handlers;
 
-std::vector<WindowStack> wm_stacks;
-size_t wm_active_stack_idx;
+static std::vector<WindowStack> wm_stacks;
+static size_t wm_active_stack_idx;
 
 //
 
@@ -167,6 +171,45 @@ void InitializeWM() {
                                           Handle_WM_Protocols);
   wm_property_change_handlers.try_emplace(XCB_ATOM_WM_TRANSIENT_FOR,
                                           Handle_WM_Transient_For);
+
+  wm_bar_window = xcb_generate_id(wm_conn);
+
+  if (xcb_request_check(
+          wm_conn,
+          xcb_create_window_checked(
+              wm_conn, XCB_COPY_FROM_PARENT, wm_bar_window, wm_screen.root, 0,
+              0, wm_screen.width_in_pixels, wm_bar_height, 0,
+              XCB_WINDOW_CLASS_INPUT_OUTPUT, wm_screen.root_visual,
+              XCB_CW_BACK_PIXEL | XCB_CW_OVERRIDE_REDIRECT | XCB_CW_EVENT_MASK,
+              (uint32_t[]){
+                  wm_screen.black_pixel,
+                  true,
+                  XCB_EVENT_MASK_EXPOSURE,
+              }))) {
+    LOG(ERROR) << "could not create bar window";
+  }
+
+  xcb_map_window(wm_conn, wm_bar_window);
+
+  constexpr const char* kFontName = "fixed";
+
+  xcb_font_t font = xcb_generate_id(wm_conn);
+
+  if (xcb_request_check(
+          wm_conn,
+          xcb_open_font_checked(wm_conn, font, strlen(kFontName), kFontName))) {
+    LOG(ERROR) << "could not create bar font";
+  }
+
+  wm_bar_gc = xcb_generate_id(wm_conn);
+  if (xcb_request_check(wm_conn,
+                        xcb_create_gc_checked(
+                            wm_conn, wm_bar_gc, wm_bar_window,
+                            XCB_GC_FOREGROUND | XCB_GC_BACKGROUND | XCB_GC_FONT,
+                            (uint32_t[]){wm_screen.white_pixel,
+                                         wm_screen.black_pixel, font}))) {
+    LOG(ERROR) << "could not create bar GC";
+  }
 }
 
 static void ClearZoom(WindowStack& stack) {
@@ -780,6 +823,28 @@ void ProcessWMEvents(const bool& is_running, uint16_t modifier,
       }
     }
   }
+}
+
+void UpdateBar() {
+  const WindowStack& stack = GetActiveStack();
+
+  const std::string& active_client_name =
+      stack.active_window ? wm_clients.at(stack.active_window).name : "nylawm";
+
+  double load_avg[3];
+  getloadavg(load_avg, std::size(load_avg));
+
+  std::string bar_text = absl::StrFormat(
+      "%.2f, %.2f, %.2f %s %v", load_avg[0], load_avg[1], load_avg[2],
+      absl::FormatTime("%H:%M:%S %d.%m.%Y", absl::Now(), absl::LocalTimeZone()),
+      active_client_name);
+
+  xcb_clear_area(wm_conn, 0, wm_bar_window, 0, 0, wm_screen.width_in_pixels,
+                 wm_bar_height);
+  xcb_image_text_8(wm_conn, bar_text.size(), wm_bar_window, wm_bar_gc, 8, 16,
+                   bar_text.data());
+
+  wm_bar_dirty = false;
 }
 
 std::string DumpClients() {

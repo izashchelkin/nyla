@@ -50,7 +50,6 @@ extern xcb_connection_t* wm_conn;
 extern xcb_screen_t wm_screen;
 extern X11Atoms atoms;
 
-extern uint32_t wm_bar_height;
 extern bool wm_bar_dirty;
 
 //
@@ -59,6 +58,7 @@ void InitializeWM();
 void ProcessWMEvents(const bool& is_running, uint16_t modifier,
                      std::span<Keybind> keybinds);
 void ProcessWM();
+void UpdateBar();
 
 std::string DumpClients();
 std::string GetActiveClientBarText();
