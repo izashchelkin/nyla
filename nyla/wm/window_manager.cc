@@ -70,7 +70,7 @@ static void Handle_WM_Hints(xcb_window_t client_window, Client& client,
   }
 
   if (xcb_get_property_value_length(reply) != sizeof(WM_Hints)) {
-    LOG(ERROR) << "invalid property size";
+    LOG(ERROR) << "invalid property size " << xcb_get_property_value_length(reply) << " expected: " << sizeof(WM_Hints);
     return;
   }
 
