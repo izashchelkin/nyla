@@ -369,9 +369,67 @@ int main() {
 
   VkPipelineLayout pipeline_layout;
 
-  VkPipelineLayoutCreateInfo pipeline_create_info{
+  VkPipelineLayoutCreateInfo pipeline_layout_create_info{
       .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
   };
-  vkCreatePipelineLayout(device, &pipeline_create_info, nullptr,
+  vkCreatePipelineLayout(device, &pipeline_layout_create_info, nullptr,
                          &pipeline_layout);
+
+  VkAttachmentDescription color_attachment{
+      .format = surface_format.format,
+      .samples = VK_SAMPLE_COUNT_1_BIT,
+      .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+      .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+      .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+      .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+      .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+      .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+  };
+
+  VkAttachmentReference color_attachment_ref{
+      .attachment = 0,
+      .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+  };
+
+  VkSubpassDescription subpass{
+      .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
+      .colorAttachmentCount = 1,
+      .pColorAttachments = &color_attachment_ref,
+  };
+
+  VkRenderPassCreateInfo render_pass_create_info{
+      .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+      .attachmentCount = 1,
+      .pAttachments = &color_attachment,
+      .subpassCount = 1,
+      .pSubpasses = &subpass,
+  };
+
+  VkRenderPass render_pass;
+  CHECK(vkCreateRenderPass(device, &render_pass_create_info, nullptr,
+                           &render_pass) == VK_SUCCESS);
+
+  VkGraphicsPipelineCreateInfo pipeline_create_info{
+      .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+      .stageCount = 2,
+      .pStages = shader_stages.data(),
+      .pVertexInputState = &vertex_input_info,
+      .pInputAssemblyState = &input_assembly_create_info,
+      .pViewportState = &viewport_state_create_info,
+      .pRasterizationState = &rasterizer_create_info,
+      .pMultisampleState = &multisampling,
+      .pDepthStencilState = nullptr,
+      .pColorBlendState = &color_blending,
+      .pDynamicState = &dynamic_state_create_info,
+      .layout = pipeline_layout,
+      .renderPass = render_pass,
+      .subpass = 0,
+      .basePipelineHandle = VK_NULL_HANDLE,
+      .basePipelineIndex = -1,
+  };
+
+  VkPipeline graphics_pipeline;
+  CHECK(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1,
+                                  &pipeline_create_info, nullptr,
+                                  &graphics_pipeline) == VK_SUCCESS);
 }
