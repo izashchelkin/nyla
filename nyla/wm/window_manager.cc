@@ -589,8 +589,6 @@ void ProcessWM() {
   WindowStack& stack = GetActiveStack();
 
   if (!wm_pending_clients.empty()) {
-    ClearZoom(stack);
-
     for (xcb_window_t client_window : wm_pending_clients) {
       auto it = wm_clients.find(client_window);
       if (it == wm_clients.end()) continue;
@@ -611,6 +609,9 @@ void ProcessWM() {
         }
         if (!found) client.transient_for = 0;
       }
+
+      if (!client.transient_for || client.transient_for != stack.active_window)
+        ClearZoom(stack);
     }
 
     bool activated = false;
