@@ -6,8 +6,11 @@
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <fstream>
+#include <initializer_list>
 #include <limits>
+#include <ranges>
 #include <string_view>
 #include <vector>
 
@@ -32,6 +35,41 @@ namespace nyla {}  // namespace nyla
 
 #define GET_INSTANCE_PROC_ADDR(name) \
   reinterpret_cast<PFN_##name>(vkGetInstanceProcAddr(instance, #name))
+
+struct Vec2 {
+  union {
+    float data[2];
+    struct {
+      float x;
+      float y;
+    };
+  };
+
+  constexpr Vec2(float x, float y) : x{x}, y{y} {};
+};
+
+struct Vec3 {
+  union {
+    float data[3];
+    struct {
+      float x;
+      float y;
+      float z;
+    };
+    struct {
+      float r;
+      float g;
+      float b;
+    };
+  };
+
+  constexpr Vec3(float x, float y, float z) : x{x}, y{y}, z{z} {};
+};
+
+struct Vertex {
+  Vec2 pos;
+  Vec3 color;
+};
 
 static std::vector<char> ReadFile(const std::string& filename) {
   std::ifstream file(filename, std::ios::ate | std::ios::binary);
@@ -85,6 +123,54 @@ static VkShaderModule CreateShaderModule(VkDevice device,
   CHECK(vkCreateShaderModule(device, &shader_module_info, nullptr,
                              &shader_module) == VK_SUCCESS);
   return shader_module;
+}
+
+static std::pair<VkBuffer, VkDeviceMemory> CreateBuffer(
+    VkDevice device, VkPhysicalDevice phys_device, VkDeviceSize size,
+    VkBufferUsageFlags usage, VkMemoryPropertyFlags properties) {
+  const VkBufferCreateInfo buffer_create_info{
+      .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+      .size = size,
+      .usage = usage,
+      .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+  };
+
+  VkBuffer buffer;
+  CHECK_EQ(vkCreateBuffer(device, &buffer_create_info, nullptr, &buffer),
+           VK_SUCCESS);
+
+  VkMemoryRequirements mem_requirements;
+  vkGetBufferMemoryRequirements(device, buffer, &mem_requirements);
+
+  const VkMemoryAllocateInfo alloc_info{
+      .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+      .allocationSize = mem_requirements.size,
+      .memoryTypeIndex =
+          [=]() {
+            VkPhysicalDeviceMemoryProperties mem_propertities;
+            vkGetPhysicalDeviceMemoryProperties(phys_device, &mem_propertities);
+
+            for (uint32_t i = 0; i < mem_propertities.memoryTypeCount; ++i) {
+              if (!(mem_requirements.memoryTypeBits & (1 << i))) {
+                continue;
+              }
+              if ((mem_propertities.memoryTypes[i].propertyFlags &
+                   properties) != properties) {
+                continue;
+              }
+              return i;
+            }
+
+            CHECK(false);
+          }(),
+  };
+
+  VkDeviceMemory buffer_memory;
+  CHECK_EQ(vkAllocateMemory(device, &alloc_info, nullptr, &buffer_memory),
+           VK_SUCCESS);
+  CHECK_EQ(vkBindBufferMemory(device, buffer, buffer_memory, 0), VK_SUCCESS);
+
+  return {buffer, buffer_memory};
 }
 
 int main() {
@@ -379,17 +465,21 @@ int main() {
 
   auto vert_shader_module =
       CreateShaderModule(device, ReadFile("nyla/vulkan/shaders/vert.spv"));
-  shader_stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-  shader_stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-  shader_stages[0].module = vert_shader_module;
-  shader_stages[0].pName = "main";
+  shader_stages[0] = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+      .stage = VK_SHADER_STAGE_VERTEX_BIT,
+      .module = vert_shader_module,
+      .pName = "main",
+  };
 
   auto frag_shader_module =
       CreateShaderModule(device, ReadFile("nyla/vulkan/shaders/frag.spv"));
-  shader_stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-  shader_stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-  shader_stages[1].module = frag_shader_module;
-  shader_stages[1].pName = "main";
+  shader_stages[1] = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+      .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+      .module = frag_shader_module,
+      .pName = "main",
+  };
 
   auto dynamic_states = std::to_array<VkDynamicState>({
       VK_DYNAMIC_STATE_VIEWPORT,
@@ -402,9 +492,34 @@ int main() {
   dynamic_state_create_info.dynamicStateCount = dynamic_states.size();
   dynamic_state_create_info.pDynamicStates = dynamic_states.data();
 
-  VkPipelineVertexInputStateCreateInfo vertex_input_create_info{};
-  vertex_input_create_info.sType =
-      VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+  const VkVertexInputBindingDescription binding_description{
+      .binding = 0,
+      .stride = sizeof(Vertex),
+      .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
+  };
+
+  const VkVertexInputAttributeDescription attr_description[2] = {
+      {
+          .location = 0,
+          .binding = 0,
+          .format = VK_FORMAT_R32G32B32_SFLOAT,
+          .offset = 0,
+      },
+      {
+          .location = 1,
+          .binding = 0,
+          .format = VK_FORMAT_R32G32B32_SFLOAT,
+          .offset = offsetof(Vertex, color),
+      },
+  };
+
+  const VkPipelineVertexInputStateCreateInfo vertex_input_create_info{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+      .vertexBindingDescriptionCount = 1,
+      .pVertexBindingDescriptions = &binding_description,
+      .vertexAttributeDescriptionCount = 2,
+      .pVertexAttributeDescriptions = attr_description,
+  };
 
   VkPipelineInputAssemblyStateCreateInfo input_assembly_create_info{};
   input_assembly_create_info.sType =
@@ -417,15 +532,15 @@ int main() {
       .scissorCount = 1,
   };
 
-  VkPipelineRasterizationStateCreateInfo rasterizer_create_info{};
-  rasterizer_create_info.sType =
-      VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-  rasterizer_create_info.depthClampEnable = VK_FALSE;
-  rasterizer_create_info.rasterizerDiscardEnable = VK_FALSE;
-  rasterizer_create_info.polygonMode = VK_POLYGON_MODE_FILL;
-  rasterizer_create_info.cullMode = VK_CULL_MODE_BACK_BIT;
-  rasterizer_create_info.frontFace = VK_FRONT_FACE_CLOCKWISE;
-  rasterizer_create_info.lineWidth = 1.0f;
+  const VkPipelineRasterizationStateCreateInfo rasterizer_create_info{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+      .depthClampEnable = VK_FALSE,
+      .rasterizerDiscardEnable = VK_FALSE,
+      .polygonMode = VK_POLYGON_MODE_FILL,
+      .cullMode = VK_CULL_MODE_BACK_BIT,
+      .frontFace = VK_FRONT_FACE_CLOCKWISE,
+      .lineWidth = 1.0f,
+  };
 
   VkPipelineMultisampleStateCreateInfo multisampling_create_info{};
   multisampling_create_info.sType =
@@ -512,6 +627,24 @@ int main() {
   CHECK(vkCreateCommandPool(device, &command_pool_create_info, nullptr,
                             &command_pool) == VK_SUCCESS);
 
+  const std::vector<Vertex> vertices = {
+      {{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+      {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+      {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+  };
+
+  const VkDeviceSize buffer_size = sizeof(vertices[0]) * vertices.size();
+
+  auto [vertex_buffer, vertex_buffer_memory] = CreateBuffer(
+      device, phys_device, buffer_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+          VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+  void* data;
+  vkMapMemory(device, vertex_buffer_memory, 0, buffer_size, 0, &data);
+  memcpy(data, vertices.data(), buffer_size);
+  vkUnmapMemory(device, vertex_buffer_memory);
+
   const uint8_t num_in_flight_frames = 2;
 
   std::vector<VkCommandBuffer> command_buffers(num_in_flight_frames);
@@ -587,10 +720,17 @@ int main() {
     };
 
     {
+      static uint32_t first_frame = 0;
+      const uint32_t image_bit = 1 << image_index;
+      const VkImageLayout old_layout = (first_frame & image_bit)
+                                           ? VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+                                           : VK_IMAGE_LAYOUT_UNDEFINED;
+      first_frame |= image_bit;
+
       const VkImageMemoryBarrier image_memory_barrier{
           .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
           .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-          .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+          .oldLayout = old_layout,
           .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
           .image = swapchain_images[image_index],
           .subresourceRange =
@@ -613,6 +753,10 @@ int main() {
       vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                         graphics_pipeline);
 
+      VkBuffer vertex_buffers[] = {vertex_buffer};
+      VkDeviceSize offsets[] = {0};
+      vkCmdBindVertexBuffers(command_buffer, 0, 1, vertex_buffers, offsets);
+
       VkViewport viewport{};
       viewport.x = 0.0f;
       viewport.y = 0.0f;
@@ -629,7 +773,7 @@ int main() {
 
       vkCmdSetScissor(command_buffer, 0, 1, &scissor);
 
-      vkCmdDraw(command_buffer, 3, 1, 0, 0);
+      vkCmdDraw(command_buffer, vertices.size(), 1, 0, 0);
     }
     vkCmdEndRendering(command_buffer);
 
@@ -637,7 +781,7 @@ int main() {
       const VkImageMemoryBarrier image_memory_barrier{
           .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
           .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-          .oldLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL,
+          .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
           .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
           .image = swapchain_images[image_index],
           .subresourceRange =
