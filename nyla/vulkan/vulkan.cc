@@ -635,15 +635,61 @@ int main() {
 
   const VkDeviceSize buffer_size = sizeof(vertices[0]) * vertices.size();
 
-  auto [vertex_buffer, vertex_buffer_memory] = CreateBuffer(
-      device, phys_device, buffer_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+  auto [staging_buffer, staging_buffer_memory] = CreateBuffer(
+      device, phys_device, buffer_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
           VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
   void* data;
-  vkMapMemory(device, vertex_buffer_memory, 0, buffer_size, 0, &data);
+  vkMapMemory(device, staging_buffer_memory, 0, buffer_size, 0, &data);
   memcpy(data, vertices.data(), buffer_size);
-  vkUnmapMemory(device, vertex_buffer_memory);
+  vkUnmapMemory(device, staging_buffer_memory);
+
+  auto [vertex_buffer, vertex_buffer_memory] = CreateBuffer(
+      device, phys_device, buffer_size,
+      VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+  const VkCommandBufferAllocateInfo command_buffer_alloc_info{
+      .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+      .commandPool = command_pool,
+      .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+      .commandBufferCount = 1,
+  };
+
+  VkCommandBuffer command_buffer;
+  CHECK_EQ(vkAllocateCommandBuffers(device, &command_buffer_alloc_info,
+                                    &command_buffer),
+           VK_SUCCESS);
+
+  const VkCommandBufferBeginInfo command_buffer_begin_info{
+      .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+      .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+  };
+
+  CHECK_EQ(vkBeginCommandBuffer(command_buffer, &command_buffer_begin_info),
+           VK_SUCCESS);
+
+  const VkBufferCopy copy_region{
+      .srcOffset = 0,
+      .dstOffset = 0,
+      .size = buffer_size,
+  };
+  vkCmdCopyBuffer(command_buffer, staging_buffer, vertex_buffer, 1,
+                  &copy_region);
+
+  vkEndCommandBuffer(command_buffer);
+
+  const VkSubmitInfo submit_info{
+      .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+      .commandBufferCount = 1,
+      .pCommandBuffers = &command_buffer,
+  };
+  vkQueueSubmit(queue, 1, &submit_info, VK_NULL_HANDLE);
+  vkQueueWaitIdle(queue);
+  vkFreeCommandBuffers(device, command_pool, 1, &command_buffer);
+  vkDestroyBuffer(device, staging_buffer, nullptr);
+  vkFreeMemory(device, staging_buffer_memory, nullptr);
 
   const uint8_t num_in_flight_frames = 2;
 
