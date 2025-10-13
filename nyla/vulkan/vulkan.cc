@@ -1,26 +1,22 @@
 #include "nyla/vulkan/vulkan.h"
 
+#define VK_USE_PLATFORM_XCB_KHR
+
 #include <unistd.h>
 #include <xkbcommon/xkbcommon.h>
 
+#include <algorithm>
+#include <array>
 #include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <initializer_list>
-#include <limits>
-#include <ranges>
-#include <string_view>
-#include <vector>
-
-#define VK_USE_PLATFORM_XCB_KHR
-
-#include <algorithm>
-#include <array>
-#include <cstdint>
-#include <fstream>
 #include <iostream>
+#include <limits>
+#include <vector>
 
 #include "absl/log/check.h"
 #include "absl/log/globals.h"
@@ -84,7 +80,10 @@ static std::vector<char> ReadFile(const std::string& filename) {
   return buffer;
 }
 
-static VkSemaphore CreateSemaphore(VkDevice device) {
+static VkDevice device;
+static VkPhysicalDevice phys_device;
+
+static VkSemaphore CreateSemaphore() {
   const VkSemaphoreCreateInfo semaphore_create_info{
       .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
   };
@@ -96,7 +95,7 @@ static VkSemaphore CreateSemaphore(VkDevice device) {
   return semaphore;
 }
 
-static VkFence CreateFence(VkDevice device, bool signaled = false) {
+static VkFence CreateFence(bool signaled = false) {
   VkFenceCreateFlags flags{};
   if (signaled) flags += VK_FENCE_CREATE_SIGNALED_BIT;
 
@@ -111,8 +110,7 @@ static VkFence CreateFence(VkDevice device, bool signaled = false) {
   return fence;
 }
 
-static VkShaderModule CreateShaderModule(VkDevice device,
-                                         const std::vector<char>& code) {
+static VkShaderModule CreateShaderModule(const std::vector<char>& code) {
   VkShaderModuleCreateInfo shader_module_info{
       .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
       .codeSize = code.size(),
@@ -126,8 +124,8 @@ static VkShaderModule CreateShaderModule(VkDevice device,
 }
 
 static std::pair<VkBuffer, VkDeviceMemory> CreateBuffer(
-    VkDevice device, VkPhysicalDevice phys_device, VkDeviceSize size,
-    VkBufferUsageFlags usage, VkMemoryPropertyFlags properties) {
+    VkDeviceSize size, VkBufferUsageFlags usage,
+    VkMemoryPropertyFlags properties) {
   const VkBufferCreateInfo buffer_create_info{
       .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
       .size = size,
@@ -169,6 +167,66 @@ static std::pair<VkBuffer, VkDeviceMemory> CreateBuffer(
   CHECK_EQ(vkAllocateMemory(device, &alloc_info, nullptr, &buffer_memory),
            VK_SUCCESS);
   CHECK_EQ(vkBindBufferMemory(device, buffer, buffer_memory, 0), VK_SUCCESS);
+
+  return {buffer, buffer_memory};
+}
+
+static std::pair<VkBuffer, VkDeviceMemory> CreateBuffer(
+    VkCommandPool command_pool, VkQueue transfer_queue, VkDeviceSize data_size,
+    const void* src_data, VkBufferUsageFlags usage) {
+  auto [staging_buffer, staging_buffer_memory] =
+      CreateBuffer(data_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                       VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+  void* dst_data;
+  vkMapMemory(device, staging_buffer_memory, 0, data_size, 0, &dst_data);
+  memcpy(dst_data, src_data, data_size);
+  vkUnmapMemory(device, staging_buffer_memory);
+
+  auto [buffer, buffer_memory] =
+      CreateBuffer(data_size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | usage,
+                   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+  const VkCommandBufferAllocateInfo command_buffer_alloc_info{
+      .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+      .commandPool = command_pool,
+      .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+      .commandBufferCount = 1,
+  };
+
+  VkCommandBuffer command_buffer;
+  CHECK_EQ(vkAllocateCommandBuffers(device, &command_buffer_alloc_info,
+                                    &command_buffer),
+           VK_SUCCESS);
+
+  const VkCommandBufferBeginInfo command_buffer_begin_info{
+      .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+      .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+  };
+
+  CHECK_EQ(vkBeginCommandBuffer(command_buffer, &command_buffer_begin_info),
+           VK_SUCCESS);
+
+  const VkBufferCopy copy_region{
+      .srcOffset = 0,
+      .dstOffset = 0,
+      .size = data_size,
+  };
+  vkCmdCopyBuffer(command_buffer, staging_buffer, buffer, 1, &copy_region);
+
+  vkEndCommandBuffer(command_buffer);
+
+  const VkSubmitInfo submit_info{
+      .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+      .commandBufferCount = 1,
+      .pCommandBuffers = &command_buffer,
+  };
+  vkQueueSubmit(transfer_queue, 1, &submit_info, VK_NULL_HANDLE);
+  vkQueueWaitIdle(transfer_queue);
+  vkFreeCommandBuffers(device, command_pool, 1, &command_buffer);
+  vkDestroyBuffer(device, staging_buffer, nullptr);
+  vkFreeMemory(device, staging_buffer_memory, nullptr);
 
   return {buffer, buffer_memory};
 }
@@ -261,7 +319,7 @@ int main() {
     return instance;
   }();
 
-  VkPhysicalDevice phys_device = [=]() {
+  phys_device = [=]() {
     uint32_t num_phys_devices = 0;
     CHECK_EQ(vkEnumeratePhysicalDevices(instance, &num_phys_devices, nullptr),
              VK_SUCCESS);
@@ -285,7 +343,7 @@ int main() {
 
   uint32_t queue_family_index = 0;
 
-  VkDevice device = [=]() {
+  device = [=]() {
     float queue_priority = 1.0f;
 
     VkDeviceQueueCreateInfo queue_create_info{};
@@ -464,7 +522,7 @@ int main() {
   std::array<VkPipelineShaderStageCreateInfo, 2> shader_stages;
 
   auto vert_shader_module =
-      CreateShaderModule(device, ReadFile("nyla/vulkan/shaders/vert.spv"));
+      CreateShaderModule(ReadFile("nyla/vulkan/shaders/vert.spv"));
   shader_stages[0] = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
       .stage = VK_SHADER_STAGE_VERTEX_BIT,
@@ -473,7 +531,7 @@ int main() {
   };
 
   auto frag_shader_module =
-      CreateShaderModule(device, ReadFile("nyla/vulkan/shaders/frag.spv"));
+      CreateShaderModule(ReadFile("nyla/vulkan/shaders/frag.spv"));
   shader_stages[1] = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
       .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
@@ -633,63 +691,9 @@ int main() {
       {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
   };
 
-  const VkDeviceSize buffer_size = sizeof(vertices[0]) * vertices.size();
-
-  auto [staging_buffer, staging_buffer_memory] = CreateBuffer(
-      device, phys_device, buffer_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-          VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-  void* data;
-  vkMapMemory(device, staging_buffer_memory, 0, buffer_size, 0, &data);
-  memcpy(data, vertices.data(), buffer_size);
-  vkUnmapMemory(device, staging_buffer_memory);
-
-  auto [vertex_buffer, vertex_buffer_memory] = CreateBuffer(
-      device, phys_device, buffer_size,
-      VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-  const VkCommandBufferAllocateInfo command_buffer_alloc_info{
-      .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-      .commandPool = command_pool,
-      .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-      .commandBufferCount = 1,
-  };
-
-  VkCommandBuffer command_buffer;
-  CHECK_EQ(vkAllocateCommandBuffers(device, &command_buffer_alloc_info,
-                                    &command_buffer),
-           VK_SUCCESS);
-
-  const VkCommandBufferBeginInfo command_buffer_begin_info{
-      .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-      .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-  };
-
-  CHECK_EQ(vkBeginCommandBuffer(command_buffer, &command_buffer_begin_info),
-           VK_SUCCESS);
-
-  const VkBufferCopy copy_region{
-      .srcOffset = 0,
-      .dstOffset = 0,
-      .size = buffer_size,
-  };
-  vkCmdCopyBuffer(command_buffer, staging_buffer, vertex_buffer, 1,
-                  &copy_region);
-
-  vkEndCommandBuffer(command_buffer);
-
-  const VkSubmitInfo submit_info{
-      .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-      .commandBufferCount = 1,
-      .pCommandBuffers = &command_buffer,
-  };
-  vkQueueSubmit(queue, 1, &submit_info, VK_NULL_HANDLE);
-  vkQueueWaitIdle(queue);
-  vkFreeCommandBuffers(device, command_pool, 1, &command_buffer);
-  vkDestroyBuffer(device, staging_buffer, nullptr);
-  vkFreeMemory(device, staging_buffer_memory, nullptr);
+  auto [vertex_buffer, vertex_buffer_memory] =
+      CreateBuffer(command_pool, queue, sizeof(vertices[0]) * vertices.size(),
+                   vertices.data(), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
   const uint8_t num_in_flight_frames = 2;
 
@@ -711,13 +715,13 @@ int main() {
   std::vector<VkFence> frame_fences(num_in_flight_frames);
 
   for (uint8_t i = 0; i < num_in_flight_frames; ++i) {
-    acquire_semaphores[i] = CreateSemaphore(device);
-    frame_fences[i] = CreateFence(device, true);
+    acquire_semaphores[i] = CreateSemaphore();
+    frame_fences[i] = CreateFence(true);
   }
 
   std::vector<VkSemaphore> submit_semaphores(swapchain_images.size());
   for (uint8_t i = 0; i < swapchain_images.size(); ++i) {
-    submit_semaphores[i] = CreateSemaphore(device);
+    submit_semaphores[i] = CreateSemaphore();
   }
 
   for (uint8_t iframe = 0; iframe < num_in_flight_frames;
