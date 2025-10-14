@@ -221,14 +221,7 @@ static void ApplyBorder(xcb_connection_t* conn, xcb_window_t window,
   xcb_change_window_attributes(conn, window, XCB_CW_BORDER_PIXEL, &color);
 }
 
-static void Activate(WindowStack& stack, xcb_window_t client_window,
-                     xcb_timestamp_t time) {
-  if (stack.active_window != client_window) {
-    ApplyBorder(wm_conn, stack.active_window, Color::kNone);
-    stack.active_window = client_window;
-    wm_bar_dirty = true;
-  }
-
+static void Activate(const WindowStack& stack, xcb_timestamp_t time) {
   if (!stack.active_window) goto revert_to_root;
 
   if (auto it = wm_clients.find(stack.active_window); it != wm_clients.end()) {
@@ -252,6 +245,17 @@ revert_to_root:
   xcb_set_input_focus(wm_conn, XCB_INPUT_FOCUS_NONE, wm_screen.root, time);
 }
 
+static void Activate(WindowStack& stack, xcb_window_t client_window,
+                     xcb_timestamp_t time) {
+  if (stack.active_window != client_window) {
+    ApplyBorder(wm_conn, stack.active_window, Color::kNone);
+    stack.active_window = client_window;
+    wm_bar_dirty = true;
+  }
+
+  Activate(stack, time);
+}
+
 static void CheckFocusTheft() {
   auto reply =
       xcb_get_input_focus_reply(wm_conn, xcb_get_input_focus(wm_conn), nullptr);
@@ -260,13 +264,7 @@ static void CheckFocusTheft() {
 
   if (!window || window == wm_screen.root) return;
 
-  WindowStack& stack = GetActiveStack();
-  const xcb_window_t active_client_window = stack.active_window;
-
-  auto restore_input_focus = [&stack] {
-    // TODO: use SERVERTIME? <-- requires extension
-    Activate(stack, stack.active_window, XCB_CURRENT_TIME);
-  };
+  const WindowStack& stack = GetActiveStack();
 
   if (!wm_clients.contains(window)) {
     for (;;) {
@@ -275,7 +273,7 @@ static void CheckFocusTheft() {
 
       if (!reply) {
         LOG(ERROR) << "xcb_query_tree_reply failed for " << window;
-        restore_input_focus();
+        Activate(stack, XCB_CURRENT_TIME);
         return;
       }
 
@@ -287,25 +285,28 @@ static void CheckFocusTheft() {
     }
   }
 
-  if (active_client_window == window) return;
+  if (stack.active_window == window) return;
 
   auto it = wm_clients.find(window);
   if (it == wm_clients.end()) {
-    restore_input_focus();
+    Activate(stack, XCB_CURRENT_TIME);
     return;
   }
 
   const auto& [_, client] = *it;
   if (client.transient_for) {
-    if (client.transient_for == active_client_window) return;
+    if (client.transient_for == stack.active_window) {
+      return;
+    }
 
-    const auto& active_client = wm_clients.at(window);
-    if (client.transient_for == active_client.transient_for) return;
+    if (auto it = wm_clients.find(stack.active_window);
+        it != wm_clients.end() &&
+        client.transient_for == it->second.transient_for) {
+      return;
+    }
   }
 
-  LOG(WARNING) << "Restoring focus back to " << std::hex << active_client_window
-               << " (changed by " << std::hex << window << ")";
-  restore_input_focus();
+  Activate(stack, XCB_CURRENT_TIME);
 }
 
 static void FetchClientProperty(xcb_window_t client_window, Client& client,
@@ -325,8 +326,11 @@ static void FetchClientProperty(xcb_window_t client_window, Client& client,
 void ManageClient(xcb_window_t client_window) {
   if (auto [it, inserted] = wm_clients.try_emplace(client_window, Client{});
       inserted) {
-    xcb_change_window_attributes(wm_conn, client_window, XCB_CW_EVENT_MASK,
-                                 (uint32_t[]){XCB_EVENT_MASK_PROPERTY_CHANGE});
+    xcb_change_window_attributes(
+        wm_conn, client_window, XCB_CW_EVENT_MASK,
+        (uint32_t[]){
+            XCB_EVENT_MASK_PROPERTY_CHANGE | XCB_EVENT_MASK_FOCUS_CHANGE,
+        });
 
     for (auto& [property, _] : wm_property_change_handlers) {
       FetchClientProperty(client_window, it->second, property);
@@ -401,12 +405,8 @@ void UnmanageClient(xcb_window_t window) {
       wm_follow = false;
 
       if (istack == wm_active_stack_idx) {
-        if (stack.windows.empty()) {
-          xcb_set_input_focus(wm_conn, XCB_INPUT_FOCUS_POINTER_ROOT,
-                              wm_screen.root, XCB_CURRENT_TIME);
-        } else {
-          Activate(stack, stack.windows.front(), XCB_CURRENT_TIME);
-        }
+        Activate(stack, stack.windows.empty() ? 0 : stack.windows.front(),
+                 XCB_CURRENT_TIME);
       }
     }
     return;
@@ -815,6 +815,14 @@ void ProcessWMEvents(const bool& is_running, uint16_t modifier,
             reinterpret_cast<xcb_destroy_notify_event_t*>(event)->window);
         break;
       }
+      case XCB_FOCUS_OUT: {
+        auto reply = xcb_get_input_focus_reply(
+            wm_conn, xcb_get_input_focus(wm_conn), nullptr);
+        xcb_window_t window = reply->focus;
+        free(reply);
+        LOG(INFO) << " window in focus: " << window;
+        break;
+      }
       case XCB_FOCUS_IN: {
         auto focusin = reinterpret_cast<xcb_focus_in_event_t*>(event);
         if (focusin->mode == XCB_NOTIFY_MODE_NORMAL) CheckFocusTheft();
@@ -837,6 +845,12 @@ void ProcessWMEvents(const bool& is_running, uint16_t modifier,
 }
 
 void UpdateBar() {
+  auto reply =
+      xcb_get_input_focus_reply(wm_conn, xcb_get_input_focus(wm_conn), nullptr);
+  xcb_window_t window = reply->focus;
+  LOG(INFO) << window;
+  free(reply);
+
   const WindowStack& stack = GetActiveStack();
 
   const std::string& active_client_name =
