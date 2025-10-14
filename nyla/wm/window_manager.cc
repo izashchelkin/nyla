@@ -259,20 +259,21 @@ static void Activate(WindowStack& stack, xcb_window_t client_window,
 static void CheckFocusTheft() {
   auto reply =
       xcb_get_input_focus_reply(wm_conn, xcb_get_input_focus(wm_conn), nullptr);
-  xcb_window_t window = reply->focus;
+  xcb_window_t focused_window = reply->focus;
   free(reply);
 
-  if (!window || window == wm_screen.root) return;
-
   const WindowStack& stack = GetActiveStack();
+  if (stack.active_window == focused_window) return;
 
-  if (!wm_clients.contains(window)) {
+  if (focused_window == wm_screen.root) return;
+  if (!focused_window) return;
+
+  if (!wm_clients.contains(focused_window)) {
     for (;;) {
       xcb_query_tree_reply_t* reply = xcb_query_tree_reply(
-          wm_conn, xcb_query_tree(wm_conn, window), nullptr);
+          wm_conn, xcb_query_tree(wm_conn, focused_window), nullptr);
 
       if (!reply) {
-        LOG(ERROR) << "xcb_query_tree_reply failed for " << window;
         Activate(stack, XCB_CURRENT_TIME);
         return;
       }
@@ -281,13 +282,13 @@ static void CheckFocusTheft() {
       free(reply);
 
       if (!parent || parent == wm_screen.root) break;
-      window = parent;
+      focused_window = parent;
     }
   }
 
-  if (stack.active_window == window) return;
+  if (stack.active_window == focused_window) return;
 
-  auto it = wm_clients.find(window);
+  auto it = wm_clients.find(focused_window);
   if (it == wm_clients.end()) {
     Activate(stack, XCB_CURRENT_TIME);
     return;
