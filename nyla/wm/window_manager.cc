@@ -815,14 +815,6 @@ void ProcessWMEvents(const bool& is_running, uint16_t modifier,
             reinterpret_cast<xcb_destroy_notify_event_t*>(event)->window);
         break;
       }
-      case XCB_FOCUS_OUT: {
-        auto reply = xcb_get_input_focus_reply(
-            wm_conn, xcb_get_input_focus(wm_conn), nullptr);
-        xcb_window_t window = reply->focus;
-        free(reply);
-        LOG(INFO) << " window in focus: " << window;
-        break;
-      }
       case XCB_FOCUS_IN: {
         auto focusin = reinterpret_cast<xcb_focus_in_event_t*>(event);
         if (focusin->mode == XCB_NOTIFY_MODE_NORMAL) CheckFocusTheft();
@@ -845,12 +837,6 @@ void ProcessWMEvents(const bool& is_running, uint16_t modifier,
 }
 
 void UpdateBar() {
-  auto reply =
-      xcb_get_input_focus_reply(wm_conn, xcb_get_input_focus(wm_conn), nullptr);
-  xcb_window_t window = reply->focus;
-  LOG(INFO) << window;
-  free(reply);
-
   const WindowStack& stack = GetActiveStack();
 
   const std::string& active_client_name =
