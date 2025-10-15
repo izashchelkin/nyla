@@ -31,37 +31,6 @@ namespace nyla {}  // namespace nyla
 
 #define GET_INSTANCE_PROC_ADDR(name) \
   reinterpret_cast<PFN_##name>(vkGetInstanceProcAddr(instance, #name))
-
-struct Vec2 {
-  union {
-    float data[2];
-    struct {
-      float x;
-      float y;
-    };
-  };
-
-  constexpr Vec2(float x, float y) : x{x}, y{y} {};
-};
-
-struct Vec3 {
-  union {
-    float data[3];
-    struct {
-      float x;
-      float y;
-      float z;
-    };
-    struct {
-      float r;
-      float g;
-      float b;
-    };
-  };
-
-  constexpr Vec3(float x, float y, float z) : x{x}, y{y}, z{z} {};
-};
-
 struct Vertex {
   Vec2 pos;
   Vec3 color;
