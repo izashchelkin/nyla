@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "absl/cleanup/cleanup.h"
+#include "absl/container/flat_hash_map.h"
 #include "absl/log/check.h"
 #include "absl/log/log.h"
 #include "absl/strings/str_join.h"
@@ -30,6 +31,40 @@ namespace nyla {
 
 template <typename Key, typename Val>
 using Map = absl::flat_hash_map<Key, Val>;
+
+struct WindowStack {
+  LayoutType layout_type;
+  bool zoom;
+
+  std::vector<xcb_window_t> windows;
+  xcb_window_t active_window;
+};
+
+struct Client {
+  Rect rect;
+  std::string name;
+
+  bool wm_hints_input;
+  bool wm_take_focus;
+  bool wm_delete_window;
+
+  uint32_t max_width;
+  uint32_t max_height;
+
+  bool urgent;
+  bool wants_configure_notify;
+
+  xcb_window_t transient_for;
+  std::vector<xcb_window_t> subwindows;
+
+  Map<xcb_atom_t, xcb_get_property_cookie_t> property_cookies;
+};
+
+template <typename Sink>
+void AbslStringify(Sink& sink, const Client& c) {
+  absl::Format(&sink, "Window{ rect=%v, input=%v, take_focus=%v }", c.rect,
+               c.wm_hints_input, c.wm_take_focus);
+}
 
 X11Atoms atoms;
 
