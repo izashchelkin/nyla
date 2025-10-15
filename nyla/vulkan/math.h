@@ -98,6 +98,7 @@ float Dot(const Vec<N>& lhs, const Vec<N>& rhs) {
 using Vec2 = Vec<2>;
 using Vec3 = Vec<3>;
 using Vec4 = Vec<4>;
+using Quat = Vec<4>;
 
 inline Vec3 Cross(const Vec3& lhs, const Vec3& rhs) {
   return {
@@ -149,5 +150,21 @@ inline Mat4 Identity4 = {
     {0.0f, 0.0f, 1.0f, 0.0f},
     {0.0f, 0.0f, 0.0f, 1.0f},
 };
+
+inline Mat4 QuatToMat(const Quat& q) {
+  const float w = q[0];
+  const float x = q[1];
+  const float y = q[2];
+  const float z = q[3];
+
+  // clang-format off
+  return {
+      { 1.f - 2.f*(y*y + z*z),  2.f*(x*y + w*z),        2.f*(x*z - w*y),        0.f },
+      { 2.f*(x*y - w*z),        1.f - 2.f*(x*x + z*z),  2.f*(y*z + w*x),        0.f },
+      { 2.f*(x*z + w*y),        2.f*(y*z - w*x),        1.f - 2.f*(x*x + y*y),  0.f },
+      { 0.f,                    0.f,                    0.f,                    1.f },
+  };
+  // clang-format on
+}
 
 }  // namespace nyla
