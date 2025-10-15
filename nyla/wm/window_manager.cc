@@ -500,6 +500,7 @@ static void MoveStack(xcb_timestamp_t time, auto compute_idx) {
         oldstack.active_window = oldstack.windows.at(0);
     }
   } else {
+    ApplyBorder(wm_conn, oldstack.active_window, Color::kNone);
     Activate(newstack, newstack.active_window, time);
   }
 
