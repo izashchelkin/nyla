@@ -435,22 +435,23 @@ static int Main() {
   if (surface_capabilities.maxImageCount)
     image_count = std::min(surface_capabilities.maxImageCount, image_count);
 
-  VkSwapchainKHR swapchain = [=]() {
-    VkSwapchainCreateInfoKHR create_info{};
-    create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-    create_info.surface = surface;
-    create_info.minImageCount = image_count;
-    create_info.imageFormat = surface_format.format;
-    create_info.imageColorSpace = surface_format.colorSpace;
-    create_info.imageExtent = surface_extent;
-    create_info.imageArrayLayers = 1;
-    create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    create_info.preTransform = surface_capabilities.currentTransform;
-    create_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-    create_info.presentMode = present_mode;
-    create_info.clipped = VK_TRUE;
-    create_info.oldSwapchain = VK_NULL_HANDLE;
+  const VkSwapchainKHR swapchain = [=]() {
+    const VkSwapchainCreateInfoKHR create_info{
+        .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+        .surface = surface,
+        .minImageCount = image_count,
+        .imageFormat = surface_format.format,
+        .imageColorSpace = surface_format.colorSpace,
+        .imageExtent = surface_extent,
+        .imageArrayLayers = 1,
+        .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+        .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .preTransform = surface_capabilities.currentTransform,
+        .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+        .presentMode = present_mode,
+        .clipped = VK_TRUE,
+        .oldSwapchain = VK_NULL_HANDLE,
+    };
 
     VkSwapchainKHR swapchain{};
     CHECK_EQ(vkCreateSwapchainKHR(device, &create_info, nullptr, &swapchain),
@@ -458,7 +459,7 @@ static int Main() {
     return swapchain;
   }();
 
-  std::vector<VkImage> swapchain_images = [=]() {
+  const std::vector<VkImage> swapchain_images = [=]() {
     uint32_t swapchain_image_count;
     vkGetSwapchainImagesKHR(device, swapchain, &swapchain_image_count, nullptr);
 
@@ -467,24 +468,32 @@ static int Main() {
                             swapchain_images.data());
     return swapchain_images;
   }();
+  const uint32_t swapchain_images_count = swapchain_images.size();
 
-  std::vector<VkImageView> swapchain_image_views(swapchain_images.size());
+  std::vector<VkImageView> swapchain_image_views(swapchain_images_count);
 
-  for (size_t iimage = 0; iimage < swapchain_images.size(); ++iimage) {
-    VkImageViewCreateInfo create_info{};
-    create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-    create_info.image = swapchain_images.at(iimage),
-    create_info.viewType = VK_IMAGE_VIEW_TYPE_2D,
-    create_info.format = surface_format.format,
-    create_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-    create_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-    create_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-    create_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-    create_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    create_info.subresourceRange.baseMipLevel = 0;
-    create_info.subresourceRange.levelCount = 1;
-    create_info.subresourceRange.baseArrayLayer = 0;
-    create_info.subresourceRange.layerCount = 1;
+  for (size_t iimage = 0; iimage < swapchain_images_count; ++iimage) {
+    const VkImageViewCreateInfo create_info{
+        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+        .image = swapchain_images.at(iimage),
+        .viewType = VK_IMAGE_VIEW_TYPE_2D,
+        .format = surface_format.format,
+        .components =
+            {
+                .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+                .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+                .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+                .a = VK_COMPONENT_SWIZZLE_IDENTITY,
+            },
+        .subresourceRange =
+            {
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .baseMipLevel = 0,
+                .levelCount = 1,
+                .baseArrayLayer = 0,
+                .layerCount = 1,
+            },
+    };
 
     CHECK_EQ(vkCreateImageView(device, &create_info, nullptr,
                                &swapchain_image_views.at(iimage)),
@@ -497,11 +506,11 @@ static int Main() {
     Mat4 proj;
   };
 
-  std::vector<VkBuffer> uniform_buffers(swapchain_images.size());
-  std::vector<VkDeviceMemory> uniform_buffers_memory(swapchain_images.size());
-  std::vector<void*> uniform_buffers_mapped(swapchain_images.size());
+  std::vector<VkBuffer> uniform_buffers(swapchain_images_count);
+  std::vector<VkDeviceMemory> uniform_buffers_memory(swapchain_images_count);
+  std::vector<void*> uniform_buffers_mapped(swapchain_images_count);
 
-  for (size_t i = 0; i < swapchain_images.size(); ++i) {
+  for (size_t i = 0; i < swapchain_images_count; ++i) {
     CreateBuffer(sizeof(UniformBufferObject),
                  VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
@@ -512,179 +521,234 @@ static int Main() {
                 sizeof(UniformBufferObject), 0, &uniform_buffers_mapped[i]);
   }
 
-  const VkPipeline graphics_pipeline = [=]() {
-    const auto shader_stages = std::to_array<VkPipelineShaderStageCreateInfo>({
-        {
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-            .stage = VK_SHADER_STAGE_VERTEX_BIT,
-            .module =
-                CreateShaderModule(ReadFile("nyla/vulkan/shaders/vert.spv")),
-            .pName = "main",
-        },
-        {
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-            .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-            .module =
-                CreateShaderModule(ReadFile("nyla/vulkan/shaders/frag.spv")),
-            .pName = "main",
-        },
-    });
-
-    const VkPipelineLayout pipeline_layout = [=]() {
-      const VkDescriptorSetLayoutBinding ubo_layout_binding{
-          .binding = 0,
-          .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-          .descriptorCount = 1,
-          .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
-      };
-
-      const VkDescriptorSetLayoutCreateInfo descriptor_set_layout_create_info{
-          .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-          .bindingCount = 1,
-          .pBindings = &ubo_layout_binding,
-      };
-
-      VkDescriptorSetLayout descriptor_set_layout;
-      CHECK_EQ(vkCreateDescriptorSetLayout(device,
-                                           &descriptor_set_layout_create_info,
-                                           nullptr, &descriptor_set_layout),
-               VK_SUCCESS);
-
-      const VkPipelineLayoutCreateInfo pipeline_layout_create_info{
-          .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-          .setLayoutCount = 1,
-          .pSetLayouts = &descriptor_set_layout,
-      };
-
-      VkPipelineLayout pipeline_layout;
-      vkCreatePipelineLayout(device, &pipeline_layout_create_info, nullptr,
-                             &pipeline_layout);
-      return pipeline_layout;
-    }();
-
-    const VkPipelineRenderingCreateInfo pipeline_rendering_create_info{
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-        .colorAttachmentCount = 1,
-        .pColorAttachmentFormats = &surface_format.format,
+  const VkDescriptorPool descriptor_pool = [&] {
+    const VkDescriptorPoolSize descriptor_pool_size{
+        .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+        .descriptorCount = static_cast<uint32_t>(swapchain_images_count),
     };
 
-    const VkVertexInputBindingDescription binding_description{
-        .binding = 0,
-        .stride = sizeof(Vertex),
-        .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
+    const VkDescriptorPoolCreateInfo descriptor_pool_create_info{
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+        .maxSets = static_cast<uint32_t>(swapchain_images_count),
+        .poolSizeCount = 1,
+        .pPoolSizes = &descriptor_pool_size,
     };
 
-    const VkVertexInputAttributeDescription attr_description[2] = {
-        {
-            .location = 0,
-            .binding = 0,
-            .format = VK_FORMAT_R32G32B32_SFLOAT,
-            .offset = 0,
-        },
-        {
-            .location = 1,
-            .binding = 0,
-            .format = VK_FORMAT_R32G32B32_SFLOAT,
-            .offset = offsetof(Vertex, color),
-        },
-    };
-
-    const VkPipelineVertexInputStateCreateInfo vertex_input_create_info{
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-        .vertexBindingDescriptionCount = 1,
-        .pVertexBindingDescriptions = &binding_description,
-        .vertexAttributeDescriptionCount = 2,
-        .pVertexAttributeDescriptions = attr_description,
-    };
-
-    const VkPipelineInputAssemblyStateCreateInfo input_assembly_create_info{
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-        .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-    };
-
-    const VkPipelineViewportStateCreateInfo viewport_state_create_info{
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
-        .viewportCount = 1,
-        .scissorCount = 1,
-    };
-
-    const VkPipelineRasterizationStateCreateInfo rasterizer_create_info{
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-        .depthClampEnable = VK_FALSE,
-        .rasterizerDiscardEnable = VK_FALSE,
-        .polygonMode = VK_POLYGON_MODE_FILL,
-        .cullMode = VK_CULL_MODE_BACK_BIT,
-        .frontFace = VK_FRONT_FACE_CLOCKWISE,
-        .lineWidth = 1.0f,
-    };
-
-    const VkPipelineMultisampleStateCreateInfo multisampling_create_info{
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-        .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
-        .sampleShadingEnable = VK_FALSE,
-        .minSampleShading = 1.0f,
-        .alphaToCoverageEnable = VK_FALSE,
-        .alphaToOneEnable = VK_FALSE,
-    };
-
-    const VkPipelineColorBlendAttachmentState color_blend_attachment{
-        .blendEnable = VK_FALSE,
-        .srcColorBlendFactor = VK_BLEND_FACTOR_ONE,
-        .dstColorBlendFactor = VK_BLEND_FACTOR_ZERO,
-        .colorBlendOp = VK_BLEND_OP_ADD,
-        .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
-        .dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
-        .alphaBlendOp = VK_BLEND_OP_ADD,
-        .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                          VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
-    };
-
-    const VkPipelineColorBlendStateCreateInfo color_blending_create_info{
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
-        .logicOpEnable = VK_FALSE,
-        .logicOp = VK_LOGIC_OP_COPY,
-        .attachmentCount = 1,
-        .pAttachments = &color_blend_attachment,
-        .blendConstants = {},
-    };
-
-    const auto dynamic_states = std::to_array<VkDynamicState>({
-        VK_DYNAMIC_STATE_VIEWPORT,
-        VK_DYNAMIC_STATE_SCISSOR,
-    });
-
-    const VkPipelineDynamicStateCreateInfo dynamic_state_create_info{
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-        .dynamicStateCount = dynamic_states.size(),
-        .pDynamicStates = dynamic_states.data(),
-    };
-
-    const VkGraphicsPipelineCreateInfo pipeline_create_info{
-        .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-        .pNext = &pipeline_rendering_create_info,
-        .stageCount = shader_stages.size(),
-        .pStages = shader_stages.data(),
-        .pVertexInputState = &vertex_input_create_info,
-        .pInputAssemblyState = &input_assembly_create_info,
-        .pViewportState = &viewport_state_create_info,
-        .pRasterizationState = &rasterizer_create_info,
-        .pMultisampleState = &multisampling_create_info,
-        .pDepthStencilState = nullptr,
-        .pColorBlendState = &color_blending_create_info,
-        .pDynamicState = &dynamic_state_create_info,
-        .layout = pipeline_layout,
-        .subpass = 0,
-        .basePipelineHandle = VK_NULL_HANDLE,
-        .basePipelineIndex = -1,
-    };
-
-    VkPipeline graphics_pipeline;
-    CHECK_EQ(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1,
-                                       &pipeline_create_info, nullptr,
-                                       &graphics_pipeline),
+    VkDescriptorPool descriptor_pool;
+    CHECK_EQ(vkCreateDescriptorPool(device, &descriptor_pool_create_info,
+                                    nullptr, &descriptor_pool),
              VK_SUCCESS);
-    return graphics_pipeline;
+    return descriptor_pool;
   }();
+
+  const auto shader_stages = std::to_array<VkPipelineShaderStageCreateInfo>({
+      {
+          .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+          .stage = VK_SHADER_STAGE_VERTEX_BIT,
+          .module =
+              CreateShaderModule(ReadFile("nyla/vulkan/shaders/vert.spv")),
+          .pName = "main",
+      },
+      {
+          .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+          .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+          .module =
+              CreateShaderModule(ReadFile("nyla/vulkan/shaders/frag.spv")),
+          .pName = "main",
+      },
+  });
+
+  const VkPipelineLayout pipeline_layout = [=]() {
+    const VkDescriptorSetLayoutBinding ubo_layout_binding{
+        .binding = 0,
+        .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+        .descriptorCount = 1,
+        .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+    };
+
+    const VkDescriptorSetLayoutCreateInfo descriptor_set_layout_create_info{
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+        .bindingCount = 1,
+        .pBindings = &ubo_layout_binding,
+    };
+
+    VkDescriptorSetLayout descriptor_set_layout;
+    CHECK_EQ(
+        vkCreateDescriptorSetLayout(device, &descriptor_set_layout_create_info,
+                                    nullptr, &descriptor_set_layout),
+        VK_SUCCESS);
+
+    const std::vector<VkDescriptorSetLayout> layouts(swapchain_images_count,
+                                                     descriptor_set_layout);
+
+    const VkDescriptorSetAllocateInfo descriptor_set_alloc_info{
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+        .descriptorPool = descriptor_pool,
+        .descriptorSetCount = static_cast<uint32_t>(layouts.size()),
+        .pSetLayouts = layouts.data(),
+    };
+
+    std::vector<VkDescriptorSet> descriptor_sets(swapchain_images_count);
+
+    CHECK_EQ(vkAllocateDescriptorSets(device, &descriptor_set_alloc_info,
+                                      descriptor_sets.data()),
+             VK_SUCCESS);
+
+    for (size_t i = 0; i < swapchain_images_count; ++i) {
+      const VkDescriptorBufferInfo buffer_info{
+          .buffer = uniform_buffers[i],
+          .offset = 0,
+          .range = sizeof(UniformBufferObject),
+      };
+
+      const VkWriteDescriptorSet descriptor_write{
+          .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+          .dstSet = descriptor_sets[i],
+          .dstBinding = 0,
+          .dstArrayElement = 0,
+          .descriptorCount = 1,
+          .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+          .pImageInfo = nullptr,
+          .pBufferInfo = &buffer_info,
+          .pTexelBufferView = nullptr,
+      };
+
+      vkUpdateDescriptorSets(device, 1, &descriptor_write, 0, nullptr);
+    }
+
+    const VkPipelineLayoutCreateInfo pipeline_layout_create_info{
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+        .setLayoutCount = 1,
+        .pSetLayouts = &descriptor_set_layout,
+    };
+
+    VkPipelineLayout pipeline_layout;
+    vkCreatePipelineLayout(device, &pipeline_layout_create_info, nullptr,
+                           &pipeline_layout);
+    return pipeline_layout;
+  }();
+
+  const VkPipelineRenderingCreateInfo pipeline_rendering_create_info{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+      .colorAttachmentCount = 1,
+      .pColorAttachmentFormats = &surface_format.format,
+  };
+
+  const VkVertexInputBindingDescription binding_description{
+      .binding = 0,
+      .stride = sizeof(Vertex),
+      .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
+  };
+
+  const VkVertexInputAttributeDescription attr_description[2] = {
+      {
+          .location = 0,
+          .binding = 0,
+          .format = VK_FORMAT_R32G32B32_SFLOAT,
+          .offset = 0,
+      },
+      {
+          .location = 1,
+          .binding = 0,
+          .format = VK_FORMAT_R32G32B32_SFLOAT,
+          .offset = offsetof(Vertex, color),
+      },
+  };
+
+  const VkPipelineVertexInputStateCreateInfo vertex_input_create_info{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+      .vertexBindingDescriptionCount = 1,
+      .pVertexBindingDescriptions = &binding_description,
+      .vertexAttributeDescriptionCount = 2,
+      .pVertexAttributeDescriptions = attr_description,
+  };
+
+  const VkPipelineInputAssemblyStateCreateInfo input_assembly_create_info{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+      .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+  };
+
+  const VkPipelineViewportStateCreateInfo viewport_state_create_info{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+      .viewportCount = 1,
+      .scissorCount = 1,
+  };
+
+  const VkPipelineRasterizationStateCreateInfo rasterizer_create_info{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+      .depthClampEnable = VK_FALSE,
+      .rasterizerDiscardEnable = VK_FALSE,
+      .polygonMode = VK_POLYGON_MODE_FILL,
+      .cullMode = VK_CULL_MODE_BACK_BIT,
+      .frontFace = VK_FRONT_FACE_CLOCKWISE,
+      .lineWidth = 1.0f,
+  };
+
+  const VkPipelineMultisampleStateCreateInfo multisampling_create_info{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+      .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
+      .sampleShadingEnable = VK_FALSE,
+      .minSampleShading = 1.0f,
+      .alphaToCoverageEnable = VK_FALSE,
+      .alphaToOneEnable = VK_FALSE,
+  };
+
+  const VkPipelineColorBlendAttachmentState color_blend_attachment{
+      .blendEnable = VK_FALSE,
+      .srcColorBlendFactor = VK_BLEND_FACTOR_ONE,
+      .dstColorBlendFactor = VK_BLEND_FACTOR_ZERO,
+      .colorBlendOp = VK_BLEND_OP_ADD,
+      .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
+      .dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
+      .alphaBlendOp = VK_BLEND_OP_ADD,
+      .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                        VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
+  };
+
+  const VkPipelineColorBlendStateCreateInfo color_blending_create_info{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+      .logicOpEnable = VK_FALSE,
+      .logicOp = VK_LOGIC_OP_COPY,
+      .attachmentCount = 1,
+      .pAttachments = &color_blend_attachment,
+      .blendConstants = {},
+  };
+
+  const auto dynamic_states = std::to_array<VkDynamicState>({
+      VK_DYNAMIC_STATE_VIEWPORT,
+      VK_DYNAMIC_STATE_SCISSOR,
+  });
+
+  const VkPipelineDynamicStateCreateInfo dynamic_state_create_info{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+      .dynamicStateCount = dynamic_states.size(),
+      .pDynamicStates = dynamic_states.data(),
+  };
+
+  const VkGraphicsPipelineCreateInfo pipeline_create_info{
+      .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+      .pNext = &pipeline_rendering_create_info,
+      .stageCount = shader_stages.size(),
+      .pStages = shader_stages.data(),
+      .pVertexInputState = &vertex_input_create_info,
+      .pInputAssemblyState = &input_assembly_create_info,
+      .pViewportState = &viewport_state_create_info,
+      .pRasterizationState = &rasterizer_create_info,
+      .pMultisampleState = &multisampling_create_info,
+      .pDepthStencilState = nullptr,
+      .pColorBlendState = &color_blending_create_info,
+      .pDynamicState = &dynamic_state_create_info,
+      .layout = pipeline_layout,
+      .subpass = 0,
+      .basePipelineHandle = VK_NULL_HANDLE,
+      .basePipelineIndex = -1,
+  };
+
+  VkPipeline graphics_pipeline;
+  CHECK_EQ(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1,
+                                     &pipeline_create_info, nullptr,
+                                     &graphics_pipeline),
+           VK_SUCCESS);
 
   const VkCommandPoolCreateInfo command_pool_create_info{
       .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
@@ -728,8 +792,8 @@ static int Main() {
     frame_fences[i] = CreateFence(true);
   }
 
-  std::vector<VkSemaphore> submit_semaphores(swapchain_images.size());
-  for (uint8_t i = 0; i < swapchain_images.size(); ++i) {
+  std::vector<VkSemaphore> submit_semaphores(swapchain_images_count);
+  for (uint8_t i = 0; i < swapchain_images_count; ++i) {
     submit_semaphores[i] = CreateSemaphore();
   }
 
@@ -830,20 +894,20 @@ static int Main() {
       VkDeviceSize offsets[] = {0};
       vkCmdBindVertexBuffers(command_buffer, 0, 1, vertex_buffers, offsets);
 
-      VkViewport viewport{};
-      viewport.x = 0.0f;
-      viewport.y = 0.0f;
-      viewport.width = static_cast<float>(surface_extent.width);
-      viewport.height = static_cast<float>(surface_extent.height);
-      viewport.minDepth = 0.0f;
-      viewport.maxDepth = 1.0f;
-
+      const VkViewport viewport{
+          .x = 0.0f,
+          .y = 0.0f,
+          .width = static_cast<float>(surface_extent.width),
+          .height = static_cast<float>(surface_extent.height),
+          .minDepth = 0.0f,
+          .maxDepth = 1.0f,
+      };
       vkCmdSetViewport(command_buffer, 0, 1, &viewport);
 
-      VkRect2D scissor{};
-      scissor.offset = {0, 0};
-      scissor.extent = surface_extent;
-
+      const VkRect2D scissor{
+          .offset = {0, 0},
+          .extent = surface_extent,
+      };
       vkCmdSetScissor(command_buffer, 0, 1, &scissor);
 
       vkCmdDraw(command_buffer, vertices.size(), 1, 0, 0);
