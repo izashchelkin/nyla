@@ -1,11 +1,14 @@
 #include "nyla/vulkan/swapchain.h"
 
+#include "absl/log/log.h"
 #include "nyla/vulkan/vulkan.h"
 
 namespace nyla {
 
 void CreateSwapchain() {
-  if (vk.swapchain) vkDeviceWaitIdle(vk.device);
+  if (vk.swapchain) {
+    vkDeviceWaitIdle(vk.device);
+  }
 
   {
     VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(

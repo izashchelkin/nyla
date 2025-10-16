@@ -539,9 +539,12 @@ static int Main() {
         vk.device, vk.swapchain, std::numeric_limits<uint64_t>::max(),
         acquire_semaphore, VK_NULL_HANDLE, &image_index);
 
-    if (acquire_result == VK_ERROR_OUT_OF_DATE_KHR) break;
-    CHECK((acquire_result == VK_SUBOPTIMAL_KHR) ||
-          (acquire_result == VK_SUCCESS));
+    if (acquire_result == VK_ERROR_OUT_OF_DATE_KHR ||
+        acquire_result == VK_ERROR_OUT_OF_DATE_KHR) {
+      CreateSwapchain();
+      continue;
+    }
+    VK_CHECK(acquire_result);
 
     const VkCommandBuffer command_buffer = command_buffers[iframe];
 
@@ -586,17 +589,10 @@ static int Main() {
     }
 
     {
-      static uint32_t first_frame = 0;
-      const uint32_t image_bit = 1 << image_index;
-      const VkImageLayout old_layout = (first_frame & image_bit)
-                                           ? VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
-                                           : VK_IMAGE_LAYOUT_UNDEFINED;
-      first_frame |= image_bit;
-
       const VkImageMemoryBarrier image_memory_barrier{
           .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
           .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-          .oldLayout = old_layout,
+          .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,  // TODO:
           .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
           .image = vk.swapchain_images[image_index],
           .subresourceRange =
@@ -687,7 +683,7 @@ static int Main() {
         .pSignalSemaphores = &submit_semaphore,
     };
 
-    CHECK_EQ(vkQueueSubmit(queue, 1, &submit_info, frame_fence), VK_SUCCESS);
+    VK_CHECK(vkQueueSubmit(queue, 1, &submit_info, frame_fence));
 
     const VkPresentInfoKHR present_info{
         .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
@@ -698,7 +694,13 @@ static int Main() {
         .pImageIndices = &image_index,
     };
 
-    vkQueuePresentKHR(queue, &present_info);
+    VkResult present_result = vkQueuePresentKHR(queue, &present_info);
+    if (present_result == VK_ERROR_OUT_OF_DATE_KHR ||
+        present_result == VK_ERROR_OUT_OF_DATE_KHR) {
+      CreateSwapchain();
+      continue;
+    }
+    VK_CHECK(present_result);
   }
 
   return 0;
