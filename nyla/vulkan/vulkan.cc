@@ -22,15 +22,19 @@
 #include "absl/log/globals.h"
 #include "absl/log/initialize.h"
 #include "absl/log/log.h"
+#include "nyla/vulkan/math.h"
 #include "vulkan/vulkan.h"
 #include "xcb/xcb.h"
 #include "xcb/xcb_aux.h"
 #include "xcb/xproto.h"
 
-namespace nyla {}  // namespace nyla
+namespace nyla {
+
+static constexpr uint8_t kInFlightFrames = 2;
 
 #define GET_INSTANCE_PROC_ADDR(name) \
   reinterpret_cast<PFN_##name>(vkGetInstanceProcAddr(instance, #name))
+
 struct Vertex {
   Vec2 pos;
   Vec3 color;
@@ -92,9 +96,9 @@ static VkShaderModule CreateShaderModule(const std::vector<char>& code) {
   return shader_module;
 }
 
-static std::pair<VkBuffer, VkDeviceMemory> CreateBuffer(
-    VkDeviceSize size, VkBufferUsageFlags usage,
-    VkMemoryPropertyFlags properties) {
+static void CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
+                         VkMemoryPropertyFlags properties, VkBuffer& buffer,
+                         VkDeviceMemory& buffer_memory) {
   const VkBufferCreateInfo buffer_create_info{
       .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
       .size = size,
@@ -102,7 +106,6 @@ static std::pair<VkBuffer, VkDeviceMemory> CreateBuffer(
       .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
   };
 
-  VkBuffer buffer;
   CHECK_EQ(vkCreateBuffer(device, &buffer_create_info, nullptr, &buffer),
            VK_SUCCESS);
 
@@ -132,30 +135,30 @@ static std::pair<VkBuffer, VkDeviceMemory> CreateBuffer(
           }(),
   };
 
-  VkDeviceMemory buffer_memory;
   CHECK_EQ(vkAllocateMemory(device, &alloc_info, nullptr, &buffer_memory),
            VK_SUCCESS);
   CHECK_EQ(vkBindBufferMemory(device, buffer, buffer_memory, 0), VK_SUCCESS);
-
-  return {buffer, buffer_memory};
 }
 
 static std::pair<VkBuffer, VkDeviceMemory> CreateBuffer(
     VkCommandPool command_pool, VkQueue transfer_queue, VkDeviceSize data_size,
     const void* src_data, VkBufferUsageFlags usage) {
-  auto [staging_buffer, staging_buffer_memory] =
-      CreateBuffer(data_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                       VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+  VkBuffer staging_buffer;
+  VkDeviceMemory staging_buffer_memory;
+  CreateBuffer(data_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+               VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                   VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+               staging_buffer, staging_buffer_memory);
 
   void* dst_data;
   vkMapMemory(device, staging_buffer_memory, 0, data_size, 0, &dst_data);
   memcpy(dst_data, src_data, data_size);
   vkUnmapMemory(device, staging_buffer_memory);
 
-  auto [buffer, buffer_memory] =
-      CreateBuffer(data_size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | usage,
-                   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+  VkBuffer buffer;
+  VkDeviceMemory buffer_memory;
+  CreateBuffer(data_size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | usage,
+               VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, buffer, buffer_memory);
 
   const VkCommandBufferAllocateInfo command_buffer_alloc_info{
       .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
@@ -200,7 +203,7 @@ static std::pair<VkBuffer, VkDeviceMemory> CreateBuffer(
   return {buffer, buffer_memory};
 }
 
-int main() {
+static int Main() {
   absl::InitializeLog();
   absl::SetStderrThreshold(absl::LogSeverityAtLeast::kInfo);
 
@@ -488,6 +491,27 @@ int main() {
              VK_SUCCESS);
   }
 
+  struct UniformBufferObject {
+    Mat4 model;
+    Mat4 view;
+    Mat4 proj;
+  };
+
+  std::vector<VkBuffer> uniform_buffers(swapchain_images.size());
+  std::vector<VkDeviceMemory> uniform_buffers_memory(swapchain_images.size());
+  std::vector<void*> uniform_buffers_mapped(swapchain_images.size());
+
+  for (size_t i = 0; i < swapchain_images.size(); ++i) {
+    CreateBuffer(sizeof(UniformBufferObject),
+                 VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                     VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 uniform_buffers[i], uniform_buffers_memory[i]);
+
+    vkMapMemory(device, uniform_buffers_memory[i], 0,
+                sizeof(UniformBufferObject), 0, &uniform_buffers_mapped[i]);
+  }
+
   const VkPipeline graphics_pipeline = [=]() {
     const auto shader_stages = std::to_array<VkPipelineShaderStageCreateInfo>({
         {
@@ -682,10 +706,8 @@ int main() {
       CreateBuffer(command_pool, queue, sizeof(vertices[0]) * vertices.size(),
                    vertices.data(), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
-  const uint8_t num_in_flight_frames = 2;
-
-  std::vector<VkCommandBuffer> command_buffers(num_in_flight_frames);
-  for (uint8_t i = 0; i < num_in_flight_frames; ++i) {
+  std::vector<VkCommandBuffer> command_buffers(kInFlightFrames);
+  for (uint8_t i = 0; i < kInFlightFrames; ++i) {
     const VkCommandBufferAllocateInfo alloc_info{
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
         .commandPool = command_pool,
@@ -698,10 +720,10 @@ int main() {
              VK_SUCCESS);
   }
 
-  std::vector<VkSemaphore> acquire_semaphores(num_in_flight_frames);
-  std::vector<VkFence> frame_fences(num_in_flight_frames);
+  std::vector<VkSemaphore> acquire_semaphores(kInFlightFrames);
+  std::vector<VkFence> frame_fences(kInFlightFrames);
 
-  for (uint8_t i = 0; i < num_in_flight_frames; ++i) {
+  for (uint8_t i = 0; i < kInFlightFrames; ++i) {
     acquire_semaphores[i] = CreateSemaphore();
     frame_fences[i] = CreateFence(true);
   }
@@ -711,8 +733,8 @@ int main() {
     submit_semaphores[i] = CreateSemaphore();
   }
 
-  for (uint8_t iframe = 0; iframe < num_in_flight_frames;
-       iframe = ((iframe + 1) % num_in_flight_frames)) {
+  for (uint8_t iframe = 0; iframe < kInFlightFrames;
+       iframe = ((iframe + 1) % kInFlightFrames)) {
     const VkFence frame_fence = frame_fences[iframe];
 
     vkWaitForFences(device, 1, &frame_fence, VK_TRUE,
@@ -755,6 +777,20 @@ int main() {
         .colorAttachmentCount = 1,
         .pColorAttachments = &color_attachment_info,
     };
+
+    UniformBufferObject ubo{};
+
+    {
+      static float w = 0.f;
+      w += .01f;
+      if (w >= 2.f) w = 0.f;
+      ubo.model = RotationMatrix(Quat{w - 1.f, 0, 1, 0});
+      ubo.view = LookAt(Vec3{2.f, 2.f, 2.f}, Vec3{}, Vec3{0.f, 0.f, 1.f});
+      ubo.proj = Perspective(
+          .78f, surface_extent.width / (float)surface_extent.height, .1f, 10.f);
+
+      memcpy(uniform_buffers_mapped[image_index], &ubo, sizeof(ubo));
+    }
 
     {
       static uint32_t first_frame = 0;
@@ -868,4 +904,10 @@ int main() {
 
     vkQueuePresentKHR(queue, &present_info);
   }
+
+  return 0;
 }
+
+}  // namespace nyla
+
+int main() { return nyla::Main(); }

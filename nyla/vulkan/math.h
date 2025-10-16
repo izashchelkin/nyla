@@ -25,6 +25,10 @@ struct Vec {
     requires(N == 4)
       : data{x, y, z, w} {}
 
+  Vec(Vec<3> v, float w)
+    requires(N == 4)
+      : data{v[0], v[1], v[2], w} {}
+
   float operator[](size_t i) const { return data[i]; }
   float& operator[](size_t i) { return data[i]; }
 
@@ -151,11 +155,11 @@ inline Mat4 Identity4 = {
     {0.0f, 0.0f, 0.0f, 1.0f},
 };
 
-inline Mat4 QuatToMat(const Quat& q) {
-  const float w = q[0];
-  const float x = q[1];
-  const float y = q[2];
-  const float z = q[3];
+inline Mat4 RotationMatrix(const Quat& q) {
+  const float x = q[0];
+  const float y = q[1];
+  const float z = q[2];
+  const float w = q[3];
 
   // clang-format off
   return {
@@ -165,6 +169,32 @@ inline Mat4 QuatToMat(const Quat& q) {
       { 0.f,                    0.f,                    0.f,                    1.f },
   };
   // clang-format on
+}
+
+inline Mat4 LookAt(const Vec3& from, const Vec3& to, const Vec3& arbitrary_up) {
+  const Vec3 forward = Normalize(from - to);
+  const Vec3 right = Normalize(Cross(arbitrary_up, forward));
+  const Vec3 up = Cross(forward, right);
+
+  return {
+      {right, 0.f},
+      {up, 0.f},
+      {forward, 0.f},
+      {-Dot(right, from), -Dot(up, from), -Dot(forward, from), 1.f},
+  };
+}
+
+inline Mat4 Perspective(float fovy_radians, float aspect, float z_near,
+                        float z_far) {
+  const float f = 1.f / std::tan(fovy_radians * .5f);
+  const float nf = 1.f / (z_far - z_near);
+
+  return {
+      {f / aspect, 0.f, 0.f, 0.f},
+      {0.f, f, 0.f, 0.f},
+      {0.f, 0.f, z_far * nf, 1.f},
+      {0.f, 0.f, -z_near * z_far * nf, 0.f},
+  };
 }
 
 }  // namespace nyla
