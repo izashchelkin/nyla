@@ -25,6 +25,11 @@ struct VkState {
 };
 extern VkState vk;
 
+#define VK_GET_INSTANCE_PROC_ADDR(name) \
+  reinterpret_cast<PFN_##name>(vkGetInstanceProcAddr(instance, #name))
+
 #define VK_CHECK(a) CHECK_EQ(a, VK_SUCCESS);
+
+VkExtent2D PlatformGetWindowSize();
 
 }  // namespace nyla

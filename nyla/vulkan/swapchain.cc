@@ -6,9 +6,9 @@
 namespace nyla {
 
 void CreateSwapchain() {
-  if (vk.swapchain) {
-    vkDeviceWaitIdle(vk.device);
-  }
+  VkSwapchainKHR old_swapchain = vk.swapchain;
+  std::vector<VkImage> old_images = vk.swapchain_images;
+  std::vector<VkImageView> old_image_views = vk.swapchain_image_views;
 
   {
     VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
@@ -128,6 +128,15 @@ void CreateSwapchain() {
       VK_CHECK(vkCreateImageView(vk.device, &create_info, nullptr,
                                  &vk.swapchain_image_views[i]));
     }
+  }
+
+  if (old_swapchain) {
+    vkDeviceWaitIdle(vk.device);
+
+    for (const VkImageView image_view : old_image_views)
+      vkDestroyImageView(vk.device, image_view, nullptr);
+
+    vkDestroySwapchainKHR(vk.device, old_swapchain, nullptr);
   }
 }
 

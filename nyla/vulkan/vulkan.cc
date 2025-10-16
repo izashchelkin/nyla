@@ -34,9 +34,6 @@ namespace nyla {
 
 static constexpr uint8_t kInFlightFrames = 2;
 
-#define GET_INSTANCE_PROC_ADDR(name) \
-  reinterpret_cast<PFN_##name>(vkGetInstanceProcAddr(instance, #name))
-
 struct Vertex {
   Vec2 pos;
   Vec3 color;
@@ -90,7 +87,7 @@ static int Main() {
   //
 
   vk.instance = []() {
-    VkApplicationInfo app_info{
+    const VkApplicationInfo app_info{
         .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
         .pApplicationName = "nyla",
         .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
@@ -99,18 +96,18 @@ static int Main() {
         .apiVersion = VK_API_VERSION_1_4,
     };
 
-    auto instance_extensions = std::to_array({
+    const auto instance_extensions = std::to_array({
         VK_KHR_SURFACE_EXTENSION_NAME,
         VK_KHR_XCB_SURFACE_EXTENSION_NAME,
         VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
     });
 
-    auto validation_layers = std::to_array({
+    const auto validation_layers = std::to_array({
         "VK_LAYER_KHRONOS_validation",
     });
 
 #ifndef NDEBUG
-    VkDebugUtilsMessengerCreateInfoEXT debug_messenger_create_info{
+    const VkDebugUtilsMessengerCreateInfoEXT debug_messenger_create_info{
         .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
         .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
                            VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
@@ -129,7 +126,7 @@ static int Main() {
     };
 #endif
 
-    VkInstanceCreateInfo instance_create_info{
+    const VkInstanceCreateInfo instance_create_info{
         .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
 #ifndef NDEBUG
         .pNext = &debug_messenger_create_info,
@@ -148,7 +145,7 @@ static int Main() {
 #ifndef NDEBUG
     VkDebugUtilsMessengerEXT debug_messenger;
     CHECK_EQ(
-        GET_INSTANCE_PROC_ADDR(vkCreateDebugUtilsMessengerEXT)(
+        VK_GET_INSTANCE_PROC_ADDR(vkCreateDebugUtilsMessengerEXT)(
             instance, &debug_messenger_create_info, nullptr, &debug_messenger),
         VK_SUCCESS);
 #endif
@@ -204,14 +201,14 @@ static int Main() {
         .pNext = &v13,
     };
 
-    VkDeviceCreateInfo device_create_info{};
-    device_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    device_create_info.pNext = &features;
-    device_create_info.queueCreateInfoCount = 1;
-    device_create_info.pQueueCreateInfos = &queue_create_info;
-    device_create_info.enabledExtensionCount = device_extensions.size();
-    device_create_info.ppEnabledExtensionNames = device_extensions.data();
-
+    const VkDeviceCreateInfo device_create_info{
+        .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+        .pNext = &features,
+        .queueCreateInfoCount = 1,
+        .pQueueCreateInfos = &queue_create_info,
+        .enabledExtensionCount = device_extensions.size(),
+        .ppEnabledExtensionNames = device_extensions.data(),
+    };
     VK_CHECK(vkCreateDevice(vk.phys_device, &device_create_info, nullptr,
                             &vk.device));
   }
