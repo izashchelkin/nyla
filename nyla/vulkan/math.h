@@ -4,6 +4,8 @@
 #include <cmath>
 #include <cstddef>
 
+#include "absl/strings/str_format.h"
+
 namespace nyla {
 
 template <size_t N>
@@ -132,6 +134,16 @@ struct Mat {
   Vec<R>& operator[](size_t i) { return cols[i]; }
 };
 
+template <typename Sink, size_t R, size_t C>
+void AbslStringify(Sink& sink, const Mat<R, C> mat) {
+  for (size_t i = 0; i < R; ++i) {
+    for (size_t j = 0; j < C; ++j) {
+      absl::Format(&sink, "%v ", mat[j][i]);
+    }
+    sink.Append("\n");
+  }
+}
+
 template <size_t R, size_t S, size_t C>
 Mat<R, C> Mult(const Mat<R, S>& lhs, const Mat<S, C>& rhs) {
   Mat<R, C> ret{};
@@ -154,6 +166,12 @@ inline Mat4 Identity4 = {
     {0.0f, 0.0f, 1.0f, 0.0f},
     {0.0f, 0.0f, 0.0f, 1.0f},
 };
+
+inline Mat4 TranslationMatrix(Vec3 v) {
+  Mat4 ret = Identity4;
+  ret[3] = {v, 1};
+  return ret;
+}
 
 inline Mat4 RotationMatrix(const Quat& q) {
   const float x = q[0];

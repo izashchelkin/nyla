@@ -47,7 +47,7 @@ void CreateSwapchain() {
     vkGetPhysicalDeviceSurfacePresentModesKHR(
         vk.phys_device, vk.surface, &present_mode_count, present_modes.data());
 
-    vk.present_mode = present_modes.front();
+    vk.present_mode = VK_PRESENT_MODE_FIFO_KHR;
   }
 
   if (vk.surface_capabilities.currentExtent.width ==

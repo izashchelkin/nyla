@@ -16,6 +16,7 @@
 #include <limits>
 #include <vector>
 
+#include "absl/cleanup/cleanup.h"
 #include "absl/log/check.h"
 #include "absl/log/globals.h"
 #include "absl/log/initialize.h"
@@ -75,10 +76,11 @@ static int Main() {
     window = xcb_generate_id(conn);
 
     CHECK(!xcb_request_check(
-        conn, xcb_create_window_checked(conn, XCB_COPY_FROM_PARENT, window,
-                                        screen->root, 0, 0, 100, 100, 0,
-                                        XCB_WINDOW_CLASS_INPUT_OUTPUT,
-                                        screen->root_visual, 0, nullptr)));
+        conn, xcb_create_window_checked(
+                  conn, XCB_COPY_FROM_PARENT, window, screen->root, 0, 0,
+                  screen->width_in_pixels, screen->height_in_pixels, 0,
+                  XCB_WINDOW_CLASS_INPUT_OUTPUT, screen->root_visual,
+                  XCB_CW_OVERRIDE_REDIRECT, (uint32_t[]){false})));
 
     xcb_map_window(conn, window);
     xcb_flush(conn);
@@ -522,8 +524,32 @@ static int Main() {
     submit_semaphores[i] = CreateSemaphore();
   }
 
+  bool running = true;
   for (uint8_t iframe = 0; iframe < kInFlightFrames;
        iframe = ((iframe + 1) % kInFlightFrames)) {
+    for (;;) {
+      if (xcb_connection_has_error(conn)) {
+        running = false;
+        break;
+      }
+
+      xcb_generic_event_t* event = xcb_poll_for_event(conn);
+      if (!event) break;
+
+      absl::Cleanup event_freer = [=]() { free(event); };
+      const uint8_t event_type = event->response_type & 0x7F;
+
+      switch (event_type) {
+        case XCB_CLIENT_MESSAGE: {
+          running = false;
+          break;
+        }
+      }
+    }
+    if (!running) {
+      break;
+    }
+
     const VkFence frame_fence = frame_fences[iframe];
 
     vkWaitForFences(vk.device, 1, &frame_fence, VK_TRUE,
@@ -573,14 +599,29 @@ static int Main() {
     UniformBufferObject ubo{};
 
     {
+#if 1
       static float w = 0.f;
       w += .01f;
       if (w >= 2.f) w = 0.f;
+
+      ubo.model = TranslationMatrix(Vec3{w - 1.f, 0, 0});
+      ubo.view = Identity4;
+      ubo.proj = Identity4;
+#else
       ubo.model = RotationMatrix(Quat{w - 1.f, 0, 1, 0});
       ubo.view = LookAt(Vec3{2.f, 2.f, 2.f}, Vec3{}, Vec3{0.f, 0.f, 1.f});
       ubo.proj = Perspective(
           .78f, vk.surface_extent.width / (float)vk.surface_extent.height, .1f,
           10.f);
+
+      LOG(INFO) << ubo.model;
+      LOG(INFO) << ubo.view;
+      LOG(INFO) << ubo.proj;
+
+      ubo.model = Identity4;
+      ubo.view = Identity4;
+      ubo.proj = Identity4;
+#endif
 
       memcpy(uniform_buffers_mapped[image_index], &ubo, sizeof(ubo));
     }
