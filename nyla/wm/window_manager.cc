@@ -41,6 +41,7 @@ struct WindowStack {
 
 struct Client {
   Rect rect;
+  uint32_t border_width;
   std::string name;
 
   bool wm_hints_input;
@@ -74,6 +75,7 @@ static uint32_t wm_bar_height = 20;
 static xcb_window_t wm_bar_window;
 static xcb_gcontext_t wm_bar_gc;
 bool wm_bar_dirty;
+bool wm_bar_hidden;
 
 static bool wm_layout_dirty;
 static bool wm_follow;
@@ -448,25 +450,55 @@ void UnmanageClient(xcb_window_t window) {
   }
 }
 
-static void ConfigureClient(xcb_connection_t* conn, xcb_window_t client_window,
-                            Client& client, const Rect& new_rect) {
+static void ConfigureClientIfNeeded(xcb_connection_t* conn,
+                                    xcb_window_t client_window, Client& client,
+                                    const Rect& new_rect,
+                                    uint32_t new_border_width) {
   uint16_t mask = 0;
-  mask |= XCB_CONFIG_WINDOW_X;
-  mask |= XCB_CONFIG_WINDOW_Y;
-  mask |= XCB_CONFIG_WINDOW_WIDTH;
-  mask |= XCB_CONFIG_WINDOW_HEIGHT;
-  mask |= XCB_CONFIG_WINDOW_BORDER_WIDTH;
-  // mask |= XCB_CONFIG_WINDOW_STACK_MODE;
+  std::vector<uint32_t> values;
+  bool anything_changed = false;
+  bool size_changed = false;
 
-  struct {
-    Rect rect;
-    uint32_t border_width;
-    // uint32_t stack_mode;
-  } values = {new_rect, 2};
-  static_assert(sizeof(values) == 5 * 4);
+  if (new_rect.x() != client.rect.x()) {
+    anything_changed = true;
+    mask |= XCB_CONFIG_WINDOW_X;
+    values.emplace_back(new_rect.x());
+  }
 
-  xcb_configure_window(conn, client_window, mask, &values);
-  client.wants_configure_notify = IsSameWH(client.rect, new_rect);
+  if (new_rect.y() != client.rect.y()) {
+    anything_changed = true;
+    mask |= XCB_CONFIG_WINDOW_Y;
+    values.emplace_back(new_rect.y());
+  }
+
+  if (new_rect.width() != client.rect.width()) {
+    anything_changed = true;
+    size_changed = true;
+    mask |= XCB_CONFIG_WINDOW_WIDTH;
+    values.emplace_back(new_rect.width());
+  }
+
+  if (new_rect.height() != client.rect.height()) {
+    anything_changed = true;
+    size_changed = true;
+    mask |= XCB_CONFIG_WINDOW_HEIGHT;
+    values.emplace_back(new_rect.height());
+  }
+
+  if (new_border_width != client.border_width) {
+    anything_changed = true;
+    size_changed = true;
+    mask |= XCB_CONFIG_WINDOW_BORDER_WIDTH;
+    values.emplace_back(new_border_width);
+  }
+
+  if (anything_changed) {
+    xcb_configure_window(conn, client_window, mask, values.data());
+
+    client.wants_configure_notify = !size_changed;
+    client.rect = new_rect;
+    client.border_width = new_border_width;
+  }
 }
 
 static void MoveStack(xcb_timestamp_t time, auto compute_idx) {
@@ -586,6 +618,7 @@ void CloseActive() {
 void ToggleZoom() {
   WindowStack& stack = GetActiveStack();
   stack.zoom ^= 1;
+  wm_bar_dirty = true;
   wm_layout_dirty = true;
   wm_border_dirty = true;
 }
@@ -682,18 +715,17 @@ void ProcessWM() {
   }
 
   if (wm_layout_dirty) {
-    Rect screen_rect = TryApplyMarginTop(
-        Rect(wm_screen.width_in_pixels, wm_screen.height_in_pixels),
-        wm_bar_height);
+    Rect screen_rect =
+        Rect(wm_screen.width_in_pixels, wm_screen.height_in_pixels);
+    if (!stack.zoom)
+      screen_rect = TryApplyMarginTop(screen_rect, wm_bar_height);
 
     auto hide = [](xcb_window_t client_window, Client& client) {
-      if (client.rect.x() == wm_screen.width_in_pixels &&
-          client.rect.y() == wm_screen.height_in_pixels)
-        return;
-
-      client.rect.x() = wm_screen.width_in_pixels;
-      client.rect.y() = wm_screen.height_in_pixels;
-      ConfigureClient(wm_conn, client_window, client, client.rect);
+      ConfigureClientIfNeeded(
+          wm_conn, client_window, client,
+          Rect{wm_screen.width_in_pixels, wm_screen.height_in_pixels,
+               client.rect.width(), client.rect.height()},
+          client.border_width);
     };
 
     auto hide_all = [hide](xcb_window_t client_window, Client& client) {
@@ -723,10 +755,7 @@ void ProcessWM() {
         center(client.max_width, rect.width(), rect.x());
         center(client.max_height, rect.height(), rect.y());
 
-        if (rect != client.rect) {
-          ConfigureClient(wm_conn, client_window, client, rect);
-          client.rect = rect;
-        }
+        ConfigureClientIfNeeded(wm_conn, client_window, client, rect, 2);
 
         visitor(client);
       }
@@ -744,11 +773,8 @@ void ProcessWM() {
         if (client_window != stack.active_window) {
           hide_all(client_window, client);
         } else {
-          Rect rect = TryApplyPadding(screen_rect, 2);
-          if (client.rect != rect) {
-            ConfigureClient(wm_conn, client_window, client, rect);
-            client.rect = rect;
-          }
+          ConfigureClientIfNeeded(wm_conn, client_window, client, screen_rect,
+                                  wm_follow ? 2 : 0);
 
           configure_subwindows(client);
         }
@@ -873,7 +899,23 @@ void ProcessWMEvents(const bool& is_running, uint16_t modifier,
 }
 
 void UpdateBar() {
+  wm_bar_dirty = false;
+
   const WindowStack& stack = GetActiveStack();
+
+  if (stack.zoom) {
+    if (!wm_bar_hidden) {
+      xcb_unmap_window(wm_conn, wm_bar_window);
+      wm_bar_hidden = true;
+    }
+
+    return;
+  }
+
+  if (wm_bar_hidden) {
+    xcb_map_window(wm_conn, wm_bar_window);
+    wm_bar_hidden = false;
+  }
 
   const std::string& active_client_name =
       stack.active_window ? wm_clients.at(stack.active_window).name : "nylawm";
@@ -890,8 +932,6 @@ void UpdateBar() {
                  wm_bar_height);
   xcb_image_text_8(wm_conn, bar_text.size(), wm_bar_window, wm_bar_gc, 8, 16,
                    bar_text.data());
-
-  wm_bar_dirty = false;
 }
 
 std::string DumpClients() {
