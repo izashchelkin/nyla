@@ -682,7 +682,7 @@ void ProcessWM() {
   }
 
   if (wm_layout_dirty) {
-    Rect screen_rect = ApplyMarginTop(
+    Rect screen_rect = TryApplyMarginTop(
         Rect(wm_screen.width_in_pixels, wm_screen.height_in_pixels),
         wm_bar_height);
 
@@ -733,7 +733,7 @@ void ProcessWM() {
     };
 
     auto configure_subwindows = [configure_windows](const Client& client) {
-      configure_windows(ApplyMargin(client.rect, 20), client.subwindows,
+      configure_windows(TryApplyMargin(client.rect, 20), client.subwindows,
                         LayoutType::kRows, [](Client& client) {});
     };
 
@@ -744,7 +744,7 @@ void ProcessWM() {
         if (client_window != stack.active_window) {
           hide_all(client_window, client);
         } else {
-          Rect rect = ApplyPadding(screen_rect, 2);
+          Rect rect = TryApplyPadding(screen_rect, 2);
           if (client.rect != rect) {
             ConfigureClient(wm_conn, client_window, client, rect);
             client.rect = rect;

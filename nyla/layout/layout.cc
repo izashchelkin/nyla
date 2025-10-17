@@ -30,7 +30,7 @@ static void ComputeColumns(const Rect& bounding_rect, uint32_t n,
   uint32_t width = bounding_rect.width() / n;
   for (uint32_t i = 0; i < n; ++i) {
     out.emplace_back(
-        ApplyPadding(Rect(static_cast<int32_t>(bounding_rect.x() + (i * width)),
+        TryApplyPadding(Rect(static_cast<int32_t>(bounding_rect.x() + (i * width)),
                           bounding_rect.y(), width, bounding_rect.height()),
                      padding));
   }
@@ -40,7 +40,7 @@ static void ComputeRows(const Rect& bounding_rect, uint32_t n, uint32_t padding,
                         std::vector<Rect>& out) {
   uint32_t height = bounding_rect.height() / n;
   for (uint32_t i = 0; i < n; ++i) {
-    out.emplace_back(ApplyPadding(
+    out.emplace_back(TryApplyPadding(
         Rect(bounding_rect.x(),
              static_cast<int32_t>(bounding_rect.y() + (i * height)),
              bounding_rect.width(), height),
@@ -62,7 +62,7 @@ static void ComputeGrid(const Rect& bounding_rect, uint32_t n, uint32_t padding,
 
     for (uint32_t i = 0; i < n; ++i) {
       out.emplace_back(
-          ApplyPadding(Rect(static_cast<int32_t>(bounding_rect.x() +
+          TryApplyPadding(Rect(static_cast<int32_t>(bounding_rect.x() +
                                                  ((i % num_cols) * width)),
                             static_cast<int32_t>(bounding_rect.y() +
                                                  ((i / num_cols) * height)),
@@ -78,7 +78,7 @@ std::vector<Rect> ComputeLayout(const Rect& bounding_rect, uint32_t n,
     case 0:
       return {};
     case 1:
-      return {ApplyPadding(bounding_rect, padding)};
+      return {TryApplyPadding(bounding_rect, padding)};
   }
 
   std::vector<Rect> out;
