@@ -14,13 +14,12 @@
 #include "nyla/commons/spawn.h"
 #include "nyla/commons/timer.h"
 #include "nyla/fs/nylafs.h"
-#include "nyla/protocols/atoms.h"
-#include "nyla/protocols/send.h"
-#include "nyla/protocols/wm_protocols.h"
 #include "nyla/wm/keyboard.h"
 #include "nyla/wm/window_manager.h"
+#include "nyla/x11/send.h"
+#include "nyla/x11/wm_protocols.h"
+#include "nyla/x11/x11.h"
 #include "xcb/xcb.h"
-#include "xcb/xcb_aux.h"
 #include "xcb/xproto.h"
 
 namespace nyla {
@@ -31,20 +30,14 @@ int Main(int argc, char** argv) {
   absl::InitializeLog();
   absl::SetStderrThreshold(absl::LogSeverityAtLeast::kInfo);
 
-  int iscreen;
-  wm_conn = xcb_connect(nullptr, &iscreen);
-  if (xcb_connection_has_error(wm_conn)) {
-    LOG(QFATAL) << "could not connect to X server";
-  }
+  InitializeX11();
 
-  xcb_grab_server(wm_conn);
-
-  wm_screen = *xcb_aux_get_screen(wm_conn, iscreen);
+  xcb_grab_server(x11.conn);
 
   if (xcb_request_check(
-          wm_conn,
+          x11.conn,
           xcb_change_window_attributes_checked(
-              wm_conn, wm_screen.root, XCB_CW_EVENT_MASK,
+              x11.conn, x11.screen->root, XCB_CW_EVENT_MASK,
               (uint32_t[]){
                   XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT |
                   XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY |
@@ -55,10 +48,9 @@ int Main(int argc, char** argv) {
     LOG(QFATAL) << "another wm is already running";
   }
 
-  if (!InitKeyboard(wm_conn)) LOG(QFATAL) << "could not init keyboard";
+  if (!InitKeyboard(x11.conn)) LOG(QFATAL) << "could not init keyboard";
   LOG(INFO) << "init keyboard successful";
 
-  atoms = InternAtoms(wm_conn);
   InitializeWM();
 
   uint16_t modifier = XCB_MOD_MASK_4;
@@ -83,7 +75,7 @@ int Main(int argc, char** argv) {
   keybinds.emplace_back("AB02", [](xcb_timestamp_t time) { CloseActive(); });
   keybinds.emplace_back("AB04", [](xcb_timestamp_t) { ToggleFollow(); });
 
-  if (!BindKeyboard(wm_conn, wm_screen.root, modifier, keybinds))
+  if (!BindKeyboard(x11.conn, x11.screen->root, modifier, keybinds))
     LOG(QFATAL) << "could not bind keyboard";
   LOG(INFO) << "bind keyboard successful";
 
@@ -97,7 +89,7 @@ int Main(int argc, char** argv) {
 
   std::vector<pollfd> fds;
   fds.emplace_back(
-      pollfd{.fd = xcb_get_file_descriptor(wm_conn), .events = POLLIN});
+      pollfd{.fd = xcb_get_file_descriptor(x11.conn), .events = POLLIN});
   fds.emplace_back(pollfd{.fd = tfd, .events = POLLIN});
 
   NylaFs nylafs;
@@ -113,14 +105,14 @@ int Main(int argc, char** argv) {
     LOG(ERROR) << "could not start NylaFS, continuing anyway...";
   }
 
-  xcb_ungrab_server(wm_conn);
+  xcb_ungrab_server(x11.conn);
 
-  while (is_running && !xcb_connection_has_error(wm_conn)) {
-    xcb_flush(wm_conn);
+  while (is_running && !xcb_connection_has_error(x11.conn)) {
+    xcb_flush(x11.conn);
 
     ProcessWM();
 
-    xcb_flush(wm_conn);
+    xcb_flush(x11.conn);
 
     if (poll(fds.data(), fds.size(), -1) == -1) {
       PLOG(ERROR) << "poll";

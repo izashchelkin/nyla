@@ -16,13 +16,13 @@
 #include "absl/strings/str_join.h"
 #include "nyla/commons/rect.h"
 #include "nyla/layout/layout.h"
-#include "nyla/protocols/atoms.h"
-#include "nyla/protocols/send.h"
-#include "nyla/protocols/wm_hints.h"
-#include "nyla/protocols/wm_protocols.h"
 #include "nyla/wm/keyboard.h"
 #include "nyla/wm/palette.h"
-#include "nyla/wm/x11.h"
+#include "nyla/x11/error.h"
+#include "nyla/x11/send.h"
+#include "nyla/x11/wm_hints.h"
+#include "nyla/x11/wm_protocols.h"
+#include "nyla/x11/x11.h"
 #include "xcb/xcb.h"
 #include "xcb/xproto.h"
 
@@ -65,11 +65,6 @@ void AbslStringify(Sink& sink, const Client& c) {
   absl::Format(&sink, "Window{ rect=%v, input=%v, take_focus=%v }", c.rect,
                c.wm_hints_input, c.wm_take_focus);
 }
-
-X11Atoms atoms;
-
-xcb_connection_t* wm_conn;
-xcb_screen_t wm_screen;
 
 static uint32_t wm_bar_height = 20;
 static xcb_window_t wm_bar_window;
@@ -170,11 +165,11 @@ static void Handle_WM_Protocols(xcb_window_t client_window, Client& client,
   // LOG(INFO) << client_window << " " << absl::StrJoin(wm_protocols, ", ");
 
   for (xcb_atom_t atom : wm_protocols) {
-    if (atom == atoms.wm_delete_window) {
+    if (atom == x11.atoms.wm_delete_window) {
       client.wm_delete_window = true;
       continue;
     }
-    if (atom == atoms.wm_take_focus) {
+    if (atom == x11.atoms.wm_take_focus) {
       client.wm_take_focus = true;
       continue;
     }
@@ -199,47 +194,47 @@ void InitializeWM() {
   wm_property_change_handlers.try_emplace(XCB_ATOM_WM_NORMAL_HINTS,
                                           Handle_WM_Normal_Hints);
   wm_property_change_handlers.try_emplace(XCB_ATOM_WM_NAME, Handle_WM_Name);
-  wm_property_change_handlers.try_emplace(atoms.wm_protocols,
+  wm_property_change_handlers.try_emplace(x11.atoms.wm_protocols,
                                           Handle_WM_Protocols);
   wm_property_change_handlers.try_emplace(XCB_ATOM_WM_TRANSIENT_FOR,
                                           Handle_WM_Transient_For);
 
-  wm_bar_window = xcb_generate_id(wm_conn);
+  wm_bar_window = xcb_generate_id(x11.conn);
 
   if (xcb_request_check(
-          wm_conn,
+          x11.conn,
           xcb_create_window_checked(
-              wm_conn, XCB_COPY_FROM_PARENT, wm_bar_window, wm_screen.root, 0,
-              0, wm_screen.width_in_pixels, wm_bar_height, 0,
-              XCB_WINDOW_CLASS_INPUT_OUTPUT, wm_screen.root_visual,
+              x11.conn, XCB_COPY_FROM_PARENT, wm_bar_window, x11.screen->root,
+              0, 0, x11.screen->width_in_pixels, wm_bar_height, 0,
+              XCB_WINDOW_CLASS_INPUT_OUTPUT, x11.screen->root_visual,
               XCB_CW_BACK_PIXEL | XCB_CW_OVERRIDE_REDIRECT | XCB_CW_EVENT_MASK,
               (uint32_t[]){
-                  wm_screen.black_pixel,
+                  x11.screen->black_pixel,
                   true,
                   XCB_EVENT_MASK_EXPOSURE,
               }))) {
     LOG(ERROR) << "could not create bar window";
   }
 
-  xcb_map_window(wm_conn, wm_bar_window);
+  xcb_map_window(x11.conn, wm_bar_window);
 
   constexpr const char* kFontName = "fixed";
 
-  xcb_font_t font = xcb_generate_id(wm_conn);
+  xcb_font_t font = xcb_generate_id(x11.conn);
 
-  if (xcb_request_check(
-          wm_conn,
-          xcb_open_font_checked(wm_conn, font, strlen(kFontName), kFontName))) {
+  if (xcb_request_check(x11.conn,
+                        xcb_open_font_checked(x11.conn, font, strlen(kFontName),
+                                              kFontName))) {
     LOG(ERROR) << "could not create bar font";
   }
 
-  wm_bar_gc = xcb_generate_id(wm_conn);
-  if (xcb_request_check(wm_conn,
+  wm_bar_gc = xcb_generate_id(x11.conn);
+  if (xcb_request_check(x11.conn,
                         xcb_create_gc_checked(
-                            wm_conn, wm_bar_gc, wm_bar_window,
+                            x11.conn, wm_bar_gc, wm_bar_window,
                             XCB_GC_FOREGROUND | XCB_GC_BACKGROUND | XCB_GC_FONT,
-                            (uint32_t[]){wm_screen.white_pixel,
-                                         wm_screen.black_pixel, font}))) {
+                            (uint32_t[]){x11.screen->white_pixel,
+                                         x11.screen->black_pixel, font}))) {
     LOG(ERROR) << "could not create bar GC";
   }
 }
@@ -266,25 +261,25 @@ static void Activate(const WindowStack& stack, xcb_timestamp_t time) {
     const auto& client = it->second;
 
     xcb_window_t immediate_focus =
-        client.wm_hints_input ? stack.active_window : wm_screen.root;
+        client.wm_hints_input ? stack.active_window : x11.screen->root;
 
-    xcb_set_input_focus(wm_conn, XCB_INPUT_FOCUS_NONE, immediate_focus, time);
+    xcb_set_input_focus(x11.conn, XCB_INPUT_FOCUS_NONE, immediate_focus, time);
 
     if (client.wm_take_focus) {
-      Send_WM_Take_Focus(wm_conn, stack.active_window, atoms, time);
+      Send_WM_Take_Focus(stack.active_window, time);
     }
 
     return;
   }
 
 revert_to_root:
-  xcb_set_input_focus(wm_conn, XCB_INPUT_FOCUS_NONE, wm_screen.root, time);
+  xcb_set_input_focus(x11.conn, XCB_INPUT_FOCUS_NONE, x11.screen->root, time);
 }
 
 static void Activate(WindowStack& stack, xcb_window_t client_window,
                      xcb_timestamp_t time) {
   if (stack.active_window != client_window) {
-    ApplyBorder(wm_conn, stack.active_window, Color::kNone);
+    ApplyBorder(x11.conn, stack.active_window, Color::kNone);
     stack.active_window = client_window;
     wm_bar_dirty = true;
   }
@@ -293,21 +288,21 @@ static void Activate(WindowStack& stack, xcb_window_t client_window,
 }
 
 static void CheckFocusTheft() {
-  auto reply =
-      xcb_get_input_focus_reply(wm_conn, xcb_get_input_focus(wm_conn), nullptr);
+  auto reply = xcb_get_input_focus_reply(
+      x11.conn, xcb_get_input_focus(x11.conn), nullptr);
   xcb_window_t focused_window = reply->focus;
   free(reply);
 
   const WindowStack& stack = GetActiveStack();
   if (stack.active_window == focused_window) return;
 
-  if (focused_window == wm_screen.root) return;
+  if (focused_window == x11.screen->root) return;
   if (!focused_window) return;
 
   if (!wm_clients.contains(focused_window)) {
     for (;;) {
       xcb_query_tree_reply_t* reply = xcb_query_tree_reply(
-          wm_conn, xcb_query_tree(wm_conn, focused_window), nullptr);
+          x11.conn, xcb_query_tree(x11.conn, focused_window), nullptr);
 
       if (!reply) {
         Activate(stack, XCB_CURRENT_TIME);
@@ -317,7 +312,7 @@ static void CheckFocusTheft() {
       xcb_window_t parent = reply->parent;
       free(reply);
 
-      if (!parent || parent == wm_screen.root) break;
+      if (!parent || parent == x11.screen->root) break;
       focused_window = parent;
     }
   }
@@ -351,7 +346,7 @@ static void FetchClientProperty(xcb_window_t client_window, Client& client,
   if (!wm_property_change_handlers.contains(property)) return;
 
   auto cookie = xcb_get_property_unchecked(
-      wm_conn, false, client_window, property, XCB_ATOM_ANY, 0,
+      x11.conn, false, client_window, property, XCB_ATOM_ANY, 0,
       std::numeric_limits<uint32_t>::max());
 
   auto it = client.property_cookies.find(property);
@@ -364,7 +359,7 @@ void ManageClient(xcb_window_t client_window) {
   if (auto [it, inserted] = wm_clients.try_emplace(client_window, Client{});
       inserted) {
     xcb_change_window_attributes(
-        wm_conn, client_window, XCB_CW_EVENT_MASK,
+        x11.conn, client_window, XCB_CW_EVENT_MASK,
         (uint32_t[]){
             XCB_EVENT_MASK_PROPERTY_CHANGE | XCB_EVENT_MASK_FOCUS_CHANGE,
         });
@@ -379,7 +374,7 @@ void ManageClient(xcb_window_t client_window) {
 
 void ManageClientsStartup() {
   xcb_query_tree_reply_t* tree_reply = xcb_query_tree_reply(
-      wm_conn, xcb_query_tree(wm_conn, wm_screen.root), nullptr);
+      x11.conn, xcb_query_tree(x11.conn, x11.screen->root), nullptr);
   if (!tree_reply) return;
 
   std::span<xcb_window_t> children = {
@@ -389,7 +384,7 @@ void ManageClientsStartup() {
   for (xcb_window_t client_window : children) {
     xcb_get_window_attributes_reply_t* attr_reply =
         xcb_get_window_attributes_reply(
-            wm_conn, xcb_get_window_attributes(wm_conn, client_window),
+            x11.conn, xcb_get_window_attributes(x11.conn, client_window),
             nullptr);
     if (!attr_reply) continue;
     absl::Cleanup attr_reply_freer = [attr_reply] { free(attr_reply); };
@@ -410,7 +405,7 @@ void UnmanageClient(xcb_window_t window) {
   auto& client = it->second;
 
   for (auto& [_, cookie] : client.property_cookies)
-    xcb_discard_reply(wm_conn, cookie.sequence);
+    xcb_discard_reply(x11.conn, cookie.sequence);
 
   if (client.transient_for) {
     CHECK(client.subwindows.empty());
@@ -531,7 +526,7 @@ static void MoveStack(xcb_timestamp_t time, auto compute_idx) {
         oldstack.active_window = oldstack.windows.at(0);
     }
   } else {
-    ApplyBorder(wm_conn, oldstack.active_window, Color::kNone);
+    ApplyBorder(x11.conn, oldstack.active_window, Color::kNone);
     Activate(newstack, newstack.active_window, time);
   }
 
@@ -610,7 +605,7 @@ void CloseActive() {
 
   static absl::Time last = absl::InfinitePast();
   if (absl::Now() - last >= absl::Milliseconds(100)) {
-    Send_WM_Delete_Window(wm_conn, stack.active_window, atoms);
+    Send_WM_Delete_Window(stack.active_window);
   }
   last = absl::Now();
 }
@@ -642,7 +637,7 @@ void ProcessWM() {
   for (auto& [client_window, client] : wm_clients) {
     for (auto& [property, cookie] : client.property_cookies) {
       xcb_get_property_reply_t* reply =
-          xcb_get_property_reply(wm_conn, cookie, nullptr);
+          xcb_get_property_reply(x11.conn, cookie, nullptr);
 
       auto handler_it = wm_property_change_handlers.find(property);
       if (handler_it == wm_property_change_handlers.end()) {
@@ -709,21 +704,21 @@ void ProcessWM() {
       if (stack.zoom || stack.windows.size() < 2) return Color::kNone;
       return Color::kActive;
     }();
-    ApplyBorder(wm_conn, stack.active_window, color);
+    ApplyBorder(x11.conn, stack.active_window, color);
 
     wm_border_dirty = false;
   }
 
   if (wm_layout_dirty) {
     Rect screen_rect =
-        Rect(wm_screen.width_in_pixels, wm_screen.height_in_pixels);
+        Rect(x11.screen->width_in_pixels, x11.screen->height_in_pixels);
     if (!stack.zoom)
       screen_rect = TryApplyMarginTop(screen_rect, wm_bar_height);
 
     auto hide = [](xcb_window_t client_window, Client& client) {
       ConfigureClientIfNeeded(
-          wm_conn, client_window, client,
-          Rect{wm_screen.width_in_pixels, wm_screen.height_in_pixels,
+          x11.conn, client_window, client,
+          Rect{x11.screen->width_in_pixels, x11.screen->height_in_pixels,
                client.rect.width(), client.rect.height()},
           client.border_width);
     };
@@ -755,7 +750,7 @@ void ProcessWM() {
         center(client.max_width, rect.width(), rect.x());
         center(client.max_height, rect.height(), rect.y());
 
-        ConfigureClientIfNeeded(wm_conn, client_window, client, rect, 2);
+        ConfigureClientIfNeeded(x11.conn, client_window, client, rect, 2);
 
         visitor(client);
       }
@@ -773,7 +768,7 @@ void ProcessWM() {
         if (client_window != stack.active_window) {
           hide_all(client_window, client);
         } else {
-          ConfigureClientIfNeeded(wm_conn, client_window, client, screen_rect,
+          ConfigureClientIfNeeded(x11.conn, client_window, client, screen_rect,
                                   wm_follow ? 2 : 0);
 
           configure_subwindows(client);
@@ -796,8 +791,8 @@ void ProcessWM() {
 
   for (auto& [client_window, client] : wm_clients) {
     if (client.wants_configure_notify) {
-      SendConfigureNotify(wm_conn, client_window, wm_screen.root,
-                          client.rect.x(), client.rect.y(), client.rect.width(),
+      SendConfigureNotify(client_window, x11.screen->root, client.rect.x(),
+                          client.rect.y(), client.rect.width(),
                           client.rect.height(), 2);
       client.wants_configure_notify = false;
     }
@@ -807,7 +802,7 @@ void ProcessWM() {
 void ProcessWMEvents(const bool& is_running, uint16_t modifier,
                      std::span<Keybind> keybinds) {
   while (is_running) {
-    xcb_generic_event_t* event = xcb_poll_for_event(wm_conn);
+    xcb_generic_event_t* event = xcb_poll_for_event(x11.conn);
     if (!event) break;
     absl::Cleanup event_freer = [event] { free(event); };
 
@@ -847,7 +842,8 @@ void ProcessWMEvents(const bool& is_running, uint16_t modifier,
       }
       case XCB_MAP_REQUEST: {
         xcb_map_window(
-            wm_conn, reinterpret_cast<xcb_map_request_event_t*>(event)->window);
+            x11.conn,
+            reinterpret_cast<xcb_map_request_event_t*>(event)->window);
         break;
       }
       case XCB_MAP_NOTIFY: {
@@ -860,7 +856,7 @@ void ProcessWMEvents(const bool& is_running, uint16_t modifier,
         break;
       }
       case XCB_MAPPING_NOTIFY: {
-        if (BindKeyboard(wm_conn, wm_screen.root, modifier, keybinds))
+        if (BindKeyboard(x11.conn, x11.screen->root, modifier, keybinds))
           LOG(INFO) << "bind keyboard successful";
         else
           LOG(ERROR) << "could not bind keyboard";
@@ -905,7 +901,7 @@ void UpdateBar() {
 
   if (stack.zoom) {
     if (!wm_bar_hidden) {
-      xcb_unmap_window(wm_conn, wm_bar_window);
+      xcb_unmap_window(x11.conn, wm_bar_window);
       wm_bar_hidden = true;
     }
 
@@ -913,7 +909,7 @@ void UpdateBar() {
   }
 
   if (wm_bar_hidden) {
-    xcb_map_window(wm_conn, wm_bar_window);
+    xcb_map_window(x11.conn, wm_bar_window);
     wm_bar_hidden = false;
   }
 
@@ -928,9 +924,9 @@ void UpdateBar() {
       absl::FormatTime("%H:%M:%S %d.%m.%Y", absl::Now(), absl::LocalTimeZone()),
       active_client_name);
 
-  xcb_clear_area(wm_conn, 0, wm_bar_window, 0, 0, wm_screen.width_in_pixels,
+  xcb_clear_area(x11.conn, 0, wm_bar_window, 0, 0, x11.screen->width_in_pixels,
                  wm_bar_height);
-  xcb_image_text_8(wm_conn, bar_text.size(), wm_bar_window, wm_bar_gc, 8, 16,
+  xcb_image_text_8(x11.conn, bar_text.size(), wm_bar_window, wm_bar_gc, 8, 16,
                    bar_text.data());
 }
 

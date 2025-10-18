@@ -24,7 +24,6 @@
 #include "absl/log/initialize.h"
 #include "absl/log/log.h"
 #include "nyla/math/mat4.h"
-#include "nyla/math/quat.h"
 #include "nyla/math/vec3.h"
 #include "nyla/vulkan/memory.h"
 #include "nyla/vulkan/pipeline.h"
@@ -494,9 +493,9 @@ static int Main() {
                             &command_pool) == VK_SUCCESS);
 
   const std::vector<Vertex> vertices = {
-      {{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-      {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
-      {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+      {{0, -25.f}, {0.0f, 1.0f, 0.0f}},
+      {{-25.f, 25.f}, {1.0f, 0.0f, 0.0f}},
+      {{25.f, 25.f}, {0.0f, 0.0f, 1.0f}},
   };
 
   VkBuffer vertex_buffer;
@@ -553,9 +552,7 @@ static int Main() {
         }
       }
     }
-    if (!running) {
-      break;
-    }
+    if (!running) break;
 
     const VkFence frame_fence = frame_fences[iframe];
 
@@ -606,34 +603,16 @@ static int Main() {
     UniformBufferObject ubo{};
 
     {
-#if 1
-      // ubo.model = TranslationMatrix(Vec3{w - 1.f, 0, 0});
+      static float x = .0f;
+      x += 1.f;
 
-      static int tick = 0;
-      tick++;
-
-      ubo.model = ToRotationMatrix(
-          Slerp(MakeQuat(Vec3{0.f, 0.f, 1.f}, 0),
-                MakeQuat(Vec3{0.f, 0.f, 1.f}, std::numbers::pi * 1.5),
-                (tick % 1000) / 1000.f));
-
+      ubo.model = Translate(Vec3{0, 0, 0});
       ubo.view = Identity4;
-      ubo.proj = Identity4;
-#else
-      ubo.model = RotationMatrix(Quat{w - 1.f, 0, 1, 0});
-      ubo.view = LookAt(Vec3{2.f, 2.f, 2.f}, Vec3{}, Vec3{0.f, 0.f, 1.f});
-      ubo.proj = Perspective(
-          .78f, vk.surface_extent.width / (float)vk.surface_extent.height, .1f,
-          10.f);
 
-      LOG(INFO) << ubo.model;
-      LOG(INFO) << ubo.view;
-      LOG(INFO) << ubo.proj;
-
-      ubo.model = Identity4;
-      ubo.view = Identity4;
-      ubo.proj = Identity4;
-#endif
+      ubo.proj =
+          Ortho(vk.surface_extent.width / -2.f, vk.surface_extent.width / 2.f,
+                vk.surface_extent.height / 2.f, vk.surface_extent.height / -2.f,
+                0.f, 1.f);
 
       memcpy(uniform_buffers_mapped[image_index], &ubo, sizeof(ubo));
     }

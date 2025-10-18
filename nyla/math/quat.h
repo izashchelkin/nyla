@@ -50,25 +50,25 @@ inline Quat MakeQuat(const Vec3& axis, float radians) {
 
 inline Mat4 ToRotationMatrix(const Quat& q) {
   return {
-      MatCol4{
+      Mat4Col{
           1 - 2 * (q.j * q.j + q.k * q.k),
           2 * (q.i * q.j - q.k * q.w),
           2 * (q.i * q.k + q.j * q.w),
           0,
       },
-      MatCol4{
+      Mat4Col{
           2 * (q.i * q.j + q.k * q.w),
           1 - 2 * (q.i * q.i + q.k * q.k),
           2 * (q.j * q.k - q.i * q.w),
           0,
       },
-      MatCol4{
+      Mat4Col{
           2 * (q.i * q.k - q.j * q.w),
           2 * (q.j * q.k + q.i * q.w),
           1 - 2 * (q.i * q.i + q.j * q.j),
           0,
       },
-      MatCol4{0, 0, 0, 1},
+      Mat4Col{0, 0, 0, 1},
   };
 }
 

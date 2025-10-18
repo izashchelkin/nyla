@@ -1,4 +1,4 @@
-#include "nyla/protocols/wm_hints.h"
+#include "nyla/x11/wm_hints.h"
 
 namespace nyla {
 

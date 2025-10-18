@@ -3,9 +3,16 @@ load("@rules_cc//cc:cc_library.bzl", "cc_library")
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
-    name = "protocols",
+    name = "x11",
     srcs = glob(["*.cc"]),
     hdrs = glob(["*.h"]),
+    linkopts = [
+        "-lxcb",
+        "-lxcb-util",
+        "-lxcb-xkb",
+        "-lxkbcommon",
+        "-lxkbcommon-x11",
+    ],
     deps = [
         "@abseil-cpp//absl/log",
         "@abseil-cpp//absl/strings",

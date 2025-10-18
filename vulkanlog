@@ -1,0 +1,15 @@
+E1017 23:29:27.014678    6794 vulkan.cc:125] 
+Searching for ICD drivers named libGLX_nvidia.so.0
+
+E1017 23:29:27.037461    6794 vulkan.cc:125] 
+Loading layer library libVkLayer_khronos_validation.so
+
+E1017 23:29:27.087544    6794 vulkan.cc:125] 
+Copying old device 0 into new device 0
+
+E1017 23:29:27.089010    6794 vulkan.cc:125] 
+Copying old device 0 into new device 0
+
+E1017 23:29:27.089025    6794 vulkan.cc:125] 
+Copying old device 0 into new device 0
+

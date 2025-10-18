@@ -1,17 +1,12 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 
-#include "nyla/protocols/atoms.h"
 #include "nyla/wm/keyboard.h"
-#include "xcb/xcb.h"
 #include "xcb/xproto.h"
 
 namespace nyla {
-
-extern xcb_connection_t* wm_conn;
-extern xcb_screen_t wm_screen;
-extern X11Atoms atoms;
 
 extern bool wm_bar_dirty;
 
