@@ -5,6 +5,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <variant>
 
 #include "absl/cleanup/cleanup.h"
 #include "absl/log/check.h"
@@ -14,7 +15,6 @@
 #include "nyla/commons/spawn.h"
 #include "nyla/commons/timer.h"
 #include "nyla/fs/nylafs.h"
-#include "nyla/wm/keyboard.h"
 #include "nyla/wm/window_manager.h"
 #include "nyla/x11/send.h"
 #include "nyla/x11/wm_protocols.h"
@@ -48,36 +48,50 @@ int Main(int argc, char** argv) {
     LOG(QFATAL) << "another wm is already running";
   }
 
-  if (!InitKeyboard(x11.conn)) LOG(QFATAL) << "could not init keyboard";
-  LOG(INFO) << "init keyboard successful";
-
   InitializeWM();
 
   uint16_t modifier = XCB_MOD_MASK_4;
-  std::vector<Keybind> keybinds;
+  std::vector<
+      std::pair<xcb_keycode_t,
+                std::variant<void (*)(xcb_timestamp_t timestamp), void (*)()>>>
+      keybinds;
 
-  keybinds.emplace_back("AD02", [](xcb_timestamp_t time) { NextLayout(); });
-  keybinds.emplace_back("AD03",
-                        [](xcb_timestamp_t time) { MoveStackPrev(time); });
-  keybinds.emplace_back("AD04",
-                        [](xcb_timestamp_t time) { MoveStackNext(time); });
-  keybinds.emplace_back(
-      "AD05", [](xcb_timestamp_t time) { Spawn({{"ghostty", nullptr}}); });
+  {
+    KeyResolver key_resolver;
+    InitializeKeyResolver(key_resolver);
 
-  keybinds.emplace_back(
-      "AC02", [](xcb_timestamp_t time) { Spawn({{"dmenu_run", nullptr}}); });
-  keybinds.emplace_back("AC03",
-                        [](xcb_timestamp_t time) { MoveLocalPrev(time); });
-  keybinds.emplace_back("AC04",
-                        [](xcb_timestamp_t time) { MoveLocalNext(time); });
-  keybinds.emplace_back("AC05", [](xcb_timestamp_t time) { ToggleZoom(); });
+    // W
+    keybinds.emplace_back(ResolveKeyCode(key_resolver, "AD02"), NextLayout);
+    // E
+    keybinds.emplace_back(ResolveKeyCode(key_resolver, "AD03"), MoveStackPrev);
+    // R
+    keybinds.emplace_back(ResolveKeyCode(key_resolver, "AD04"), MoveStackNext);
+    // D
+    keybinds.emplace_back(ResolveKeyCode(key_resolver, "AC03"), MoveLocalPrev);
+    // F
+    keybinds.emplace_back(ResolveKeyCode(key_resolver, "AC04"), MoveLocalNext);
+    // G
+    keybinds.emplace_back(ResolveKeyCode(key_resolver, "AC05"), ToggleZoom);
+    // X
+    keybinds.emplace_back(ResolveKeyCode(key_resolver, "AB02"), CloseActive);
+    // V
+    keybinds.emplace_back(ResolveKeyCode(key_resolver, "AB04"), ToggleFollow);
+    // T
+    keybinds.emplace_back(
+        ResolveKeyCode(key_resolver, "AD05"),
+        [](xcb_timestamp_t time) { Spawn({{"ghostty", nullptr}}); });
+    // S
+    keybinds.emplace_back(
+        ResolveKeyCode(key_resolver, "AC02"),
+        [](xcb_timestamp_t time) { Spawn({{"dmenu_run", nullptr}}); });
 
-  keybinds.emplace_back("AB02", [](xcb_timestamp_t time) { CloseActive(); });
-  keybinds.emplace_back("AB04", [](xcb_timestamp_t) { ToggleFollow(); });
+    FreeKeyResolver(key_resolver);
 
-  if (!BindKeyboard(x11.conn, x11.screen->root, modifier, keybinds))
-    LOG(QFATAL) << "could not bind keyboard";
-  LOG(INFO) << "bind keyboard successful";
+    for (const auto& [keycode, _] : keybinds) {
+      xcb_grab_key(x11.conn, false, x11.screen->root, XCB_MOD_MASK_4, keycode,
+                   XCB_GRAB_MODE_ASYNC, XCB_GRAB_MODE_ASYNC);
+    }
+  }
 
   using namespace std::chrono_literals;
   int tfd = MakeTimerFd(501ms);

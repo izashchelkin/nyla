@@ -3,6 +3,8 @@
 #include <string_view>
 
 #include "xcb/xcb.h"
+#include "xcb/xproto.h"
+#include "xkbcommon/xkbcommon.h"
 
 namespace nyla {
 
@@ -25,5 +27,17 @@ void InitializeX11();
 
 xcb_atom_t InternAtom(xcb_connection_t* conn, std::string_view name,
                       bool only_if_exists = false);
+
+//
+
+struct KeyResolver {
+  xkb_context* ctx;
+  xkb_keymap* keymap;
+};
+
+bool InitializeKeyResolver(KeyResolver& resolver);
+void FreeKeyResolver(KeyResolver& resolver);
+xcb_keycode_t ResolveKeyCode(const KeyResolver& resolver,
+                             std::string_view keyname);
 
 }  // namespace nyla

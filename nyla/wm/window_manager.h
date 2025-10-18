@@ -2,8 +2,9 @@
 
 #include <cstdint>
 #include <string>
+#include <variant>
+#include <vector>
 
-#include "nyla/wm/keyboard.h"
 #include "xcb/xproto.h"
 
 namespace nyla {
@@ -13,8 +14,13 @@ extern bool wm_bar_dirty;
 //
 
 void InitializeWM();
-void ProcessWMEvents(const bool& is_running, uint16_t modifier,
-                     std::span<Keybind> keybinds);
+void ProcessWMEvents(
+    const bool& is_running, uint16_t modifier,
+    std::vector<std::pair<
+        xcb_keycode_t,
+        std::variant<void (*)(xcb_timestamp_t timestamp), void (*)()>>>
+        keybinds);
+
 void ProcessWM();
 void UpdateBar();
 

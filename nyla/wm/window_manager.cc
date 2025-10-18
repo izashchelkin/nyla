@@ -7,6 +7,7 @@
 #include <iterator>
 #include <limits>
 #include <span>
+#include <variant>
 #include <vector>
 
 #include "absl/cleanup/cleanup.h"
@@ -16,7 +17,6 @@
 #include "absl/strings/str_join.h"
 #include "nyla/commons/rect.h"
 #include "nyla/layout/layout.h"
-#include "nyla/wm/keyboard.h"
 #include "nyla/wm/palette.h"
 #include "nyla/x11/error.h"
 #include "nyla/x11/send.h"
@@ -799,8 +799,12 @@ void ProcessWM() {
   }
 }
 
-void ProcessWMEvents(const bool& is_running, uint16_t modifier,
-                     std::span<Keybind> keybinds) {
+void ProcessWMEvents(
+    const bool& is_running, uint16_t modifier,
+    std::vector<std::pair<
+        xcb_keycode_t,
+        std::variant<void (*)(xcb_timestamp_t timestamp), void (*)()>>>
+        keybinds) {
   while (is_running) {
     xcb_generic_event_t* event = xcb_poll_for_event(x11.conn);
     if (!event) break;
@@ -816,8 +820,21 @@ void ProcessWMEvents(const bool& is_running, uint16_t modifier,
     switch (event_type) {
       case XCB_KEY_PRESS: {
         auto keypress = reinterpret_cast<xcb_key_press_event_t*>(event);
-        if (keypress->state == modifier)
-          HandleKeyPress(keypress->detail, keybinds, keypress->time);
+        if (keypress->state == modifier) {
+          for (const auto& [keycode, fn] : keybinds) {
+            if (keycode == keypress->detail) {
+              if (std::holds_alternative<void (*)()>(fn)) {
+                std::get<void (*)()>(fn)();
+              } else if (std::holds_alternative<void (*)(xcb_timestamp_t time)>(
+                             fn)) {
+                std::get<void (*)(xcb_timestamp_t time)>(fn)(keypress->time);
+              } else {
+                CHECK(false);
+              }
+              break;
+            }
+          }
+        }
         break;
       }
       case XCB_PROPERTY_NOTIFY: {
@@ -856,11 +873,9 @@ void ProcessWMEvents(const bool& is_running, uint16_t modifier,
         break;
       }
       case XCB_MAPPING_NOTIFY: {
-        if (BindKeyboard(x11.conn, x11.screen->root, modifier, keybinds))
-          LOG(INFO) << "bind keyboard successful";
-        else
-          LOG(ERROR) << "could not bind keyboard";
-
+        // auto mappingnotify =
+        //     reinterpret_cast<xcb_mapping_notify_event_t*>(event);
+        LOG(INFO) << "mapping notify";
         break;
       }
       case XCB_UNMAP_NOTIFY: {
