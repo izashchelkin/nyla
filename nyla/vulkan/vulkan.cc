@@ -19,6 +19,7 @@
 #include <vector>
 
 #include "absl/cleanup/cleanup.h"
+#include "absl/container/flat_hash_set.h"
 #include "absl/log/check.h"
 #include "absl/log/globals.h"
 #include "absl/log/initialize.h"
@@ -84,19 +85,29 @@ static int Main() {
             x11.conn, XCB_COPY_FROM_PARENT, window, x11.screen->root, 0, 0,
             x11.screen->width_in_pixels, x11.screen->height_in_pixels, 0,
             XCB_WINDOW_CLASS_INPUT_OUTPUT, x11.screen->root_visual,
-            XCB_CW_OVERRIDE_REDIRECT, (uint32_t[]){false})));
+            XCB_CW_OVERRIDE_REDIRECT | XCB_CW_EVENT_MASK,
+            (uint32_t[]){false, XCB_EVENT_MASK_KEY_PRESS |
+                                    XCB_EVENT_MASK_KEY_RELEASE})));
 
     xcb_map_window(x11.conn, window);
     xcb_flush(x11.conn);
   }
 
-  xcb_keycode_t q_keycode;
+  xcb_keycode_t up_keycode;
+  xcb_keycode_t left_keycode;
+  xcb_keycode_t down_keycode;
+  xcb_keycode_t right_keycode;
+
+  absl::flat_hash_set<xcb_keycode_t> pressed_keys;
 
   {
     KeyResolver key_resolver;
     InitializeKeyResolver(key_resolver);
 
-    q_keycode = ResolveKeyCode(key_resolver, "AD01");
+    up_keycode = ResolveKeyCode(key_resolver, "AD03");
+    left_keycode = ResolveKeyCode(key_resolver, "AC02");
+    down_keycode = ResolveKeyCode(key_resolver, "AC03");
+    right_keycode = ResolveKeyCode(key_resolver, "AC04");
 
     FreeKeyResolver(key_resolver);
   }
@@ -555,9 +566,22 @@ static int Main() {
       const uint8_t event_type = event->response_type & 0x7F;
 
       switch (event_type) {
+        case XCB_KEY_PRESS: {
+          auto keypress = reinterpret_cast<xcb_key_press_event_t*>(event);
+          pressed_keys.emplace(keypress->detail);
+          break;
+        }
+
+        case XCB_KEY_RELEASE: {
+          auto keyrelease = reinterpret_cast<xcb_key_release_event_t*>(event);
+          pressed_keys.erase(keyrelease->detail);
+          break;
+        }
+
         case XCB_CLIENT_MESSAGE: {
           auto clientmessage =
               reinterpret_cast<xcb_client_message_event_t*>(event);
+					LOG(INFO) << "here";
 
           if (clientmessage->format == 32 &&
               clientmessage->type == x11.atoms.wm_protocols &&
@@ -619,10 +643,21 @@ static int Main() {
     UniformBufferObject ubo{};
 
     {
-      static float x = .0f;
-      x += 1.f;
+      static Vec3 trans = Vec3{0, 0, 0};
 
-      ubo.model = Translate(Vec3{0, 0, 0});
+      if (pressed_keys.contains(up_keycode)) {
+        trans.y += 1.f;
+      } else if (pressed_keys.contains(down_keycode)) {
+        trans.y -= 1.f;
+      }
+
+      if (pressed_keys.contains(right_keycode)) {
+        trans.x += 1.f;
+      } else if (pressed_keys.contains(left_keycode)) {
+        trans.x -= 1.f;
+      }
+
+      ubo.model = Translate(trans);
       ubo.view = Identity4;
 
       ubo.proj =

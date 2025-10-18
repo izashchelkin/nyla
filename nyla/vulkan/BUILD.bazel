@@ -13,6 +13,7 @@ cc_binary(
         "@abseil-cpp//absl/log",
         "@abseil-cpp//absl/log:check",
         "@abseil-cpp//absl/log:initialize",
+        "@abseil-cpp//absl/container:flat_hash_set",
         # "@rules_cc//cc/runfiles",
     ],
 )

@@ -95,20 +95,14 @@ static WindowStack& GetActiveStack() {
 
 static void Handle_WM_Hints(xcb_window_t client_window, Client& client,
                             xcb_get_property_reply_t* reply) {
-  if (!reply) return;
+  WM_Hints wm_hints = [&reply] {
+    if (!reply || xcb_get_property_value_length(reply) != sizeof(WM_Hints))
+      return WM_Hints{};
 
-  uint32_t length = xcb_get_property_value_length(reply);
-  if (!length) return;
+    return *static_cast<WM_Hints*>(xcb_get_property_value(reply));
+  }();
 
-  if (length != sizeof(WM_Hints)) {
-    LOG(ERROR) << "invalid property size " << length
-               << " expected: " << sizeof(WM_Hints);
-    return;
-  }
-
-  auto wm_hints = *static_cast<WM_Hints*>(xcb_get_property_value(reply));
   Initialize(wm_hints);
-  // LOG(INFO) << wm_hints;
 
   client.wm_hints_input = wm_hints.input;
 
@@ -118,19 +112,14 @@ static void Handle_WM_Hints(xcb_window_t client_window, Client& client,
 
 static void Handle_WM_Normal_Hints(xcb_window_t client_window, Client& client,
                                    xcb_get_property_reply_t* reply) {
-  if (!reply) return;
+  WM_Normal_Hints wm_normal_hints = [&reply] {
+    if (!reply ||
+        xcb_get_property_value_length(reply) != sizeof(WM_Normal_Hints))
+      return WM_Normal_Hints{};
 
-  uint32_t length = xcb_get_property_value_length(reply);
-  if (!length) return;
+    return *static_cast<WM_Normal_Hints*>(xcb_get_property_value(reply));
+  }();
 
-  if (length != sizeof(WM_Normal_Hints)) {
-    LOG(ERROR) << "invalid property size " << length
-               << " expected: " << sizeof(WM_Normal_Hints);
-    return;
-  }
-
-  auto wm_normal_hints =
-      *static_cast<WM_Normal_Hints*>(xcb_get_property_value(reply));
   Initialize(wm_normal_hints);
   // LOG(INFO) << client_window << " " << wm_normal_hints;
 
@@ -638,6 +627,7 @@ void ProcessWM() {
     for (auto& [property, cookie] : client.property_cookies) {
       xcb_get_property_reply_t* reply =
           xcb_get_property_reply(x11.conn, cookie, nullptr);
+      if (!reply) continue;
 
       auto handler_it = wm_property_change_handlers.find(property);
       if (handler_it == wm_property_change_handlers.end()) {
