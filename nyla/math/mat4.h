@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <cmath>
 #include <cstddef>
 
 #include "nyla/math/vec3.h"
@@ -32,6 +33,13 @@ inline Mat4 Mult(const Mat4& lhs, const Mat4& rhs) {
 inline Mat4 Translate(const Vec3& v) {
   Mat4 ret = Identity4;
   ret[3] = {v.x, v.y, v.z, 1.f};
+  return ret;
+}
+
+inline Mat4 Rotate2D(float radians) {
+  Mat4 ret = Identity4;
+  ret[0] = {std::cos(radians), std::sin(radians), 0, 0};
+  ret[1] = {-std::sin(radians), std::cos(radians), 0, 0};
   return ret;
 }
 

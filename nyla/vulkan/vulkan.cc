@@ -513,9 +513,9 @@ static int Main() {
                             &command_pool) == VK_SUCCESS);
 
   const std::vector<Vertex> vertices = {
-      {{0, -25.f}, {0.0f, 1.0f, 0.0f}},
       {{-25.f, 25.f}, {1.0f, 0.0f, 0.0f}},
-      {{25.f, 25.f}, {0.0f, 0.0f, 1.0f}},
+      {{25.f, 0.f}, {0.0f, 1.0f, 0.0f}},
+      {{-25.f, -25.f}, {0.0f, 0.0f, 1.0f}},
   };
 
   VkBuffer vertex_buffer;
@@ -581,7 +581,6 @@ static int Main() {
         case XCB_CLIENT_MESSAGE: {
           auto clientmessage =
               reinterpret_cast<xcb_client_message_event_t*>(event);
-					LOG(INFO) << "here";
 
           if (clientmessage->format == 32 &&
               clientmessage->type == x11.atoms.wm_protocols &&
@@ -643,21 +642,40 @@ static int Main() {
     UniformBufferObject ubo{};
 
     {
-      static Vec3 trans = Vec3{0, 0, 0};
+      struct ShipState {
+        Vec3 pos;
+        float dir_radians;
+        float acceleration;
+      };
+      static ShipState ship_state;
 
-      if (pressed_keys.contains(up_keycode)) {
-        trans.y += 1.f;
-      } else if (pressed_keys.contains(down_keycode)) {
-        trans.y -= 1.f;
-      }
+      const float target_dir = [&] {
+        constexpr float kPi = std::numbers::pi_v<float>;
 
-      if (pressed_keys.contains(right_keycode)) {
-        trans.x += 1.f;
-      } else if (pressed_keys.contains(left_keycode)) {
-        trans.x -= 1.f;
-      }
+        if (pressed_keys.contains(up_keycode)) {
+          if (pressed_keys.contains(right_keycode)) return kPi / 4.f;
+          if (pressed_keys.contains(left_keycode)) return 3.f * kPi / 4.f;
 
-      ubo.model = Translate(trans);
+          return kPi / 2.f;
+        }
+
+        if (pressed_keys.contains(down_keycode)) {
+          if (pressed_keys.contains(right_keycode)) return kPi * 1.75f;
+          if (pressed_keys.contains(left_keycode)) return kPi * 1.25f;
+
+          return kPi * 1.5f;
+        }
+
+        if (pressed_keys.contains(right_keycode)) return 0.f;
+        if (pressed_keys.contains(left_keycode)) return kPi;
+
+        return ship_state.dir_radians;
+      }();
+
+			ship_state.dir_radians = target_dir;
+
+      ubo.model =
+          Mult(Translate(ship_state.pos), Rotate2D(ship_state.dir_radians));
       ubo.view = Identity4;
 
       ubo.proj =
