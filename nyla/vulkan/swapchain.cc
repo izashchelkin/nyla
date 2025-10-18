@@ -1,13 +1,11 @@
 #include "nyla/vulkan/swapchain.h"
 
-#include "absl/log/log.h"
 #include "nyla/vulkan/vulkan.h"
 
 namespace nyla {
 
 void CreateSwapchain() {
   VkSwapchainKHR old_swapchain = vk.swapchain;
-  std::vector<VkImage> old_images = vk.swapchain_images;
   std::vector<VkImageView> old_image_views = vk.swapchain_image_views;
 
   {

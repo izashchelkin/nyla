@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -14,6 +15,7 @@
 #include <initializer_list>
 #include <iostream>
 #include <limits>
+#include <numbers>
 #include <vector>
 
 #include "absl/cleanup/cleanup.h"
@@ -21,7 +23,9 @@
 #include "absl/log/globals.h"
 #include "absl/log/initialize.h"
 #include "absl/log/log.h"
-#include "nyla/vulkan/math.h"
+#include "nyla/math/mat4.h"
+#include "nyla/math/quat.h"
+#include "nyla/math/vec3.h"
 #include "nyla/vulkan/memory.h"
 #include "nyla/vulkan/pipeline.h"
 #include "nyla/vulkan/swapchain.h"
@@ -36,7 +40,10 @@ namespace nyla {
 static constexpr uint8_t kInFlightFrames = 2;
 
 struct Vertex {
-  Vec2 pos;
+  struct {
+    float x;
+    float y;
+  } pos;
   Vec3 color;
 };
 
@@ -600,11 +607,16 @@ static int Main() {
 
     {
 #if 1
-      static float w = 0.f;
-      w += .01f;
-      if (w >= 2.f) w = 0.f;
+      // ubo.model = TranslationMatrix(Vec3{w - 1.f, 0, 0});
 
-      ubo.model = TranslationMatrix(Vec3{w - 1.f, 0, 0});
+      static int tick = 0;
+      tick++;
+
+      ubo.model = ToRotationMatrix(
+          Slerp(MakeQuat(Vec3{0.f, 0.f, 1.f}, 0),
+                MakeQuat(Vec3{0.f, 0.f, 1.f}, std::numbers::pi * 1.5),
+                (tick % 1000) / 1000.f));
+
       ubo.view = Identity4;
       ubo.proj = Identity4;
 #else
