@@ -32,6 +32,7 @@
 #include "nyla/x11/x11.h"
 #include "vulkan/vulkan.h"
 #include "xcb/xcb.h"
+#include "xcb/xproto.h"
 
 namespace nyla {
 
@@ -87,6 +88,17 @@ static int Main() {
 
     xcb_map_window(x11.conn, window);
     xcb_flush(x11.conn);
+  }
+
+  xcb_keycode_t q_keycode;
+
+  {
+    KeyResolver key_resolver;
+    InitializeKeyResolver(key_resolver);
+
+    q_keycode = ResolveKeyCode(key_resolver, "AD01");
+
+    FreeKeyResolver(key_resolver);
   }
 
   //
@@ -544,7 +556,14 @@ static int Main() {
 
       switch (event_type) {
         case XCB_CLIENT_MESSAGE: {
-          running = false;
+          auto clientmessage =
+              reinterpret_cast<xcb_client_message_event_t*>(event);
+
+          if (clientmessage->format == 32 &&
+              clientmessage->type == x11.atoms.wm_protocols &&
+              clientmessage->data.data32[0] == x11.atoms.wm_delete_window) {
+            running = false;
+          }
           break;
         }
       }
