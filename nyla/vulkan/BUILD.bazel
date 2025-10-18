@@ -6,16 +6,10 @@ cc_binary(
         "*.cc",
         "*.h",
     ]),
-    linkopts = [
-        "-lxcb",
-        "-lxcb-util",
-        "-lxcb-xkb",
-        "-lxkbcommon",
-        "-lxkbcommon-x11",
-    ],
     deps = [
         "//third_party/vulkansdk",
         "//nyla/math",
+        "//nyla/x11",
         "@abseil-cpp//absl/log",
         "@abseil-cpp//absl/log:check",
         "@abseil-cpp//absl/log:initialize",

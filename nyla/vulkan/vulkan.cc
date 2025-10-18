@@ -29,10 +29,9 @@
 #include "nyla/vulkan/pipeline.h"
 #include "nyla/vulkan/swapchain.h"
 #include "nyla/vulkan/sync.h"
+#include "nyla/x11/x11.h"
 #include "vulkan/vulkan.h"
 #include "xcb/xcb.h"
-#include "xcb/xcb_aux.h"
-#include "xcb/xproto.h"
 
 namespace nyla {
 
@@ -59,13 +58,12 @@ static std::vector<char> ReadFile(const std::string& filename) {
   return buffer;
 }
 
-xcb_connection_t* conn;
 xcb_window_t window;
 VkState vk;
 
 VkExtent2D PlatformGetWindowSize() {
-  xcb_get_geometry_reply_t* window_geometry =
-      xcb_get_geometry_reply(conn, xcb_get_geometry(conn, window), nullptr);
+  xcb_get_geometry_reply_t* window_geometry = xcb_get_geometry_reply(
+      x11.conn, xcb_get_geometry(x11.conn, window), nullptr);
 
   return {.width = window_geometry->width, .height = window_geometry->height};
 }
@@ -74,22 +72,21 @@ static int Main() {
   absl::InitializeLog();
   absl::SetStderrThreshold(absl::LogSeverityAtLeast::kInfo);
 
-  {
-    int iscreen;
-    conn = xcb_connect(nullptr, &iscreen);
-    xcb_screen_t* screen = xcb_aux_get_screen(conn, iscreen);
+  InitializeX11();
 
-    window = xcb_generate_id(conn);
+  {
+    window = xcb_generate_id(x11.conn);
 
     CHECK(!xcb_request_check(
-        conn, xcb_create_window_checked(
-                  conn, XCB_COPY_FROM_PARENT, window, screen->root, 0, 0,
-                  screen->width_in_pixels, screen->height_in_pixels, 0,
-                  XCB_WINDOW_CLASS_INPUT_OUTPUT, screen->root_visual,
-                  XCB_CW_OVERRIDE_REDIRECT, (uint32_t[]){false})));
+        x11.conn,
+        xcb_create_window_checked(
+            x11.conn, XCB_COPY_FROM_PARENT, window, x11.screen->root, 0, 0,
+            x11.screen->width_in_pixels, x11.screen->height_in_pixels, 0,
+            XCB_WINDOW_CLASS_INPUT_OUTPUT, x11.screen->root_visual,
+            XCB_CW_OVERRIDE_REDIRECT, (uint32_t[]){false})));
 
-    xcb_map_window(conn, window);
-    xcb_flush(conn);
+    xcb_map_window(x11.conn, window);
+    xcb_flush(x11.conn);
   }
 
   //
@@ -226,7 +223,7 @@ static int Main() {
 
   const VkXcbSurfaceCreateInfoKHR surface_create_info{
       .sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR,
-      .connection = conn,
+      .connection = x11.conn,
       .window = window,
   };
   VK_CHECK(vkCreateXcbSurfaceKHR(vk.instance, &surface_create_info, nullptr,
@@ -534,12 +531,12 @@ static int Main() {
   for (uint8_t iframe = 0; iframe < kInFlightFrames;
        iframe = ((iframe + 1) % kInFlightFrames)) {
     for (;;) {
-      if (xcb_connection_has_error(conn)) {
+      if (xcb_connection_has_error(x11.conn)) {
         running = false;
         break;
       }
 
-      xcb_generic_event_t* event = xcb_poll_for_event(conn);
+      xcb_generic_event_t* event = xcb_poll_for_event(x11.conn);
       if (!event) break;
 
       absl::Cleanup event_freer = [=]() { free(event); };
