@@ -1,6 +1,5 @@
 #include <sys/poll.h>
 #include <sys/time.h>
-#include <sys/timerfd.h>
 #include <unistd.h>
 
 #include <chrono>
@@ -13,7 +12,7 @@
 #include "absl/log/initialize.h"
 #include "absl/log/log.h"
 #include "nyla/commons/spawn.h"
-#include "nyla/commons/timer.h"
+#include "nyla/commons/timerfd.h"
 #include "nyla/fs/nylafs.h"
 #include "nyla/wm/window_manager.h"
 #include "nyla/x11/send.h"

@@ -24,8 +24,10 @@
 #include "absl/log/globals.h"
 #include "absl/log/initialize.h"
 #include "absl/log/log.h"
-#include "nyla/math/mat4.h"
-#include "nyla/math/vec3.h"
+#include "nyla/commons/clock.h"
+#include "nyla/commons/math/lerp.h"
+#include "nyla/commons/math/mat4.h"
+#include "nyla/commons/math/vec3.h"
 #include "nyla/vulkan/memory.h"
 #include "nyla/vulkan/pipeline.h"
 #include "nyla/vulkan/swapchain.h"
@@ -513,9 +515,9 @@ static int Main() {
                             &command_pool) == VK_SUCCESS);
 
   const std::vector<Vertex> vertices = {
-      {{-25.f, 25.f}, {1.0f, 0.0f, 0.0f}},
+      {{-25.f, 18.f}, {1.0f, 0.0f, 0.0f}},
       {{25.f, 0.f}, {0.0f, 1.0f, 0.0f}},
-      {{-25.f, -25.f}, {0.0f, 0.0f, 1.0f}},
+      {{-25.f, -18.f}, {0.0f, 0.0f, 1.0f}},
   };
 
   VkBuffer vertex_buffer;
@@ -593,6 +595,14 @@ static int Main() {
     }
     if (!running) break;
 
+    const float dts = [] {
+      static uint64_t ts = GetMonotonicTimeMillis();
+      uint64_t now = GetMonotonicTimeMillis();
+      uint64_t dts = now - ts;
+      ts = now;
+      return dts / 1000.f;
+    }();
+
     const VkFence frame_fence = frame_fences[iframe];
 
     vkWaitForFences(vk.device, 1, &frame_fence, VK_TRUE,
@@ -645,13 +655,12 @@ static int Main() {
       struct ShipState {
         Vec3 pos;
         float dir_radians;
-        float acceleration;
       };
       static ShipState ship_state;
 
-      const float target_dir = [&] {
-        constexpr float kPi = std::numbers::pi_v<float>;
+      constexpr float kPi = std::numbers::pi_v<float>;
 
+      float target_dir = [&] {
         if (pressed_keys.contains(up_keycode)) {
           if (pressed_keys.contains(right_keycode)) return kPi / 4.f;
           if (pressed_keys.contains(left_keycode)) return 3.f * kPi / 4.f;
@@ -672,7 +681,14 @@ static int Main() {
         return ship_state.dir_radians;
       }();
 
-			ship_state.dir_radians = target_dir;
+      if (std::abs(ship_state.dir_radians - (target_dir - 2 * kPi)) <
+          std::abs(ship_state.dir_radians - target_dir)) {
+        target_dir -= 2 * kPi;
+      }
+
+      float max_speed = 6.0f;
+      ship_state.dir_radians =
+          RotateTowards(ship_state.dir_radians, target_dir, max_speed, dts*20);
 
       ubo.model =
           Mult(Translate(ship_state.pos), Rotate2D(ship_state.dir_radians));

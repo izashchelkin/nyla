@@ -8,7 +8,7 @@ cc_binary(
     ]),
     deps = [
         "//third_party/vulkansdk",
-        "//nyla/math",
+        "//nyla/commons",
         "//nyla/x11",
         "@abseil-cpp//absl/log",
         "@abseil-cpp//absl/log:check",

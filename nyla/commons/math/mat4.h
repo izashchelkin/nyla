@@ -4,7 +4,7 @@
 #include <cmath>
 #include <cstddef>
 
-#include "nyla/math/vec3.h"
+#include "nyla/commons/math/vec3.h"
 
 namespace nyla {
 
