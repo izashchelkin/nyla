@@ -99,6 +99,7 @@ static int Main() {
   xcb_keycode_t left_keycode;
   xcb_keycode_t down_keycode;
   xcb_keycode_t right_keycode;
+  xcb_keycode_t acceleration_keycode;
 
   absl::flat_hash_set<xcb_keycode_t> pressed_keys;
 
@@ -110,6 +111,7 @@ static int Main() {
     left_keycode = ResolveKeyCode(key_resolver, "AC02");
     down_keycode = ResolveKeyCode(key_resolver, "AC03");
     right_keycode = ResolveKeyCode(key_resolver, "AC04");
+    acceleration_keycode = ResolveKeyCode(key_resolver, "SPCE");
 
     FreeKeyResolver(key_resolver);
   }
@@ -603,6 +605,8 @@ static int Main() {
       return dts / 1000.f;
     }();
 
+    if (dts > .05f) LOG(INFO) << "dts spike: " << dts << "s";
+
     const VkFence frame_fence = frame_fences[iframe];
 
     vkWaitForFences(vk.device, 1, &frame_fence, VK_TRUE,
@@ -616,7 +620,7 @@ static int Main() {
         acquire_semaphore, VK_NULL_HANDLE, &image_index);
 
     if (acquire_result == VK_ERROR_OUT_OF_DATE_KHR ||
-        acquire_result == VK_ERROR_OUT_OF_DATE_KHR) {
+        acquire_result == VK_SUBOPTIMAL_KHR) {
       CreateSwapchain();
       continue;
     }
@@ -649,8 +653,6 @@ static int Main() {
         .pColorAttachments = &color_attachment_info,
     };
 
-    UniformBufferObject ubo{};
-
     {
       struct ShipState {
         Vec3 pos;
@@ -658,46 +660,38 @@ static int Main() {
       };
       static ShipState ship_state;
 
-      constexpr float kPi = std::numbers::pi_v<float>;
+      {
+        const int dx = (pressed_keys.contains(right_keycode) ? 1 : 0) -
+                       (pressed_keys.contains(left_keycode) ? 1 : 0);
+        const int dy = (pressed_keys.contains(down_keycode) ? 1 : 0) -
+                       (pressed_keys.contains(up_keycode) ? 1 : 0);
 
-      float target_dir = [&] {
-        if (pressed_keys.contains(up_keycode)) {
-          if (pressed_keys.contains(right_keycode)) return kPi / 4.f;
-          if (pressed_keys.contains(left_keycode)) return 3.f * kPi / 4.f;
+        if (dx || dy) {
+          float angle =
+              std::atan2(-static_cast<float>(dy), static_cast<float>(dx));
+          if (angle < 0.f) {
+            angle += 2.f * std::numbers::pi_v<float>;
+          }
 
-          return kPi / 2.f;
+          ship_state.dir_radians =
+              LerpAngle(ship_state.dir_radians, angle, dts * 60);
         }
-
-        if (pressed_keys.contains(down_keycode)) {
-          if (pressed_keys.contains(right_keycode)) return kPi * 1.75f;
-          if (pressed_keys.contains(left_keycode)) return kPi * 1.25f;
-
-          return kPi * 1.5f;
-        }
-
-        if (pressed_keys.contains(right_keycode)) return 0.f;
-        if (pressed_keys.contains(left_keycode)) return kPi;
-
-        return ship_state.dir_radians;
-      }();
-
-      if (std::abs(ship_state.dir_radians - (target_dir - 2 * kPi)) <
-          std::abs(ship_state.dir_radians - target_dir)) {
-        target_dir -= 2 * kPi;
       }
 
-      float max_speed = 6.0f;
-      ship_state.dir_radians =
-          RotateTowards(ship_state.dir_radians, target_dir, max_speed, dts*20);
+      if (pressed_keys.contains(acceleration_keycode)) {
+        ship_state.pos.x += 500.f * dts * std::cos(ship_state.dir_radians);
+        ship_state.pos.y += 500.f * dts * std::sin(ship_state.dir_radians);
+      }
 
-      ubo.model =
-          Mult(Translate(ship_state.pos), Rotate2D(ship_state.dir_radians));
-      ubo.view = Identity4;
-
-      ubo.proj =
-          Ortho(vk.surface_extent.width / -2.f, vk.surface_extent.width / 2.f,
-                vk.surface_extent.height / 2.f, vk.surface_extent.height / -2.f,
-                0.f, 1.f);
+      const UniformBufferObject ubo{
+          .model =
+              Mult(Translate(ship_state.pos), Rotate2D(ship_state.dir_radians)),
+          .view = Identity4,
+          .proj = Ortho(vk.surface_extent.width / -2.f,
+                        vk.surface_extent.width / 2.f,
+                        vk.surface_extent.height / 2.f,
+                        vk.surface_extent.height / -2.f, 0.f, 1.f),
+      };
 
       memcpy(uniform_buffers_mapped[image_index], &ubo, sizeof(ubo));
     }
@@ -759,7 +753,7 @@ static int Main() {
     {
       const VkImageMemoryBarrier image_memory_barrier{
           .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-          .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+          .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT,
           .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
           .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
           .image = vk.swapchain_images[image_index],
@@ -810,13 +804,13 @@ static int Main() {
 
     VkResult present_result = vkQueuePresentKHR(queue, &present_info);
     if (present_result == VK_ERROR_OUT_OF_DATE_KHR ||
-        present_result == VK_ERROR_OUT_OF_DATE_KHR) {
+        present_result == VK_SUBOPTIMAL_KHR) {
       CreateSwapchain();
       continue;
     }
+
     VK_CHECK(present_result);
   }
-
   return 0;
 }
 
