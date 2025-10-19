@@ -27,6 +27,7 @@
 #include "nyla/commons/clock.h"
 #include "nyla/commons/math/lerp.h"
 #include "nyla/commons/math/mat4.h"
+#include "nyla/commons/math/vec2.h"
 #include "nyla/commons/math/vec3.h"
 #include "nyla/vulkan/memory.h"
 #include "nyla/vulkan/pipeline.h"
@@ -554,9 +555,22 @@ static int Main() {
     submit_semaphores[i] = CreateSemaphore();
   }
 
+  struct Profiling {
+    uint16_t xevent_polling;
+  };
+  std::array<Profiling, 3> prof_data;
+  uint8_t iprof = 0;
+
   bool running = true;
   for (uint8_t iframe = 0; iframe < kInFlightFrames;
        iframe = ((iframe + 1) % kInFlightFrames)) {
+    Profiling& prof = prof_data[iprof];
+    prof = {};
+    iprof = (iprof + 1) % prof_data.size();
+
+    //
+
+    prof.xevent_polling = GetMonotonicTimeMicros();
     for (;;) {
       if (xcb_connection_has_error(x11.conn)) {
         running = false;
@@ -595,17 +609,26 @@ static int Main() {
         }
       }
     }
+    prof.xevent_polling = GetMonotonicTimeMicros() - prof.xevent_polling;
+
+    //
+
     if (!running) break;
 
     const float dts = [] {
-      static uint64_t ts = GetMonotonicTimeMillis();
-      uint64_t now = GetMonotonicTimeMillis();
-      uint64_t dts = now - ts;
-      ts = now;
+      static uint64_t last = GetMonotonicTimeMillis();
+      const uint64_t now = GetMonotonicTimeMillis();
+      const uint64_t dts = now - last;
+      last = now;
       return dts / 1000.f;
     }();
+    if (dts > .05f) {
+      LOG(INFO) << "dts spike: " << dts << "s";
 
-    if (dts > .05f) LOG(INFO) << "dts spike: " << dts << "s";
+      const Profiling& lastprof =
+          prof_data[(iprof + prof_data.size() - 2) % prof_data.size()];
+      LOG(INFO) << "last frame prof: xevent=" << lastprof.xevent_polling;
+    }
 
     const VkFence frame_fence = frame_fences[iframe];
 
@@ -655,7 +678,7 @@ static int Main() {
 
     {
       struct ShipState {
-        Vec3 pos;
+        Vec2 pos;
         float dir_radians;
       };
       static ShipState ship_state;
@@ -674,18 +697,22 @@ static int Main() {
           }
 
           ship_state.dir_radians =
-              LerpAngle(ship_state.dir_radians, angle, dts * 60);
+              LerpAngle(ship_state.dir_radians, angle, dts * 5);
         }
       }
 
       if (pressed_keys.contains(acceleration_keycode)) {
-        ship_state.pos.x += 500.f * dts * std::cos(ship_state.dir_radians);
-        ship_state.pos.y += 500.f * dts * std::sin(ship_state.dir_radians);
+        const Vec2 vdir = Normalize(Vec2{
+            .x = std::cos(ship_state.dir_radians),
+            .y = std::sin(ship_state.dir_radians),
+        });
+        ship_state.pos += vdir * (1000.f * dts);
       }
 
       const UniformBufferObject ubo{
           .model =
-              Mult(Translate(ship_state.pos), Rotate2D(ship_state.dir_radians)),
+              Mult(Translate(Vec3{ship_state.pos.x, ship_state.pos.y, 0.f}),
+                   Rotate2D(ship_state.dir_radians)),
           .view = Identity4,
           .proj = Ortho(vk.surface_extent.width / -2.f,
                         vk.surface_extent.width / 2.f,
