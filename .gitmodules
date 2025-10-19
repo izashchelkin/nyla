@@ -1,3 +1,0 @@
-[submodule "third_party/libxkbcommon/libxkbcommon"]
-	path = third_party/libxkbcommon/libxkbcommon
-	url = https://github.com/xkbcommon/libxkbcommon
