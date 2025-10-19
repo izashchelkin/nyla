@@ -1,19 +1,21 @@
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 
-cc_binary(
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
     name = "vulkan",
     srcs = glob([
         "*.cc",
+    ]),
+    hdrs = glob([
         "*.h",
     ]),
     deps = [
-        "//third_party/vulkansdk",
         "//nyla/commons",
-        "//nyla/x11",
+        "//third_party/vulkansdk",
+        "@abseil-cpp//absl/container:flat_hash_set",
         "@abseil-cpp//absl/log",
         "@abseil-cpp//absl/log:check",
         "@abseil-cpp//absl/log:initialize",
-        "@abseil-cpp//absl/container:flat_hash_set",
-        # "@rules_cc//cc/runfiles",
     ],
 )

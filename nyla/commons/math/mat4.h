@@ -43,7 +43,7 @@ inline Mat4 Rotate2D(float radians) {
   return ret;
 }
 
-inline Mat4 Ortho(float left, float right, float bottom, float top, float near,
+inline Mat4 Ortho(float left, float right, float top, float bottom, float near,
                   float far) {
   return {Mat4Col{2.f / (right - left), 0.f, 0.f, 0.f},
           Mat4Col{0.f, 2.f / (top - bottom), 0.f, 0.f},

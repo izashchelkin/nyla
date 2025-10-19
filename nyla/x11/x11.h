@@ -8,36 +8,53 @@
 
 namespace nyla {
 
-struct X11State {
+#define Nyla_X11_Atoms(X) \
+  X(compound_text)        \
+  X(wm_delete_window)     \
+  X(wm_protocols)         \
+  X(wm_name)              \
+  X(wm_state)             \
+  X(wm_take_focus)
+
+struct X11_State {
   xcb_connection_t* conn;
   xcb_screen_t* screen;
 
   struct {
-    xcb_atom_t compound_text;
-    xcb_atom_t wm_delete_window;
-    xcb_atom_t wm_name;
-    xcb_atom_t wm_protocols;
-    xcb_atom_t wm_state;
-    xcb_atom_t wm_take_focus;
+#define X(atom) xcb_atom_t atom;
+    Nyla_X11_Atoms(X)
+#undef X
   } atoms;
 };
-extern X11State x11;
+extern X11_State x11;
 
-void InitializeX11();
+void X11_Initialize();
 
-xcb_atom_t InternAtom(xcb_connection_t* conn, std::string_view name,
-                      bool only_if_exists = false);
+xcb_atom_t X11_InternAtom(xcb_connection_t* conn, std::string_view name,
+                          bool only_if_exists = false);
+
+void X11_SendClientMessage32(xcb_window_t window, xcb_atom_t type,
+                             xcb_atom_t arg1, uint32_t arg2, uint32_t arg3,
+                             uint32_t arg4);
+
+void X11_Send_WM_Take_Focus(xcb_window_t window, uint32_t time);
+
+void X11_Send_WM_Delete_Window(xcb_window_t window);
+
+void X11_SendConfigureNotify(xcb_window_t window, xcb_window_t parent,
+                             int16_t x, int16_t y, uint16_t width,
+                             uint16_t height, uint16_t border_width);
 
 //
 
-struct KeyResolver {
+struct X11_KeyResolver {
   xkb_context* ctx;
   xkb_keymap* keymap;
 };
 
-bool InitializeKeyResolver(KeyResolver& resolver);
-void FreeKeyResolver(KeyResolver& resolver);
-xcb_keycode_t ResolveKeyCode(const KeyResolver& resolver,
-                             std::string_view keyname);
+bool X11_InitializeKeyResolver(X11_KeyResolver& resolver);
+void X11_FreeKeyResolver(X11_KeyResolver& resolver);
+xcb_keycode_t X11_ResolveKeyCode(const X11_KeyResolver& resolver,
+                                 std::string_view keyname);
 
 }  // namespace nyla

@@ -19,9 +19,7 @@
 #include "nyla/layout/layout.h"
 #include "nyla/wm/palette.h"
 #include "nyla/x11/error.h"
-#include "nyla/x11/send.h"
 #include "nyla/x11/wm_hints.h"
-#include "nyla/x11/wm_protocols.h"
 #include "nyla/x11/x11.h"
 #include "xcb/xcb.h"
 #include "xcb/xproto.h"
@@ -255,7 +253,7 @@ static void Activate(const WindowStack& stack, xcb_timestamp_t time) {
     xcb_set_input_focus(x11.conn, XCB_INPUT_FOCUS_NONE, immediate_focus, time);
 
     if (client.wm_take_focus) {
-      Send_WM_Take_Focus(stack.active_window, time);
+      X11_Send_WM_Take_Focus(stack.active_window, time);
     }
 
     return;
@@ -594,7 +592,7 @@ void CloseActive() {
 
   static absl::Time last = absl::InfinitePast();
   if (absl::Now() - last >= absl::Milliseconds(100)) {
-    Send_WM_Delete_Window(stack.active_window);
+    X11_Send_WM_Delete_Window(stack.active_window);
   }
   last = absl::Now();
 }
@@ -781,9 +779,9 @@ void ProcessWM() {
 
   for (auto& [client_window, client] : wm_clients) {
     if (client.wants_configure_notify) {
-      SendConfigureNotify(client_window, x11.screen->root, client.rect.x(),
-                          client.rect.y(), client.rect.width(),
-                          client.rect.height(), 2);
+      X11_SendConfigureNotify(client_window, x11.screen->root, client.rect.x(),
+                              client.rect.y(), client.rect.width(),
+                              client.rect.height(), 2);
       client.wants_configure_notify = false;
     }
   }

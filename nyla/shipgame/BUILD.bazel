@@ -1,0 +1,17 @@
+cc_binary(
+    name = "shipgame",
+    srcs = glob([
+        "*.cc",
+        # "*.h",
+    ]),
+    deps = [
+        "//nyla/vulkan",
+        "//nyla/commons",
+        "//nyla/x11",
+        "@abseil-cpp//absl/log",
+        "@abseil-cpp//absl/log:check",
+        "@abseil-cpp//absl/log:initialize",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        # "@rules_cc//cc/runfiles",
+    ],
+)

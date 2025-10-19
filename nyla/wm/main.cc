@@ -15,8 +15,6 @@
 #include "nyla/commons/timerfd.h"
 #include "nyla/fs/nylafs.h"
 #include "nyla/wm/window_manager.h"
-#include "nyla/x11/send.h"
-#include "nyla/x11/wm_protocols.h"
 #include "nyla/x11/x11.h"
 #include "xcb/xcb.h"
 #include "xcb/xproto.h"
@@ -29,7 +27,7 @@ int Main(int argc, char** argv) {
   absl::InitializeLog();
   absl::SetStderrThreshold(absl::LogSeverityAtLeast::kInfo);
 
-  InitializeX11();
+  X11_Initialize();
 
   xcb_grab_server(x11.conn);
 
@@ -56,35 +54,41 @@ int Main(int argc, char** argv) {
       keybinds;
 
   {
-    KeyResolver key_resolver;
-    InitializeKeyResolver(key_resolver);
+    X11_KeyResolver key_resolver;
+    X11_InitializeKeyResolver(key_resolver);
 
     // W
-    keybinds.emplace_back(ResolveKeyCode(key_resolver, "AD02"), NextLayout);
+    keybinds.emplace_back(X11_ResolveKeyCode(key_resolver, "AD02"), NextLayout);
     // E
-    keybinds.emplace_back(ResolveKeyCode(key_resolver, "AD03"), MoveStackPrev);
+    keybinds.emplace_back(X11_ResolveKeyCode(key_resolver, "AD03"),
+                          MoveStackPrev);
     // R
-    keybinds.emplace_back(ResolveKeyCode(key_resolver, "AD04"), MoveStackNext);
+    keybinds.emplace_back(X11_ResolveKeyCode(key_resolver, "AD04"),
+                          MoveStackNext);
     // D
-    keybinds.emplace_back(ResolveKeyCode(key_resolver, "AC03"), MoveLocalPrev);
+    keybinds.emplace_back(X11_ResolveKeyCode(key_resolver, "AC03"),
+                          MoveLocalPrev);
     // F
-    keybinds.emplace_back(ResolveKeyCode(key_resolver, "AC04"), MoveLocalNext);
+    keybinds.emplace_back(X11_ResolveKeyCode(key_resolver, "AC04"),
+                          MoveLocalNext);
     // G
-    keybinds.emplace_back(ResolveKeyCode(key_resolver, "AC05"), ToggleZoom);
+    keybinds.emplace_back(X11_ResolveKeyCode(key_resolver, "AC05"), ToggleZoom);
     // X
-    keybinds.emplace_back(ResolveKeyCode(key_resolver, "AB02"), CloseActive);
+    keybinds.emplace_back(X11_ResolveKeyCode(key_resolver, "AB02"),
+                          CloseActive);
     // V
-    keybinds.emplace_back(ResolveKeyCode(key_resolver, "AB04"), ToggleFollow);
+    keybinds.emplace_back(X11_ResolveKeyCode(key_resolver, "AB04"),
+                          ToggleFollow);
     // T
     keybinds.emplace_back(
-        ResolveKeyCode(key_resolver, "AD05"),
+        X11_ResolveKeyCode(key_resolver, "AD05"),
         [](xcb_timestamp_t time) { Spawn({{"ghostty", nullptr}}); });
     // S
     keybinds.emplace_back(
-        ResolveKeyCode(key_resolver, "AC02"),
+        X11_ResolveKeyCode(key_resolver, "AC02"),
         [](xcb_timestamp_t time) { Spawn({{"dmenu_run", nullptr}}); });
 
-    FreeKeyResolver(key_resolver);
+    X11_FreeKeyResolver(key_resolver);
 
     for (const auto& [keycode, _] : keybinds) {
       xcb_grab_key(x11.conn, false, x11.screen->root, XCB_MOD_MASK_4, keycode,
