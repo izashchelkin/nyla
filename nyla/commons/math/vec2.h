@@ -1,13 +1,33 @@
 #pragma once
 
 #include <cmath>
+#include <span>
+
+#include "absl/strings/str_format.h"
 
 namespace nyla {
 
 struct Vec2 {
   float x;
   float y;
+
+  operator std::span<const float>() const {
+    return std::span<const float>{&x, 2};
+  }
+  operator std::span<float>() { return std::span<float>{&x, 2}; }
 };
+
+template <typename Sink>
+void AbslStringify(Sink& sink, const Vec2& v) {
+  absl::Format(&sink, "x=%v ", v.y);
+  absl::Format(&sink, "y=%v ", v.y);
+}
+
+inline bool operator==(const Vec2& lhs, const Vec2& rhs) {
+  if (lhs.x != rhs.x) return false;
+  if (lhs.y != rhs.y) return false;
+  return true;
+}
 
 inline Vec2 operator-(const Vec2& v) {
   return {

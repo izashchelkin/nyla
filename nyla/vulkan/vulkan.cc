@@ -615,15 +615,15 @@ static int Main() {
 
     if (!running) break;
 
-    const float dts = [] {
+    const float dt = [] {
       static uint64_t last = GetMonotonicTimeMillis();
       const uint64_t now = GetMonotonicTimeMillis();
       const uint64_t dts = now - last;
       last = now;
       return dts / 1000.f;
     }();
-    if (dts > .05f) {
-      LOG(INFO) << "dts spike: " << dts << "s";
+    if (dt > .05f) {
+      LOG(INFO) << "dts spike: " << dt << "s";
 
       const Profiling& lastprof =
           prof_data[(iprof + prof_data.size() - 2) % prof_data.size()];
@@ -679,16 +679,18 @@ static int Main() {
     {
       struct ShipState {
         Vec2 pos;
+        Vec2 velocity;
         float dir_radians;
       };
       static ShipState ship_state;
 
-      {
-        const int dx = (pressed_keys.contains(right_keycode) ? 1 : 0) -
-                       (pressed_keys.contains(left_keycode) ? 1 : 0);
-        const int dy = (pressed_keys.contains(down_keycode) ? 1 : 0) -
-                       (pressed_keys.contains(up_keycode) ? 1 : 0);
+      const int dx = (pressed_keys.contains(right_keycode) ? 1 : 0) -
+                     (pressed_keys.contains(left_keycode) ? 1 : 0);
+      const int dy = (pressed_keys.contains(down_keycode) ? 1 : 0) -
+                     (pressed_keys.contains(up_keycode) ? 1 : 0);
 
+      constexpr float step = 1e-5;
+      for (float accumulator = 0; accumulator < dt; accumulator += step) {
         if (dx || dy) {
           float angle =
               std::atan2(-static_cast<float>(dy), static_cast<float>(dx));
@@ -696,17 +698,23 @@ static int Main() {
             angle += 2.f * std::numbers::pi_v<float>;
           }
 
-          ship_state.dir_radians =
-              LerpAngle(ship_state.dir_radians, angle, dts * 5);
-        }
-      }
+          const float multiplier = 20.f;
 
-      if (pressed_keys.contains(acceleration_keycode)) {
-        const Vec2 vdir = Normalize(Vec2{
-            .x = std::cos(ship_state.dir_radians),
-            .y = std::sin(ship_state.dir_radians),
-        });
-        ship_state.pos += vdir * (1000.f * dts);
+          ship_state.dir_radians =
+              LerpAngle(ship_state.dir_radians, angle, step * multiplier);
+        }
+
+        if (pressed_keys.contains(acceleration_keycode)) {
+          const Vec2 direction = Normalize(Vec2{
+              .x = std::cos(ship_state.dir_radians),
+              .y = std::sin(ship_state.dir_radians),
+          });
+          Lerp(ship_state.velocity, direction * 2000.f, step);
+        } else {
+          Lerp(ship_state.velocity, Vec2{}, step);
+        }
+
+        ship_state.pos += ship_state.velocity * step;
       }
 
       const UniformBufferObject ubo{
@@ -719,7 +727,6 @@ static int Main() {
                         vk.surface_extent.height / 2.f,
                         vk.surface_extent.height / -2.f, 0.f, 1.f),
       };
-
       memcpy(uniform_buffers_mapped[image_index], &ubo, sizeof(ubo));
     }
 
