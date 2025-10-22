@@ -1,7 +1,7 @@
+#include <cstddef>
 #include <vector>
 
 #include "absl/cleanup/cleanup.h"
-#include "absl/container/flat_hash_set.h"
 #include "absl/log/globals.h"
 #include "absl/log/initialize.h"
 #include "absl/log/log.h"
@@ -12,6 +12,7 @@
 #include "nyla/commons/math/vec2.h"
 #include "nyla/commons/math/vec3.h"
 #include "nyla/commons/readfile.h"
+#include "nyla/commons/types.h"
 #include "nyla/vulkan/vulkan.h"
 #include "nyla/x11/x11.h"
 #include "xcb/xcb.h"
@@ -26,9 +27,34 @@ struct Vertex {
   Vec3 color;
 };
 
+const std::vector<Vertex> vertices = {
+    {{-25.f, -18.f}, {0.0f, 0.0f, 1.0f}},
+    {{25.f, 0.f}, {0.0f, 1.0f, 0.0f}},
+    {{-25.f, 18.f}, {1.0f, 0.0f, 0.0f}},
+};
+
+struct UniformBufferObject {
+  Mat4 model;
+  Mat4 view;
+  Mat4 proj;
+};
+
+struct PerSwapchainImageData {
+  PerSwapchainImageData(size_t num_swapchain_images)
+      : uniform_buffers(num_swapchain_images),
+        uniform_buffers_memory(num_swapchain_images),
+        uniform_buffers_mapped(num_swapchain_images),
+        descriptor_sets(num_swapchain_images) {}
+
+  std::vector<VkBuffer> uniform_buffers;
+  std::vector<VkDeviceMemory> uniform_buffers_memory;
+  std::vector<void*> uniform_buffers_mapped;
+  std::vector<VkDescriptorSet> descriptor_sets;
+};
+
 static bool running = true;
 static xcb_window_t window;
-static absl::flat_hash_set<xcb_keycode_t> pressed_keys;
+static Set<xcb_keycode_t> pressed_keys;
 
 VkExtent2D Vulkan_PlatformGetWindowExtent() {
   xcb_get_geometry_reply_t* window_geometry = xcb_get_geometry_reply(
@@ -136,50 +162,6 @@ static int Main() {
 
   Vulkan_Initialize();
 
-  //
-
-  struct UniformBufferObject {
-    Mat4 model;
-    Mat4 view;
-    Mat4 proj;
-  };
-
-  std::vector<VkBuffer> uniform_buffers(vk.swapchain_image_count());
-  std::vector<VkDeviceMemory> uniform_buffers_memory(
-      vk.swapchain_image_count());
-  std::vector<void*> uniform_buffers_mapped(vk.swapchain_image_count());
-
-  for (size_t i = 0; i < vk.swapchain_image_count(); ++i) {
-    Vulkan_CreateBuffer(sizeof(UniformBufferObject),
-                        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                        uniform_buffers[i], uniform_buffers_memory[i]);
-
-    vkMapMemory(vk.device, uniform_buffers_memory[i], 0,
-                sizeof(UniformBufferObject), 0, &uniform_buffers_mapped[i]);
-  }
-
-  const VkDescriptorPool descriptor_pool = [&] {
-    const VkDescriptorPoolSize descriptor_pool_size{
-        .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-        .descriptorCount = static_cast<uint32_t>(vk.swapchain_image_count()),
-    };
-
-    const VkDescriptorPoolCreateInfo descriptor_pool_create_info{
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-        .maxSets = static_cast<uint32_t>(vk.swapchain_image_count()),
-        .poolSizeCount = 1,
-        .pPoolSizes = &descriptor_pool_size,
-    };
-
-    VkDescriptorPool descriptor_pool;
-    CHECK_EQ(vkCreateDescriptorPool(vk.device, &descriptor_pool_create_info,
-                                    nullptr, &descriptor_pool),
-             VK_SUCCESS);
-    return descriptor_pool;
-  }();
-
   const auto shader_stages = std::to_array<VkPipelineShaderStageCreateInfo>({
       {
           .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
@@ -197,6 +179,24 @@ static int Main() {
       },
   });
 
+  //
+
+  const VkDescriptorPoolSize descriptor_pool_size{
+      .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+      .descriptorCount = static_cast<uint32_t>(vk.swapchain_image_count()),
+  };
+
+  const VkDescriptorPoolCreateInfo descriptor_pool_create_info{
+      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+      .maxSets = static_cast<uint32_t>(vk.swapchain_image_count()),
+      .poolSizeCount = 1,
+      .pPoolSizes = &descriptor_pool_size,
+  };
+
+  VkDescriptorPool descriptor_pool;
+  VK_CHECK(vkCreateDescriptorPool(vk.device, &descriptor_pool_create_info,
+                                  nullptr, &descriptor_pool));
+
   const VkDescriptorSetLayoutBinding ubo_layout_binding{
       .binding = 0,
       .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
@@ -211,13 +211,24 @@ static int Main() {
   };
 
   VkDescriptorSetLayout descriptor_set_layout;
-  CHECK_EQ(
-      vkCreateDescriptorSetLayout(vk.device, &descriptor_set_layout_create_info,
-                                  nullptr, &descriptor_set_layout),
-      VK_SUCCESS);
+  VK_CHECK(vkCreateDescriptorSetLayout(vk.device,
+                                       &descriptor_set_layout_create_info,
+                                       nullptr, &descriptor_set_layout));
 
   const std::vector<VkDescriptorSetLayout> layouts(vk.swapchain_image_count(),
                                                    descriptor_set_layout);
+
+  const VkPipelineLayoutCreateInfo pipeline_layout_create_info{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+      .setLayoutCount = 1,
+      .pSetLayouts = &descriptor_set_layout,
+  };
+
+  VkPipelineLayout pipeline_layout;
+  vkCreatePipelineLayout(vk.device, &pipeline_layout_create_info, nullptr,
+                         &pipeline_layout);
+
+  PerSwapchainImageData per_swapchain_image_data(vk.swapchain_image_count());
 
   const VkDescriptorSetAllocateInfo descriptor_set_alloc_info{
       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
@@ -226,22 +237,36 @@ static int Main() {
       .pSetLayouts = layouts.data(),
   };
 
-  std::vector<VkDescriptorSet> descriptor_sets(vk.swapchain_image_count());
-
-  CHECK_EQ(vkAllocateDescriptorSets(vk.device, &descriptor_set_alloc_info,
-                                    descriptor_sets.data()),
-           VK_SUCCESS);
+  VK_CHECK(vkAllocateDescriptorSets(
+      vk.device, &descriptor_set_alloc_info,
+      per_swapchain_image_data.descriptor_sets.data()));
 
   for (size_t i = 0; i < vk.swapchain_image_count(); ++i) {
+    auto& uniform_buffer = per_swapchain_image_data.uniform_buffers[i];
+    auto& uniform_buffer_memory =
+        per_swapchain_image_data.uniform_buffers_memory[i];
+    auto& uniform_buffer_mapped =
+        per_swapchain_image_data.uniform_buffers_mapped[i];
+    auto& descriptor_set = per_swapchain_image_data.descriptor_sets[i];
+
+    Vulkan_CreateBuffer(sizeof(UniformBufferObject),
+                        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                        uniform_buffer, uniform_buffer_memory);
+
+    vkMapMemory(vk.device, uniform_buffer_memory, 0,
+                sizeof(UniformBufferObject), 0, &uniform_buffer_mapped);
+
     const VkDescriptorBufferInfo buffer_info{
-        .buffer = uniform_buffers[i],
+        .buffer = uniform_buffer,
         .offset = 0,
         .range = sizeof(UniformBufferObject),
     };
 
     const VkWriteDescriptorSet descriptor_write{
         .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-        .dstSet = descriptor_sets[i],
+        .dstSet = descriptor_set,
         .dstBinding = 0,
         .dstArrayElement = 0,
         .descriptorCount = 1,
@@ -253,16 +278,6 @@ static int Main() {
 
     vkUpdateDescriptorSets(vk.device, 1, &descriptor_write, 0, nullptr);
   }
-
-  const VkPipelineLayoutCreateInfo pipeline_layout_create_info{
-      .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-      .setLayoutCount = 1,
-      .pSetLayouts = &descriptor_set_layout,
-  };
-
-  VkPipelineLayout pipeline_layout;
-  vkCreatePipelineLayout(vk.device, &pipeline_layout_create_info, nullptr,
-                         &pipeline_layout);
 
   const VkVertexInputBindingDescription binding_description{
       .binding = 0,
@@ -293,11 +308,8 @@ static int Main() {
       .pVertexAttributeDescriptions = attr_description,
   };
 
-  const std::vector<Vertex> vertices = {
-      {{-25.f, -18.f}, {0.0f, 0.0f, 1.0f}},
-      {{25.f, 0.f}, {0.0f, 1.0f, 0.0f}},
-      {{-25.f, 18.f}, {1.0f, 0.0f, 0.0f}},
-  };
+  VkPipeline graphics_pipeline = Vulkan_CreateGraphicsPipeline(
+      vertex_input_create_info, pipeline_layout, shader_stages);
 
   VkBuffer vertex_buffer;
   VkDeviceMemory vertex_buffer_memory;
@@ -306,17 +318,13 @@ static int Main() {
                       VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, vertex_buffer,
                       vertex_buffer_memory);
 
-  VkPipeline graphics_pipeline = Vulkan_CreateGraphicsPipeline(
-      vertex_input_create_info, pipeline_layout, shader_stages);
-
   struct Profiling {
     uint16_t xevent;
   };
   std::array<Profiling, 3> prof_data;
   uint8_t iprof = 0;
 
-  for (uint8_t iframe = 0; iframe < kVulkan_NumFramesInFlight;
-       iframe = ((iframe + 1) % kVulkan_NumFramesInFlight)) {
+  for (;;) {
     Profiling& prof = prof_data[iprof];
     prof = {};
     iprof = (iprof + 1) % prof_data.size();
@@ -393,7 +401,7 @@ static int Main() {
                         vk.surface_extent.height / 2.f,
                         vk.surface_extent.height / -2.f, 0.f, 1.f),
       };
-      memcpy(uniform_buffers_mapped[frame_data.swapchain_image_index], &ubo,
+      memcpy(per_swapchain_image_data.uniform_buffers_mapped[frame_data.swapchain_image_index], &ubo,
              sizeof(ubo));
     }
 
@@ -408,7 +416,7 @@ static int Main() {
 
       vkCmdBindDescriptorSets(
           command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0,
-          1, &descriptor_sets[frame_data.swapchain_image_index], 0, nullptr);
+          1, &per_swapchain_image_data.descriptor_sets[frame_data.swapchain_image_index], 0, nullptr);
       vkCmdDraw(command_buffer, vertices.size(), 1, 0, 0);
     }
     Vulkan_RenderingEnd(graphics_pipeline, frame_data);

@@ -132,8 +132,7 @@ int Main(int argc, char** argv) {
     xcb_flush(x11.conn);
 
     if (poll(fds.data(), fds.size(), -1) == -1) {
-      PLOG(ERROR) << "poll";
-      break;
+      continue;
     }
 
     if (fds[0].revents & POLLIN) {
