@@ -1,4 +1,6 @@
 #include <cstddef>
+#include <cstdlib>
+#include <random>
 #include <vector>
 
 #include "absl/cleanup/cleanup.h"
@@ -29,6 +31,16 @@ struct UniformBufferObject {
   Mat4 model;
   Mat4 view;
   Mat4 proj;
+};
+
+struct Asteroid {
+  Vec2 pos;
+};
+
+struct Ship {
+  Vec2 pos;
+  Vec2 velocity;
+  float dir_radians;
 };
 
 struct PerSwapchainImageData {
@@ -241,7 +253,7 @@ static int Main() {
         per_swapchain_image_data.uniform_buffers_mapped[i];
     auto& descriptor_set = per_swapchain_image_data.descriptor_sets[i];
 
-    size_t buffer_size = 2 * sizeof(UniformBufferObject);
+    size_t buffer_size = 11 * sizeof(UniformBufferObject);
 
     Vulkan_CreateBuffer(buffer_size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
@@ -322,10 +334,11 @@ static int Main() {
   VkDeviceMemory asteroid_vertex_buffer_memory;
   std::vector<Vertex> asteroid_vertices;
   {
-    std::vector<Vec2> asteroid_vertex_positions = TriangulateCircle(6, 25);
-    asteroid_vertices.reserve(asteroid_vertex_positions.size());
-    for (const auto& pos : asteroid_vertex_positions) {
-      asteroid_vertices.emplace_back(Vertex{pos, Vec3{1.f, 1.f, 1.f}});
+    for (size_t i = 0; i < 10; ++i) {
+      std::vector<Vec2> asteroid_vertex_positions = TriangulateCircle(6, 25);
+      for (const auto& pos : asteroid_vertex_positions) {
+        asteroid_vertices.emplace_back(Vertex{pos, Vec3{1.f, 0.f, 1.f}});
+      }
     }
 
     Vulkan_CreateBuffer(vk.command_pool, vk.queue,
@@ -367,14 +380,23 @@ static int Main() {
       LOG(INFO) << "last frame prof: xevent=" << lastprof.xevent;
     }
 
-    {
-      struct ShipState {
-        Vec2 pos;
-        Vec2 velocity;
-        float dir_radians;
-      };
-      static ShipState ship_state;
+    static Ship ship;
+    static std::array<Asteroid, 10> asteroids = [] {
+      std::random_device rd;
+      std::mt19937 gen(rd());
+      std::uniform_real_distribution<float> dist(-300.f, 300.f);
 
+      std::array<Asteroid, 10> a{};
+      for (auto& s : a) {
+        s.pos.x = dist(gen);
+        s.pos.y = dist(gen);
+      }
+      return a;
+    }();
+
+    static Vec2 camera_pos = {};
+
+    {
       const int dx = (pressed_keys.contains(right_keycode) ? 1 : 0) -
                      (pressed_keys.contains(left_keycode) ? 1 : 0);
       const int dy = (pressed_keys.contains(down_keycode) ? 1 : 0) -
@@ -383,29 +405,34 @@ static int Main() {
       constexpr float step = 1e-5;
       for (float accumulator = 0; accumulator < frame_data.dt;
            accumulator += step) {
-        if (dx || dy) {
-          float angle =
-              std::atan2(-static_cast<float>(dy), static_cast<float>(dx));
-          if (angle < 0.f) {
-            angle += 2.f * pi;
+        {
+          if (dx || dy) {
+            float angle =
+                std::atan2(-static_cast<float>(dy), static_cast<float>(dx));
+            if (angle < 0.f) {
+              angle += 2.f * pi;
+            }
+
+            ship.dir_radians = LerpAngle(ship.dir_radians, angle, step * 2.5f);
           }
 
-          ship_state.dir_radians =
-              LerpAngle(ship_state.dir_radians, angle, step * 20.f);
+          if (pressed_keys.contains(acceleration_keycode)) {
+            const Vec2 direction = Normalize(Vec2{
+                std::cos(ship.dir_radians),
+                std::sin(ship.dir_radians),
+            });
+            Lerp(ship.velocity, direction * 2000.f, step);
+          } else {
+            Lerp(ship.velocity, Vec2{},
+                 pressed_keys.contains(brake_keycode) ? 2.f * step : step);
+          }
+
+          ship.pos += ship.velocity * step;
         }
 
-        if (pressed_keys.contains(acceleration_keycode)) {
-          const Vec2 direction = Normalize(Vec2{
-              .x = std::cos(ship_state.dir_radians),
-              .y = std::sin(ship_state.dir_radians),
-          });
-          Lerp(ship_state.velocity, direction * 2000.f, step);
-        } else {
-          Lerp(ship_state.velocity, Vec2{},
-               pressed_keys.contains(brake_keycode) ? 2.f * step : step);
+        {
+          Lerp(camera_pos, ship.pos, 5.f * step);
         }
-
-        ship_state.pos += ship_state.velocity * step;
       }
 
       const Mat4 proj =
@@ -413,20 +440,28 @@ static int Main() {
                 vk.surface_extent.height / 2.f, vk.surface_extent.height / -2.f,
                 0.f, 1.f);
 
-      const UniformBufferObject ubos[] = {
-          {
-              .model =
-                  Mult(Translate(Vec3{ship_state.pos.x, ship_state.pos.y, 0.f}),
-                       Rotate2D(ship_state.dir_radians)),
-              .view = Identity4,
-              .proj = proj,
-          },
-          {
-              .model = Identity4,
-              .view = Identity4,
-              .proj = proj,
-          },
+      const Mat4 view = Translate(Vec3{
+          -camera_pos.x,
+          -camera_pos.y,
+          0.f,
+      });
+
+      UniformBufferObject ubos[11];
+      ubos[0] = {
+          .model = Mult(Translate(Vec3{ship.pos.x, ship.pos.y, 0.f}),
+                        Rotate2D(ship.dir_radians)),
+          .view = view,
+          .proj = proj,
       };
+
+      for (int i = 0; i < 10; ++i) {
+        const auto& asteroid = asteroids[i];
+        ubos[i + 1] = {
+            .model = Translate(Vec3{asteroid.pos.x, asteroid.pos.y, 0.f}),
+            .view = view,
+            .proj = proj,
+        };
+      }
 
       memcpy(per_swapchain_image_data
                  .uniform_buffers_mapped[frame_data.swapchain_image_index],
@@ -453,8 +488,8 @@ static int Main() {
         vkCmdDraw(command_buffer, ship_vertices.size(), 1, 0, 0);
       }
 
-      {
-        uint32_t offset1 = sizeof(UniformBufferObject);
+      for (int i = 1; i < 11; ++i) {
+        uint32_t offset1 = i * sizeof(UniformBufferObject);
         vkCmdBindDescriptorSets(
             command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0,
             1,

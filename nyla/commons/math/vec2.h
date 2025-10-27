@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cmath>
+#include <complex>
 #include <span>
 
 #include "absl/strings/str_format.h"
@@ -10,6 +11,10 @@ namespace nyla {
 struct Vec2 {
   float x;
   float y;
+
+  Vec2() : x{}, y{} {};
+  Vec2(float x, float y) : x(x), y{y} {}
+  Vec2(std::complex<float> c) : x(c.real()), y{c.imag()} {}
 
   operator std::span<const float>() const {
     return std::span<const float>{&x, 2};

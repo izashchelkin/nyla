@@ -21,11 +21,9 @@ std::vector<Vec2> TriangulateCircle(size_t n, float radius) {
 
   for (size_t i = 0; i < n; ++i) {
     ret.emplace_back(Vec2{0.f, 0.f});
-    ret.emplace_back(Vec2{r.real(), r.imag()} * radius);
-
+    ret.emplace_back(Vec2{r} * radius);
     r *= (std::cos(theta) + std::sin(theta) * 1if);
-
-    ret.emplace_back(Vec2{r.real(), r.imag()} * radius);
+    ret.emplace_back(Vec2{r} * radius);
   }
 
   return ret;
