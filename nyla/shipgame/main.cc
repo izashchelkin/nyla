@@ -1,5 +1,7 @@
 #include <cstddef>
+#include <cstdint>
 #include <cstdlib>
+#include <iterator>
 #include <random>
 #include <vector>
 
@@ -22,15 +24,20 @@
 
 namespace nyla {
 
+constexpr size_t kEntityCount = 256;
+
 struct Vertex {
   Vec2 pos;
   Vec3 color;
 };
 
-struct UniformBufferObject {
-  Mat4 model;
+struct SceneUbo {
   Mat4 view;
   Mat4 proj;
+};
+
+struct EntityUbo {
+  Mat4 model;
 };
 
 struct Asteroid {
@@ -45,15 +52,25 @@ struct Ship {
 
 struct PerSwapchainImageData {
   PerSwapchainImageData(size_t num_swapchain_images)
-      : uniform_buffers(num_swapchain_images),
-        uniform_buffers_memory(num_swapchain_images),
-        uniform_buffers_mapped(num_swapchain_images),
-        descriptor_sets(num_swapchain_images) {}
+      : descriptor_sets(num_swapchain_images),
+        scene_ubo(num_swapchain_images),
+        entity_ubo(num_swapchain_images) {}
 
-  std::vector<VkBuffer> uniform_buffers;
-  std::vector<VkDeviceMemory> uniform_buffers_memory;
-  std::vector<void*> uniform_buffers_mapped;
   std::vector<VkDescriptorSet> descriptor_sets;
+
+  struct Uniform {
+    Uniform(size_t num_swapchain_images)
+        : buffer(num_swapchain_images),
+          memory(num_swapchain_images),
+          mapped(num_swapchain_images) {}
+
+    std::vector<VkBuffer> buffer;
+    std::vector<VkDeviceMemory> memory;
+    std::vector<void*> mapped;
+  };
+
+  Uniform scene_ubo;
+  Uniform entity_ubo;
 };
 
 static bool running = true;
@@ -75,6 +92,40 @@ void Vulkan_PlatformSetSurface() {
   };
   VK_CHECK(vkCreateXcbSurfaceKHR(vk.instance, &surface_create_info, nullptr,
                                  &vk.surface));
+}
+
+static void CreateUniformBuffer(VkDescriptorSet descriptor_set,
+                                uint32_t dstBinding, bool dynamic,
+                                size_t buffer_size, size_t range,
+                                VkBuffer& buffer, VkDeviceMemory& memory,
+                                void*& mapped) {
+  Vulkan_CreateBuffer(buffer_size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                          VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                      buffer, memory);
+
+  vkMapMemory(vk.device, memory, 0, buffer_size, 0, &mapped);
+
+  VkDescriptorBufferInfo descriptor_buffer_info{
+      .buffer = buffer,
+      .offset = 0,
+      .range = range,
+  };
+
+  VkWriteDescriptorSet write_descriptor_set{
+      .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+      .dstSet = descriptor_set,
+      .dstBinding = dstBinding,
+      .dstArrayElement = 0,
+      .descriptorCount = 1,
+      .descriptorType = dynamic ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC
+                                : VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+      .pImageInfo = nullptr,
+      .pBufferInfo = &descriptor_buffer_info,
+      .pTexelBufferView = nullptr,
+  };
+
+  vkUpdateDescriptorSets(vk.device, 1, &write_descriptor_set, 0, nullptr);
 }
 
 static void ProcessXEvents() {
@@ -143,11 +194,14 @@ static int Main() {
 
   Vulkan_Initialize();
 
+  PerSwapchainImageData per_swapchain_image_data(vk.swapchain_image_count());
+
   xcb_keycode_t up_keycode;
   xcb_keycode_t left_keycode;
   xcb_keycode_t down_keycode;
   xcb_keycode_t right_keycode;
   xcb_keycode_t acceleration_keycode;
+  xcb_keycode_t boost_keycode;
   xcb_keycode_t brake_keycode;
   xcb_keycode_t fire_keycode;
 
@@ -159,8 +213,9 @@ static int Main() {
     left_keycode = X11_ResolveKeyCode(key_resolver, "AC02");
     down_keycode = X11_ResolveKeyCode(key_resolver, "AC03");
     right_keycode = X11_ResolveKeyCode(key_resolver, "AC04");
-    acceleration_keycode = X11_ResolveKeyCode(key_resolver, "SPCE");
-    brake_keycode = X11_ResolveKeyCode(key_resolver, "AC07");
+    acceleration_keycode = X11_ResolveKeyCode(key_resolver, "AC07");
+    boost_keycode = X11_ResolveKeyCode(key_resolver, "AC08");
+    brake_keycode = X11_ResolveKeyCode(key_resolver, "SPCE");
     fire_keycode = X11_ResolveKeyCode(key_resolver, "AC08");
 
     X11_FreeKeyResolver(key_resolver);
@@ -185,42 +240,61 @@ static int Main() {
 
   //
 
-  const VkDescriptorPoolSize descriptor_pool_size{
-      .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
-      .descriptorCount = static_cast<uint32_t>(vk.swapchain_image_count()),
-  };
+  const VkDescriptorPool descriptor_pool = [] {
+    const VkDescriptorPoolSize descriptor_pool_sizes[] = {
+        {
+            .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+            .descriptorCount =
+                static_cast<uint32_t>(vk.swapchain_image_count()),
+        },
+        {
+            .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .descriptorCount =
+                static_cast<uint32_t>(vk.swapchain_image_count()),
+        },
+    };
 
-  const VkDescriptorPoolCreateInfo descriptor_pool_create_info{
-      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-      .maxSets = static_cast<uint32_t>(vk.swapchain_image_count()),
-      .poolSizeCount = 1,
-      .pPoolSizes = &descriptor_pool_size,
-  };
+    const VkDescriptorPoolCreateInfo descriptor_pool_create_info{
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+        .maxSets = static_cast<uint32_t>(vk.swapchain_image_count()),
+        .poolSizeCount = std::size(descriptor_pool_sizes),
+        .pPoolSizes = descriptor_pool_sizes,
+    };
 
-  VkDescriptorPool descriptor_pool;
-  VK_CHECK(vkCreateDescriptorPool(vk.device, &descriptor_pool_create_info,
-                                  nullptr, &descriptor_pool));
+    VkDescriptorPool descriptor_pool;
+    VK_CHECK(vkCreateDescriptorPool(vk.device, &descriptor_pool_create_info,
+                                    nullptr, &descriptor_pool));
+    return descriptor_pool;
+  }();
 
-  const VkDescriptorSetLayoutBinding ubo_layout_binding{
-      .binding = 0,
-      .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
-      .descriptorCount = 1,
-      .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
-  };
+  const VkDescriptorSetLayout descriptor_set_layout = [] {
+    const VkDescriptorSetLayoutBinding descriptor_set_layout_bindings[] = {
+        {
+            .binding = 0,
+            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .descriptorCount = 1,
+            .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+        },
+        {
+            .binding = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+            .descriptorCount = 1,
+            .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+        },
+    };
 
-  const VkDescriptorSetLayoutCreateInfo descriptor_set_layout_create_info{
-      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-      .bindingCount = 1,
-      .pBindings = &ubo_layout_binding,
-  };
+    const VkDescriptorSetLayoutCreateInfo descriptor_set_layout_create_info{
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+        .bindingCount = std::size(descriptor_set_layout_bindings),
+        .pBindings = descriptor_set_layout_bindings,
+    };
 
-  VkDescriptorSetLayout descriptor_set_layout;
-  VK_CHECK(vkCreateDescriptorSetLayout(vk.device,
-                                       &descriptor_set_layout_create_info,
-                                       nullptr, &descriptor_set_layout));
-
-  const std::vector<VkDescriptorSetLayout> layouts(vk.swapchain_image_count(),
-                                                   descriptor_set_layout);
+    VkDescriptorSetLayout descriptor_set_layout;
+    VK_CHECK(vkCreateDescriptorSetLayout(vk.device,
+                                         &descriptor_set_layout_create_info,
+                                         nullptr, &descriptor_set_layout));
+    return descriptor_set_layout;
+  }();
 
   const VkPipelineLayoutCreateInfo pipeline_layout_create_info{
       .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
@@ -232,96 +306,78 @@ static int Main() {
   vkCreatePipelineLayout(vk.device, &pipeline_layout_create_info, nullptr,
                          &pipeline_layout);
 
-  PerSwapchainImageData per_swapchain_image_data(vk.swapchain_image_count());
+  {
+    const std::vector<VkDescriptorSetLayout> descriptor_sets_layouts(
+        vk.swapchain_image_count(), descriptor_set_layout);
 
-  const VkDescriptorSetAllocateInfo descriptor_set_alloc_info{
-      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-      .descriptorPool = descriptor_pool,
-      .descriptorSetCount = static_cast<uint32_t>(layouts.size()),
-      .pSetLayouts = layouts.data(),
-  };
-
-  VK_CHECK(vkAllocateDescriptorSets(
-      vk.device, &descriptor_set_alloc_info,
-      per_swapchain_image_data.descriptor_sets.data()));
-
-  for (size_t i = 0; i < vk.swapchain_image_count(); ++i) {
-    auto& uniform_buffer = per_swapchain_image_data.uniform_buffers[i];
-    auto& uniform_buffer_memory =
-        per_swapchain_image_data.uniform_buffers_memory[i];
-    auto& uniform_buffer_mapped =
-        per_swapchain_image_data.uniform_buffers_mapped[i];
-    auto& descriptor_set = per_swapchain_image_data.descriptor_sets[i];
-
-    size_t buffer_size = 11 * sizeof(UniformBufferObject);
-
-    Vulkan_CreateBuffer(buffer_size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                        uniform_buffer, uniform_buffer_memory);
-
-    vkMapMemory(vk.device, uniform_buffer_memory, 0, buffer_size, 0,
-                &uniform_buffer_mapped);
-
-    const VkDescriptorBufferInfo buffer_info{
-        .buffer = uniform_buffer,
-        .offset = 0,
-        .range = sizeof(UniformBufferObject),
+    const VkDescriptorSetAllocateInfo descriptor_set_alloc_info{
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+        .descriptorPool = descriptor_pool,
+        .descriptorSetCount =
+            static_cast<uint32_t>(descriptor_sets_layouts.size()),
+        .pSetLayouts = descriptor_sets_layouts.data(),
     };
 
-    const VkWriteDescriptorSet descriptor_write{
-        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-        .dstSet = descriptor_set,
-        .dstBinding = 0,
-        .dstArrayElement = 0,
-        .descriptorCount = 1,
-        .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
-        .pImageInfo = nullptr,
-        .pBufferInfo = &buffer_info,
-        .pTexelBufferView = nullptr,
-    };
-
-    vkUpdateDescriptorSets(vk.device, 1, &descriptor_write, 0, nullptr);
+    VK_CHECK(vkAllocateDescriptorSets(
+        vk.device, &descriptor_set_alloc_info,
+        per_swapchain_image_data.descriptor_sets.data()));
   }
 
-  const VkVertexInputBindingDescription binding_description{
-      .binding = 0,
-      .stride = sizeof(Vertex),
-      .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
-  };
+  for (size_t i = 0; i < vk.swapchain_image_count(); ++i) {
+    CreateUniformBuffer(per_swapchain_image_data.descriptor_sets[i], 0, false,
+                        sizeof(SceneUbo), sizeof(SceneUbo),
+                        per_swapchain_image_data.scene_ubo.buffer[i],
+                        per_swapchain_image_data.scene_ubo.memory[i],
+                        per_swapchain_image_data.scene_ubo.mapped[i]);
 
-  const VkVertexInputAttributeDescription attr_description[2] = {
-      {
-          .location = 0,
-          .binding = 0,
-          .format = VK_FORMAT_R32G32_SFLOAT,
-          .offset = 0,
-      },
-      {
-          .location = 1,
-          .binding = 0,
-          .format = VK_FORMAT_R32G32B32_SFLOAT,
-          .offset = offsetof(Vertex, color),
-      },
-  };
+    CreateUniformBuffer(per_swapchain_image_data.descriptor_sets[i], 1, true,
+                        kEntityCount * sizeof(EntityUbo), sizeof(EntityUbo),
+                        per_swapchain_image_data.entity_ubo.buffer[i],
+                        per_swapchain_image_data.entity_ubo.memory[i],
+                        per_swapchain_image_data.entity_ubo.mapped[i]);
+  }
 
-  const VkPipelineVertexInputStateCreateInfo vertex_input_create_info{
-      .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-      .vertexBindingDescriptionCount = 1,
-      .pVertexBindingDescriptions = &binding_description,
-      .vertexAttributeDescriptionCount = 2,
-      .pVertexAttributeDescriptions = attr_description,
-  };
+  const VkPipeline graphics_pipeline = [&] {
+    const VkVertexInputBindingDescription binding_description{
+        .binding = 0,
+        .stride = sizeof(Vertex),
+        .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
+    };
 
-  VkPipeline graphics_pipeline = Vulkan_CreateGraphicsPipeline(
-      vertex_input_create_info, pipeline_layout, shader_stages);
+    const VkVertexInputAttributeDescription attr_description[2] = {
+        {
+            .location = 0,
+            .binding = 0,
+            .format = VK_FORMAT_R32G32_SFLOAT,
+            .offset = 0,
+        },
+        {
+            .location = 1,
+            .binding = 0,
+            .format = VK_FORMAT_R32G32B32_SFLOAT,
+            .offset = offsetof(Vertex, color),
+        },
+    };
+
+    const VkPipelineVertexInputStateCreateInfo vertex_input_create_info{
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+        .vertexBindingDescriptionCount = 1,
+        .pVertexBindingDescriptions = &binding_description,
+        .vertexAttributeDescriptionCount = 2,
+        .pVertexAttributeDescriptions = attr_description,
+    };
+
+    VkPipeline graphics_pipeline = Vulkan_CreateGraphicsPipeline(
+        vertex_input_create_info, pipeline_layout, shader_stages);
+    return graphics_pipeline;
+  }();
 
   VkBuffer ship_vertex_buffer;
   VkDeviceMemory ship_vertex_buffer_memory;
   const std::vector<Vertex> ship_vertices = {
-      {{-25.f, -18.f}, {0.0f, 0.0f, 1.0f}},
+      {{-25.f, -18.f}, {0.0f, 1.0f, 1.0f}},
       {{25.f, 0.f}, {0.0f, 1.0f, 0.0f}},
-      {{-25.f, 18.f}, {1.0f, 0.0f, 0.0f}},
+      {{-25.f, 18.f}, {0.0f, 1.0f, 0.0f}},
   };
   {
     Vulkan_CreateBuffer(vk.command_pool, vk.queue,
@@ -413,18 +469,25 @@ static int Main() {
               angle += 2.f * pi;
             }
 
-            ship.dir_radians = LerpAngle(ship.dir_radians, angle, step * 2.5f);
+            ship.dir_radians = LerpAngle(ship.dir_radians, angle, step * 5.f);
           }
 
-          if (pressed_keys.contains(acceleration_keycode)) {
+          if (pressed_keys.contains(brake_keycode)) {
+            Lerp(ship.velocity, Vec2{}, step * 5.f);
+          } else if (pressed_keys.contains(boost_keycode)) {
             const Vec2 direction = Normalize(Vec2{
                 std::cos(ship.dir_radians),
                 std::sin(ship.dir_radians),
             });
-            Lerp(ship.velocity, direction * 2000.f, step);
+            Lerp(ship.velocity, direction * 5000.f, step);
+          } else if (pressed_keys.contains(acceleration_keycode)) {
+            const Vec2 direction = Normalize(Vec2{
+                std::cos(ship.dir_radians),
+                std::sin(ship.dir_radians),
+            });
+            Lerp(ship.velocity, direction * 1000.f, step * 8.f);
           } else {
-            Lerp(ship.velocity, Vec2{},
-                 pressed_keys.contains(brake_keycode) ? 2.f * step : step);
+            Lerp(ship.velocity, Vec2{}, step);
           }
 
           ship.pos += ship.velocity * step;
@@ -435,37 +498,30 @@ static int Main() {
         }
       }
 
-      const Mat4 proj =
-          Ortho(vk.surface_extent.width / -2.f, vk.surface_extent.width / 2.f,
-                vk.surface_extent.height / 2.f, vk.surface_extent.height / -2.f,
-                0.f, 1.f);
-
-      const Mat4 view = Translate(Vec3{
-          -camera_pos.x,
-          -camera_pos.y,
-          0.f,
-      });
-
-      UniformBufferObject ubos[11];
-      ubos[0] = {
-          .model = Mult(Translate(Vec3{ship.pos.x, ship.pos.y, 0.f}),
-                        Rotate2D(ship.dir_radians)),
-          .view = view,
-          .proj = proj,
+      const SceneUbo scene_ubo = {
+          .view = Translate(Vec3{-camera_pos.x, -camera_pos.y, 0.f}),
+          .proj = Ortho(vk.surface_extent.width / -2.f,
+                        vk.surface_extent.width / 2.f,
+                        vk.surface_extent.height / 2.f,
+                        vk.surface_extent.height / -2.f, 0.f, 1.f),
       };
+
+      EntityUbo entity_ubos[11];
+      entity_ubos[0].model = Mult(Translate(Vec3{ship.pos.x, ship.pos.y, 0.f}),
+                                  Rotate2D(ship.dir_radians));
 
       for (int i = 0; i < 10; ++i) {
         const auto& asteroid = asteroids[i];
-        ubos[i + 1] = {
-            .model = Translate(Vec3{asteroid.pos.x, asteroid.pos.y, 0.f}),
-            .view = view,
-            .proj = proj,
-        };
+        entity_ubos[i + 1].model =
+            Translate(Vec3{asteroid.pos.x, asteroid.pos.y, 0.f});
       }
 
-      memcpy(per_swapchain_image_data
-                 .uniform_buffers_mapped[frame_data.swapchain_image_index],
-             &ubos, sizeof(ubos));
+      memcpy(per_swapchain_image_data.scene_ubo
+                 .mapped[frame_data.swapchain_image_index],
+             &scene_ubo, sizeof(scene_ubo));
+      memcpy(per_swapchain_image_data.entity_ubo
+                 .mapped[frame_data.swapchain_image_index],
+             &entity_ubos, sizeof(entity_ubos));
     }
 
     Vulkan_RenderingBegin(graphics_pipeline, frame_data);
@@ -489,7 +545,7 @@ static int Main() {
       }
 
       for (int i = 1; i < 11; ++i) {
-        uint32_t offset1 = i * sizeof(UniformBufferObject);
+        uint32_t offset1 = i * sizeof(EntityUbo);
         vkCmdBindDescriptorSets(
             command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0,
             1,

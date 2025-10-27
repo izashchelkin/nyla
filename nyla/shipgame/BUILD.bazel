@@ -18,7 +18,11 @@ cc_binary(
 
 cc_binary(
     name = "shipgame2",
-    srcs = ["main2.cpp", "circle.cc", "circle.h"],
+    srcs = [
+        "circle.cc",
+        "circle.h",
+        "main2.cpp",
+    ],
     deps = [
         "//nyla/vulkan",
         "//nyla/commons",
