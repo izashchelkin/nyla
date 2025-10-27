@@ -917,7 +917,8 @@ void UpdateBar() {
   }
 
   const std::string& active_client_name =
-      stack.active_window ? wm_clients.at(stack.active_window).name : "nylawm";
+      stack.active_window ? wm_clients.at(stack.active_window).name
+                          : ("nylawm " + std::to_string(wm_active_stack_idx));
 
   double load_avg[3];
   getloadavg(load_avg, std::size(load_avg));
