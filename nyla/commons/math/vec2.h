@@ -19,7 +19,7 @@ struct Vec2 {
 
 template <typename Sink>
 void AbslStringify(Sink& sink, const Vec2& v) {
-  absl::Format(&sink, "x=%v ", v.y);
+  absl::Format(&sink, "x=%v ", v.x);
   absl::Format(&sink, "y=%v ", v.y);
 }
 

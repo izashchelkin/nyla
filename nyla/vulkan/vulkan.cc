@@ -565,6 +565,10 @@ void Vulkan_RenderingEnd(VkPipeline graphics_pipeline,
   }
 
   CHECK_EQ(vkEndCommandBuffer(command_buffer), VK_SUCCESS);
+}
+
+void Vulkan_FrameEnd(Vulkan_FrameData& frame_data) {
+  const VkCommandBuffer command_buffer = vk.command_buffers[frame_data.iframe];
 
   const VkPipelineStageFlags wait_stages[] = {
       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
@@ -604,9 +608,7 @@ void Vulkan_RenderingEnd(VkPipeline graphics_pipeline,
   } else {
     VK_CHECK(present_result);
   }
-}
 
-void Vulkan_FrameEnd(Vulkan_FrameData& frame_data) {
   frame_data.iframe = (frame_data.iframe + 1) % kVulkan_NumFramesInFlight;
 }
 

@@ -15,3 +15,18 @@ cc_binary(
         # "@rules_cc//cc/runfiles",
     ],
 )
+
+cc_binary(
+    name = "shipgame2",
+    srcs = ["main2.cpp", "circle.cc", "circle.h"],
+    deps = [
+        "//nyla/vulkan",
+        "//nyla/commons",
+        "//nyla/x11",
+        "@abseil-cpp//absl/log",
+        "@abseil-cpp//absl/log:check",
+        "@abseil-cpp//absl/log:initialize",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        # "@rules_cc//cc/runfiles",
+    ],
+)

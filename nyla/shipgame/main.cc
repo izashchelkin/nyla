@@ -13,6 +13,7 @@
 #include "nyla/commons/math/vec3.h"
 #include "nyla/commons/readfile.h"
 #include "nyla/commons/types.h"
+#include "nyla/shipgame/circle.h"
 #include "nyla/vulkan/vulkan.h"
 #include "nyla/x11/x11.h"
 #include "xcb/xcb.h"
@@ -20,17 +21,8 @@
 namespace nyla {
 
 struct Vertex {
-  struct {
-    float x;
-    float y;
-  } pos;
+  Vec2 pos;
   Vec3 color;
-};
-
-const std::vector<Vertex> vertices = {
-    {{-25.f, -18.f}, {0.0f, 0.0f, 1.0f}},
-    {{25.f, 0.f}, {0.0f, 1.0f, 0.0f}},
-    {{-25.f, 18.f}, {1.0f, 0.0f, 0.0f}},
 };
 
 struct UniformBufferObject {
@@ -137,6 +129,8 @@ static int Main() {
     xcb_flush(x11.conn);
   }
 
+  Vulkan_Initialize();
+
   xcb_keycode_t up_keycode;
   xcb_keycode_t left_keycode;
   xcb_keycode_t down_keycode;
@@ -160,8 +154,6 @@ static int Main() {
     X11_FreeKeyResolver(key_resolver);
   }
 
-  Vulkan_Initialize();
-
   const auto shader_stages = std::to_array<VkPipelineShaderStageCreateInfo>({
       {
           .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
@@ -182,7 +174,7 @@ static int Main() {
   //
 
   const VkDescriptorPoolSize descriptor_pool_size{
-      .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+      .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
       .descriptorCount = static_cast<uint32_t>(vk.swapchain_image_count()),
   };
 
@@ -199,7 +191,7 @@ static int Main() {
 
   const VkDescriptorSetLayoutBinding ubo_layout_binding{
       .binding = 0,
-      .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+      .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
       .descriptorCount = 1,
       .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
   };
@@ -249,14 +241,15 @@ static int Main() {
         per_swapchain_image_data.uniform_buffers_mapped[i];
     auto& descriptor_set = per_swapchain_image_data.descriptor_sets[i];
 
-    Vulkan_CreateBuffer(sizeof(UniformBufferObject),
-                        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+    size_t buffer_size = 2 * sizeof(UniformBufferObject);
+
+    Vulkan_CreateBuffer(buffer_size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                             VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                         uniform_buffer, uniform_buffer_memory);
 
-    vkMapMemory(vk.device, uniform_buffer_memory, 0,
-                sizeof(UniformBufferObject), 0, &uniform_buffer_mapped);
+    vkMapMemory(vk.device, uniform_buffer_memory, 0, buffer_size, 0,
+                &uniform_buffer_mapped);
 
     const VkDescriptorBufferInfo buffer_info{
         .buffer = uniform_buffer,
@@ -270,7 +263,7 @@ static int Main() {
         .dstBinding = 0,
         .dstArrayElement = 0,
         .descriptorCount = 1,
-        .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+        .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
         .pImageInfo = nullptr,
         .pBufferInfo = &buffer_info,
         .pTexelBufferView = nullptr,
@@ -311,12 +304,36 @@ static int Main() {
   VkPipeline graphics_pipeline = Vulkan_CreateGraphicsPipeline(
       vertex_input_create_info, pipeline_layout, shader_stages);
 
-  VkBuffer vertex_buffer;
-  VkDeviceMemory vertex_buffer_memory;
-  Vulkan_CreateBuffer(vk.command_pool, vk.queue,
-                      sizeof(vertices[0]) * vertices.size(), vertices.data(),
-                      VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, vertex_buffer,
-                      vertex_buffer_memory);
+  VkBuffer ship_vertex_buffer;
+  VkDeviceMemory ship_vertex_buffer_memory;
+  const std::vector<Vertex> ship_vertices = {
+      {{-25.f, -18.f}, {0.0f, 0.0f, 1.0f}},
+      {{25.f, 0.f}, {0.0f, 1.0f, 0.0f}},
+      {{-25.f, 18.f}, {1.0f, 0.0f, 0.0f}},
+  };
+  {
+    Vulkan_CreateBuffer(vk.command_pool, vk.queue,
+                        sizeof(ship_vertices[0]) * ship_vertices.size(),
+                        ship_vertices.data(), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                        ship_vertex_buffer, ship_vertex_buffer_memory);
+  }
+
+  VkBuffer asteroid_vertex_buffer;
+  VkDeviceMemory asteroid_vertex_buffer_memory;
+  std::vector<Vertex> asteroid_vertices;
+  {
+    std::vector<Vec2> asteroid_vertex_positions = TriangulateCircle(6, 25);
+    asteroid_vertices.reserve(asteroid_vertex_positions.size());
+    for (const auto& pos : asteroid_vertex_positions) {
+      asteroid_vertices.emplace_back(Vertex{pos, Vec3{1.f, 1.f, 1.f}});
+    }
+
+    Vulkan_CreateBuffer(vk.command_pool, vk.queue,
+                        sizeof(asteroid_vertices[0]) * asteroid_vertices.size(),
+                        asteroid_vertices.data(),
+                        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                        asteroid_vertex_buffer, asteroid_vertex_buffer_memory);
+  }
 
   struct Profiling {
     uint16_t xevent;
@@ -391,18 +408,29 @@ static int Main() {
         ship_state.pos += ship_state.velocity * step;
       }
 
-      const UniformBufferObject ubo{
-          .model =
-              Mult(Translate(Vec3{ship_state.pos.x, ship_state.pos.y, 0.f}),
-                   Rotate2D(ship_state.dir_radians)),
-          .view = Identity4,
-          .proj = Ortho(vk.surface_extent.width / -2.f,
-                        vk.surface_extent.width / 2.f,
-                        vk.surface_extent.height / 2.f,
-                        vk.surface_extent.height / -2.f, 0.f, 1.f),
+      const Mat4 proj =
+          Ortho(vk.surface_extent.width / -2.f, vk.surface_extent.width / 2.f,
+                vk.surface_extent.height / 2.f, vk.surface_extent.height / -2.f,
+                0.f, 1.f);
+
+      const UniformBufferObject ubos[] = {
+          {
+              .model =
+                  Mult(Translate(Vec3{ship_state.pos.x, ship_state.pos.y, 0.f}),
+                       Rotate2D(ship_state.dir_radians)),
+              .view = Identity4,
+              .proj = proj,
+          },
+          {
+              .model = Identity4,
+              .view = Identity4,
+              .proj = proj,
+          },
       };
-      memcpy(per_swapchain_image_data.uniform_buffers_mapped[frame_data.swapchain_image_index], &ubo,
-             sizeof(ubo));
+
+      memcpy(per_swapchain_image_data
+                 .uniform_buffers_mapped[frame_data.swapchain_image_index],
+             &ubos, sizeof(ubos));
     }
 
     Vulkan_RenderingBegin(graphics_pipeline, frame_data);
@@ -410,17 +438,37 @@ static int Main() {
       const VkCommandBuffer command_buffer =
           vk.command_buffers[frame_data.iframe];
 
-      VkBuffer vertex_buffers[] = {vertex_buffer};
-      VkDeviceSize offsets[] = {0};
-      vkCmdBindVertexBuffers(command_buffer, 0, 1, vertex_buffers, offsets);
+      {
+        uint32_t offset0 = 0;
+        vkCmdBindDescriptorSets(
+            command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0,
+            1,
+            &per_swapchain_image_data
+                 .descriptor_sets[frame_data.swapchain_image_index],
+            1, &offset0);
 
-      vkCmdBindDescriptorSets(
-          command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0,
-          1, &per_swapchain_image_data.descriptor_sets[frame_data.swapchain_image_index], 0, nullptr);
-      vkCmdDraw(command_buffer, vertices.size(), 1, 0, 0);
+        VkBuffer vertex_buffers[] = {ship_vertex_buffer};
+        VkDeviceSize offsets[] = {0};
+        vkCmdBindVertexBuffers(command_buffer, 0, 1, vertex_buffers, offsets);
+        vkCmdDraw(command_buffer, ship_vertices.size(), 1, 0, 0);
+      }
+
+      {
+        uint32_t offset1 = sizeof(UniformBufferObject);
+        vkCmdBindDescriptorSets(
+            command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0,
+            1,
+            &per_swapchain_image_data
+                 .descriptor_sets[frame_data.swapchain_image_index],
+            1, &offset1);
+
+        VkBuffer vertex_buffers[] = {asteroid_vertex_buffer};
+        VkDeviceSize offsets[] = {0};
+        vkCmdBindVertexBuffers(command_buffer, 0, 1, vertex_buffers, offsets);
+        vkCmdDraw(command_buffer, asteroid_vertices.size(), 1, 0, 0);
+      }
     }
     Vulkan_RenderingEnd(graphics_pipeline, frame_data);
-
     Vulkan_FrameEnd(frame_data);
   }
   return 0;
