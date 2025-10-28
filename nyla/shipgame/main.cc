@@ -375,9 +375,9 @@ static int Main() {
   VkBuffer ship_vertex_buffer;
   VkDeviceMemory ship_vertex_buffer_memory;
   const std::vector<Vertex> ship_vertices = {
-      {{-25.f, -18.f}, {0.0f, 1.0f, 1.0f}},
-      {{25.f, 0.f}, {0.0f, 1.0f, 0.0f}},
-      {{-25.f, 18.f}, {0.0f, 1.0f, 0.0f}},
+      {{-25.f, -18.f}, {1.0f, 0.0f, 0.3f}},
+      {{25.f, 0.f}, {1.0f, 0.0f, 0.0f}},
+      {{-25.f, 18.f}, {1.0f, 0.3f, 0.0f}},
   };
   {
     Vulkan_CreateBuffer(vk.command_pool, vk.queue,
@@ -458,7 +458,7 @@ static int Main() {
       const int dy = (pressed_keys.contains(down_keycode) ? 1 : 0) -
                      (pressed_keys.contains(up_keycode) ? 1 : 0);
 
-      constexpr float step = 1e-5;
+      constexpr float step = 1.f / 120.f;
       for (float accumulator = 0; accumulator < frame_data.dt;
            accumulator += step) {
         {
