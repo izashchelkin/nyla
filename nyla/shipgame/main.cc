@@ -458,9 +458,11 @@ static int Main() {
       const int dy = (pressed_keys.contains(down_keycode) ? 1 : 0) -
                      (pressed_keys.contains(up_keycode) ? 1 : 0);
 
+      static float dt_accumulator = 0.f;
+      dt_accumulator += frame_data.dt;
+
       constexpr float step = 1.f / 120.f;
-      for (float accumulator = 0; accumulator < frame_data.dt;
-           accumulator += step) {
+      for (; dt_accumulator >= frame_data.dt; dt_accumulator -= step) {
         {
           if (dx || dy) {
             float angle =
