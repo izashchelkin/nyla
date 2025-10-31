@@ -3,6 +3,7 @@
 #include <cmath>
 
 #include "absl/strings/str_format.h"
+#include "nyla/commons/math/vec2.h"
 
 namespace nyla {
 
@@ -10,6 +11,10 @@ struct Vec3 {
   float x;
   float y;
   float z;
+
+  Vec3() : x{}, y{}, z{} {};
+  Vec3(float x, float y, float z) : x(x), y{y}, z{} {}
+  Vec3(Vec2 v2) : x{v2.x}, y{v2.y}, z{0} {}
 
   operator std::span<const float>() const {
     return std::span<const float>{&x, 3};

@@ -24,12 +24,24 @@
 
 namespace nyla {
 
-constexpr size_t kEntityCount = 256;
-
 struct Vertex {
   Vec2 pos;
   Vec3 color;
 };
+
+struct Entity {
+  uint32_t flags;
+  Vec2 pos;
+  Vec2 velocity;
+  float angle_radians;
+
+  uint32_t vertex_count;
+  uint32_t vertex_offset;
+  VkBuffer vertex_buffer;
+  VkDeviceMemory vertex_buffer_memory;
+};
+uint16_t ientity;
+static Entity entities[256];
 
 struct SceneUbo {
   Mat4 view;
@@ -38,16 +50,6 @@ struct SceneUbo {
 
 struct EntityUbo {
   Mat4 model;
-};
-
-struct Asteroid {
-  Vec2 pos;
-};
-
-struct Ship {
-  Vec2 pos;
-  Vec2 velocity;
-  float dir_radians;
 };
 
 struct PerSwapchainImageData {
@@ -331,7 +333,8 @@ static int Main() {
                         per_swapchain_image_data.scene_ubo.mapped[i]);
 
     CreateUniformBuffer(per_swapchain_image_data.descriptor_sets[i], 1, true,
-                        kEntityCount * sizeof(EntityUbo), sizeof(EntityUbo),
+                        std::size(entities) * sizeof(EntityUbo),
+                        sizeof(EntityUbo),
                         per_swapchain_image_data.entity_ubo.buffer[i],
                         per_swapchain_image_data.entity_ubo.memory[i],
                         per_swapchain_image_data.entity_ubo.mapped[i]);
@@ -372,38 +375,6 @@ static int Main() {
     return graphics_pipeline;
   }();
 
-  VkBuffer ship_vertex_buffer;
-  VkDeviceMemory ship_vertex_buffer_memory;
-  const std::vector<Vertex> ship_vertices = {
-      {{-25.f, -18.f}, {1.0f, 0.0f, 0.3f}},
-      {{25.f, 0.f}, {1.0f, 0.0f, 0.0f}},
-      {{-25.f, 18.f}, {1.0f, 0.3f, 0.0f}},
-  };
-  {
-    Vulkan_CreateBuffer(vk.command_pool, vk.queue,
-                        sizeof(ship_vertices[0]) * ship_vertices.size(),
-                        ship_vertices.data(), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                        ship_vertex_buffer, ship_vertex_buffer_memory);
-  }
-
-  VkBuffer asteroid_vertex_buffer;
-  VkDeviceMemory asteroid_vertex_buffer_memory;
-  std::vector<Vertex> asteroid_vertices;
-  {
-    for (size_t i = 0; i < 10; ++i) {
-      std::vector<Vec2> asteroid_vertex_positions = TriangulateCircle(6, 25);
-      for (const auto& pos : asteroid_vertex_positions) {
-        asteroid_vertices.emplace_back(Vertex{pos, Vec3{1.f, 0.f, 1.f}});
-      }
-    }
-
-    Vulkan_CreateBuffer(vk.command_pool, vk.queue,
-                        sizeof(asteroid_vertices[0]) * asteroid_vertices.size(),
-                        asteroid_vertices.data(),
-                        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                        asteroid_vertex_buffer, asteroid_vertex_buffer_memory);
-  }
-
   struct Profiling {
     uint16_t xevent;
   };
@@ -436,18 +407,69 @@ static int Main() {
       LOG(INFO) << "last frame prof: xevent=" << lastprof.xevent;
     }
 
-    static Ship ship;
-    static std::array<Asteroid, 10> asteroids = [] {
+    static Entity& ship = *[] {
+      Entity& ship = entities[ientity++];
+
+      VkBuffer ship_vertex_buffer;
+      VkDeviceMemory ship_vertex_buffer_memory;
+      const std::vector<Vertex> ship_vertices = {
+          {{-25.f, -18.f}, {1.0f, 0.0f, 0.3f}},
+          {{25.f, 0.f}, {1.0f, 0.0f, 0.0f}},
+          {{-25.f, 18.f}, {1.0f, 0.3f, 0.0f}},
+      };
+
+      Vulkan_CreateBuffer(vk.command_pool, vk.queue,
+                          sizeof(ship_vertices[0]) * ship_vertices.size(),
+                          ship_vertices.data(),
+                          VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, ship_vertex_buffer,
+                          ship_vertex_buffer_memory);
+
+      ship.flags = 1;
+      ship.vertex_count = ship_vertices.size();
+      ship.vertex_buffer = ship_vertex_buffer;
+      ship.vertex_buffer_memory = ship_vertex_buffer_memory;
+
+      return &ship;
+    }();
+
+    static std::span<Entity> asteroids = [] {
+      std::vector<Vertex> asteroid_vertices;
+      {
+        std::vector<Vec2> asteroid_vertex_positions = TriangulateCircle(7, 30);
+        asteroid_vertices.reserve(asteroid_vertex_positions.size());
+        for (Vec2& pos : asteroid_vertex_positions) {
+          asteroid_vertices.emplace_back(Vertex{pos, {.3f, 1.f, .3f}});
+        }
+      }
+
+      VkBuffer asteroid_vertex_buffer;
+      VkDeviceMemory asteroid_vertex_buffer_memory;
+      Vulkan_CreateBuffer(
+          vk.command_pool, vk.queue, sizeof(Vertex) * asteroid_vertices.size(),
+          asteroid_vertices.data(), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+          asteroid_vertex_buffer, asteroid_vertex_buffer_memory);
+
+      //
+
+      std::span<Entity> asteroids = {&entities[ientity], 64};
+      ientity += asteroids.size();
+
       std::random_device rd;
       std::mt19937 gen(rd());
       std::uniform_real_distribution<float> dist(-300.f, 300.f);
 
-      std::array<Asteroid, 10> a{};
-      for (auto& s : a) {
-        s.pos.x = dist(gen);
-        s.pos.y = dist(gen);
+      for (Entity& asteroid : asteroids) {
+        asteroid.flags = 1;
+
+        asteroid.pos.x = dist(gen);
+        asteroid.pos.y = dist(gen);
+
+        asteroid.vertex_count = asteroid_vertices.size();
+        asteroid.vertex_buffer = asteroid_vertex_buffer;
+        asteroid.vertex_buffer_memory = asteroid_vertex_buffer_memory;
       }
-      return a;
+
+      return asteroids;
     }();
 
     static Vec2 camera_pos = {};
@@ -471,21 +493,22 @@ static int Main() {
               angle += 2.f * pi;
             }
 
-            ship.dir_radians = LerpAngle(ship.dir_radians, angle, step * 5.f);
+            ship.angle_radians =
+                LerpAngle(ship.angle_radians, angle, step * 5.f);
           }
 
           if (pressed_keys.contains(brake_keycode)) {
             Lerp(ship.velocity, Vec2{}, step * 5.f);
           } else if (pressed_keys.contains(boost_keycode)) {
             const Vec2 direction = Normalize(Vec2{
-                std::cos(ship.dir_radians),
-                std::sin(ship.dir_radians),
+                std::cos(ship.angle_radians),
+                std::sin(ship.angle_radians),
             });
             Lerp(ship.velocity, direction * 5000.f, step);
           } else if (pressed_keys.contains(acceleration_keycode)) {
             const Vec2 direction = Normalize(Vec2{
-                std::cos(ship.dir_radians),
-                std::sin(ship.dir_radians),
+                std::cos(ship.angle_radians),
+                std::sin(ship.angle_radians),
             });
             Lerp(ship.velocity, direction * 1000.f, step * 8.f);
           } else {
@@ -508,14 +531,12 @@ static int Main() {
                         vk.surface_extent.height / -2.f, 0.f, 1.f),
       };
 
-      EntityUbo entity_ubos[11];
-      entity_ubos[0].model = Mult(Translate(Vec3{ship.pos.x, ship.pos.y, 0.f}),
-                                  Rotate2D(ship.dir_radians));
+      EntityUbo entity_ubos[std::size(entities)];
+      for (size_t i = 0; i < std::size(entities); ++i) {
+        auto& ubo = entity_ubos[i];
+        const auto& entity = entities[i];
 
-      for (int i = 0; i < 10; ++i) {
-        const auto& asteroid = asteroids[i];
-        entity_ubos[i + 1].model =
-            Translate(Vec3{asteroid.pos.x, asteroid.pos.y, 0.f});
+        ubo.model = Mult(Translate(entity.pos), Rotate2D(entity.angle_radians));
       }
 
       memcpy(per_swapchain_image_data.scene_ubo
@@ -531,34 +552,33 @@ static int Main() {
       const VkCommandBuffer command_buffer =
           vk.command_buffers[frame_data.iframe];
 
-      {
-        uint32_t offset0 = 0;
+      VkBuffer last_vertex_buffer = nullptr;
+      uint32_t last_vertex_offset = 0;
+
+      for (size_t i = 0; i < std::size(entities); ++i) {
+        const auto& entity = entities[i];
+
+        if (!entity.flags) continue;
+
+        if (last_vertex_buffer != entity.vertex_buffer ||
+            last_vertex_offset != entity.vertex_offset) {
+          last_vertex_buffer = entity.vertex_buffer;
+          last_vertex_offset = entity.vertex_offset;
+
+          const VkDeviceSize offset = last_vertex_offset * sizeof(Vertex);
+          vkCmdBindVertexBuffers(command_buffer, 0, 1, &last_vertex_buffer,
+                                 &offset);
+        }
+
+        const uint32_t ubo_offset = i * sizeof(EntityUbo);
         vkCmdBindDescriptorSets(
             command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0,
             1,
             &per_swapchain_image_data
                  .descriptor_sets[frame_data.swapchain_image_index],
-            1, &offset0);
+            1, &ubo_offset);
 
-        VkBuffer vertex_buffers[] = {ship_vertex_buffer};
-        VkDeviceSize offsets[] = {0};
-        vkCmdBindVertexBuffers(command_buffer, 0, 1, vertex_buffers, offsets);
-        vkCmdDraw(command_buffer, ship_vertices.size(), 1, 0, 0);
-      }
-
-      for (int i = 1; i < 11; ++i) {
-        uint32_t offset1 = i * sizeof(EntityUbo);
-        vkCmdBindDescriptorSets(
-            command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0,
-            1,
-            &per_swapchain_image_data
-                 .descriptor_sets[frame_data.swapchain_image_index],
-            1, &offset1);
-
-        VkBuffer vertex_buffers[] = {asteroid_vertex_buffer};
-        VkDeviceSize offsets[] = {0};
-        vkCmdBindVertexBuffers(command_buffer, 0, 1, vertex_buffers, offsets);
-        vkCmdDraw(command_buffer, asteroid_vertices.size(), 1, 0, 0);
+        vkCmdDraw(command_buffer, entity.vertex_count, 1, 0, 0);
       }
     }
     Vulkan_RenderingEnd(graphics_pipeline, frame_data);
