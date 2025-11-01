@@ -129,9 +129,14 @@ void Vulkan_Initialize() {
         .synchronization2 = VK_TRUE,
         .dynamicRendering = VK_TRUE,
     };
+    VkPhysicalDeviceVulkan12Features v12{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
+        .pNext = &v13,
+        .scalarBlockLayout = VK_TRUE,
+    };
     VkPhysicalDeviceFeatures2 features{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-        .pNext = &v13,
+        .pNext = &v12,
     };
 
     const VkDeviceCreateInfo device_create_info{

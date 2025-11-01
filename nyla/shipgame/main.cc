@@ -1,3 +1,4 @@
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -34,7 +35,10 @@ struct Entity {
   Vec2 pos;
   Vec2 velocity;
   float mass;
+  float density;
   float angle_radians;
+
+  Vec2 hit_rect;
 
   uint32_t vertex_count;
   uint32_t vertex_offset;
@@ -396,6 +400,7 @@ static int Main() {
 
       ship.flags = 1;
       ship.mass = 5;
+      ship.density = 1;
       ship.vertex_count = ship_vertices.size();
       ship.vertex_buffer = ship_vertex_buffer;
       ship.vertex_buffer_memory = ship_vertex_buffer_memory;
@@ -417,16 +422,23 @@ static int Main() {
       for (size_t i = 0; i < std::size(asteroids); ++i) {
         auto& asteroid = asteroids[i];
 
-        if (i & 1)
-          asteroid.mass = 300;
-        else {
-          asteroid.mass = 50;
+        asteroid.density = 0.0001;
+
+        switch (i % 2) {
+          case 0:
+            asteroid.mass = 300;
+          case 1:
+            asteroid.mass = 50;
         }
+        if (i == 0) asteroid.mass = 300000;
+
+        float volume = asteroid.mass / asteroid.density;
+        float radius = std::cbrt(volume * 3.f / 4.f / pi);
 
         std::vector<Vertex> asteroid_vertices;
         {
           std::vector<Vec2> asteroid_vertex_positions =
-              TriangulateCircle(asteroid.mass / 2 + 3, asteroid.mass + 3);
+              TriangulateCircle(10, radius);
           asteroid_vertices.reserve(asteroid_vertex_positions.size());
           for (Vec2& pos : asteroid_vertex_positions) {
             asteroid_vertices.emplace_back(Vertex{pos, {.3f, 1.f, .3f}});
@@ -466,7 +478,8 @@ static int Main() {
       dt_accumulator += vk.current_frame_data.dt;
 
       constexpr float step = 1.f / 120.f;
-      for (; dt_accumulator >= vk.current_frame_data.dt; dt_accumulator -= step) {
+      for (; dt_accumulator >= vk.current_frame_data.dt;
+           dt_accumulator -= step) {
         {
           if (dx || dy) {
             float angle =
@@ -557,7 +570,7 @@ static int Main() {
     RenderText(200, 200, "Hello world!");
     RenderText(250, 250, "Hello world, here too!");
 
-		TextRendererBefore();
+    TextRendererBefore();
 
     Vulkan_RenderingBegin();
     {
@@ -590,8 +603,8 @@ static int Main() {
           vkCmdBindDescriptorSets(
               command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout,
               0, 1,
-              &per_swapchain_image_data
-                   .descriptor_sets[vk.current_frame_data.swapchain_image_index],
+              &per_swapchain_image_data.descriptor_sets
+                   [vk.current_frame_data.swapchain_image_index],
               1, &ubo_offset);
 
           vkCmdDraw(command_buffer, entity.vertex_count, 1, 0, 0);
@@ -599,7 +612,7 @@ static int Main() {
       }
 #endif
 
-			TextRendererRecord();
+      TextRendererRecord();
     }
 
     Vulkan_RenderingEnd();
