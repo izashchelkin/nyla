@@ -33,6 +33,7 @@ struct Entity {
   uint32_t flags;
   Vec2 pos;
   Vec2 velocity;
+  float mass;
   float angle_radians;
 
   uint32_t vertex_count;
@@ -425,6 +426,7 @@ static int Main() {
                           ship_vertex_buffer_memory);
 
       ship.flags = 1;
+      ship.mass = 5;
       ship.vertex_count = ship_vertices.size();
       ship.vertex_buffer = ship_vertex_buffer;
       ship.vertex_buffer_memory = ship_vertex_buffer_memory;
@@ -433,22 +435,6 @@ static int Main() {
     }();
 
     static std::span<Entity> asteroids = [] {
-      std::vector<Vertex> asteroid_vertices;
-      {
-        std::vector<Vec2> asteroid_vertex_positions = TriangulateCircle(7, 30);
-        asteroid_vertices.reserve(asteroid_vertex_positions.size());
-        for (Vec2& pos : asteroid_vertex_positions) {
-          asteroid_vertices.emplace_back(Vertex{pos, {.3f, 1.f, .3f}});
-        }
-      }
-
-      VkBuffer asteroid_vertex_buffer;
-      VkDeviceMemory asteroid_vertex_buffer_memory;
-      Vulkan_CreateBuffer(
-          vk.command_pool, vk.queue, sizeof(Vertex) * asteroid_vertices.size(),
-          asteroid_vertices.data(), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-          asteroid_vertex_buffer, asteroid_vertex_buffer_memory);
-
       //
 
       std::span<Entity> asteroids = {&entities[ientity], 64};
@@ -456,10 +442,38 @@ static int Main() {
 
       std::random_device rd;
       std::mt19937 gen(rd());
-      std::uniform_real_distribution<float> dist(-300.f, 300.f);
+      std::uniform_real_distribution<float> dist(-x11.screen->width_in_pixels,
+                                                 x11.screen->width_in_pixels);
 
-      for (Entity& asteroid : asteroids) {
-        asteroid.flags = 1;
+      for (size_t i = 0; i < std::size(asteroids); ++i) {
+        auto& asteroid = asteroids[i];
+
+        if (i == 0)
+          asteroid.mass = 200;
+        else {
+          asteroid.mass = 1 * i + 10;
+          // asteroid.velocity = {10, 10};
+        }
+
+        std::vector<Vertex> asteroid_vertices;
+        {
+          std::vector<Vec2> asteroid_vertex_positions =
+              TriangulateCircle(asteroid.mass / 2 + 3, asteroid.mass + 3);
+          asteroid_vertices.reserve(asteroid_vertex_positions.size());
+          for (Vec2& pos : asteroid_vertex_positions) {
+            asteroid_vertices.emplace_back(Vertex{pos, {.3f, 1.f, .3f}});
+          }
+        }
+
+        VkBuffer asteroid_vertex_buffer;
+        VkDeviceMemory asteroid_vertex_buffer_memory;
+        Vulkan_CreateBuffer(
+            vk.command_pool, vk.queue,
+            sizeof(Vertex) * asteroid_vertices.size(), asteroid_vertices.data(),
+            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, asteroid_vertex_buffer,
+            asteroid_vertex_buffer_memory);
+
+        asteroid.flags = 3;
 
         asteroid.pos.x = dist(gen);
         asteroid.pos.y = dist(gen);
@@ -521,14 +535,39 @@ static int Main() {
         {
           Lerp(camera_pos, ship.pos, 5.f * step);
         }
+
+        {
+          for (size_t i = 0; i < std::size(entities); ++i) {
+            auto& entity = entities[i];
+            if ((entity.flags & 2) == 0) continue;
+
+            Vec2 force_sum{};
+
+            for (size_t j = 0; j < std::size(entities); ++j) {
+              if (j == i) continue;
+              if (!entities[j].mass) continue;
+
+              Vec2 v = entities[j].pos - entity.pos;
+              float r = Len(v);
+              float F = 100 * 6.7f * entity.mass * entities[j].mass / (r * r);
+
+              force_sum += (v / Len(v) * F);
+            }
+
+            entity.velocity += (force_sum / entity.mass) * step;
+            entity.pos += entity.velocity * step;
+          }
+        }
       }
+
+      float zoom = 1.f;
 
       const SceneUbo scene_ubo = {
           .view = Translate(Vec3{-camera_pos.x, -camera_pos.y, 0.f}),
-          .proj = Ortho(vk.surface_extent.width / -2.f,
-                        vk.surface_extent.width / 2.f,
-                        vk.surface_extent.height / 2.f,
-                        vk.surface_extent.height / -2.f, 0.f, 1.f),
+          .proj = Ortho(vk.surface_extent.width * zoom / -2.f,
+                        vk.surface_extent.width * zoom / 2.f,
+                        vk.surface_extent.height * zoom / 2.f,
+                        vk.surface_extent.height * zoom / -2.f, 0.f, 1.f),
       };
 
       EntityUbo entity_ubos[std::size(entities)];
