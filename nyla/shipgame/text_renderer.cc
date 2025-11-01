@@ -1,18 +1,18 @@
+#include "nyla/shipgame/text_renderer.h"
+
 #include <array>
 #include <cstdint>
 #include <string_view>
 
+#include "absl/log/check.h"
 #include "absl/log/log.h"
 #include "nyla/commons/readfile.h"
 #include "nyla/vulkan/vulkan.h"
 
-namespace nyla {
+namespace {
 
-static VkPipelineLayout pipeline_layout;
-static VkPipeline pipeline;
-
-struct DebugTextLineUBO {
-  uint32_t words[64];
+struct TextRendererLineUBO {
+  uint32_t words[68];
   int origin_x;
   int origin_y;
   uint32_t word_count;
@@ -21,8 +21,8 @@ struct DebugTextLineUBO {
   float bg[4];
 };
 
-struct PerSwapchainImageData2 {
-  PerSwapchainImageData2(size_t num_swapchain_images)
+struct PerSwapchainImageData {
+  PerSwapchainImageData(size_t num_swapchain_images)
       : descriptor_sets(num_swapchain_images),
         text_line_ubo(num_swapchain_images) {}
 
@@ -42,11 +42,20 @@ struct PerSwapchainImageData2 {
   Uniform text_line_ubo;
 };
 
-static PerSwapchainImageData2* per_swapchain_image_data;
+}  // namespace
 
-void InitDebugTextRenderer() {
+namespace nyla {
+
+static TextRendererLineUBO submit_buffer[16];
+static uint8_t isubmit;
+
+static VkPipelineLayout pipeline_layout;
+static VkPipeline pipeline;
+static PerSwapchainImageData* per_swapchain_image_data;
+
+void InitTextRenderer() {
   per_swapchain_image_data =
-      new PerSwapchainImageData2(vk.swapchain_image_count());
+      new PerSwapchainImageData(vk.swapchain_image_count());
 
   const auto shader_stages = std::to_array<VkPipelineShaderStageCreateInfo>({
       {
@@ -68,7 +77,7 @@ void InitDebugTextRenderer() {
   const VkDescriptorPool descriptor_pool = [] {
     const VkDescriptorPoolSize descriptor_pool_sizes[] = {
         {
-            .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
             .descriptorCount =
                 static_cast<uint32_t>(vk.swapchain_image_count()),
         },
@@ -91,7 +100,7 @@ void InitDebugTextRenderer() {
     const VkDescriptorSetLayoutBinding descriptor_set_layout_bindings[] = {
         {
             .binding = 0,
-            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
             .descriptorCount = 1,
             .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
         },
@@ -137,8 +146,9 @@ void InitDebugTextRenderer() {
   }
 
   for (size_t i = 0; i < vk.swapchain_image_count(); ++i) {
-    CreateUniformBuffer(per_swapchain_image_data->descriptor_sets[i], 0, false,
-                        sizeof(DebugTextLineUBO), sizeof(DebugTextLineUBO),
+    CreateUniformBuffer(per_swapchain_image_data->descriptor_sets[i], 0, true,
+                        sizeof(TextRendererLineUBO) * std::size(submit_buffer),
+                        sizeof(TextRendererLineUBO),
                         per_swapchain_image_data->text_line_ubo.buffer[i],
                         per_swapchain_image_data->text_line_ubo.memory[i],
                         per_swapchain_image_data->text_line_ubo.mapped[i]);
@@ -156,9 +166,10 @@ void InitDebugTextRenderer() {
                                            pipeline_layout, shader_stages);
 }
 
-void DebugRenderTextBegin(const Vulkan_FrameData& frame_data, int32_t x,
-                          int32_t y, std::string_view text) {
-  DebugTextLineUBO ubo{};
+void RenderText(int32_t x, int32_t y, std::string_view text) {
+  CHECK_LT(isubmit, std::size(submit_buffer));
+
+  TextRendererLineUBO& ubo = submit_buffer[isubmit++];
 
   ubo.origin_x = x;
   ubo.origin_y = y;
@@ -168,7 +179,7 @@ void DebugRenderTextBegin(const Vulkan_FrameData& frame_data, int32_t x,
   ubo.fg[2] = 1.f;
   ubo.fg[3] = 1.f;
 
-  ubo.word_count = std::min<size_t>((text.size() + 3) / 4, 64);  // clamp to 64
+  ubo.word_count = std::min<size_t>((text.size() + 3) / 4, 68);
   size_t nbytes = std::min(text.size(), size_t(ubo.word_count) * 4);
 
   for (size_t i = 0; i < ubo.word_count; ++i) {
@@ -176,29 +187,37 @@ void DebugRenderTextBegin(const Vulkan_FrameData& frame_data, int32_t x,
     for (uint8_t j = 0; j < 4; ++j) {
       size_t idx = i * 4 + j;
       if (idx < nbytes) {
-        w |= (uint32_t(uint8_t(text[idx])) << (8 * j));  // << (8*j) !
+        w |= (uint32_t(uint8_t(text[idx])) << (8 * j));
       }
     }
     ubo.words[i] = w;
   }
-
-  memcpy(per_swapchain_image_data->text_line_ubo
-             .mapped[frame_data.swapchain_image_index],
-         &ubo, sizeof(ubo));
 }
 
-void DebugRenderText(const Vulkan_FrameData& frame_data) {
-  const VkCommandBuffer command_buffer = vk.command_buffers[frame_data.iframe];
+void TextRendererBefore() {
+  memcpy(per_swapchain_image_data->text_line_ubo
+             .mapped[vk.current_frame_data.swapchain_image_index],
+         &submit_buffer, sizeof(TextRendererLineUBO) * isubmit);
+}
+
+void TextRendererRecord() {
+  const VkCommandBuffer command_buffer =
+      vk.command_buffers[vk.current_frame_data.iframe];
 
   vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
-  vkCmdBindDescriptorSets(
-      command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1,
-      &per_swapchain_image_data
-           ->descriptor_sets[frame_data.swapchain_image_index],
-      0, nullptr);
+  for (uint8_t i = 0; i < isubmit; ++i) {
+    uint32_t offset = sizeof(TextRendererLineUBO) * i;
 
-  vkCmdDraw(command_buffer, 3, 1, 0, 0);
+    vkCmdBindDescriptorSets(
+        command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1,
+        &per_swapchain_image_data
+             ->descriptor_sets[vk.current_frame_data.swapchain_image_index],
+        1, &offset);
+
+    vkCmdDraw(command_buffer, 3, 1, 0, 0);
+  }
+  isubmit = 0;
 }
 
 }  // namespace nyla

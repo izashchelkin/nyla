@@ -111,7 +111,7 @@ const uvec4 font_data[96] = {
 };
 
 layout(scalar, set=0, binding=0) uniform TextLineUBO {
-	uint words[64];
+	uint words[68];
 	ivec2 origin_px;
 	uint word_count;
 	int pad;

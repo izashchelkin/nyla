@@ -431,23 +431,24 @@ VkShaderModule Vulkan_CreateShaderModule(const std::vector<char>& code) {
   return shader_module;
 }
 
-void Vulkan_FrameBegin(Vulkan_FrameData& frame_data) {
-  const VkFence frame_fence = vk.frame_fences[frame_data.iframe];
+void Vulkan_FrameBegin() {
+  const VkFence frame_fence = vk.frame_fences[vk.current_frame_data.iframe];
 
   vkWaitForFences(vk.device, 1, &frame_fence, VK_TRUE,
                   std::numeric_limits<uint64_t>::max());
   vkResetFences(vk.device, 1, &frame_fence);
 
   const VkSemaphore acquire_semaphore =
-      vk.acquire_semaphores[frame_data.iframe];
+      vk.acquire_semaphores[vk.current_frame_data.iframe];
   VkResult acquire_result = vkAcquireNextImageKHR(
       vk.device, vk.swapchain, std::numeric_limits<uint64_t>::max(),
-      acquire_semaphore, VK_NULL_HANDLE, &frame_data.swapchain_image_index);
+      acquire_semaphore, VK_NULL_HANDLE,
+      &vk.current_frame_data.swapchain_image_index);
 
   if (acquire_result == VK_ERROR_OUT_OF_DATE_KHR ||
       acquire_result == VK_SUBOPTIMAL_KHR) {
     CreateSwapchain();
-    Vulkan_FrameBegin(frame_data);
+    Vulkan_FrameBegin();
     return;
   }
   VK_CHECK(acquire_result);
@@ -457,9 +458,10 @@ void Vulkan_FrameBegin(Vulkan_FrameData& frame_data) {
   const uint64_t dtnanos = now - last;
   last = now;
 
-  frame_data.dt = dtnanos / (float)1e9;
+  vk.current_frame_data.dt = dtnanos / (float)1e9;
 
-  const VkCommandBuffer command_buffer = vk.command_buffers[frame_data.iframe];
+  const VkCommandBuffer command_buffer =
+      vk.command_buffers[vk.current_frame_data.iframe];
 
   VK_CHECK(vkResetCommandBuffer(command_buffer, 0));
 
@@ -469,8 +471,9 @@ void Vulkan_FrameBegin(Vulkan_FrameData& frame_data) {
   VK_CHECK(vkBeginCommandBuffer(command_buffer, &command_buffer_begin_info));
 }
 
-void Vulkan_RenderingBegin(Vulkan_FrameData& frame_data) {
-  const VkCommandBuffer command_buffer = vk.command_buffers[frame_data.iframe];
+void Vulkan_RenderingBegin() {
+  const VkCommandBuffer command_buffer =
+      vk.command_buffers[vk.current_frame_data.iframe];
 
   {
     const VkImageMemoryBarrier image_memory_barrier{
@@ -478,7 +481,8 @@ void Vulkan_RenderingBegin(Vulkan_FrameData& frame_data) {
         .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
         .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,  // TODO:
         .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        .image = vk.swapchain_images[frame_data.swapchain_image_index],
+        .image =
+            vk.swapchain_images[vk.current_frame_data.swapchain_image_index],
         .subresourceRange =
             {
                 .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -496,7 +500,8 @@ void Vulkan_RenderingBegin(Vulkan_FrameData& frame_data) {
 
   const VkRenderingAttachmentInfo color_attachment_info{
       .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-      .imageView = vk.swapchain_image_views[frame_data.swapchain_image_index],
+      .imageView =
+          vk.swapchain_image_views[vk.current_frame_data.swapchain_image_index],
       .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
       .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
       .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
@@ -531,8 +536,9 @@ void Vulkan_RenderingBegin(Vulkan_FrameData& frame_data) {
   }
 }
 
-void Vulkan_RenderingEnd(Vulkan_FrameData& frame_data) {
-  const VkCommandBuffer command_buffer = vk.command_buffers[frame_data.iframe];
+void Vulkan_RenderingEnd() {
+  const VkCommandBuffer command_buffer =
+      vk.command_buffers[vk.current_frame_data.iframe];
 
   vkCmdEndRendering(command_buffer);
 
@@ -542,7 +548,8 @@ void Vulkan_RenderingEnd(Vulkan_FrameData& frame_data) {
         .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT,
         .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-        .image = vk.swapchain_images[frame_data.swapchain_image_index],
+        .image =
+            vk.swapchain_images[vk.current_frame_data.swapchain_image_index],
         .subresourceRange =
             {
                 .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -562,17 +569,18 @@ void Vulkan_RenderingEnd(Vulkan_FrameData& frame_data) {
   CHECK_EQ(vkEndCommandBuffer(command_buffer), VK_SUCCESS);
 }
 
-void Vulkan_FrameEnd(Vulkan_FrameData& frame_data) {
-  const VkCommandBuffer command_buffer = vk.command_buffers[frame_data.iframe];
+void Vulkan_FrameEnd() {
+  const VkCommandBuffer command_buffer =
+      vk.command_buffers[vk.current_frame_data.iframe];
 
   const VkPipelineStageFlags wait_stages[] = {
       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
   };
 
   const VkSemaphore acquire_semaphore =
-      vk.acquire_semaphores[frame_data.iframe];
+      vk.acquire_semaphores[vk.current_frame_data.iframe];
   const VkSemaphore submit_semaphore =
-      vk.submit_semaphores[frame_data.swapchain_image_index];
+      vk.submit_semaphores[vk.current_frame_data.swapchain_image_index];
   const VkSubmitInfo submit_info{
       .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
       .waitSemaphoreCount = 1,
@@ -584,7 +592,7 @@ void Vulkan_FrameEnd(Vulkan_FrameData& frame_data) {
       .pSignalSemaphores = &submit_semaphore,
   };
 
-  const VkFence frame_fence = vk.frame_fences[frame_data.iframe];
+  const VkFence frame_fence = vk.frame_fences[vk.current_frame_data.iframe];
   VK_CHECK(vkQueueSubmit(vk.queue, 1, &submit_info, frame_fence));
 
   const VkPresentInfoKHR present_info{
@@ -593,7 +601,7 @@ void Vulkan_FrameEnd(Vulkan_FrameData& frame_data) {
       .pWaitSemaphores = &submit_semaphore,
       .swapchainCount = 1,
       .pSwapchains = &vk.swapchain,
-      .pImageIndices = &frame_data.swapchain_image_index,
+      .pImageIndices = &vk.current_frame_data.swapchain_image_index,
   };
 
   VkResult present_result = vkQueuePresentKHR(vk.queue, &present_info);
@@ -604,7 +612,8 @@ void Vulkan_FrameEnd(Vulkan_FrameData& frame_data) {
     VK_CHECK(present_result);
   }
 
-  frame_data.iframe = (frame_data.iframe + 1) % kVulkan_NumFramesInFlight;
+  vk.current_frame_data.iframe =
+      (vk.current_frame_data.iframe + 1) % kVulkan_NumFramesInFlight;
 }
 
 void Vulkan_CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage,

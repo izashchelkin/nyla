@@ -32,6 +32,12 @@ struct Vulkan_State {
   std::vector<VkFence> frame_fences;
   std::vector<VkSemaphore> submit_semaphores;
   std::vector<VkCommandBuffer> command_buffers;
+
+  struct {
+    uint32_t swapchain_image_index;
+    float dt;
+    uint8_t iframe;
+  } current_frame_data;
 };
 extern Vulkan_State vk;
 
@@ -93,15 +99,10 @@ inline VkFence CreateFence(bool signaled = false) {
 
 //
 
-struct Vulkan_FrameData {
-  uint32_t swapchain_image_index;
-  float dt;
-  uint8_t iframe;
-};
-void Vulkan_FrameBegin(Vulkan_FrameData& frame_data);
-void Vulkan_RenderingBegin(Vulkan_FrameData& frame_data);
-void Vulkan_RenderingEnd(Vulkan_FrameData& frame_data);
-void Vulkan_FrameEnd(Vulkan_FrameData& frame_data);
+void Vulkan_FrameBegin();
+void Vulkan_RenderingBegin();
+void Vulkan_RenderingEnd();
+void Vulkan_FrameEnd();
 
 //
 

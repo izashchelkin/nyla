@@ -17,7 +17,7 @@
 #include "nyla/commons/readfile.h"
 #include "nyla/commons/types.h"
 #include "nyla/shipgame/circle.h"
-#include "nyla/shipgame/debug_text_renderer.h"
+#include "nyla/shipgame/text_renderer.h"
 #include "nyla/vulkan/vulkan.h"
 #include "nyla/x11/x11.h"
 #include "xcb/xcb.h"
@@ -344,7 +344,7 @@ static int Main() {
     return graphics_pipeline;
   }();
 
-  InitDebugTextRenderer();
+  InitTextRenderer();
 
   struct Profiling {
     uint16_t xevent;
@@ -367,11 +367,10 @@ static int Main() {
 
     if (!running) break;
 
-    static Vulkan_FrameData frame_data;
-    Vulkan_FrameBegin(frame_data);
+    Vulkan_FrameBegin();
 
-    if (frame_data.dt > .05f) {
-      LOG(INFO) << "dts spike: " << frame_data.dt << "s";
+    if (vk.current_frame_data.dt > .05f) {
+      LOG(INFO) << "dts spike: " << vk.current_frame_data.dt << "s";
 
       const Profiling& lastprof =
           prof_data[(iprof + prof_data.size() - 2) % prof_data.size()];
@@ -464,10 +463,10 @@ static int Main() {
                      (pressed_keys.contains(up_keycode) ? 1 : 0);
 
       static float dt_accumulator = 0.f;
-      dt_accumulator += frame_data.dt;
+      dt_accumulator += vk.current_frame_data.dt;
 
       constexpr float step = 1.f / 120.f;
-      for (; dt_accumulator >= frame_data.dt; dt_accumulator -= step) {
+      for (; dt_accumulator >= vk.current_frame_data.dt; dt_accumulator -= step) {
         {
           if (dx || dy) {
             float angle =
@@ -548,19 +547,22 @@ static int Main() {
       }
 
       memcpy(per_swapchain_image_data.scene_ubo
-                 .mapped[frame_data.swapchain_image_index],
+                 .mapped[vk.current_frame_data.swapchain_image_index],
              &scene_ubo, sizeof(scene_ubo));
       memcpy(per_swapchain_image_data.entity_ubo
-                 .mapped[frame_data.swapchain_image_index],
+                 .mapped[vk.current_frame_data.swapchain_image_index],
              &entity_ubos, sizeof(entity_ubos));
     }
 
-    DebugRenderTextBegin(frame_data, 200, 200, "Hello world!");
+    RenderText(200, 200, "Hello world!");
+    RenderText(250, 250, "Hello world, here too!");
 
-    Vulkan_RenderingBegin(frame_data);
+		TextRendererBefore();
+
+    Vulkan_RenderingBegin();
     {
       const VkCommandBuffer command_buffer =
-          vk.command_buffers[frame_data.iframe];
+          vk.command_buffers[vk.current_frame_data.iframe];
 
 #if 1
       vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -589,7 +591,7 @@ static int Main() {
               command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout,
               0, 1,
               &per_swapchain_image_data
-                   .descriptor_sets[frame_data.swapchain_image_index],
+                   .descriptor_sets[vk.current_frame_data.swapchain_image_index],
               1, &ubo_offset);
 
           vkCmdDraw(command_buffer, entity.vertex_count, 1, 0, 0);
@@ -597,11 +599,11 @@ static int Main() {
       }
 #endif
 
-      DebugRenderText(frame_data);
+			TextRendererRecord();
     }
 
-    Vulkan_RenderingEnd(frame_data);
-    Vulkan_FrameEnd(frame_data);
+    Vulkan_RenderingEnd();
+    Vulkan_FrameEnd();
   }
   return 0;
 }
