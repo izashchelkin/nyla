@@ -17,6 +17,7 @@
 #include "nyla/commons/readfile.h"
 #include "nyla/commons/types.h"
 #include "nyla/shipgame/circle.h"
+#include "nyla/shipgame/debug_text_renderer.h"
 #include "nyla/vulkan/vulkan.h"
 #include "nyla/x11/x11.h"
 #include "xcb/xcb.h"
@@ -96,40 +97,6 @@ void Vulkan_PlatformSetSurface() {
                                  &vk.surface));
 }
 
-static void CreateUniformBuffer(VkDescriptorSet descriptor_set,
-                                uint32_t dstBinding, bool dynamic,
-                                size_t buffer_size, size_t range,
-                                VkBuffer& buffer, VkDeviceMemory& memory,
-                                void*& mapped) {
-  Vulkan_CreateBuffer(buffer_size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                          VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                      buffer, memory);
-
-  vkMapMemory(vk.device, memory, 0, buffer_size, 0, &mapped);
-
-  VkDescriptorBufferInfo descriptor_buffer_info{
-      .buffer = buffer,
-      .offset = 0,
-      .range = range,
-  };
-
-  VkWriteDescriptorSet write_descriptor_set{
-      .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-      .dstSet = descriptor_set,
-      .dstBinding = dstBinding,
-      .dstArrayElement = 0,
-      .descriptorCount = 1,
-      .descriptorType = dynamic ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC
-                                : VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-      .pImageInfo = nullptr,
-      .pBufferInfo = &descriptor_buffer_info,
-      .pTexelBufferView = nullptr,
-  };
-
-  vkUpdateDescriptorSets(vk.device, 1, &write_descriptor_set, 0, nullptr);
-}
-
 static void ProcessXEvents() {
   for (;;) {
     if (xcb_connection_has_error(x11.conn)) {
@@ -196,6 +163,9 @@ static int Main() {
   Vulkan_Initialize();
 
   PerSwapchainImageData per_swapchain_image_data(vk.swapchain_image_count());
+
+  CHECK_EQ(vk.swapchain_image_count(),
+           per_swapchain_image_data.entity_ubo.buffer.size());
 
   xcb_keycode_t up_keycode;
   xcb_keycode_t left_keycode;
@@ -373,6 +343,8 @@ static int Main() {
         vertex_input_create_info, pipeline_layout, shader_stages);
     return graphics_pipeline;
   }();
+
+  InitDebugTextRenderer();
 
   struct Profiling {
     uint16_t xevent;
@@ -583,41 +555,52 @@ static int Main() {
              &entity_ubos, sizeof(entity_ubos));
     }
 
-    Vulkan_RenderingBegin(graphics_pipeline, frame_data);
+    DebugRenderTextBegin(frame_data, 200, 200, "Hello world!");
+
+    Vulkan_RenderingBegin(frame_data);
     {
       const VkCommandBuffer command_buffer =
           vk.command_buffers[frame_data.iframe];
 
-      VkBuffer last_vertex_buffer = nullptr;
-      uint32_t last_vertex_offset = 0;
+#if 1
+      vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                        graphics_pipeline);
+      {
+        VkBuffer last_vertex_buffer = nullptr;
+        uint32_t last_vertex_offset = 0;
 
-      for (size_t i = 0; i < std::size(entities); ++i) {
-        const auto& entity = entities[i];
+        for (size_t i = 0; i < std::size(entities); ++i) {
+          const auto& entity = entities[i];
 
-        if (!entity.flags) continue;
+          if (!entity.flags) continue;
 
-        if (last_vertex_buffer != entity.vertex_buffer ||
-            last_vertex_offset != entity.vertex_offset) {
-          last_vertex_buffer = entity.vertex_buffer;
-          last_vertex_offset = entity.vertex_offset;
+          if (last_vertex_buffer != entity.vertex_buffer ||
+              last_vertex_offset != entity.vertex_offset) {
+            last_vertex_buffer = entity.vertex_buffer;
+            last_vertex_offset = entity.vertex_offset;
 
-          const VkDeviceSize offset = last_vertex_offset * sizeof(Vertex);
-          vkCmdBindVertexBuffers(command_buffer, 0, 1, &last_vertex_buffer,
-                                 &offset);
+            const VkDeviceSize offset = last_vertex_offset * sizeof(Vertex);
+            vkCmdBindVertexBuffers(command_buffer, 0, 1, &last_vertex_buffer,
+                                   &offset);
+          }
+
+          const uint32_t ubo_offset = i * sizeof(EntityUbo);
+          vkCmdBindDescriptorSets(
+              command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout,
+              0, 1,
+              &per_swapchain_image_data
+                   .descriptor_sets[frame_data.swapchain_image_index],
+              1, &ubo_offset);
+
+          vkCmdDraw(command_buffer, entity.vertex_count, 1, 0, 0);
         }
-
-        const uint32_t ubo_offset = i * sizeof(EntityUbo);
-        vkCmdBindDescriptorSets(
-            command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0,
-            1,
-            &per_swapchain_image_data
-                 .descriptor_sets[frame_data.swapchain_image_index],
-            1, &ubo_offset);
-
-        vkCmdDraw(command_buffer, entity.vertex_count, 1, 0, 0);
       }
+#endif
+
+      DebugRenderText(frame_data);
     }
-    Vulkan_RenderingEnd(graphics_pipeline, frame_data);
+
+    Vulkan_RenderingEnd(frame_data);
     Vulkan_FrameEnd(frame_data);
   }
   return 0;

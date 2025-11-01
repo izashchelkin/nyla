@@ -1,5 +1,7 @@
 #version 460
 
+#extension GL_EXT_scalar_block_layout : require
+
 // Auto-generated from PSF2 (8x16)
 // Packing convention:
 //   Each glyph uses uvec4 {w0,w1,w2,w3} (16 bytes total).
@@ -108,10 +110,10 @@ const uvec4 font_data[96] = {
   uvec4(0x08100000, 0x00000000, 0x00000000, 0x00000000), // 0x7F: BACKSPACE
 };
 
-layout(std140, set=0, binding=0) uniform TextLineUBO {
+layout(scalar, set=0, binding=0) uniform TextLineUBO {
 	uint words[64];
 	ivec2 origin_px;
-	int word_count;
+	uint word_count;
 	int pad;
 	vec4 fg;
 	vec4 bg;
@@ -132,7 +134,7 @@ void main() {
 	if (top_left_pos.y < 0) discard;
 	if (top_left_pos.y >= int(HEIGHT)) discard;
 
-	int line_width_px = text_line.word_count * 4 * int(WIDTH);
+	uint line_width_px = text_line.word_count * 4 * WIDTH;
 	if (top_left_pos.x >= line_width_px) discard;
 
 	int cx = top_left_pos.x / int(WIDTH);

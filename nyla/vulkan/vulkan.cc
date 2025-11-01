@@ -469,8 +469,7 @@ void Vulkan_FrameBegin(Vulkan_FrameData& frame_data) {
   VK_CHECK(vkBeginCommandBuffer(command_buffer, &command_buffer_begin_info));
 }
 
-void Vulkan_RenderingBegin(VkPipeline graphics_pipeline,
-                           Vulkan_FrameData& frame_data) {
+void Vulkan_RenderingBegin(Vulkan_FrameData& frame_data) {
   const VkCommandBuffer command_buffer = vk.command_buffers[frame_data.iframe];
 
   {
@@ -514,9 +513,6 @@ void Vulkan_RenderingBegin(VkPipeline graphics_pipeline,
 
   vkCmdBeginRendering(command_buffer, &rendering_info);
   {
-    vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                      graphics_pipeline);
-
     const VkViewport viewport{
         .x = 0.f,
         .y = static_cast<float>(vk.surface_extent.height),
@@ -535,8 +531,7 @@ void Vulkan_RenderingBegin(VkPipeline graphics_pipeline,
   }
 }
 
-void Vulkan_RenderingEnd(VkPipeline graphics_pipeline,
-                         Vulkan_FrameData& frame_data) {
+void Vulkan_RenderingEnd(Vulkan_FrameData& frame_data) {
   const VkCommandBuffer command_buffer = vk.command_buffers[frame_data.iframe];
 
   vkCmdEndRendering(command_buffer);
@@ -712,6 +707,39 @@ void Vulkan_CreateBuffer(VkCommandPool command_pool, VkQueue transfer_queue,
   vkFreeCommandBuffers(vk.device, command_pool, 1, &command_buffer);
   vkDestroyBuffer(vk.device, staging_buffer, nullptr);
   vkFreeMemory(vk.device, staging_buffer_memory, nullptr);
+}
+
+void CreateUniformBuffer(VkDescriptorSet descriptor_set, uint32_t dstBinding,
+                         bool dynamic, size_t buffer_size, size_t range,
+                         VkBuffer& buffer, VkDeviceMemory& memory,
+                         void*& mapped) {
+  Vulkan_CreateBuffer(buffer_size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                          VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                      buffer, memory);
+
+  vkMapMemory(vk.device, memory, 0, buffer_size, 0, &mapped);
+
+  VkDescriptorBufferInfo descriptor_buffer_info{
+      .buffer = buffer,
+      .offset = 0,
+      .range = range,
+  };
+
+  VkWriteDescriptorSet write_descriptor_set{
+      .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+      .dstSet = descriptor_set,
+      .dstBinding = dstBinding,
+      .dstArrayElement = 0,
+      .descriptorCount = 1,
+      .descriptorType = dynamic ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC
+                                : VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+      .pImageInfo = nullptr,
+      .pBufferInfo = &descriptor_buffer_info,
+      .pTexelBufferView = nullptr,
+  };
+
+  vkUpdateDescriptorSets(vk.device, 1, &write_descriptor_set, 0, nullptr);
 }
 
 }  // namespace nyla

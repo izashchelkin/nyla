@@ -99,10 +99,15 @@ struct Vulkan_FrameData {
   uint8_t iframe;
 };
 void Vulkan_FrameBegin(Vulkan_FrameData& frame_data);
-void Vulkan_RenderingBegin(VkPipeline graphics_pipeline,
-                           Vulkan_FrameData& frame_data);
-void Vulkan_RenderingEnd(VkPipeline graphics_pipeline,
-                         Vulkan_FrameData& frame_data);
+void Vulkan_RenderingBegin(Vulkan_FrameData& frame_data);
+void Vulkan_RenderingEnd(Vulkan_FrameData& frame_data);
 void Vulkan_FrameEnd(Vulkan_FrameData& frame_data);
+
+//
+
+void CreateUniformBuffer(VkDescriptorSet descriptor_set, uint32_t dstBinding,
+                         bool dynamic, size_t buffer_size, size_t range,
+                         VkBuffer& buffer, VkDeviceMemory& memory,
+                         void*& mapped);
 
 }  // namespace nyla
