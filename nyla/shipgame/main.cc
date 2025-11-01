@@ -6,10 +6,9 @@
 #include <vector>
 
 #include "absl/cleanup/cleanup.h"
-#include "absl/log/globals.h"
-#include "absl/log/initialize.h"
 #include "absl/log/log.h"
 #include "nyla/commons/clock.h"
+#include "nyla/commons/logging/init.h"
 #include "nyla/commons/math/lerp.h"
 #include "nyla/commons/math/mat4.h"
 #include "nyla/commons/math/math.h"
@@ -173,8 +172,7 @@ static void ProcessXEvents() {
 }
 
 static int Main() {
-  absl::InitializeLog();
-  absl::SetStderrThreshold(absl::LogSeverityAtLeast::kInfo);
+  InitLogging();
 
   X11_Initialize();
 
@@ -448,11 +446,10 @@ static int Main() {
       for (size_t i = 0; i < std::size(asteroids); ++i) {
         auto& asteroid = asteroids[i];
 
-        if (i == 0)
-          asteroid.mass = 200;
+        if (i & 1)
+          asteroid.mass = 300;
         else {
-          asteroid.mass = 1 * i + 10;
-          // asteroid.velocity = {10, 10};
+          asteroid.mass = 50;
         }
 
         std::vector<Vertex> asteroid_vertices;

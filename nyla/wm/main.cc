@@ -8,9 +8,8 @@
 
 #include "absl/cleanup/cleanup.h"
 #include "absl/log/check.h"
-#include "absl/log/globals.h"
-#include "absl/log/initialize.h"
 #include "absl/log/log.h"
+#include "nyla/commons/logging/init.h"
 #include "nyla/commons/spawn.h"
 #include "nyla/commons/timerfd.h"
 #include "nyla/fs/nylafs.h"
@@ -22,10 +21,9 @@
 namespace nyla {
 
 int Main(int argc, char** argv) {
-  bool is_running = true;
+  InitLogging();
 
-  absl::InitializeLog();
-  absl::SetStderrThreshold(absl::LogSeverityAtLeast::kInfo);
+  bool is_running = true;
 
   X11_Initialize();
 
