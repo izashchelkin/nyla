@@ -1,4 +1,6 @@
 #include "nyla/commons/math/mat4.h"
+#include "nyla/commons/math/vec/vec2f.h"
+#include "nyla/commons/math/vec/vec3f.h"
 
 namespace nyla {
 
@@ -12,12 +14,12 @@ struct EntityUbo {
 };
 
 struct Vertex {
-  Vec2 pos;
-  Vec3 color;
+  Vec2f pos;
+  Vec3f color;
 };
 
 void InitEntityRenderer();
-void EntityRendererBefore(Vec2 camera_pos, float zoom);
+void EntityRendererBefore(Vec2f camera_pos, float zoom);
 void EntityRendererRecord();
 
 }  // namespace nyla

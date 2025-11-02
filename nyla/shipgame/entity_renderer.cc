@@ -5,6 +5,7 @@
 #include <array>
 
 #include "nyla/commons/readfile.h"
+#include "nyla/shipgame/bump_aloc.h"
 #include "nyla/shipgame/common.h"
 #include "nyla/vulkan/vulkan.h"
 
@@ -193,9 +194,9 @@ void InitEntityRenderer() {
                                            pipeline_layout, shader_stages);
 }
 
-void EntityRendererBefore(Vec2 camera_pos, float zoom) {
+void EntityRendererBefore(Vec2f camera_pos, float zoom) {
   const SceneUbo scene_ubo = {
-      .view = Translate(Vec3{-camera_pos.x, -camera_pos.y, 0.f}),
+      .view = Translate(*Tnew(Vec2fNeg(camera_pos))),
       .proj = Ortho(vk.surface_extent.width * zoom / -2.f,
                     vk.surface_extent.width * zoom / 2.f,
                     vk.surface_extent.height * zoom / 2.f,

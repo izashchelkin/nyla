@@ -4,7 +4,7 @@
 #include <cmath>
 #include <cstddef>
 
-#include "nyla/commons/math/vec3.h"
+#include "absl/log/check.h"
 
 namespace nyla {
 
@@ -30,9 +30,11 @@ inline Mat4 Mult(const Mat4& lhs, const Mat4& rhs) {
   return ret;
 }
 
-inline Mat4 Translate(const Vec3& v) {
+inline Mat4 Translate(std::span<const float> v) {
+  CHECK(v.size() >= 2);
+
   Mat4 ret = Identity4;
-  ret[3] = {v.x, v.y, v.z, 1.f};
+  ret[3] = {v[0], v[1], v.size() > 2 ? v[2] : 0.f, 1.f};
   return ret;
 }
 

@@ -1,19 +1,21 @@
+#pragma once
+
 #include <cstdint>
 
-#include "nyla/commons/math/vec2.h"
+#include "nyla/commons/math/vec/vec2f.h"
 #include "nyla/vulkan/vulkan.h"
 
 namespace nyla {
 
 struct Entity {
   uint32_t flags;
-  Vec2 pos;
-  Vec2 velocity;
+  Vec2f pos;
+  Vec2f velocity;
   float mass;
   float density;
   float angle_radians;
 
-  Vec2 hit_rect;
+  Vec2f hit_rect;
 
   uint32_t vertex_count;
   uint32_t vertex_offset;

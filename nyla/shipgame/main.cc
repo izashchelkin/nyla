@@ -6,6 +6,7 @@
 #include <iterator>
 #include <memory>
 #include <random>
+#include <string>
 #include <vector>
 
 #include "absl/cleanup/cleanup.h"
@@ -16,10 +17,11 @@
 #include "nyla/commons/math/lerp.h"
 #include "nyla/commons/math/mat4.h"
 #include "nyla/commons/math/math.h"
-#include "nyla/commons/math/vec2.h"
-#include "nyla/commons/math/vec3.h"
+#include "nyla/commons/math/vec/vec2f.h"
+#include "nyla/commons/math/vec/vec3f.h"
 #include "nyla/commons/readfile.h"
 #include "nyla/commons/types.h"
+#include "nyla/shipgame/bump_aloc.h"
 #include "nyla/shipgame/circle.h"
 #include "nyla/shipgame/common.h"
 #include "nyla/shipgame/entity_renderer.h"
@@ -76,6 +78,7 @@ static void ProcessXEvents() {
       case XCB_KEY_PRESS: {
         auto keypress = reinterpret_cast<xcb_key_press_event_t*>(event);
         pressed_keys.emplace(keypress->detail);
+        released_keys.erase(keypress->detail);
         break;
       }
 
@@ -117,6 +120,7 @@ static void ProcessXEvents() {
 
 static int Main() {
   InitLogging();
+  InitGlobalTnew();
 
   X11_Initialize();
 
@@ -220,8 +224,8 @@ static int Main() {
                           ship_vertex_buffer_memory);
 
       ship.flags = 1;
-      ship.mass = 5;
-      ship.density = 1;
+      ship.mass = 0;
+      ship.density = 0;
       ship.vertex_count = ship_vertices.size();
       ship.vertex_buffer = ship_vertex_buffer;
       ship.vertex_buffer_memory = ship_vertex_buffer_memory;
@@ -260,10 +264,10 @@ static int Main() {
 
         std::vector<Vertex> asteroid_vertices;
         {
-          std::vector<Vec2> asteroid_vertex_positions =
+          std::vector<Vec2f> asteroid_vertex_positions =
               TriangulateCircle(10, radius);
           asteroid_vertices.reserve(asteroid_vertex_positions.size());
-          for (Vec2& pos : asteroid_vertex_positions) {
+          for (Vec2f& pos : asteroid_vertex_positions) {
             asteroid_vertices.emplace_back(Vertex{pos, {.3f, 1.f, .3f}});
           }
         }
@@ -278,8 +282,8 @@ static int Main() {
 
         asteroid.flags = 3;
 
-        asteroid.pos.x = dist(gen);
-        asteroid.pos.y = dist(gen);
+        asteroid.pos[0] = dist(gen);
+        asteroid.pos[1] = dist(gen);
 
         asteroid.vertex_count = asteroid_vertices.size();
         asteroid.vertex_buffer = asteroid_vertex_buffer;
@@ -289,7 +293,7 @@ static int Main() {
       return asteroids;
     }();
 
-    static Vec2 camera_pos = {};
+    static Vec2f camera_pos = {};
 
     const int dx = (pressed_keys.contains(right_keycode) ? 1 : 0) -
                    (pressed_keys.contains(left_keycode) ? 1 : 0);
@@ -313,24 +317,22 @@ static int Main() {
         }
 
         if (pressed_keys.contains(brake_keycode)) {
-          Lerp(ship.velocity, Vec2{}, step * 5.f);
+          Lerp(ship.velocity, *Tnew(Vec2f{}), step * 5.f);
         } else if (pressed_keys.contains(boost_keycode)) {
-          const Vec2 direction = Normalize(Vec2{
-              std::cos(ship.angle_radians),
-              std::sin(ship.angle_radians),
-          });
-          Lerp(ship.velocity, direction * 5000.f, step);
+          const Vec2f direction = Vec2fNorm(*Tnew<Vec2f>(
+              std::cos(ship.angle_radians), std::sin(ship.angle_radians)));
+
+          Lerp(ship.velocity, *Tnew(Vec2fMul(direction, 5000.f)), step);
         } else if (pressed_keys.contains(acceleration_keycode)) {
-          const Vec2 direction = Normalize(Vec2{
-              std::cos(ship.angle_radians),
-              std::sin(ship.angle_radians),
-          });
-          Lerp(ship.velocity, direction * 1000.f, step * 8.f);
+          const Vec2f direction = Vec2fNorm(*Tnew<Vec2f>(
+              std::cos(ship.angle_radians), std::sin(ship.angle_radians)));
+
+          Lerp(ship.velocity, *Tnew(Vec2fMul(direction, 1000.f)), step * 8.f);
         } else {
-          Lerp(ship.velocity, Vec2{}, step);
+          Lerp(ship.velocity, *Tnew(Vec2f{}), step);
         }
 
-        ship.pos += ship.velocity * step;
+        Vec2fAdd(ship.pos, *Tnew<Vec2f>(Vec2fMul(ship.velocity, step)));
       }
 
       {
@@ -340,23 +342,25 @@ static int Main() {
       {
         for (size_t i = 0; i < std::size(entities); ++i) {
           auto& entity = entities[i];
+          if (!entity.mass) continue;
           if ((entity.flags & 2) == 0) continue;
 
-          Vec2 force_sum{};
+          Vec2f force_sum{};
 
           for (size_t j = 0; j < std::size(entities); ++j) {
             if (j == i) continue;
             if (!entities[j].mass) continue;
 
-            Vec2 v = entities[j].pos - entity.pos;
-            float r = Len(v);
+            Vec2f v = Vec2fDif(entities[j].pos, entity.pos);
+            float r = Vec2fLen(v);
             float F = 100 * 6.7f * entity.mass * entities[j].mass / (r * r);
 
-            force_sum += (v / Len(v) * F);
+            Vec2fAdd(force_sum, *Tnew<Vec2f>(Vec2fMul(v, F / Vec2fLen(v))));
           }
 
-          entity.velocity += (force_sum / entity.mass) * step;
-          entity.pos += entity.velocity * step;
+          Vec2fAdd(entity.velocity,
+                   *Tnew(Vec2fMul(force_sum, step / entity.mass)));
+          Vec2fAdd(entity.pos, *Tnew(Vec2fMul(entity.velocity, step)));
         }
       }
     }
@@ -370,8 +374,9 @@ static int Main() {
       zoom = std::clamp(zoom, .1f, 10.f);
     }
 
-    RenderText(200, 200, "Zoom: " + std::to_string(zoom));
-    RenderText(250, 250, "Hello world, here too!");
+    RenderText(200, 200, "zoom: " + std::to_string(zoom));
+    RenderText(200, 250,
+               "dt: " + std::to_string(1.f / vk.current_frame_data.dt));
 
     EntityRendererBefore(camera_pos, zoom);
     TextRendererBefore();
@@ -383,6 +388,8 @@ static int Main() {
     }
     Vulkan_RenderingEnd();
     Vulkan_FrameEnd();
+
+    BumpAllocReset();
 
     for (auto key : released_keys) {
       pressed_keys.erase(key);

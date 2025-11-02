@@ -1,9 +1,11 @@
 #pragma once
 
-#include "nyla/commons/math/vec2.h"
+#include <vector>
+
+#include "nyla/commons/math/vec/vec2f.h"
 
 namespace nyla {
 
-std::vector<Vec2> TriangulateCircle(size_t n, float radius);
+std::vector<Vec2f> TriangulateCircle(size_t n, float radius);
 
 }  // namespace nyla
