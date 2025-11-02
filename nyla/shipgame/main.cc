@@ -1,13 +1,16 @@
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <iterator>
+#include <memory>
 #include <random>
 #include <vector>
 
 #include "absl/cleanup/cleanup.h"
 #include "absl/log/log.h"
+#include "absl/strings/str_join.h"
 #include "nyla/commons/clock.h"
 #include "nyla/commons/logging/init.h"
 #include "nyla/commons/math/lerp.h"
@@ -18,71 +21,26 @@
 #include "nyla/commons/readfile.h"
 #include "nyla/commons/types.h"
 #include "nyla/shipgame/circle.h"
+#include "nyla/shipgame/common.h"
+#include "nyla/shipgame/entity_renderer.h"
 #include "nyla/shipgame/text_renderer.h"
 #include "nyla/vulkan/vulkan.h"
 #include "nyla/x11/x11.h"
 #include "xcb/xcb.h"
+#include "xcb/xproto.h"
 
 namespace nyla {
 
-struct Vertex {
-  Vec2 pos;
-  Vec3 color;
-};
-
-struct Entity {
-  uint32_t flags;
-  Vec2 pos;
-  Vec2 velocity;
-  float mass;
-  float density;
-  float angle_radians;
-
-  Vec2 hit_rect;
-
-  uint32_t vertex_count;
-  uint32_t vertex_offset;
-  VkBuffer vertex_buffer;
-  VkDeviceMemory vertex_buffer_memory;
-};
 uint16_t ientity;
-static Entity entities[256];
-
-struct SceneUbo {
-  Mat4 view;
-  Mat4 proj;
-};
-
-struct EntityUbo {
-  Mat4 model;
-};
-
-struct PerSwapchainImageData {
-  PerSwapchainImageData(size_t num_swapchain_images)
-      : descriptor_sets(num_swapchain_images),
-        scene_ubo(num_swapchain_images),
-        entity_ubo(num_swapchain_images) {}
-
-  std::vector<VkDescriptorSet> descriptor_sets;
-
-  struct Uniform {
-    Uniform(size_t num_swapchain_images)
-        : buffer(num_swapchain_images),
-          memory(num_swapchain_images),
-          mapped(num_swapchain_images) {}
-
-    std::vector<VkBuffer> buffer;
-    std::vector<VkDeviceMemory> memory;
-    std::vector<void*> mapped;
-  };
-
-  Uniform scene_ubo;
-  Uniform entity_ubo;
-};
+Entity entities[256];
 
 static bool running = true;
 static xcb_window_t window;
+
 static Set<xcb_keycode_t> pressed_keys;
+static Set<xcb_keycode_t> released_keys;
+static Set<xcb_button_index_t> pressed_buttons;
+static Set<xcb_button_index_t> released_buttons;
 
 VkExtent2D Vulkan_PlatformGetWindowExtent() {
   xcb_get_geometry_reply_t* window_geometry = xcb_get_geometry_reply(
@@ -123,7 +81,22 @@ static void ProcessXEvents() {
 
       case XCB_KEY_RELEASE: {
         auto keyrelease = reinterpret_cast<xcb_key_release_event_t*>(event);
-        pressed_keys.erase(keyrelease->detail);
+        released_keys.emplace(keyrelease->detail);
+        break;
+      }
+
+      case XCB_BUTTON_PRESS: {
+        auto buttonpress = reinterpret_cast<xcb_button_press_event_t*>(event);
+        pressed_buttons.emplace(
+            static_cast<xcb_button_index_t>(buttonpress->detail));
+        break;
+      }
+
+      case XCB_BUTTON_RELEASE: {
+        auto buttonrelease =
+            reinterpret_cast<xcb_button_release_event_t*>(event);
+        released_buttons.emplace(
+            static_cast<xcb_button_index_t>(buttonrelease->detail));
         break;
       }
 
@@ -158,18 +131,15 @@ static int Main() {
             XCB_WINDOW_CLASS_INPUT_OUTPUT, x11.screen->root_visual,
             XCB_CW_OVERRIDE_REDIRECT | XCB_CW_EVENT_MASK,
             (uint32_t[]){false, XCB_EVENT_MASK_KEY_PRESS |
-                                    XCB_EVENT_MASK_KEY_RELEASE})));
+                                    XCB_EVENT_MASK_KEY_RELEASE |
+                                    XCB_EVENT_MASK_BUTTON_PRESS |
+                                    XCB_EVENT_MASK_BUTTON_RELEASE})));
 
     xcb_map_window(x11.conn, window);
     xcb_flush(x11.conn);
   }
 
   Vulkan_Initialize();
-
-  PerSwapchainImageData per_swapchain_image_data(vk.swapchain_image_count());
-
-  CHECK_EQ(vk.swapchain_image_count(),
-           per_swapchain_image_data.entity_ubo.buffer.size());
 
   xcb_keycode_t up_keycode;
   xcb_keycode_t left_keycode;
@@ -196,158 +166,9 @@ static int Main() {
     X11_FreeKeyResolver(key_resolver);
   }
 
-  const auto shader_stages = std::to_array<VkPipelineShaderStageCreateInfo>({
-      {
-          .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-          .stage = VK_SHADER_STAGE_VERTEX_BIT,
-          .module = Vulkan_CreateShaderModule(
-              ReadFile("nyla/vulkan/shaders/vert.spv")),
-          .pName = "main",
-      },
-      {
-          .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-          .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-          .module = Vulkan_CreateShaderModule(
-              ReadFile("nyla/vulkan/shaders/frag.spv")),
-          .pName = "main",
-      },
-  });
-
   //
 
-  const VkDescriptorPool descriptor_pool = [] {
-    const VkDescriptorPoolSize descriptor_pool_sizes[] = {
-        {
-            .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
-            .descriptorCount =
-                static_cast<uint32_t>(vk.swapchain_image_count()),
-        },
-        {
-            .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            .descriptorCount =
-                static_cast<uint32_t>(vk.swapchain_image_count()),
-        },
-    };
-
-    const VkDescriptorPoolCreateInfo descriptor_pool_create_info{
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-        .maxSets = static_cast<uint32_t>(vk.swapchain_image_count()),
-        .poolSizeCount = std::size(descriptor_pool_sizes),
-        .pPoolSizes = descriptor_pool_sizes,
-    };
-
-    VkDescriptorPool descriptor_pool;
-    VK_CHECK(vkCreateDescriptorPool(vk.device, &descriptor_pool_create_info,
-                                    nullptr, &descriptor_pool));
-    return descriptor_pool;
-  }();
-
-  const VkDescriptorSetLayout descriptor_set_layout = [] {
-    const VkDescriptorSetLayoutBinding descriptor_set_layout_bindings[] = {
-        {
-            .binding = 0,
-            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            .descriptorCount = 1,
-            .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
-        },
-        {
-            .binding = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
-            .descriptorCount = 1,
-            .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
-        },
-    };
-
-    const VkDescriptorSetLayoutCreateInfo descriptor_set_layout_create_info{
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-        .bindingCount = std::size(descriptor_set_layout_bindings),
-        .pBindings = descriptor_set_layout_bindings,
-    };
-
-    VkDescriptorSetLayout descriptor_set_layout;
-    VK_CHECK(vkCreateDescriptorSetLayout(vk.device,
-                                         &descriptor_set_layout_create_info,
-                                         nullptr, &descriptor_set_layout));
-    return descriptor_set_layout;
-  }();
-
-  const VkPipelineLayoutCreateInfo pipeline_layout_create_info{
-      .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-      .setLayoutCount = 1,
-      .pSetLayouts = &descriptor_set_layout,
-  };
-
-  VkPipelineLayout pipeline_layout;
-  vkCreatePipelineLayout(vk.device, &pipeline_layout_create_info, nullptr,
-                         &pipeline_layout);
-
-  {
-    const std::vector<VkDescriptorSetLayout> descriptor_sets_layouts(
-        vk.swapchain_image_count(), descriptor_set_layout);
-
-    const VkDescriptorSetAllocateInfo descriptor_set_alloc_info{
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-        .descriptorPool = descriptor_pool,
-        .descriptorSetCount =
-            static_cast<uint32_t>(descriptor_sets_layouts.size()),
-        .pSetLayouts = descriptor_sets_layouts.data(),
-    };
-
-    VK_CHECK(vkAllocateDescriptorSets(
-        vk.device, &descriptor_set_alloc_info,
-        per_swapchain_image_data.descriptor_sets.data()));
-  }
-
-  for (size_t i = 0; i < vk.swapchain_image_count(); ++i) {
-    CreateUniformBuffer(per_swapchain_image_data.descriptor_sets[i], 0, false,
-                        sizeof(SceneUbo), sizeof(SceneUbo),
-                        per_swapchain_image_data.scene_ubo.buffer[i],
-                        per_swapchain_image_data.scene_ubo.memory[i],
-                        per_swapchain_image_data.scene_ubo.mapped[i]);
-
-    CreateUniformBuffer(per_swapchain_image_data.descriptor_sets[i], 1, true,
-                        std::size(entities) * sizeof(EntityUbo),
-                        sizeof(EntityUbo),
-                        per_swapchain_image_data.entity_ubo.buffer[i],
-                        per_swapchain_image_data.entity_ubo.memory[i],
-                        per_swapchain_image_data.entity_ubo.mapped[i]);
-  }
-
-  const VkPipeline graphics_pipeline = [&] {
-    const VkVertexInputBindingDescription binding_description{
-        .binding = 0,
-        .stride = sizeof(Vertex),
-        .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
-    };
-
-    const VkVertexInputAttributeDescription attr_description[2] = {
-        {
-            .location = 0,
-            .binding = 0,
-            .format = VK_FORMAT_R32G32_SFLOAT,
-            .offset = 0,
-        },
-        {
-            .location = 1,
-            .binding = 0,
-            .format = VK_FORMAT_R32G32B32_SFLOAT,
-            .offset = offsetof(Vertex, color),
-        },
-    };
-
-    const VkPipelineVertexInputStateCreateInfo vertex_input_create_info{
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-        .vertexBindingDescriptionCount = 1,
-        .pVertexBindingDescriptions = &binding_description,
-        .vertexAttributeDescriptionCount = 2,
-        .pVertexAttributeDescriptions = attr_description,
-    };
-
-    VkPipeline graphics_pipeline = Vulkan_CreateGraphicsPipeline(
-        vertex_input_create_info, pipeline_layout, shader_stages);
-    return graphics_pipeline;
-  }();
-
+  InitEntityRenderer();
   InitTextRenderer();
 
   struct Profiling {
@@ -427,8 +248,10 @@ static int Main() {
         switch (i % 2) {
           case 0:
             asteroid.mass = 300;
+            break;
           case 1:
             asteroid.mass = 50;
+            break;
         }
         if (i == 0) asteroid.mass = 300000;
 
@@ -468,155 +291,108 @@ static int Main() {
 
     static Vec2 camera_pos = {};
 
-    {
-      const int dx = (pressed_keys.contains(right_keycode) ? 1 : 0) -
-                     (pressed_keys.contains(left_keycode) ? 1 : 0);
-      const int dy = (pressed_keys.contains(down_keycode) ? 1 : 0) -
-                     (pressed_keys.contains(up_keycode) ? 1 : 0);
+    const int dx = (pressed_keys.contains(right_keycode) ? 1 : 0) -
+                   (pressed_keys.contains(left_keycode) ? 1 : 0);
+    const int dy = (pressed_keys.contains(down_keycode) ? 1 : 0) -
+                   (pressed_keys.contains(up_keycode) ? 1 : 0);
 
-      static float dt_accumulator = 0.f;
-      dt_accumulator += vk.current_frame_data.dt;
+    static float dt_accumulator = 0.f;
+    dt_accumulator += vk.current_frame_data.dt;
 
-      constexpr float step = 1.f / 120.f;
-      for (; dt_accumulator >= vk.current_frame_data.dt;
-           dt_accumulator -= step) {
-        {
-          if (dx || dy) {
-            float angle =
-                std::atan2(-static_cast<float>(dy), static_cast<float>(dx));
-            if (angle < 0.f) {
-              angle += 2.f * pi;
-            }
-
-            ship.angle_radians =
-                LerpAngle(ship.angle_radians, angle, step * 5.f);
+    constexpr float step = 1.f / 120.f;
+    for (; dt_accumulator >= step; dt_accumulator -= step) {
+      {
+        if (dx || dy) {
+          float angle =
+              std::atan2(-static_cast<float>(dy), static_cast<float>(dx));
+          if (angle < 0.f) {
+            angle += 2.f * pi;
           }
 
-          if (pressed_keys.contains(brake_keycode)) {
-            Lerp(ship.velocity, Vec2{}, step * 5.f);
-          } else if (pressed_keys.contains(boost_keycode)) {
-            const Vec2 direction = Normalize(Vec2{
-                std::cos(ship.angle_radians),
-                std::sin(ship.angle_radians),
-            });
-            Lerp(ship.velocity, direction * 5000.f, step);
-          } else if (pressed_keys.contains(acceleration_keycode)) {
-            const Vec2 direction = Normalize(Vec2{
-                std::cos(ship.angle_radians),
-                std::sin(ship.angle_radians),
-            });
-            Lerp(ship.velocity, direction * 1000.f, step * 8.f);
-          } else {
-            Lerp(ship.velocity, Vec2{}, step);
-          }
-
-          ship.pos += ship.velocity * step;
+          ship.angle_radians = LerpAngle(ship.angle_radians, angle, step * 5.f);
         }
 
-        {
-          Lerp(camera_pos, ship.pos, 5.f * step);
+        if (pressed_keys.contains(brake_keycode)) {
+          Lerp(ship.velocity, Vec2{}, step * 5.f);
+        } else if (pressed_keys.contains(boost_keycode)) {
+          const Vec2 direction = Normalize(Vec2{
+              std::cos(ship.angle_radians),
+              std::sin(ship.angle_radians),
+          });
+          Lerp(ship.velocity, direction * 5000.f, step);
+        } else if (pressed_keys.contains(acceleration_keycode)) {
+          const Vec2 direction = Normalize(Vec2{
+              std::cos(ship.angle_radians),
+              std::sin(ship.angle_radians),
+          });
+          Lerp(ship.velocity, direction * 1000.f, step * 8.f);
+        } else {
+          Lerp(ship.velocity, Vec2{}, step);
         }
 
-        {
-          for (size_t i = 0; i < std::size(entities); ++i) {
-            auto& entity = entities[i];
-            if ((entity.flags & 2) == 0) continue;
-
-            Vec2 force_sum{};
-
-            for (size_t j = 0; j < std::size(entities); ++j) {
-              if (j == i) continue;
-              if (!entities[j].mass) continue;
-
-              Vec2 v = entities[j].pos - entity.pos;
-              float r = Len(v);
-              float F = 100 * 6.7f * entity.mass * entities[j].mass / (r * r);
-
-              force_sum += (v / Len(v) * F);
-            }
-
-            entity.velocity += (force_sum / entity.mass) * step;
-            entity.pos += entity.velocity * step;
-          }
-        }
+        ship.pos += ship.velocity * step;
       }
 
-      float zoom = 1.f;
-
-      const SceneUbo scene_ubo = {
-          .view = Translate(Vec3{-camera_pos.x, -camera_pos.y, 0.f}),
-          .proj = Ortho(vk.surface_extent.width * zoom / -2.f,
-                        vk.surface_extent.width * zoom / 2.f,
-                        vk.surface_extent.height * zoom / 2.f,
-                        vk.surface_extent.height * zoom / -2.f, 0.f, 1.f),
-      };
-
-      EntityUbo entity_ubos[std::size(entities)];
-      for (size_t i = 0; i < std::size(entities); ++i) {
-        auto& ubo = entity_ubos[i];
-        const auto& entity = entities[i];
-
-        ubo.model = Mult(Translate(entity.pos), Rotate2D(entity.angle_radians));
+      {
+        Lerp(camera_pos, ship.pos, 5.f * step);
       }
 
-      memcpy(per_swapchain_image_data.scene_ubo
-                 .mapped[vk.current_frame_data.swapchain_image_index],
-             &scene_ubo, sizeof(scene_ubo));
-      memcpy(per_swapchain_image_data.entity_ubo
-                 .mapped[vk.current_frame_data.swapchain_image_index],
-             &entity_ubos, sizeof(entity_ubos));
+      {
+        for (size_t i = 0; i < std::size(entities); ++i) {
+          auto& entity = entities[i];
+          if ((entity.flags & 2) == 0) continue;
+
+          Vec2 force_sum{};
+
+          for (size_t j = 0; j < std::size(entities); ++j) {
+            if (j == i) continue;
+            if (!entities[j].mass) continue;
+
+            Vec2 v = entities[j].pos - entity.pos;
+            float r = Len(v);
+            float F = 100 * 6.7f * entity.mass * entities[j].mass / (r * r);
+
+            force_sum += (v / Len(v) * F);
+          }
+
+          entity.velocity += (force_sum / entity.mass) * step;
+          entity.pos += entity.velocity * step;
+        }
+      }
     }
 
-    RenderText(200, 200, "Hello world!");
+    static float zoom = 1.f;
+
+    {
+      if (pressed_buttons.contains(XCB_BUTTON_INDEX_5)) zoom += .5f;
+      if (pressed_buttons.contains(XCB_BUTTON_INDEX_4)) zoom -= .5f;
+
+      zoom = std::clamp(zoom, .1f, 10.f);
+    }
+
+    RenderText(200, 200, "Zoom: " + std::to_string(zoom));
     RenderText(250, 250, "Hello world, here too!");
 
+    EntityRendererBefore(camera_pos, zoom);
     TextRendererBefore();
 
     Vulkan_RenderingBegin();
     {
-      const VkCommandBuffer command_buffer =
-          vk.command_buffers[vk.current_frame_data.iframe];
-
-#if 1
-      vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                        graphics_pipeline);
-      {
-        VkBuffer last_vertex_buffer = nullptr;
-        uint32_t last_vertex_offset = 0;
-
-        for (size_t i = 0; i < std::size(entities); ++i) {
-          const auto& entity = entities[i];
-
-          if (!entity.flags) continue;
-
-          if (last_vertex_buffer != entity.vertex_buffer ||
-              last_vertex_offset != entity.vertex_offset) {
-            last_vertex_buffer = entity.vertex_buffer;
-            last_vertex_offset = entity.vertex_offset;
-
-            const VkDeviceSize offset = last_vertex_offset * sizeof(Vertex);
-            vkCmdBindVertexBuffers(command_buffer, 0, 1, &last_vertex_buffer,
-                                   &offset);
-          }
-
-          const uint32_t ubo_offset = i * sizeof(EntityUbo);
-          vkCmdBindDescriptorSets(
-              command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout,
-              0, 1,
-              &per_swapchain_image_data.descriptor_sets
-                   [vk.current_frame_data.swapchain_image_index],
-              1, &ubo_offset);
-
-          vkCmdDraw(command_buffer, entity.vertex_count, 1, 0, 0);
-        }
-      }
-#endif
-
+      EntityRendererRecord();
       TextRendererRecord();
     }
-
     Vulkan_RenderingEnd();
     Vulkan_FrameEnd();
+
+    for (auto key : released_keys) {
+      pressed_keys.erase(key);
+    }
+    released_keys.clear();
+
+    for (auto button : released_buttons) {
+      pressed_buttons.erase(button);
+    }
+    released_buttons.clear();
   }
   return 0;
 }
