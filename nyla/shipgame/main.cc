@@ -238,7 +238,7 @@ static int Main() {
     static std::span<Entity> asteroids = [] {
       //
 
-      std::span<Entity> asteroids = {&entities[ientity], 64};
+      std::span<Entity> asteroids = {&entities[ientity], 2};
       ientity += asteroids.size();
 
       std::random_device rd;
@@ -284,7 +284,7 @@ static int Main() {
 
         asteroid.exists = true;
         asteroid.affected_by_gravity = true;
-        asteroid.orbit_radius = radius + 10;
+        asteroid.orbit_radius = radius + 50;
 
         asteroid.pos[0] = dist(gen);
         asteroid.pos[1] = dist(gen);
@@ -336,7 +336,7 @@ static int Main() {
           Lerp(ship.velocity, Vec2f{}, step);
         }
 
-        Vec2fAdd(ship.pos, *Tnew<Vec2f>(Vec2fMul(ship.velocity, step)));
+        Vec2fAdd(ship.pos, Vec2fMul(ship.velocity, step));
       }
 
       {
@@ -359,19 +359,18 @@ static int Main() {
                 !entity2.mass)
               continue;
 
-            Vec2f v = Vec2fDif(entity2.pos, entity1.pos);
-            const float r = Vec2fLen(v);
-
             using namespace std::complex_literals;
 
-            if (entity2.orbit_radius && r < 10 + entity2.orbit_radius &&
-                entity2.mass - entity1.mass >= 100) {
-              Vec2f vv = Vec2fApply(v, 1if);
-            }
+            const Vec2f v = Vec2fDif(entity2.pos, entity1.pos);
+            const float r = Vec2fLen(v);
 
-            float F = 100 * 6.7f * entity1.mass * entities[j].mass / (r * r);
+            const Vec2f vv = Vec2fNorm(Vec2fApply(v, .5if + .5f));
+            RenderText(
+                200, 250,
+                "" + std::to_string(vv[0]) + " " + std::to_string(vv[1]));
 
-            Vec2fAdd(force_sum, *Tnew<Vec2f>(Vec2fMul(v, F / Vec2fLen(v))));
+            float F = 100 * 6.7f * entity1.mass * entity2.mass / (r * r);
+            Vec2fAdd(force_sum, Vec2fMul(vv, F / Vec2fLen(vv)));
           }
 
           Vec2fAdd(entity1.velocity, Vec2fMul(force_sum, step / entity1.mass));
@@ -390,8 +389,8 @@ static int Main() {
     }
 
     RenderText(200, 200, "zoom: " + std::to_string(zoom));
-    RenderText(200, 250,
-               "dt: " + std::to_string(1.f / vk.current_frame_data.dt));
+    // RenderText(200, 250,
+    //            "dt: " + std::to_string(1.f / vk.current_frame_data.dt));
 
     EntityRendererBefore(camera_pos, zoom);
     TextRendererBefore();
