@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <iterator>
 #include <memory>
 #include <random>
@@ -20,7 +21,7 @@
 #include "nyla/commons/math/math.h"
 #include "nyla/commons/math/vec/vec2f.h"
 #include "nyla/commons/math/vec/vec3f.h"
-#include "nyla/commons/memory/bump_alloc.h"
+#include "nyla/commons/memory/tnew.h"
 #include "nyla/commons/readfile.h"
 #include "nyla/commons/types.h"
 #include "nyla/shipgame/circle.h"
@@ -33,6 +34,62 @@
 #include "xcb/xproto.h"
 
 namespace nyla {
+
+static std::vector<Vertex> TriangulateLine(const Vec2f& A, const Vec2f& B,
+                                           float thickness) {
+  const Vec3f green = {0.f, 1.f, 0.f};
+  const Vec3f red = {1.f, 0.f, 0.f};
+  std::vector<Vertex> out;
+  out.reserve(6);
+
+  const float eps = 1e-6f;
+  const float half = 0.5f * thickness;
+
+  Vec2f d = Vec2fDif(B, A);
+  float L = Vec2fLen(d);
+
+  // Degenerate: draw a tiny square "dot" so something is visible.
+  if (L < eps) {
+    const Vec2f nx{half, 0.0f};
+    const Vec2f ny{0.0f, half};
+
+    const Vec2f p0 = Vec2fSum(Vec2fSum(A, nx), ny);  // top-right
+    const Vec2f p1 = Vec2fSum(Vec2fDif(A, nx), ny);  // top-left
+    const Vec2f p2 = Vec2fDif(Vec2fDif(A, nx), ny);  // bottom-left
+    const Vec2f p3 = Vec2fSum(Vec2fDif(A, ny), nx);  // bottom-right
+
+    // CCW triangles
+    out.emplace_back(Vertex{p0, red});
+    out.emplace_back(Vertex{p2, red});
+    out.emplace_back(Vertex{p1, red});
+    out.emplace_back(Vertex{p0, green});
+    out.emplace_back(Vertex{p3, green});
+    out.emplace_back(Vertex{p2, green});
+    return out;
+  }
+
+  // Unit direction and left-hand (CCW) perpendicular
+  const Vec2f t = Vec2fNorm(d);
+  const Vec2f n_perp = Vec2fMul(Vec2f{-t[1], t[0]}, half);  // (-y, x)
+
+  // Quad corners around the segment
+  const Vec2f p0 = Vec2fSum(A, n_perp);  // "top" at A
+  const Vec2f p1 = Vec2fSum(B, n_perp);  // "top" at B
+  const Vec2f p2 = Vec2fDif(B, n_perp);  // "bottom" at B
+  const Vec2f p3 = Vec2fDif(A, n_perp);  // "bottom" at A
+
+  // Emit triangles with COUNTER-CLOCKWISE winding for Vulkan (default
+  // positive-height viewport)
+  out.emplace_back(Vertex{p0, red});
+  out.emplace_back(Vertex{p2, red});
+  out.emplace_back(Vertex{p1, red});
+
+  out.emplace_back(Vertex{p0, green});
+  out.emplace_back(Vertex{p3, green});
+  out.emplace_back(Vertex{p2, green});
+
+  return out;
+}
 
 uint16_t ientity;
 Entity entities[256];
@@ -121,7 +178,7 @@ static void ProcessXEvents() {
 
 static int Main() {
   InitLogging();
-  InitGlobalTnew();
+  TNewInit();
 
   X11_Initialize();
 
@@ -238,13 +295,14 @@ static int Main() {
     static std::span<Entity> asteroids = [] {
       //
 
-      std::span<Entity> asteroids = {&entities[ientity], 2};
+      std::span<Entity> asteroids = {&entities[ientity], 64};
       ientity += asteroids.size();
 
       std::random_device rd;
       std::mt19937 gen(rd());
       std::uniform_real_distribution<float> dist(-x11.screen->width_in_pixels,
                                                  x11.screen->width_in_pixels);
+      // std::uniform_real_distribution<float> dist(-500, 500);
 
       for (size_t i = 0; i < std::size(asteroids); ++i) {
         auto& asteroid = asteroids[i];
@@ -284,7 +342,7 @@ static int Main() {
 
         asteroid.exists = true;
         asteroid.affected_by_gravity = true;
-        asteroid.orbit_radius = radius + 50;
+        asteroid.orbit_radius = radius * 2;
 
         asteroid.pos[0] = dist(gen);
         asteroid.pos[1] = dist(gen);
@@ -296,6 +354,24 @@ static int Main() {
 
       return asteroids;
     }();
+
+    {
+      Entity& line = entities[100];
+
+      line.exists = true;
+      line.affected_by_gravity = false;
+      line.vertex_count = 6;
+
+      Vulkan_CreateBuffer(1024, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                              VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                          line.vertex_buffer, line.vertex_buffer_memory);
+
+      vkMapMemory(vk.device, line.vertex_buffer_memory, 0, 1024, 0, &line.data);
+
+      auto vertices = TriangulateLine({0, 0}, {100, 100}, 2.f);
+      memcpy(line.data, vertices.data(), vertices.size() * sizeof(Vertex));
+    }
 
     static Vec2f camera_pos = {};
 
@@ -364,16 +440,34 @@ static int Main() {
             const Vec2f v = Vec2fDif(entity2.pos, entity1.pos);
             const float r = Vec2fLen(v);
 
-            const Vec2f vv = Vec2fNorm(Vec2fApply(v, .5if + .5f));
-            RenderText(
-                200, 250,
-                "" + std::to_string(vv[0]) + " " + std::to_string(vv[1]));
+            const Vec2f v2 = Vec2fSum(
+                Vec2fMul(Vec2fNorm(Vec2fApply(
+                             Vec2fDif(entity1.pos, entity2.pos), 1.f / 1if)),
+                         std::max(0.f, entity2.orbit_radius - r / 5.f)),
+                entity2.pos);
 
-            float F = 100 * 6.7f * entity1.mass * entity2.mass / (r * r);
+            const Vec2f vv = Vec2fDif(v2, entity1.pos);
+
+            {
+              Entity& line = entities[100];
+              auto vertices = TriangulateLine(entity1.pos, v2, 10.f);
+              memcpy(line.data, vertices.data(),
+                     vertices.size() * sizeof(Vertex));
+            }
+
+            // RenderText(
+            //     200, 250,
+            //     "" + std::to_string(vv[0]) + " " + std::to_string(vv[1]));
+
+            float F = 6.7f * entity1.mass * entity2.mass / (r);
             Vec2fAdd(force_sum, Vec2fMul(vv, F / Vec2fLen(vv)));
           }
 
           Vec2fAdd(entity1.velocity, Vec2fMul(force_sum, step / entity1.mass));
+          if (Vec2fLen(entity1.velocity) > 1330) {
+            entity1.velocity = Vec2fMul(Vec2fNorm(entity1.velocity), 1330);
+          }
+
           Vec2fAdd(entity1.pos, Vec2fMul(entity1.velocity, step));
         }
       }
@@ -402,8 +496,6 @@ static int Main() {
     }
     Vulkan_RenderingEnd();
     Vulkan_FrameEnd();
-
-    BumpAllocReset();
 
     for (auto key : released_keys) {
       pressed_keys.erase(key);

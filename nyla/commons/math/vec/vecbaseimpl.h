@@ -7,7 +7,7 @@
 #include <complex>
 
 #include "absl/log/check.h"
-#include "nyla/commons/memory/bump_alloc.h"
+#include "nyla/commons/memory/tnew.h"
 
 namespace nyla {
 

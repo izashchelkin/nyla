@@ -5,21 +5,12 @@
 
 namespace nyla {
 
-struct BumpAllocArena {
-  char* base;
-  char* at;
-  size_t size;
-};
-
-extern BumpAllocArena global_tnew_arena;
-void InitGlobalTnew();
-
-void* BumpAlloc(size_t bytes, size_t align);
-void BumpAllocReset();
+void TNewInit();
+void* TNewAlloc(size_t bytes, size_t align);
 
 template <typename T, typename... Args>
 T* Tnew(Args&&... args) {
-  void* p = BumpAlloc(sizeof(T), alignof(T));
+  void* p = TNewAlloc(sizeof(T), alignof(T));
   return ::new (p) T(std::forward<Args>(args)...);
 }
 

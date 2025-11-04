@@ -20,6 +20,7 @@ struct Entity {
 
   Vec2f hit_rect;
 
+	void* data;
   uint32_t vertex_count;
   uint32_t vertex_offset;
   VkBuffer vertex_buffer;

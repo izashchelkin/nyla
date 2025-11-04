@@ -4,7 +4,6 @@
 
 #include <array>
 
-#include "nyla/commons/memory/bump_alloc.h"
 #include "nyla/commons/readfile.h"
 #include "nyla/shipgame/gamecommon.h"
 #include "nyla/vulkan/vulkan.h"
