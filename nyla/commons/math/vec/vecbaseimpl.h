@@ -4,16 +4,26 @@
 #define NYLA__VEC(suffix) NYLA__XCAT(nyla__Vec, suffix)
 
 #include <cmath>
+#include <complex>
 
 #include "absl/log/check.h"
+#include "nyla/commons/memory/bump_alloc.h"
 
 namespace nyla {
 
 Vec::operator VecSpanConst() const& { return VecSpanConst{v, kVecDimension}; }
 Vec::operator VecSpan() & { return VecSpan{v, kVecDimension}; }
+Vec::operator VecSpanConst() const&& { return *Tnew_from(std::move(*this)); };
+Vec::operator VecSpan() && { return *Tnew_from(std::move(*this)); };
 
-const VecComponentType& nyla__Vec::operator[](size_t i) const { return v[i]; }
-VecComponentType& nyla__Vec::operator[](size_t i) { return v[i]; }
+const VecComponentType& nyla__Vec::operator[](size_t i) const {
+  CHECK(i < kVecDimension);
+  return v[i];
+}
+VecComponentType& nyla__Vec::operator[](size_t i) {
+  CHECK(i < kVecDimension);
+  return v[i];
+}
 
 Vec NYLA__VEC(Neg)(VecSpanConst rhs) {
   CHECK(rhs.size() >= kVecDimension);
@@ -109,6 +119,24 @@ VecComponentType NYLA__VEC(Dot)(VecSpanConst lhs, VecSpanConst rhs) {
   for (size_t i = 0; i < kVecDimension; ++i) {
     ret += lhs[i] * rhs[i];
   }
+  return ret;
+}
+
+Vec NYLA__VEC(Apply)(VecSpanConst lhs, std::complex<VecComponentType> comp) {
+  CHECK(lhs.size() >= kVecDimension);
+
+  Vec ret{};
+
+  {
+    auto res = std::complex<VecComponentType>{lhs[0], lhs[1]} * comp;
+    ret[0] = res.real();
+    ret[1] = res.imag();
+  }
+
+  for (size_t i = 2; i < kVecDimension; ++i) {
+    ret[i] = lhs[i];
+  }
+
   return ret;
 }
 

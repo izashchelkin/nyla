@@ -5,7 +5,6 @@
 
 #include "nyla/commons/math/math.h"
 #include "nyla/commons/math/vec/vec2f.h"
-#include "nyla/shipgame/bump_aloc.h"
 
 namespace nyla {
 
@@ -22,9 +21,9 @@ std::vector<Vec2f> TriangulateCircle(size_t n, float radius) {
 
   for (size_t i = 0; i < n; ++i) {
     ret.emplace_back(Vec2f{0.f, 0.f});
-    ret.emplace_back(Vec2fMul(*Tnew<Vec2f>(r.real(), r.imag()), radius));
+    ret.emplace_back(Vec2fMul(Vec2f{r.real(), r.imag()}, radius));
     r *= (std::cos(theta) + std::sin(theta) * 1if);
-    ret.emplace_back(Vec2fMul(*Tnew<Vec2f>(r.real(), r.imag()), radius));
+    ret.emplace_back(Vec2fMul(Vec2f{r.real(), r.imag()}, radius));
   }
 
   return ret;

@@ -4,9 +4,9 @@
 
 #include <array>
 
+#include "nyla/commons/memory/bump_alloc.h"
 #include "nyla/commons/readfile.h"
-#include "nyla/shipgame/bump_aloc.h"
-#include "nyla/shipgame/common.h"
+#include "nyla/shipgame/gamecommon.h"
 #include "nyla/vulkan/vulkan.h"
 
 namespace {
@@ -196,7 +196,7 @@ void InitEntityRenderer() {
 
 void EntityRendererBefore(Vec2f camera_pos, float zoom) {
   const SceneUbo scene_ubo = {
-      .view = Translate(*Tnew(Vec2fNeg(camera_pos))),
+      .view = Translate(Vec2fNeg(camera_pos)),
       .proj = Ortho(vk.surface_extent.width * zoom / -2.f,
                     vk.surface_extent.width * zoom / 2.f,
                     vk.surface_extent.height * zoom / 2.f,
@@ -230,7 +230,7 @@ void EntityRendererRecord() {
   for (size_t i = 0; i < std::size(entities); ++i) {
     const auto& entity = entities[i];
 
-    if (!entity.flags) continue;
+    if (!entity.exists) continue;
 
     if (last_vertex_buffer != entity.vertex_buffer ||
         last_vertex_offset != entity.vertex_offset) {

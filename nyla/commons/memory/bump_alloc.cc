@@ -1,4 +1,4 @@
-#include "nyla/shipgame/bump_aloc.h"
+#include "nyla/commons/memory/bump_alloc.h"
 
 #include <cstdlib>
 

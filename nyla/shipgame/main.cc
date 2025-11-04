@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cmath>
+#include <complex>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -19,12 +20,12 @@
 #include "nyla/commons/math/math.h"
 #include "nyla/commons/math/vec/vec2f.h"
 #include "nyla/commons/math/vec/vec3f.h"
+#include "nyla/commons/memory/bump_alloc.h"
 #include "nyla/commons/readfile.h"
 #include "nyla/commons/types.h"
-#include "nyla/shipgame/bump_aloc.h"
 #include "nyla/shipgame/circle.h"
-#include "nyla/shipgame/common.h"
 #include "nyla/shipgame/entity_renderer.h"
+#include "nyla/shipgame/gamecommon.h"
 #include "nyla/shipgame/text_renderer.h"
 #include "nyla/vulkan/vulkan.h"
 #include "nyla/x11/x11.h"
@@ -223,7 +224,8 @@ static int Main() {
                           VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, ship_vertex_buffer,
                           ship_vertex_buffer_memory);
 
-      ship.flags = 1;
+      ship.exists = true;
+      ship.affected_by_gravity = false;
       ship.mass = 0;
       ship.density = 0;
       ship.vertex_count = ship_vertices.size();
@@ -280,7 +282,9 @@ static int Main() {
             VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, asteroid_vertex_buffer,
             asteroid_vertex_buffer_memory);
 
-        asteroid.flags = 3;
+        asteroid.exists = true;
+        asteroid.affected_by_gravity = true;
+        asteroid.orbit_radius = radius + 10;
 
         asteroid.pos[0] = dist(gen);
         asteroid.pos[1] = dist(gen);
@@ -317,19 +321,19 @@ static int Main() {
         }
 
         if (pressed_keys.contains(brake_keycode)) {
-          Lerp(ship.velocity, *Tnew(Vec2f{}), step * 5.f);
+          Lerp(ship.velocity, Vec2f{}, step * 5.f);
         } else if (pressed_keys.contains(boost_keycode)) {
-          const Vec2f direction = Vec2fNorm(*Tnew<Vec2f>(
-              std::cos(ship.angle_radians), std::sin(ship.angle_radians)));
+          const Vec2f direction = Vec2fNorm(Vec2f{
+              std::cos(ship.angle_radians), std::sin(ship.angle_radians)});
 
-          Lerp(ship.velocity, *Tnew(Vec2fMul(direction, 5000.f)), step);
+          Lerp(ship.velocity, Vec2fMul(direction, 5000.f), step);
         } else if (pressed_keys.contains(acceleration_keycode)) {
-          const Vec2f direction = Vec2fNorm(*Tnew<Vec2f>(
-              std::cos(ship.angle_radians), std::sin(ship.angle_radians)));
+          const Vec2f direction = Vec2fNorm(Vec2f{
+              std::cos(ship.angle_radians), std::sin(ship.angle_radians)});
 
-          Lerp(ship.velocity, *Tnew(Vec2fMul(direction, 1000.f)), step * 8.f);
+          Lerp(ship.velocity, Vec2fMul(direction, 1000.f), step * 8.f);
         } else {
-          Lerp(ship.velocity, *Tnew(Vec2f{}), step);
+          Lerp(ship.velocity, Vec2f{}, step);
         }
 
         Vec2fAdd(ship.pos, *Tnew<Vec2f>(Vec2fMul(ship.velocity, step)));
@@ -341,26 +345,37 @@ static int Main() {
 
       {
         for (size_t i = 0; i < std::size(entities); ++i) {
-          auto& entity = entities[i];
-          if (!entity.mass) continue;
-          if ((entity.flags & 2) == 0) continue;
+          Entity& entity1 = entities[i];
+          if (!entity1.exists || !entity1.affected_by_gravity || !entity1.mass)
+            continue;
 
           Vec2f force_sum{};
 
           for (size_t j = 0; j < std::size(entities); ++j) {
-            if (j == i) continue;
-            if (!entities[j].mass) continue;
+            const Entity& entity2 = entities[j];
 
-            Vec2f v = Vec2fDif(entities[j].pos, entity.pos);
-            float r = Vec2fLen(v);
-            float F = 100 * 6.7f * entity.mass * entities[j].mass / (r * r);
+            if (j == i) continue;
+            if (!entity2.exists || !entity2.affected_by_gravity ||
+                !entity2.mass)
+              continue;
+
+            Vec2f v = Vec2fDif(entity2.pos, entity1.pos);
+            const float r = Vec2fLen(v);
+
+            using namespace std::complex_literals;
+
+            if (entity2.orbit_radius && r < 10 + entity2.orbit_radius &&
+                entity2.mass - entity1.mass >= 100) {
+              Vec2f vv = Vec2fApply(v, 1if);
+            }
+
+            float F = 100 * 6.7f * entity1.mass * entities[j].mass / (r * r);
 
             Vec2fAdd(force_sum, *Tnew<Vec2f>(Vec2fMul(v, F / Vec2fLen(v))));
           }
 
-          Vec2fAdd(entity.velocity,
-                   *Tnew(Vec2fMul(force_sum, step / entity.mass)));
-          Vec2fAdd(entity.pos, *Tnew(Vec2fMul(entity.velocity, step)));
+          Vec2fAdd(entity1.velocity, Vec2fMul(force_sum, step / entity1.mass));
+          Vec2fAdd(entity1.pos, Vec2fMul(entity1.velocity, step));
         }
       }
     }

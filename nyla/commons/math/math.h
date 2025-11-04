@@ -6,4 +6,4 @@ namespace nyla {
 
 constexpr inline float pi = std::numbers::pi_v<float>;
 
-}
+}  // namespace nyla

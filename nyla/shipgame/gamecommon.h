@@ -8,12 +8,15 @@
 namespace nyla {
 
 struct Entity {
-  uint32_t flags;
+	bool exists;
+	bool affected_by_gravity;
+
   Vec2f pos;
   Vec2f velocity;
   float mass;
   float density;
   float angle_radians;
+  float orbit_radius;
 
   Vec2f hit_rect;
 

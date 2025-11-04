@@ -3,6 +3,8 @@
 #define NYLA__XCAT(a, b) NYLA__CAT(a, b)
 #define NYLA__VEC(suffix) NYLA__XCAT(nyla__Vec, suffix)
 
+#include <complex>
+
 namespace nyla {
 
 struct nyla__Vec {
@@ -10,9 +12,8 @@ struct nyla__Vec {
 
   operator nyla__VecSpanConst() const&;
   operator nyla__VecSpan() &;
-
-  operator nyla__VecSpanConst() const&& = delete;
-  operator nyla__VecSpan() && = delete;
+  operator nyla__VecSpan() &&;
+  operator nyla__VecSpanConst() const&&;
 
   const nyla__VecComponentType& operator[](size_t i) const;
   nyla__VecComponentType& operator[](size_t i);
@@ -40,6 +41,9 @@ nyla__Vec NYLA__VEC(Norm)(nyla__VecSpanConst rhs);
 
 nyla__VecComponentType NYLA__VEC(Dot)(nyla__VecSpanConst lhs,
                                       nyla__VecSpanConst rhs);
+
+nyla__Vec NYLA__VEC(Apply)(nyla__VecSpanConst lhs,
+                           std::complex<nyla__VecComponentType> comp);
 
 }  // namespace nyla
 

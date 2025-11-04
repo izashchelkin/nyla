@@ -17,25 +17,16 @@ void InitGlobalTnew();
 void* BumpAlloc(size_t bytes, size_t align);
 void BumpAllocReset();
 
-#if 0
-template <typename T, typename... Args>
-T* Tnew(Args&&... args) {
-  void* p = BumpAlloc(sizeof(T));
-  return new (p) T(std::forward<Args>(args)...);
-}
-#else
 template <typename T, typename... Args>
 T* Tnew(Args&&... args) {
   void* p = BumpAlloc(sizeof(T), alignof(T));
-  return new (p) T{std::forward<Args>(args)...};
+  return ::new (p) T(std::forward<Args>(args)...);
 }
-#endif
 
-template <typename T>
-T* Tnew(T&& value) {
+template <class T>
+auto Tnew_from(T&& value) -> std::remove_cvref_t<T>* {
   using U = std::remove_cvref_t<T>;
-  void* p = BumpAlloc(sizeof(U), alignof(U));
-  return new (p) U(value);
+  return Tnew<U>(std::forward<T>(value));
 }
 
 }  // namespace nyla
