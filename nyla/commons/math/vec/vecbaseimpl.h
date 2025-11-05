@@ -108,6 +108,10 @@ VecComponentType NYLA__VEC(Len)(VecSpanConst rhs) {
   return std::sqrt(ret);
 }
 
+Vec NYLA__VEC(Resized)(VecSpanConst rhs, VecComponentType len) {
+  return NYLA__VEC(Mul)(rhs, len / NYLA__VEC(Len)(rhs));
+}
+
 Vec NYLA__VEC(Norm)(VecSpanConst rhs) {
   return NYLA__VEC(Div)(rhs, NYLA__VEC(Len)(rhs));
 }

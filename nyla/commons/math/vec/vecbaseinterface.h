@@ -33,9 +33,16 @@ nyla__Vec NYLA__VEC(Mul)(nyla__VecSpanConst lhs, nyla__VecComponentType scalar);
 
 void NYLA__VEC(Scale)(nyla__VecSpan lhs, nyla__VecComponentType scalar);
 
+nyla__Vec NYLA__VEC(Div)(nyla__VecSpanConst lhs, nyla__VecComponentType scalar);
+
+void NYLA__VEC(ScaleDown)(nyla__VecSpan lhs, nyla__VecComponentType scalar);
+
 bool NYLA__VEC(Eq)(nyla__VecSpanConst lhs, nyla__VecSpanConst rhs);
 
 nyla__VecComponentType NYLA__VEC(Len)(nyla__VecSpanConst rhs);
+
+nyla__Vec NYLA__VEC(Resized)(nyla__VecSpanConst rhs,
+                             nyla__VecComponentType len);
 
 nyla__Vec NYLA__VEC(Norm)(nyla__VecSpanConst rhs);
 

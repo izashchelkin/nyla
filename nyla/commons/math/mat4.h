@@ -38,6 +38,13 @@ inline Mat4 Translate(std::span<const float> v) {
   return ret;
 }
 
+inline Mat4 Scale2D(float scalar) {
+  Mat4 ret = Identity4;
+  ret[0][0] = scalar;
+  ret[1][1] = scalar;
+  return ret;
+}
+
 inline Mat4 Rotate2D(float radians) {
   Mat4 ret = Identity4;
   ret[0] = {std::cos(radians), std::sin(radians), 0, 0};
