@@ -34,6 +34,7 @@ struct Vulkan_State {
   std::vector<VkCommandBuffer> command_buffers;
 
   int shaderdir_inotify_fd;
+  bool shaders_recompile = true;
   bool shaders_invalidated = true;
 
   struct {

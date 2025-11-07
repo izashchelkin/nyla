@@ -159,7 +159,7 @@ static int Main() {
     xcb_flush(x11.conn);
   }
 
-  Vulkan_Initialize("nyla/vulkan/shaders");
+  Vulkan_Initialize("nyla/shipgame/shaders");
 
   {
     X11_KeyResolver key_resolver;

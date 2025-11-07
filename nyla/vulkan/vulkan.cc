@@ -461,7 +461,6 @@ void Vulkan_FrameBegin() {
 
     int numread;
 
-    bool recompile_shaders = false;
     while ((numread = read(vk.shaderdir_inotify_fd, buf, sizeof(buf))) > 0) {
       while (bufp != buf + numread) {
         inotify_event* event = reinterpret_cast<inotify_event*>(bufp);
@@ -479,17 +478,18 @@ void Vulkan_FrameBegin() {
           }
 
           if (name.ends_with(".vert") || name.ends_with(".frag")) {
-            recompile_shaders = true;
+            vk.shaders_recompile = true;
           }
         }
       }
     }
 
-    if (recompile_shaders) {
+    if (vk.shaders_recompile) {
       vk.shaders_invalidated = false;
 
       LOG(INFO) << "shaders recompiling";
       system("bash build_shaders.sh");
+      vk.shaders_recompile = false;
     }
 
     if (vk.shaders_invalidated) {

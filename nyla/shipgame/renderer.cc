@@ -47,14 +47,14 @@ void RenderGameObjectInitialize() {
           .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
           .stage = VK_SHADER_STAGE_VERTEX_BIT,
           .module = Vulkan_CreateShaderModule(
-              ReadFile("nyla/vulkan/shaders/vert.spv")),
+              ReadFile("nyla/shipgame/shaders/vert.spv")),
           .pName = "main",
       },
       {
           .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
           .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
           .module = Vulkan_CreateShaderModule(
-              ReadFile("nyla/vulkan/shaders/frag.spv")),
+              ReadFile("nyla/shipgame/shaders/frag.spv")),
           .pName = "main",
       },
   });
