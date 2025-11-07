@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <complex>
+#include <csignal>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -131,7 +132,7 @@ static int Main() {
     sa.sa_handler = [](int signum) { CHECK(false); };
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = SA_RESTART;
-    if (sigaction(SIGCHLD, &sa, NULL) == -1) {
+    if (sigaction(SIGINT, &sa, NULL) == -1) {
       LOG(ERROR) << "sigaction failed";
       return false;
     }
@@ -206,7 +207,7 @@ static int Main() {
     Vulkan_FrameBegin();
 
     if (vk.shaders_invalidated) {
-      InitEntityRenderer();
+      RenderGameObjectInitialize();
       vk.shaders_invalidated = false;
     }
 
