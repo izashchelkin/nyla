@@ -1,28 +1,25 @@
-#include "nyla/shipgame/entity_renderer.h"
+#include "nyla/shipgame/renderer.h"
 
 #include <unistd.h>
 
 #include <array>
+#include <cstdint>
 
+#include "absl/log/log.h"
+#include "nyla/commons/math/mat4.h"
 #include "nyla/commons/readfile.h"
-#include "nyla/shipgame/gamecommon.h"
+#include "nyla/shipgame/game.h"
 #include "nyla/vulkan/vulkan.h"
 
 namespace {
 
-struct PerSwapchainImageData {
-  PerSwapchainImageData(size_t num_swapchain_images)
-      : descriptor_sets(num_swapchain_images),
-        scene_ubo(num_swapchain_images),
-        entity_ubo(num_swapchain_images) {}
+struct PerFrame {
+  PerFrame(size_t n) : descriptor_sets(n), scene_ubo(n), gameobject_ubo(n) {}
 
   std::vector<VkDescriptorSet> descriptor_sets;
 
   struct Uniform {
-    Uniform(size_t num_swapchain_images)
-        : buffer(num_swapchain_images),
-          memory(num_swapchain_images),
-          mapped(num_swapchain_images) {}
+    Uniform(size_t n) : buffer(n), memory(n), mapped(n) {}
 
     std::vector<VkBuffer> buffer;
     std::vector<VkDeviceMemory> memory;
@@ -30,7 +27,7 @@ struct PerSwapchainImageData {
   };
 
   Uniform scene_ubo;
-  Uniform entity_ubo;
+  Uniform gameobject_ubo;
 };
 
 }  // namespace
@@ -40,11 +37,10 @@ namespace nyla {
 static VkPipeline pipeline;
 static VkPipelineLayout pipeline_layout;
 
-static PerSwapchainImageData* per_swapchain_image_data;
+static PerFrame* per_frame;
 
-void InitEntityRenderer() {
-  per_swapchain_image_data =
-      new PerSwapchainImageData(vk.swapchain_image_count());
+void RenderGameObjectInitialize() {
+  per_frame = new PerFrame(kVulkan_NumFramesInFlight);
 
   const auto shader_stages = std::to_array<VkPipelineShaderStageCreateInfo>({
       {
@@ -67,19 +63,17 @@ void InitEntityRenderer() {
     const VkDescriptorPoolSize descriptor_pool_sizes[] = {
         {
             .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
-            .descriptorCount =
-                static_cast<uint32_t>(vk.swapchain_image_count()),
+            .descriptorCount = static_cast<uint32_t>(kVulkan_NumFramesInFlight),
         },
         {
             .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            .descriptorCount =
-                static_cast<uint32_t>(vk.swapchain_image_count()),
+            .descriptorCount = static_cast<uint32_t>(kVulkan_NumFramesInFlight),
         },
     };
 
     const VkDescriptorPoolCreateInfo descriptor_pool_create_info{
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-        .maxSets = static_cast<uint32_t>(vk.swapchain_image_count()),
+        .maxSets = static_cast<uint32_t>(kVulkan_NumFramesInFlight),
         .poolSizeCount = std::size(descriptor_pool_sizes),
         .pPoolSizes = descriptor_pool_sizes,
     };
@@ -130,7 +124,7 @@ void InitEntityRenderer() {
 
   {
     const std::vector<VkDescriptorSetLayout> descriptor_sets_layouts(
-        vk.swapchain_image_count(), descriptor_set_layout);
+        kVulkan_NumFramesInFlight, descriptor_set_layout);
 
     const VkDescriptorSetAllocateInfo descriptor_set_alloc_info{
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
@@ -140,24 +134,21 @@ void InitEntityRenderer() {
         .pSetLayouts = descriptor_sets_layouts.data(),
     };
 
-    VK_CHECK(vkAllocateDescriptorSets(
-        vk.device, &descriptor_set_alloc_info,
-        per_swapchain_image_data->descriptor_sets.data()));
+    VK_CHECK(vkAllocateDescriptorSets(vk.device, &descriptor_set_alloc_info,
+                                      per_frame->descriptor_sets.data()));
   }
 
-  for (size_t i = 0; i < vk.swapchain_image_count(); ++i) {
-    CreateUniformBuffer(per_swapchain_image_data->descriptor_sets[i], 0, false,
-                        sizeof(SceneUbo), sizeof(SceneUbo),
-                        per_swapchain_image_data->scene_ubo.buffer[i],
-                        per_swapchain_image_data->scene_ubo.memory[i],
-                        per_swapchain_image_data->scene_ubo.mapped[i]);
+  for (size_t i = 0; i < kVulkan_NumFramesInFlight; ++i) {
+    CreateUniformBuffer(
+        per_frame->descriptor_sets[i], 0, false, sizeof(SceneUbo),
+        sizeof(SceneUbo), per_frame->scene_ubo.buffer[i],
+        per_frame->scene_ubo.memory[i], per_frame->scene_ubo.mapped[i]);
 
-    CreateUniformBuffer(per_swapchain_image_data->descriptor_sets[i], 1, true,
-                        std::size(entities) * sizeof(EntityUbo),
-                        sizeof(EntityUbo),
-                        per_swapchain_image_data->entity_ubo.buffer[i],
-                        per_swapchain_image_data->entity_ubo.memory[i],
-                        per_swapchain_image_data->entity_ubo.mapped[i]);
+    CreateUniformBuffer(per_frame->descriptor_sets[i], 1, true,
+                        (256 * sizeof(GameObjectUbo)), sizeof(GameObjectUbo),
+                        per_frame->gameobject_ubo.buffer[i],
+                        per_frame->gameobject_ubo.memory[i],
+                        per_frame->gameobject_ubo.mapped[i]);
   }
 
   const VkVertexInputBindingDescription binding_description{
@@ -193,63 +184,74 @@ void InitEntityRenderer() {
                                            pipeline_layout, shader_stages);
 }
 
-void EntityRendererBefore(Vec2f camera_pos, float zoom) {
+constexpr float game_units_on_screen_y = 2000.f;
+
+void RenderGameObjectPrepareScene(Vec2f camera_pos, float zoom) {
+  const float aspect = static_cast<float>(vk.surface_extent.width) /
+                       static_cast<float>(vk.surface_extent.height);
+
+  const float world_h = game_units_on_screen_y * zoom;
+  const float world_w = world_h * aspect;
+
   const SceneUbo scene_ubo = {
       .view = Translate(Vec2fNeg(camera_pos)),
-      .proj = Ortho(vk.surface_extent.width * zoom / -2.f,
-                    vk.surface_extent.width * zoom / 2.f,
-                    vk.surface_extent.height * zoom / 2.f,
-                    vk.surface_extent.height * zoom / -2.f, 0.f, 1.f),
+      .proj = Ortho(-world_w * .5f, world_w * .5f, world_h * .5f,
+                    -world_h * .5f, 0.f, 1.f),
   };
 
-  EntityUbo entity_ubos[std::size(entities)];
-  for (size_t i = 0; i < std::size(entities); ++i) {
-    auto& ubo = entity_ubos[i];
-    const auto& entity = entities[i];
-
-    ubo.model = Mult(Translate(entity.pos), Rotate2D(entity.angle_radians));
-  }
-
-  memcpy(per_swapchain_image_data->scene_ubo
-             .mapped[vk.current_frame_data.swapchain_image_index],
-         &scene_ubo, sizeof(scene_ubo));
-  memcpy(per_swapchain_image_data->entity_ubo
-             .mapped[vk.current_frame_data.swapchain_image_index],
-         &entity_ubos, sizeof(entity_ubos));
+  memcpy(per_frame->scene_ubo.mapped[vk.current_frame_data.iframe], &scene_ubo,
+         sizeof(scene_ubo));
 }
 
-void EntityRendererRecord() {
+static size_t irender = 0;
+static struct {
+  GameObject obj[256];
+  GameObjectUbo ubo[256];
+} renderq;
+
+void RenderGameObject(const GameObject& obj) {
+  renderq.obj[irender] = obj;
+  auto& ubo = renderq.ubo[irender];
+  ++irender;
+
+  ubo = {};
+  ubo.model = Translate(obj.pos);
+  ubo.model = Mult(ubo.model, Rotate2D(obj.angle_radians));
+  ubo.model = Mult(ubo.model, Scale2D(200.f));
+}
+
+void RenderGameObjectFlushUniforms() {
+  memcpy(per_frame->gameobject_ubo.mapped[vk.current_frame_data.iframe],
+         &renderq.ubo, sizeof(renderq.ubo[0]) * std::size(renderq.ubo));
+}
+
+void RenderGameObjectRecord() {
+  CHECK_LT(irender, (size_t)256);
+
   const VkCommandBuffer command_buffer =
       vk.command_buffers[vk.current_frame_data.iframe];
 
   vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-  VkBuffer last_vertex_buffer = nullptr;
-  uint32_t last_vertex_offset = 0;
 
-  for (size_t i = 0; i < std::size(entities); ++i) {
-    const auto& entity = entities[i];
+  for (size_t i = 0; i < irender; ++i) {
+    const auto& obj = renderq.obj[i];
 
-    if (!entity.exists) continue;
+    VkBuffer vertex_buffer = obj.vertex_buffer[vk.current_frame_data.iframe];
+    CHECK(vertex_buffer);
 
-    if (last_vertex_buffer != entity.vertex_buffer ||
-        last_vertex_offset != entity.vertex_offset) {
-      last_vertex_buffer = entity.vertex_buffer;
-      last_vertex_offset = entity.vertex_offset;
+    const VkDeviceSize offset = 0 * sizeof(Vertex);
+    vkCmdBindVertexBuffers(command_buffer, 0, 1, &vertex_buffer, &offset);
 
-      const VkDeviceSize offset = last_vertex_offset * sizeof(Vertex);
-      vkCmdBindVertexBuffers(command_buffer, 0, 1, &last_vertex_buffer,
-                             &offset);
-    }
-
-    const uint32_t ubo_offset = i * sizeof(EntityUbo);
+    const uint32_t ubo_offset = i * sizeof(GameObjectUbo);
     vkCmdBindDescriptorSets(
         command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1,
-        &per_swapchain_image_data
-             ->descriptor_sets[vk.current_frame_data.swapchain_image_index],
-        1, &ubo_offset);
+        &per_frame->descriptor_sets[vk.current_frame_data.iframe], 1,
+        &ubo_offset);
 
-    vkCmdDraw(command_buffer, entity.vertex_count, 1, 0, 0);
+    vkCmdDraw(command_buffer, obj.vertex_count, 1, 0, 0);
   }
+
+  irender = 0;
 }
 
 }  // namespace nyla

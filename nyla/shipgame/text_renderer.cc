@@ -21,18 +21,13 @@ struct TextRendererLineUBO {
   float bg[4];
 };
 
-struct PerSwapchainImageData {
-  PerSwapchainImageData(size_t num_swapchain_images)
-      : descriptor_sets(num_swapchain_images),
-        text_line_ubo(num_swapchain_images) {}
+struct PerFrame {
+  PerFrame(size_t n) : descriptor_sets(n), text_line_ubo(n) {}
 
   std::vector<VkDescriptorSet> descriptor_sets;
 
   struct Uniform {
-    Uniform(size_t num_swapchain_images)
-        : buffer(num_swapchain_images),
-          memory(num_swapchain_images),
-          mapped(num_swapchain_images) {}
+    Uniform(size_t n) : buffer(n), memory(n), mapped(n) {}
 
     std::vector<VkBuffer> buffer;
     std::vector<VkDeviceMemory> memory;
@@ -51,11 +46,10 @@ static uint8_t isubmit;
 
 static VkPipelineLayout pipeline_layout;
 static VkPipeline pipeline;
-static PerSwapchainImageData* per_swapchain_image_data;
+static PerFrame* per_frame;
 
 void InitTextRenderer() {
-  per_swapchain_image_data =
-      new PerSwapchainImageData(vk.swapchain_image_count());
+  per_frame = new PerFrame(kVulkan_NumFramesInFlight);
 
   const auto shader_stages = std::to_array<VkPipelineShaderStageCreateInfo>({
       {
@@ -78,14 +72,13 @@ void InitTextRenderer() {
     const VkDescriptorPoolSize descriptor_pool_sizes[] = {
         {
             .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
-            .descriptorCount =
-                static_cast<uint32_t>(vk.swapchain_image_count()),
+            .descriptorCount = static_cast<uint32_t>(kVulkan_NumFramesInFlight),
         },
     };
 
     const VkDescriptorPoolCreateInfo descriptor_pool_create_info{
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-        .maxSets = static_cast<uint32_t>(vk.swapchain_image_count()),
+        .maxSets = static_cast<uint32_t>(kVulkan_NumFramesInFlight),
         .poolSizeCount = std::size(descriptor_pool_sizes),
         .pPoolSizes = descriptor_pool_sizes,
     };
@@ -130,7 +123,7 @@ void InitTextRenderer() {
 
   {
     const std::vector<VkDescriptorSetLayout> descriptor_sets_layouts(
-        vk.swapchain_image_count(), descriptor_set_layout);
+        kVulkan_NumFramesInFlight, descriptor_set_layout);
 
     const VkDescriptorSetAllocateInfo descriptor_set_alloc_info{
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
@@ -140,18 +133,16 @@ void InitTextRenderer() {
         .pSetLayouts = descriptor_sets_layouts.data(),
     };
 
-    VK_CHECK(vkAllocateDescriptorSets(
-        vk.device, &descriptor_set_alloc_info,
-        per_swapchain_image_data->descriptor_sets.data()));
+    VK_CHECK(vkAllocateDescriptorSets(vk.device, &descriptor_set_alloc_info,
+                                      per_frame->descriptor_sets.data()));
   }
 
-  for (size_t i = 0; i < vk.swapchain_image_count(); ++i) {
-    CreateUniformBuffer(per_swapchain_image_data->descriptor_sets[i], 0, true,
-                        sizeof(TextRendererLineUBO) * std::size(submit_buffer),
-                        sizeof(TextRendererLineUBO),
-                        per_swapchain_image_data->text_line_ubo.buffer[i],
-                        per_swapchain_image_data->text_line_ubo.memory[i],
-                        per_swapchain_image_data->text_line_ubo.mapped[i]);
+  for (size_t i = 0; i < kVulkan_NumFramesInFlight; ++i) {
+    CreateUniformBuffer(
+        per_frame->descriptor_sets[i], 0, true,
+        sizeof(TextRendererLineUBO) * std::size(submit_buffer),
+        sizeof(TextRendererLineUBO), per_frame->text_line_ubo.buffer[i],
+        per_frame->text_line_ubo.memory[i], per_frame->text_line_ubo.mapped[i]);
   }
 
   const VkPipelineVertexInputStateCreateInfo vertex_input_create_info{
@@ -195,8 +186,7 @@ void RenderText(int32_t x, int32_t y, std::string_view text) {
 }
 
 void TextRendererBefore() {
-  memcpy(per_swapchain_image_data->text_line_ubo
-             .mapped[vk.current_frame_data.swapchain_image_index],
+  memcpy(per_frame->text_line_ubo.mapped[vk.current_frame_data.iframe],
          &submit_buffer, sizeof(TextRendererLineUBO) * isubmit);
 }
 
@@ -211,9 +201,7 @@ void TextRendererRecord() {
 
     vkCmdBindDescriptorSets(
         command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1,
-        &per_swapchain_image_data
-             ->descriptor_sets[vk.current_frame_data.swapchain_image_index],
-        1, &offset);
+        &per_frame->descriptor_sets[vk.current_frame_data.iframe], 1, &offset);
 
     vkCmdDraw(command_buffer, 3, 1, 0, 0);
   }
