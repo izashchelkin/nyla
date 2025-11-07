@@ -1,5 +1,12 @@
-glslc shader.vert -o vert.spv
-glslc shader.frag -o frag.spv
+pushd build
 
-glslc psf2_ansii.frag -o psf2_ansii_frag.spv
-glslc psf2_ansii.vert -o psf2_ansii_vert.spv
+glslc ../shader.vert -o vert.spv
+glslc ../shader.frag -o frag.spv
+
+glslc ../grid.vert -o grid_vert.spv
+glslc ../grid.frag -o grid_frag.spv
+
+glslc ../psf2_ansii.frag -o psf2_ansii_frag.spv
+glslc ../psf2_ansii.vert -o psf2_ansii_vert.spv
+
+popd

@@ -30,6 +30,7 @@
 #include "nyla/commons/types.h"
 #include "nyla/shipgame/circle.h"
 #include "nyla/shipgame/game.h"
+#include "nyla/shipgame/grid_renderer.h"
 #include "nyla/shipgame/renderer.h"
 #include "nyla/shipgame/text_renderer.h"
 #include "nyla/vulkan/vulkan.h"
@@ -159,7 +160,9 @@ static int Main() {
     xcb_flush(x11.conn);
   }
 
-  Vulkan_Initialize("nyla/shipgame/shaders");
+  const char* shader_watch_dirs[] = {"nyla/shipgame/shaders",
+                                     "nyla/shipgame/shaders/build"};
+  Vulkan_Initialize(shader_watch_dirs);
 
   {
     X11_KeyResolver key_resolver;
@@ -182,6 +185,7 @@ static int Main() {
   InitGame();
   RenderGameObjectInitialize();
   InitTextRenderer();
+  InitGridRenderer();
 
   struct Profiling {
     uint16_t xevent;
@@ -208,6 +212,8 @@ static int Main() {
 
     if (vk.shaders_invalidated) {
       RenderGameObjectInitialize();
+      InitTextRenderer();
+      InitGridRenderer();
       vk.shaders_invalidated = false;
     }
 
@@ -252,6 +258,7 @@ static int Main() {
     {
       RenderGameObjectRecord();
       TextRendererRecord();
+      GridRendererRecord();
     }
     Vulkan_RenderingEnd();
     Vulkan_FrameEnd();

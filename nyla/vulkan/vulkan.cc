@@ -20,7 +20,7 @@ static void CreateSwapchain();
 
 Vulkan_State vk;
 
-void Vulkan_Initialize(const char* shader_directory) {
+void Vulkan_Initialize(std::span<const char* const> shader_watch_directories) {
   vk.instance = []() {
     const VkApplicationInfo app_info{
         .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
@@ -197,9 +197,10 @@ void Vulkan_Initialize(const char* shader_directory) {
   {
     vk.shaderdir_inotify_fd = inotify_init1(IN_NONBLOCK);
     CHECK(vk.shaderdir_inotify_fd > 0);
-    CHECK_GT(
-        inotify_add_watch(vk.shaderdir_inotify_fd, shader_directory, IN_MODIFY),
-        0);
+
+    for (const char* dir : shader_watch_directories) {
+      CHECK_GT(inotify_add_watch(vk.shaderdir_inotify_fd, dir, IN_MODIFY), 0);
+    }
   }
 }
 

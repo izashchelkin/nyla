@@ -50,7 +50,7 @@ extern Vulkan_State vk;
 
 #define VK_CHECK(a) CHECK_EQ(a, VK_SUCCESS);
 
-void Vulkan_Initialize(const char* shader_directory);
+void Vulkan_Initialize(std::span<const char* const> shader_watch_directories);
 
 void Vulkan_PlatformSetSurface();
 VkExtent2D Vulkan_PlatformGetWindowExtent();
