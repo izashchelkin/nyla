@@ -348,7 +348,8 @@ void ManageClient(xcb_window_t client_window) {
     xcb_change_window_attributes(
         x11.conn, client_window, XCB_CW_EVENT_MASK,
         (uint32_t[]){
-            XCB_EVENT_MASK_PROPERTY_CHANGE | XCB_EVENT_MASK_FOCUS_CHANGE,
+            XCB_EVENT_MASK_PROPERTY_CHANGE | XCB_EVENT_MASK_FOCUS_CHANGE |
+                XCB_EVENT_MASK_ENTER_WINDOW,
         });
 
     for (auto& [property, _] : wm_property_change_handlers) {
@@ -801,6 +802,8 @@ void ProcessWMEvents(
     bool is_synthethic = event->response_type & 0x80;
     uint8_t event_type = event->response_type & 0x7F;
 
+    WindowStack& stack = GetActiveStack();
+
     if (is_synthethic && event_type != XCB_CLIENT_MESSAGE) {
       // continue;
     }
@@ -884,6 +887,12 @@ void ProcessWMEvents(
       case XCB_EXPOSE: {
         auto expose = reinterpret_cast<xcb_expose_event_t*>(event);
         if (expose->window == wm_bar_window) wm_bar_dirty = true;
+        break;
+      }
+      case XCB_ENTER_NOTIFY: {
+        auto enternotify = reinterpret_cast<xcb_enter_notify_event_t*>(event);
+        if (enternotify->event)
+          Activate(stack, enternotify->event, enternotify->time);
         break;
       }
       case 0: {
