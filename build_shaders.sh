@@ -1,4 +1,4 @@
 pushd nyla/vulkan/shaders 
-bash build.sh
+bash build_shaders.sh
 popd
 

@@ -201,7 +201,7 @@ static int Main() {
     xcb_flush(x11.conn);
   }
 
-  Vulkan_Initialize();
+  Vulkan_Initialize("nyla/vulkan/shaders");
 
   xcb_keycode_t up_keycode;
   xcb_keycode_t left_keycode;
@@ -255,6 +255,11 @@ static int Main() {
     if (!running) break;
 
     Vulkan_FrameBegin();
+
+    if (vk.shaders_invalidated) {
+      InitEntityRenderer();
+      vk.shaders_invalidated = false;
+    }
 
     if (vk.current_frame_data.dt > .05f) {
       LOG(INFO) << "dts spike: " << vk.current_frame_data.dt << "s";

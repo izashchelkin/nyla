@@ -1,11 +1,13 @@
 #include "nyla/vulkan/vulkan.h"
 
+#include <sys/inotify.h>
 #include <unistd.h>
 #include <xkbcommon/xkbcommon.h>
 
 #include <array>
 #include <cstdint>
 #include <limits>
+#include <string_view>
 #include <vector>
 
 #include "absl/log/check.h"
@@ -18,7 +20,7 @@ static void CreateSwapchain();
 
 Vulkan_State vk;
 
-void Vulkan_Initialize() {
+void Vulkan_Initialize(const char* shader_directory) {
   vk.instance = []() {
     const VkApplicationInfo app_info{
         .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
@@ -188,6 +190,16 @@ void Vulkan_Initialize() {
   vk.submit_semaphores.resize(vk.swapchain_image_count());
   for (uint8_t i = 0; i < vk.swapchain_image_count(); ++i) {
     vk.submit_semaphores[i] = CreateSemaphore();
+  }
+
+  //
+
+  {
+    vk.shaderdir_inotify_fd = inotify_init1(IN_NONBLOCK);
+    CHECK(vk.shaderdir_inotify_fd > 0);
+    CHECK_GT(
+        inotify_add_watch(vk.shaderdir_inotify_fd, shader_directory, IN_MODIFY),
+        0);
   }
 }
 
@@ -442,6 +454,48 @@ void Vulkan_FrameBegin() {
   vkWaitForFences(vk.device, 1, &frame_fence, VK_TRUE,
                   std::numeric_limits<uint64_t>::max());
   vkResetFences(vk.device, 1, &frame_fence);
+
+  {
+    char buf[4096] __attribute__((aligned(__alignof__(struct inotify_event))));
+    char* bufp = buf;
+
+    int numread;
+
+    bool recompile_shaders = false;
+    while ((numread = read(vk.shaderdir_inotify_fd, buf, sizeof(buf))) > 0) {
+      while (bufp != buf + numread) {
+        inotify_event* event = reinterpret_cast<inotify_event*>(bufp);
+        bufp += sizeof(inotify_event);
+
+        if (event->mask & IN_ISDIR) {
+          bufp += event->len;
+        } else {
+          std::string_view name = {bufp, strlen(bufp)};
+          bufp += event->len;
+
+          if (name.ends_with(".spv")) {
+            vk.shaders_invalidated = true;
+            continue;
+          }
+
+          if (name.ends_with(".vert") || name.ends_with(".frag")) {
+            recompile_shaders = true;
+          }
+        }
+      }
+    }
+
+    if (recompile_shaders) {
+      vk.shaders_invalidated = false;
+
+      LOG(INFO) << "shaders recompiling";
+      system("bash build_shaders.sh");
+    }
+
+    if (vk.shaders_invalidated) {
+      LOG(INFO) << "shaders invalidated";
+    }
+  }
 
   const VkSemaphore acquire_semaphore =
       vk.acquire_semaphores[vk.current_frame_data.iframe];

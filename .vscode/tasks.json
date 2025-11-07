@@ -1,0 +1,10 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "buildshipgame",
+            "type": "shell",
+            "command": "bazel build //nyla/shipgame --compilation_mode=dbg"
+        }
+    ]
+}
