@@ -20,6 +20,8 @@ struct X11_State {
   xcb_connection_t* conn;
   xcb_screen_t* screen;
 
+  const xcb_query_extension_reply_t* ext_xi2;
+
   struct {
 #define X(atom) xcb_atom_t atom;
     Nyla_X11_Atoms(X)

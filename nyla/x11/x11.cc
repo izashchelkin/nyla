@@ -1,5 +1,6 @@
 #include "nyla/x11/x11.h"
 
+#include <cstdint>
 #include <string_view>
 
 #include "absl/cleanup/cleanup.h"
@@ -8,6 +9,7 @@
 #include "absl/strings/ascii.h"
 #include "xcb/xcb.h"
 #include "xcb/xcb_aux.h"
+#include "xcb/xinput.h"
 #include "xkbcommon/xkbcommon-x11.h"
 #include "xkbcommon/xkbcommon.h"
 
@@ -45,6 +47,28 @@ void X11_Initialize() {
         (major_xkb_version_out == XKB_X11_MIN_MAJOR_XKB_VERSION &&
          minor_xkb_version_out < XKB_X11_MIN_MINOR_XKB_VERSION)) {
       LOG(QFATAL) << "could not setup xkb extension";
+    }
+  }
+
+  {
+    x11.ext_xi2 = xcb_get_extension_data(x11.conn, &xcb_input_id);
+    if (!x11.ext_xi2 || !x11.ext_xi2->present) {
+      LOG(QFATAL) << "could nolt setup XI2 extension";
+    }
+
+    struct {
+      xcb_input_event_mask_t event_mask;
+      uint32_t mask_bits;
+    } mask;
+
+    mask.event_mask.deviceid = XCB_INPUT_DEVICE_ALL_MASTER;
+    mask.event_mask.mask_len = 1;
+    mask.mask_bits = XCB_INPUT_XI_EVENT_MASK_RAW_MOTION;
+
+    if (xcb_request_check(
+            x11.conn, xcb_input_xi_select_events_checked(
+                          x11.conn, x11.screen->root, 1, &mask.event_mask))) {
+      LOG(QFATAL) << "could not setup XI2 extension";
     }
   }
 }

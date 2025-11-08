@@ -12,6 +12,7 @@ cc_library(
         "-lxcb-xkb",
         "-lxkbcommon",
         "-lxkbcommon-x11",
+        "-lxcb-xinput",
     ],
     deps = [
         "@abseil-cpp//absl/log",

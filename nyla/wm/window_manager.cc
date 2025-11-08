@@ -22,6 +22,7 @@
 #include "nyla/x11/wm_hints.h"
 #include "nyla/x11/x11.h"
 #include "xcb/xcb.h"
+#include "xcb/xinput.h"
 #include "xcb/xproto.h"
 
 namespace nyla {
@@ -83,6 +84,9 @@ static Map<xcb_atom_t,
 
 static std::vector<WindowStack> wm_stacks;
 static size_t wm_active_stack_idx;
+
+static xcb_timestamp_t last_rawmotion_ts = 0;
+static xcb_window_t last_entered_window = 0;
 
 //
 
@@ -240,7 +244,9 @@ static void ApplyBorder(xcb_connection_t* conn, xcb_window_t window,
 }
 
 static void Activate(const WindowStack& stack, xcb_timestamp_t time) {
-  if (!stack.active_window) goto revert_to_root;
+  if (!stack.active_window) {
+    goto revert_to_root;
+  }
 
   if (auto it = wm_clients.find(stack.active_window); it != wm_clients.end()) {
     wm_border_dirty = true;
@@ -272,6 +278,21 @@ static void Activate(WindowStack& stack, xcb_window_t client_window,
   }
 
   Activate(stack, time);
+}
+
+static void MaybeActivateUnderPointer(WindowStack& stack, xcb_timestamp_t ts) {
+  if (wm_follow) return;
+
+  if (!last_entered_window) return;
+  if (last_entered_window == x11.screen->root) return;
+  if (last_entered_window == stack.active_window) return;
+
+  if (last_rawmotion_ts > ts) return;
+  if (ts - last_rawmotion_ts > 3) return;
+
+  if (wm_clients.find(last_entered_window) != wm_clients.end()) {
+    Activate(stack, last_entered_window, ts);
+  }
 }
 
 static void CheckFocusTheft() {
@@ -889,12 +910,32 @@ void ProcessWMEvents(
         if (expose->window == wm_bar_window) wm_bar_dirty = true;
         break;
       }
-      case XCB_ENTER_NOTIFY: {
-        auto enternotify = reinterpret_cast<xcb_enter_notify_event_t*>(event);
-        if (enternotify->event)
-          Activate(stack, enternotify->event, enternotify->time);
+
+      case XCB_GE_GENERIC: {
+        auto ge = reinterpret_cast<xcb_ge_generic_event_t*>(event);
+
+        if (ge->extension == x11.ext_xi2->major_opcode) {
+          switch (ge->event_type) {
+            case XCB_INPUT_RAW_MOTION: {
+              auto rawmotion =
+                  reinterpret_cast<xcb_input_raw_motion_event_t*>(event);
+              last_rawmotion_ts = std::max(last_rawmotion_ts, rawmotion->time);
+              MaybeActivateUnderPointer(stack, last_rawmotion_ts);
+              break;
+            }
+          }
+        }
+
         break;
       }
+
+      case XCB_ENTER_NOTIFY: {
+        auto enternotify = reinterpret_cast<xcb_enter_notify_event_t*>(event);
+        last_entered_window = enternotify->event;
+        MaybeActivateUnderPointer(stack, enternotify->time);
+        break;
+      }
+
       case 0: {
         auto error = reinterpret_cast<xcb_generic_error_t*>(event);
         LOG(ERROR) << "xcb error: "
