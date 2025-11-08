@@ -281,6 +281,7 @@ static void Activate(WindowStack& stack, xcb_window_t client_window,
 }
 
 static void MaybeActivateUnderPointer(WindowStack& stack, xcb_timestamp_t ts) {
+  if (stack.zoom) return;
   if (wm_follow) return;
 
   if (!last_entered_window) return;
@@ -439,10 +440,10 @@ void UnmanageClient(xcb_window_t window) {
       continue;
     }
 
-    wm_follow = false;
-    stack.zoom = false;
     wm_layout_dirty = true;
     if (!client.transient_for) {
+      wm_follow = false;
+      stack.zoom = false;
       stack.windows.erase(it);
     }
 
@@ -638,7 +639,8 @@ void ToggleZoom() {
 
 void ToggleFollow() {
   WindowStack& stack = GetActiveStack();
-  if (!stack.active_window) {
+  Client& client = wm_clients.at(stack.active_window);
+  if (!stack.active_window || client.transient_for) {
     wm_follow = false;
     return;
   }
@@ -714,6 +716,7 @@ void ProcessWM() {
     }
 
     wm_pending_clients.clear();
+    wm_follow = false;
     wm_layout_dirty = true;
   }
 
