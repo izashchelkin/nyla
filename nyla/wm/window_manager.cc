@@ -433,23 +433,32 @@ void UnmanageClient(xcb_window_t window) {
   for (size_t istack = 0; istack < wm_stacks.size(); ++istack) {
     WindowStack& stack = wm_stacks.at(istack);
 
-    auto it = std::ranges::find_if(
-        stack.windows, [window](xcb_window_t elem) { return elem == window; });
-    if (it == stack.windows.end()) continue;
+    auto it = std::ranges::find(
+        stack.windows, client.transient_for ? client.transient_for : window);
+    if (it == stack.windows.end()) {
+      continue;
+    }
 
+    wm_follow = false;
     stack.zoom = false;
-    stack.windows.erase(it);
     wm_layout_dirty = true;
+    if (!client.transient_for) {
+      stack.windows.erase(it);
+    }
 
     if (stack.active_window == window) {
       stack.active_window = 0;
-      wm_follow = false;
 
       if (istack == wm_active_stack_idx) {
-        Activate(stack, stack.windows.empty() ? 0 : stack.windows.front(),
-                 XCB_CURRENT_TIME);
+        xcb_window_t fallback_to = client.transient_for;
+        if (!fallback_to && !stack.windows.empty()) {
+          fallback_to = stack.windows.front();
+        }
+
+        Activate(stack, fallback_to, XCB_CURRENT_TIME);
       }
     }
+
     return;
   }
 }
