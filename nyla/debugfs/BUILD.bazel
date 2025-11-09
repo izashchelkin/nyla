@@ -3,17 +3,16 @@ load("@rules_cc//cc:cc_library.bzl", "cc_library")
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
-    name = "fs",
+    name = "debugfs",
     srcs = glob([
         "*.cc",
-        "*.h",
     ]),
     hdrs = glob(["*.h"]),
     defines = [
         "FUSE_USE_VERSION=316",
     ],
     deps = [
-        "@abseil-cpp//absl/container:flat_hash_map",
+        "//nyla/commons",
         "@abseil-cpp//absl/log:check",
         "@abseil-cpp//absl/log:initialize",
         "@abseil-cpp//absl/log:log",

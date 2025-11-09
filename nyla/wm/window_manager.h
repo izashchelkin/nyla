@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <string>
 #include <variant>
 #include <vector>
 
@@ -23,9 +22,6 @@ void ProcessWMEvents(
 
 void ProcessWM();
 void UpdateBar();
-
-std::string DumpClients();
-std::string GetActiveClientBarText();
 
 void ManageClientsStartup();
 

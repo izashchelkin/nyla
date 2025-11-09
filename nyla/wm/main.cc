@@ -13,7 +13,7 @@
 #include "nyla/commons/spawn.h"
 #include "nyla/commons/timerfd.h"
 #include "nyla/dbus/dbus.h"
-#include "nyla/fs/nylafs.h"
+#include "nyla/debugfs/debugfs.h"
 #include "nyla/wm/window_manager.h"
 #include "nyla/x11/x11.h"
 #include "xcb/xcb.h"
@@ -45,6 +45,7 @@ int Main(int argc, char** argv) {
   }
 
   DBus_Initialize();
+  DebugFsInitialize(argv[0] + std::string("-debugfs"));
   InitializeWM();
 
   uint16_t modifier = XCB_MOD_MASK_4;
@@ -105,19 +106,26 @@ int Main(int argc, char** argv) {
   ManageClientsStartup();
 
   std::vector<pollfd> fds;
-  fds.emplace_back(
-      pollfd{.fd = xcb_get_file_descriptor(x11.conn), .events = POLLIN});
-  fds.emplace_back(pollfd{.fd = tfd, .events = POLLIN});
+  fds.emplace_back(pollfd{
+      .fd = xcb_get_file_descriptor(x11.conn),
+      .events = POLLIN,
+  });
+  fds.emplace_back(pollfd{
+      .fd = tfd,
+      .events = POLLIN,
+  });
+  fds.emplace_back(pollfd{
+      .fd = debugfs.fd,
+      .events = POLLIN,
+  });
 
-  NylaFs nylafs;
-  CHECK(nylafs.Init());
-
-  fds.emplace_back(pollfd{.fd = nylafs.GetFd(), .events = POLLIN});
-
-  nylafs.Register(NylaFsDynamicFile{"clients", DumpClients, [] {}});
-
-  nylafs.Register(NylaFsDynamicFile{"quit", [] { return "quit\n"; },
-                                    [&is_running] { is_running = false; }});
+  DebugFsRegister(
+      "quit", &is_running,  //
+      [](auto& file) { file.content = "quit\n"; },
+      [](auto& file) {
+        *reinterpret_cast<bool*>(file.data) = false;
+        LOG(INFO) << "exit requested";
+      });
 
   xcb_ungrab_server(x11.conn);
 
@@ -137,17 +145,16 @@ int Main(int argc, char** argv) {
     }
 
     const bool update_bar = fds[1].revents & POLLIN;
+    if (update_bar) {
+      uint64_t expirations;
+      read(tfd, &expirations, sizeof(expirations));
+    }
     if (update_bar || wm_bar_dirty) {
-      if (update_bar) {
-        uint64_t expirations;
-        read(tfd, &expirations, sizeof(expirations));
-      }
-
       UpdateBar();
     }
 
     if (fds[2].revents & POLLIN) {
-      nylafs.Process();
+      DebugFsProcess();
     }
   }
 

@@ -14,7 +14,7 @@ cc_binary(
     deps = [
         "//nyla/commons",
         "//nyla/dbus",
-        "//nyla/fs",
+        "//nyla/debugfs",
         "//nyla/layout",
         "//nyla/x11",
         "@abseil-cpp//absl/container:flat_hash_map",

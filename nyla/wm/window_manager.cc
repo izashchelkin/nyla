@@ -15,8 +15,10 @@
 #include "absl/log/check.h"
 #include "absl/log/log.h"
 #include "absl/strings/str_join.h"
+#include "nyla/commons/containers/map.h"
 #include "nyla/commons/rect.h"
 #include "nyla/dbus/dbus.h"
+#include "nyla/debugfs/debugfs.h"
 #include "nyla/layout/layout.h"
 #include "nyla/wm/palette.h"
 #include "nyla/wm/screen_saver_inhibitor.h"
@@ -29,8 +31,7 @@
 
 namespace nyla {
 
-template <typename Key, typename Val>
-using Map = absl::flat_hash_map<Key, Val>;
+static std::string DumpClients();
 
 struct WindowStack {
   LayoutType layout_type;
@@ -230,6 +231,11 @@ void InitializeWM() {
                                          x11.screen->black_pixel, font}))) {
     LOG(ERROR) << "could not create bar GC";
   }
+
+  DebugFsRegister(
+      "windows", nullptr,                                //
+      [](auto& file) { file.content = DumpClients(); },  //
+      nullptr);
 
   ScreenSaverInhibitorInit();
 }
@@ -1000,7 +1006,7 @@ void UpdateBar() {
                    bar_text.data());
 }
 
-std::string DumpClients() {
+static std::string DumpClients() {
   std::string out;
 
   const WindowStack& stack = GetActiveStack();
