@@ -16,8 +16,10 @@
 #include "absl/log/log.h"
 #include "absl/strings/str_join.h"
 #include "nyla/commons/rect.h"
+#include "nyla/dbus/dbus.h"
 #include "nyla/layout/layout.h"
 #include "nyla/wm/palette.h"
+#include "nyla/wm/screen_saver_inhibitor.h"
 #include "nyla/x11/error.h"
 #include "nyla/x11/wm_hints.h"
 #include "nyla/x11/x11.h"
@@ -228,6 +230,8 @@ void InitializeWM() {
                                          x11.screen->black_pixel, font}))) {
     LOG(ERROR) << "could not create bar GC";
   }
+
+  ScreenSaverInhibitorInit();
 }
 
 static void ClearZoom(WindowStack& stack) {

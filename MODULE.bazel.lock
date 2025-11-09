@@ -159,6 +159,25 @@
   },
   "selectedYankedVersions": {},
   "moduleExtensions": {
+    "//nyla/bazel:pkg_config_dependency.bzl%pkg": {
+      "general": {
+        "bzlTransitiveDigest": "bRW0X/Jrv0HvtWWOukKxFgnhU5hsWhrE9ltYUK/DcFg=",
+        "usagesDigest": "/0OCK92YWIjLSgKcRWdpl4PCR7+CdBsDsNE0mW5PG94=",
+        "recordedFileInputs": {},
+        "recordedDirentsInputs": {},
+        "envVariables": {},
+        "generatedRepoSpecs": {
+          "dbus": {
+            "repoRuleId": "@@//nyla/bazel:pkg_config_dependency.bzl%pkg_config_repository",
+            "attributes": {
+              "alias": "dbus",
+              "pkg_name": "dbus-1"
+            }
+          }
+        },
+        "recordedRepoMappingEntries": []
+      }
+    },
     "@@pybind11_bazel+//:internal_configure.bzl%internal_configure_extension": {
       "general": {
         "bzlTransitiveDigest": "G7xCmtNWXRuBtChRgB5OK5+gmM8Uoy8Mec/B7j3fhqs=",

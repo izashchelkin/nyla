@@ -1,0 +1,14 @@
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "dbus",
+    srcs = ["dbus.cc"],
+    hdrs = ["dbus.h"],
+    deps = [
+        "//nyla/commons",
+        "@abseil-cpp//absl/log",
+        "@dbus",
+    ],
+)

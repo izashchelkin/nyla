@@ -8,7 +8,6 @@
 #include "nyla/commons/math/lerp.h"
 #include "nyla/commons/math/math.h"
 #include "nyla/commons/math/vec/vec2f.h"
-#include "nyla/commons/types.h"
 #include "nyla/shipgame/renderer.h"
 #include "nyla/vulkan/vulkan.h"
 #include "xcb/xproto.h"

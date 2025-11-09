@@ -8,8 +8,12 @@ cc_binary(
             "*.h",
         ],
     ),
+    linkopts = [
+        "-lxcb-screensaver",
+    ],
     deps = [
         "//nyla/commons",
+        "//nyla/dbus",
         "//nyla/fs",
         "//nyla/layout",
         "//nyla/x11",

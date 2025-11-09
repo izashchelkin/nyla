@@ -9,3 +9,11 @@ git_override(
     commit = "d107d9c9025915902fd52346f1c6e18d87f7013a",
     remote = "https://github.com/izashchelkin/bazel-compile-commands-extractor.git",
 )
+
+pkg = use_extension("//nyla/bazel:pkg_config_dependency.bzl", "pkg")
+pkg.dep(
+    name = "dbus",
+    alias = "dbus",
+    pkg_name = "dbus-1",
+)
+use_repo(pkg, "dbus")

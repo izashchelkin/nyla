@@ -12,6 +12,7 @@
 #include "nyla/commons/logging/init.h"
 #include "nyla/commons/spawn.h"
 #include "nyla/commons/timerfd.h"
+#include "nyla/dbus/dbus.h"
 #include "nyla/fs/nylafs.h"
 #include "nyla/wm/window_manager.h"
 #include "nyla/x11/x11.h"
@@ -43,6 +44,7 @@ int Main(int argc, char** argv) {
     LOG(QFATAL) << "another wm is already running";
   }
 
+  DBus_Initialize();
   InitializeWM();
 
   uint16_t modifier = XCB_MOD_MASK_4;
@@ -108,25 +110,22 @@ int Main(int argc, char** argv) {
   fds.emplace_back(pollfd{.fd = tfd, .events = POLLIN});
 
   NylaFs nylafs;
-  if (nylafs.Init()) {
-    fds.emplace_back(pollfd{.fd = nylafs.GetFd(), .events = POLLIN});
+  CHECK(nylafs.Init());
 
-    nylafs.Register(NylaFsDynamicFile{"clients", DumpClients, [] {}});
+  fds.emplace_back(pollfd{.fd = nylafs.GetFd(), .events = POLLIN});
 
-    nylafs.Register(NylaFsDynamicFile{"quit", [] { return "quit\n"; },
-                                      [&is_running] { is_running = false; }});
+  nylafs.Register(NylaFsDynamicFile{"clients", DumpClients, [] {}});
 
-  } else {
-    LOG(ERROR) << "could not start NylaFS, continuing anyway...";
-  }
+  nylafs.Register(NylaFsDynamicFile{"quit", [] { return "quit\n"; },
+                                    [&is_running] { is_running = false; }});
 
   xcb_ungrab_server(x11.conn);
 
   while (is_running && !xcb_connection_has_error(x11.conn)) {
+    DBus_Process();
+
     xcb_flush(x11.conn);
-
     ProcessWM();
-
     xcb_flush(x11.conn);
 
     if (poll(fds.data(), fds.size(), -1) == -1) {
@@ -147,7 +146,7 @@ int Main(int argc, char** argv) {
       UpdateBar();
     }
 
-    if (fds.size() > 2 && fds[2].revents & POLLIN) {
+    if (fds[2].revents & POLLIN) {
       nylafs.Process();
     }
   }
