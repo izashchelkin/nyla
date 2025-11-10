@@ -5,6 +5,7 @@
 
 #include "absl/log/log.h"
 #include "nyla/commons/clock.h"
+#include "nyla/commons/containers/set.h"
 #include "nyla/commons/math/lerp.h"
 #include "nyla/commons/math/math.h"
 #include "nyla/commons/math/vec/vec2f.h"
