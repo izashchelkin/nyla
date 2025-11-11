@@ -6,6 +6,26 @@
 #include "nyla/commons/readfile.h"
 #include "nyla/vulkan/vulkan.h"
 
+namespace {
+
+struct PerFrame {
+  PerFrame(size_t n) : descriptor_sets(n), scene_ubo(n) {}
+
+  std::vector<VkDescriptorSet> descriptor_sets;
+
+  struct Uniform {
+    Uniform(size_t n) : buffer(n), memory(n), mapped(n) {}
+
+    std::vector<VkBuffer> buffer;
+    std::vector<VkDeviceMemory> memory;
+    std::vector<void*> mapped;
+  };
+
+  Uniform scene_ubo;
+};
+
+}  // namespace
+
 namespace nyla {
 
 static VkPipeline pipeline;

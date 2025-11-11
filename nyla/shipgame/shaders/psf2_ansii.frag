@@ -111,39 +111,38 @@ const uvec4 font_data[96] = {
 };
 
 layout(scalar, set=0, binding=0) uniform TextLineUBO {
-	uint words[68];
-	ivec2 origin_px;
-	uint word_count;
-	int pad;
-	vec4 fg;
-	vec4 bg;
+  uint words[68];
+  ivec2 origin_px;
+  uint word_count;
+  int pad;
+  vec4 fg;
+  vec4 bg;
 } text_line;
 
 bool GlyphPixel(uint glyph_idx, uint x, uint y) {
-		uint rows = font_data[glyph_idx][y / 4];
-    uint row = (rows >> (8u * (3u - (y % 4)))) & 0xFFu;
-    uint bit = (row >> (7u - x)) & 1u;
-    return bit != 0u;
+  uint rows = font_data[glyph_idx][y / 4];
+  uint row = (rows >> (8u * (3u - (y % 4)))) & 0xFFu;
+  uint bit = (row >> (7u - x)) & 1u;
+  return bit != 0u;
 }
 
 layout(location = 0) out vec4 out_color;
 
 void main() {
-	ivec2 top_left_pos = ivec2(gl_FragCoord.xy) - text_line.origin_px;
-	if (top_left_pos.x < 0) discard;
-	if (top_left_pos.y < 0) discard;
-	if (top_left_pos.y >= int(HEIGHT)) discard;
+  ivec2 top_left_pos = ivec2(gl_FragCoord.xy) - text_line.origin_px;
+  if (top_left_pos.x < 0) discard;
+  if (top_left_pos.y < 0) discard;
+  if (top_left_pos.y >= int(HEIGHT)) discard;
 
-	uint line_width_px = text_line.word_count * 4 * WIDTH;
-	if (top_left_pos.x >= line_width_px) discard;
+  uint line_width_px = text_line.word_count * 4 * WIDTH;
+  if (top_left_pos.x >= line_width_px) discard;
 
-	int cx = top_left_pos.x / int(WIDTH);
-	int gx = top_left_pos.x % int(WIDTH);
+  int cx = top_left_pos.x / int(WIDTH);
+  int gx = top_left_pos.x % int(WIDTH);
 
-	uint ch = (text_line.words[cx / 4] >> ((cx % 4) * 8u)) & 0xFFu;
-	if (ch != 0 && GlyphPixel(uint(ch - 0x20), gx, top_left_pos.y)) 
-		out_color = text_line.fg;
-	else
-		out_color = text_line.bg;
+  uint ch = (text_line.words[cx / 4] >> ((cx % 4) * 8u)) & 0xFFu;
+  if (ch != 0 && GlyphPixel(uint(ch - 0x20), gx, top_left_pos.y)) 
+    out_color = text_line.fg;
+  else
+    out_color = text_line.bg;
 }
-

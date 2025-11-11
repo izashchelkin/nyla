@@ -162,7 +162,7 @@
     "//nyla/bazel:pkg_config_dependency.bzl%pkg": {
       "general": {
         "bzlTransitiveDigest": "bRW0X/Jrv0HvtWWOukKxFgnhU5hsWhrE9ltYUK/DcFg=",
-        "usagesDigest": "/0OCK92YWIjLSgKcRWdpl4PCR7+CdBsDsNE0mW5PG94=",
+        "usagesDigest": "YyDUmT63I9mlJ3AqfdzpYE2VcmF+K5j8XsEg67iCKp4=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},
