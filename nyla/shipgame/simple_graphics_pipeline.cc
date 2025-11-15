@@ -113,7 +113,7 @@ void SgpInit(Sgp& pipeline) {
 
   const VkPipelineLayoutCreateInfo pipeline_layout_create_info{
       .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-      .setLayoutCount = 1,
+      .setLayoutCount = static_cast<uint32_t>(num_uniforms ? 1 : 0),
       .pSetLayouts = &descriptor_set_layout,
   };
 
@@ -131,28 +131,33 @@ void SgpInit(Sgp& pipeline) {
   pipeline.descriptor_sets.resize(kVulkan_NumFramesInFlight);
   VK_CHECK(vkAllocateDescriptorSets(vk.device, &descriptor_set_alloc_info, pipeline.descriptor_sets.data()));
 
-  for (size_t i = 0; i < kVulkan_NumFramesInFlight; ++i) {
-    auto prepare = [](auto& b) -> auto& {
-      b.buffer.resize(kVulkan_NumFramesInFlight);
-      b.mem.resize(kVulkan_NumFramesInFlight);
-      b.mem_mapped.resize(kVulkan_NumFramesInFlight);
-      return b;
-    };
+  auto resize = [](auto& b) {
+    if (!b.enabled) return;
 
+    b.buffer.resize(kVulkan_NumFramesInFlight);
+    b.mem.resize(kVulkan_NumFramesInFlight);
+    b.mem_mapped.resize(kVulkan_NumFramesInFlight);
+  };
+
+  resize(pipeline.uniform);
+  resize(pipeline.dynamic_uniform);
+  resize(pipeline.vertex_buffer);
+
+  for (size_t i = 0; i < kVulkan_NumFramesInFlight; ++i) {
     if (pipeline.uniform.enabled) {
-      SgpUniformBuffer& b = prepare(pipeline.uniform);
+      SgpUniformBuffer& b = pipeline.uniform;
       CreateMappedUniformBuffer(pipeline.descriptor_sets[i], 0, (bool)false, b.size, b.range, b.buffer[i], b.mem[i],
                                 reinterpret_cast<void*&>(b.mem_mapped[i]));
     }
 
     if (pipeline.dynamic_uniform.enabled) {
-      SgpUniformBuffer& b = prepare(pipeline.dynamic_uniform);
+      SgpUniformBuffer& b = pipeline.dynamic_uniform;
       CreateMappedUniformBuffer(pipeline.descriptor_sets[i], 1, true, b.size, b.range, b.buffer[i], b.mem[i],
                                 reinterpret_cast<void*&>(b.mem_mapped[i]));
     }
 
     if (pipeline.vertex_buffer.enabled) {
-      SgpVertexBuf& b = prepare(pipeline.vertex_buffer);
+      SgpVertexBuf& b = pipeline.vertex_buffer;
       CreateMappedBuffer(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, b.size, b.buffer[i], b.mem[i],
                          reinterpret_cast<void*&>(b.mem_mapped[i]));
     }
@@ -210,7 +215,9 @@ void SgpBegin(Sgp& pipeline) {
 }
 
 void SgpStatic(Sgp& pipeline, std::span<const char> uniform_data) {
-  CHECK_LT(uniform_data.size(), pipeline.uniform.size);
+  CHECK(pipeline.uniform.enabled);
+
+  CHECK_LE(uniform_data.size(), pipeline.uniform.size);
   memcpy(pipeline.uniform.mem_mapped[vk.current_frame_data.iframe], uniform_data.data(), uniform_data.size());
 }
 
@@ -220,33 +227,41 @@ void SgpObject(Sgp& pipeline, std::span<const char> vertex_data, uint32_t vertex
 
   const VkCommandBuffer command_buffer = vk.command_buffers[vk.current_frame_data.iframe];
 
-  auto copy = [](auto& buffer, size_t size, std::span<const char> data) {
-    CHECK_LT(buffer.written_this_frame + size, buffer.size);
-
-    memcpy(buffer.mem_mapped[vk.current_frame_data.iframe] + buffer.written_this_frame, data.data(), data.size());
-    buffer.written_this_frame += data.size();
-  };
-
   if (pipeline.vertex_buffer.enabled) {
-    const VkDeviceSize offset = pipeline.vertex_buffer.written_this_frame;
-    vkCmdBindVertexBuffers(command_buffer, 0, 1, &pipeline.vertex_buffer.buffer[vk.current_frame_data.iframe], &offset);
+    auto& written_this_frame = pipeline.vertex_buffer.written_this_frame;
+    const auto& buffer = pipeline.vertex_buffer.buffer[vk.current_frame_data.iframe];
+    const auto& mem_mapped = pipeline.vertex_buffer.mem_mapped[vk.current_frame_data.iframe];
 
-    const uint32_t size = vertex_count * pipeline.vertex_buffer.attrs.size() * 16;
+    const VkDeviceSize offset = pipeline.vertex_buffer.written_this_frame;
+    vkCmdBindVertexBuffers(command_buffer, 0, 1, &buffer, &offset);
+
+    const uint32_t size = vertex_count * CalcVertexBufferStride(pipeline);
     CHECK_EQ(vertex_data.size(), size);
-    copy(pipeline.vertex_buffer, size, vertex_data);
+    CHECK_LE(pipeline.vertex_buffer.written_this_frame + size, pipeline.vertex_buffer.size);
+
+    void* dst = mem_mapped + written_this_frame;
+    memcpy(dst, vertex_data.data(), size);
+    written_this_frame += size;
   }
 
   if (pipeline.dynamic_uniform.enabled) {
-    pipeline.dynamic_uniform.written_this_frame = AlignUp(pipeline.dynamic_uniform.written_this_frame,
-                                                          vk.phys_device_props.limits.minUniformBufferOffsetAlignment);
+    auto& written_this_frame = pipeline.dynamic_uniform.written_this_frame;
+    written_this_frame = AlignUp(written_this_frame, vk.phys_device_props.limits.minUniformBufferOffsetAlignment);
 
+    const auto& mem_mapped = pipeline.dynamic_uniform.mem_mapped[vk.current_frame_data.iframe];
+
+    const auto descriptor_set = pipeline.descriptor_sets[vk.current_frame_data.iframe];
     const uint32_t dynamic_uniform_offset = pipeline.dynamic_uniform.written_this_frame;
-    vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.layout, 0, 1,
-                            &pipeline.descriptor_sets[vk.current_frame_data.iframe], 1, &dynamic_uniform_offset);
+    vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.layout, 0, 1, &descriptor_set, 1,
+                            &dynamic_uniform_offset);
 
     const uint32_t size = pipeline.dynamic_uniform.range;
     CHECK_LE(dynamic_uniform_data.size(), size);
-    copy(pipeline.dynamic_uniform, size, dynamic_uniform_data);
+    CHECK_LE(written_this_frame + size, pipeline.dynamic_uniform.size);
+
+    void* dst = mem_mapped + written_this_frame;
+    memcpy(dst, dynamic_uniform_data.data(), dynamic_uniform_data.size());
+    written_this_frame += size;
   }
 
   vkCmdDraw(command_buffer, vertex_count, 1, 0, 0);
@@ -263,6 +278,9 @@ VkFormat SgpVertexAttrVkFormat(SgpVertexAttr attr) {
     case SgpVertexAttr::UNorm8x4:
       return VK_FORMAT_R8G8B8A8_UNORM;
   }
+
+  CHECK(false);
+  return VK_FORMAT_UNDEFINED;
 }
 
 uint32_t SgpVertexAttrSize(SgpVertexAttr attr) {
@@ -276,6 +294,9 @@ uint32_t SgpVertexAttrSize(SgpVertexAttr attr) {
     case SgpVertexAttr::UNorm8x4:
       return 4;
   }
+
+  CHECK(false);
+  return 0;
 }
 
 }  // namespace nyla
