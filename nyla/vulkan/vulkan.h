@@ -46,11 +46,9 @@ struct Vulkan_State {
 };
 extern Vulkan_State vk;
 
-#define VK_GET_INSTANCE_PROC_ADDR(name) \
-  reinterpret_cast<PFN_##name>(vkGetInstanceProcAddr(instance, #name))
+#define VK_GET_INSTANCE_PROC_ADDR(name) reinterpret_cast<PFN_##name>(vkGetInstanceProcAddr(instance, #name))
 
-#define VK_CHECK(res) \
-  CHECK_EQ(res, VK_SUCCESS) << "Vulkan error: " << VkResultStr(res);
+#define VK_CHECK(res) CHECK_EQ(res, VK_SUCCESS) << "Vulkan error: " << VkResultStr(res);
 
 void Vulkan_Initialize(std::span<const char* const> shader_watch_directories);
 
@@ -59,21 +57,18 @@ VkExtent2D Vulkan_PlatformGetWindowExtent();
 
 //
 
-void Vulkan_CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
-                         VkMemoryPropertyFlags properties, VkBuffer& buffer,
-                         VkDeviceMemory& buffer_memory);
+void Vulkan_CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
+                         VkBuffer& buffer, VkDeviceMemory& buffer_memory);
 
-void Vulkan_CreateBuffer(VkCommandPool command_pool, VkQueue transfer_queue,
-                         VkDeviceSize data_size, const void* src_data,
-                         VkBufferUsageFlags usage, VkBuffer& buffer,
+void Vulkan_CreateBuffer(VkCommandPool command_pool, VkQueue transfer_queue, VkDeviceSize data_size,
+                         const void* src_data, VkBufferUsageFlags usage, VkBuffer& buffer,
                          VkDeviceMemory& buffer_memory);
 
 //
 
-VkPipeline Vulkan_CreateGraphicsPipeline(
-    const VkPipelineVertexInputStateCreateInfo& vertex_input_create_info,
-    VkPipelineLayout pipeline_layout,
-    std::span<const VkPipelineShaderStageCreateInfo> stages);
+VkPipeline Vulkan_CreateGraphicsPipeline(const VkPipelineVertexInputStateCreateInfo& vertex_input_create_info,
+                                         VkPipelineLayout pipeline_layout,
+                                         std::span<const VkPipelineShaderStageCreateInfo> stages);
 
 VkShaderModule Vulkan_CreateShaderModule(const std::vector<char>& code);
 
@@ -111,10 +106,5 @@ void Vulkan_RenderingEnd();
 void Vulkan_FrameEnd();
 
 //
-
-void CreateUniformBuffer(VkDescriptorSet descriptor_set, uint32_t dstBinding,
-                         bool dynamic, size_t buffer_size, size_t range,
-                         VkBuffer& buffer, VkDeviceMemory& memory,
-                         void*& mapped);
 
 }  // namespace nyla

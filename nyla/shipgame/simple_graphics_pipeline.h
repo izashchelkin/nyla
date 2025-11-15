@@ -1,39 +1,57 @@
+#pragma once
+
+#include <cstdint>
+#include <span>
 #include <vector>
 
-#include "nyla/commons/math/vec/vec2f.h"
-#include "nyla/commons/math/vec/vec3f.h"
 #include "vulkan/vulkan.h"
 
 namespace nyla {
 
-struct SimplePipelineVertex {
-  Vec2f pos;
-  Vec3f color;
+struct SimplePipelineUniformBuffer {
+  bool enabled;
+  std::vector<VkBuffer> buffer;
+  std::vector<VkDeviceMemory> mem;
+  std::vector<char*> mem_mapped;
+  uint32_t size;
+  uint32_t range;
+  uint32_t written_this_frame;
 };
 
-struct SimplePipelineUniform {
+enum class SimplePipelineVertexAttributeSlot {
+  Float4,
+  Half2,
+  SNorm8x4,
+  UNorm8x4,
+};
+
+struct SimplePipelineVertexBuffer {
+  bool enabled;
   std::vector<VkBuffer> buffer;
-  VkDeviceSize size;
-  VkDeviceSize range;
   std::vector<VkDeviceMemory> mem;
-  std::vector<void*> mem_mapped;
+  std::vector<char*> mem_mapped;
+  uint32_t size;
+  uint32_t written_this_frame;
+  std::vector<SimplePipelineVertexAttributeSlot> slots;
 };
 
 struct SimplePipeline {
   VkPipeline pipeline;
   VkPipelineLayout layout;
-  std::vector<VkPipelineShaderStageCreateInfo> shader_stages;
   std::vector<VkDescriptorSet> descriptor_sets;
+  std::vector<VkPipelineShaderStageCreateInfo> shader_stages;
 
-  bool has_uniform;
-  SimplePipelineUniform uniform;
-  bool has_dynamic_uniform;
-  SimplePipelineUniform dynamic_uniform;
-
-  bool has_vertex_input;
-  std::vector<VkBuffer> vertex_buffers;
+  SimplePipelineUniformBuffer uniform;
+  SimplePipelineUniformBuffer dynamic_uniform;
+  SimplePipelineVertexBuffer vertex_buffer;
 
   void (*Init)(SimplePipeline&);
 };
+
+void SimplePipelineInit(SimplePipeline& pipeline);
+void SimplePipelineBegin(SimplePipeline& pipeline);
+void SimplePipelineStatic(SimplePipeline& pipeline, std::span<const char> uniform_data);
+void SimplePipelineObject(SimplePipeline& pipeline, std::span<const char> vertex_data, uint32_t vertex_count,
+                          std::span<const char> dynamic_uniform_data);
 
 }  // namespace nyla

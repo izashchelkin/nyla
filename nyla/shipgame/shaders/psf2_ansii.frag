@@ -110,7 +110,7 @@ const uvec4 font_data[96] = {
   uvec4(0x08100000, 0x00000000, 0x00000000, 0x00000000), // 0x7F: BACKSPACE
 };
 
-layout(scalar, set=0, binding=0) uniform TextLineUBO {
+layout(scalar, set=0, binding=1) uniform TextLineUBO {
   uint words[68];
   ivec2 origin_px;
   uint word_count;

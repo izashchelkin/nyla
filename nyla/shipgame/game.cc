@@ -4,12 +4,14 @@
 #include <cstring>
 
 #include "absl/log/log.h"
+#include "nyla/commons/charview.h"
 #include "nyla/commons/clock.h"
 #include "nyla/commons/containers/set.h"
 #include "nyla/commons/math/lerp.h"
 #include "nyla/commons/math/math.h"
 #include "nyla/commons/math/vec/vec2f.h"
-#include "nyla/shipgame/renderer.h"
+#include "nyla/shipgame/game_renderer2.h"
+#include "nyla/shipgame/simple_graphics_pipeline.h"
 #include "nyla/vulkan/vulkan.h"
 #include "xcb/xproto.h"
 
@@ -34,63 +36,79 @@ static std::vector<Vertex> GenCircle(size_t n, float radius, Vec3f color) {
 
   for (size_t i = 0; i < n; ++i) {
     ret.emplace_back(Vertex{Vec2f{}, color});
-    ret.emplace_back(
-        Vertex{Vec2f{r.real() * radius, r.imag() * radius}, color});
+    ret.emplace_back(Vertex{Vec2f{r.real() * radius, r.imag() * radius}, color});
 
     using namespace std::complex_literals;
     r *= std::cos(theta) + std::sin(theta) * 1if;
 
-    ret.emplace_back(
-        Vertex{Vec2f{r.real() * radius, r.imag() * radius}, color});
+    ret.emplace_back(Vertex{Vec2f{r.real() * radius, r.imag() * radius}, color});
   }
 
   return ret;
 }
 
-static void PreRenderGameObject(GameObject& obj) {
+static void RenderGameObject(GameObject& obj) {
   obj.vertices.clear();
 
   switch (obj.type) {
     case GameObject::Type::kSolarSystem: {
-      obj.vertex_count = 0;
       break;
     }
 
     case GameObject::Type::kPlanet:
     case GameObject::Type::kMoon: {
       obj.vertices = GenCircle(32, 1.f, obj.color);
-      obj.vertex_count = obj.vertices.size();
+
       break;
     }
 
     case GameObject::Type::kShip: {
-      obj.vertex_count = 3;
       obj.vertices.reserve(3);
 
       obj.vertices.emplace_back(Vertex{{-0.5f, -0.36f}, obj.color});
       obj.vertices.emplace_back(Vertex{{0.5f, 0.0f}, obj.color});
       obj.vertices.emplace_back(Vertex{{-0.5f, 0.36f}, obj.color});
+
       break;
     }
   }
 
-  if (obj.vertex_count) {
-    memcpy(obj.vertex_data_mapped[vk.current_frame_data.iframe],
-           obj.vertices.data(), sizeof(Vertex) * obj.vertex_count);
+  if (!obj.vertices.empty()) {
+    Mat4 model = Translate(obj.pos);
+    model = Mult(model, Rotate2D(obj.angle_radians));
+    model = Mult(model, Scale2D(200.f));
 
-    RenderGameObject(obj);
+    auto vertex_data = CharViewVector(obj.vertices);
+    auto dynamic_uniform_data = CharViewRef(model);
+    SimplePipelineObject(gamerenderer2_pipeline, vertex_data, obj.vertices.size(), dynamic_uniform_data);
   }
 
   for (GameObject& child : obj.children) {
-    PreRenderGameObject(child);
+    RenderGameObject(child);
   }
 }
 
-void PreRender() {
-  PreRenderGameObject(game_solar_system);
-  PreRenderGameObject(game_ship);
-  RenderGameObjectPrepareScene(game_camera_pos, game_camera_zoom);
-  RenderGameObjectFlushUniforms();
+constexpr float game_units_on_screen_y = 2000.f;
+
+void RenderGameObjects() {
+  SimplePipelineBegin(gamerenderer2_pipeline);
+
+  {
+    const float aspect = static_cast<float>(vk.surface_extent.width) / static_cast<float>(vk.surface_extent.height);
+
+    const float world_h = game_units_on_screen_y * game_camera_zoom;
+    const float world_w = world_h * aspect;
+
+    const SceneUbo scene_ubo = {
+        .view = Translate(Vec2fNeg(game_camera_pos)),
+        .proj = Ortho(-world_w * .5f, world_w * .5f, world_h * .5f, -world_h * .5f, 0.f, 1.f),
+    };
+
+    SimplePipelineStatic(gamerenderer2_pipeline, CharViewRef(scene_ubo));
+  }
+
+  RenderGameObject(game_solar_system);
+  RenderGameObject(game_ship);
 }
 
 void InitGame() {
@@ -104,10 +122,9 @@ void InitGame() {
         .velocity = {0.f, 0.f},
     };
 
-    auto* planets =
-        new std::vector<GameObject>(3, {
-                                           .type = GameObject::Type::kPlanet,
-                                       });
+    auto* planets = new std::vector<GameObject>(3, {
+                                                       .type = GameObject::Type::kPlanet,
+                                                   });
     game_solar_system.children = {planets->data(), planets->size()};
 
     size_t iplanet = 0;
@@ -153,31 +170,10 @@ void InitGame() {
         .radius = 10,
     };
   }
-
-  auto create_vb = [](GameObject& obj, VkDeviceSize size) {
-    obj.vertex_buffer_size = size;
-
-    for (size_t i = 0; i < kVulkan_NumFramesInFlight; ++i) {
-      Vulkan_CreateBuffer(obj.vertex_buffer_size,
-                          VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                              VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                          obj.vertex_buffer[i], obj.vertex_buffer_memory[i]);
-      vkMapMemory(vk.device, obj.vertex_buffer_memory[i], 0,
-                  obj.vertex_buffer_size, 0, &obj.vertex_data_mapped[i]);
-    }
-  };
-
-  create_vb(game_ship, 1024);
-  for (auto& planet : game_solar_system.children) {
-    create_vb(planet, 1024);
-  }
 }
 
-void ProcessInput(Set<xcb_keycode_t>& pressed_keys,
-                  Set<xcb_keycode_t>& released_keys,
-                  Set<xcb_button_index_t>& pressed_buttons,
-                  Set<xcb_button_index_t>& released_buttons) {
+void ProcessInput(Set<xcb_keycode_t>& pressed_keys, Set<xcb_keycode_t>& released_keys,
+                  Set<xcb_button_index_t>& pressed_buttons, Set<xcb_button_index_t>& released_buttons) {
 #define pressed(key) pressed_keys.contains(game_keycodes.key)
 
   const int dx = pressed(right) - pressed(left);
@@ -190,28 +186,22 @@ void ProcessInput(Set<xcb_keycode_t>& pressed_keys,
   for (; dt_accumulator >= step; dt_accumulator -= step) {
     {
       if (dx || dy) {
-        float angle =
-            std::atan2(-static_cast<float>(dy), static_cast<float>(dx));
+        float angle = std::atan2(-static_cast<float>(dy), static_cast<float>(dx));
         if (angle < 0.f) {
           angle += 2.f * pi;
         }
 
-        game_ship.angle_radians =
-            LerpAngle(game_ship.angle_radians, angle, step * 5.f);
+        game_ship.angle_radians = LerpAngle(game_ship.angle_radians, angle, step * 5.f);
       }
 
       if (pressed(brake)) {
         Lerp(game_ship.velocity, Vec2f{}, step * 5.f);
       } else if (pressed(boost)) {
-        const Vec2f direction =
-            Vec2fNorm(Vec2f{std::cos(game_ship.angle_radians),
-                            std::sin(game_ship.angle_radians)});
+        const Vec2f direction = Vec2fNorm(Vec2f{std::cos(game_ship.angle_radians), std::sin(game_ship.angle_radians)});
 
         Lerp(game_ship.velocity, Vec2fMul(direction, 5000.f), step);
       } else if (pressed(acceleration)) {
-        const Vec2f direction =
-            Vec2fNorm(Vec2f{std::cos(game_ship.angle_radians),
-                            std::sin(game_ship.angle_radians)});
+        const Vec2f direction = Vec2fNorm(Vec2f{std::cos(game_ship.angle_radians), std::sin(game_ship.angle_radians)});
 
         Lerp(game_ship.velocity, Vec2fMul(direction, 1000.f), step * 8.f);
       } else {
@@ -232,17 +222,14 @@ void ProcessInput(Set<xcb_keycode_t>& pressed_keys,
         const Vec2f v = Vec2fDif(game_solar_system.pos, planet.pos);
         const float r = Vec2fLen(v);
 
-        const Vec2f v2 = Vec2fSum(
-            Vec2fMul(
-                Vec2fNorm(Vec2fApply(
-                    Vec2fDif(planet.pos, game_solar_system.pos), 1.f / 1if)),
-                std::max(0.f, planet.orbit_radius - r / 5.f)),
-            game_solar_system.pos);
+        const Vec2f v2 =
+            Vec2fSum(Vec2fMul(Vec2fNorm(Vec2fApply(Vec2fDif(planet.pos, game_solar_system.pos), 1.f / 1if)),
+                              std::max(0.f, planet.orbit_radius - r / 5.f)),
+                     game_solar_system.pos);
 
         const Vec2f vv = Vec2fDif(v2, planet.pos);
 
-        float F =
-            10000.f * 6.7f * planet.mass * game_solar_system.mass / (r * r);
+        float F = 10000.f * 6.7f * planet.mass * game_solar_system.mass / (r * r);
         Vec2f Fv = Vec2fResized(vv, F);
 
         Vec2fAdd(planet.velocity, Vec2fMul(Fv, step / planet.mass));

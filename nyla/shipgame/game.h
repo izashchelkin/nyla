@@ -13,7 +13,11 @@ namespace nyla {
 
 struct Vertex {
   Vec2f pos;
+  float pad_a[2] = {666.f, 666.f};
   Vec3f color;
+  float pad_b[1] = {777.f};
+
+  Vertex(Vec2f pos, Vec3f color) : pos{pos}, color{color} {}
 };
 
 struct GameObject {
@@ -33,16 +37,8 @@ struct GameObject {
   float orbit_radius;
   Vec2f velocity{};
 
-  std::span<GameObject> children{};
-
   std::vector<Vertex> vertices{};
-  uint32_t vertex_count;
-  uint32_t vertex_offset;
-  VkDeviceSize vertex_buffer_size;
-
-  void* vertex_data_mapped[kVulkan_NumFramesInFlight];
-  VkBuffer vertex_buffer[kVulkan_NumFramesInFlight];
-  VkDeviceMemory vertex_buffer_memory[kVulkan_NumFramesInFlight];
+  std::span<GameObject> children{};
 };
 extern GameObject game_solar_system;
 extern GameObject game_ship;
@@ -68,10 +64,8 @@ struct GameObjectUbo {
 };
 
 void InitGame();
-void ProcessInput(Set<xcb_keycode_t>& pressed_keys,
-                  Set<xcb_keycode_t>& released_keys,
-                  Set<xcb_button_index_t>& pressed_buttons,
-                  Set<xcb_button_index_t>& released_buttons);
-void PreRender();
+void ProcessInput(Set<xcb_keycode_t>& pressed_keys, Set<xcb_keycode_t>& released_keys,
+                  Set<xcb_button_index_t>& pressed_buttons, Set<xcb_button_index_t>& released_buttons);
+void RenderGameObjects();
 
 }  // namespace nyla

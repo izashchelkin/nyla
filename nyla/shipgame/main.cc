@@ -1,38 +1,23 @@
 #include <signal.h>
 
-#include <algorithm>
-#include <cmath>
-#include <complex>
 #include <csignal>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
-#include <iterator>
-#include <limits>
-#include <memory>
-#include <random>
 #include <string>
-#include <vector>
 
 #include "absl/cleanup/cleanup.h"
 #include "absl/log/log.h"
-#include "absl/strings/str_join.h"
 #include "nyla/commons/clock.h"
 #include "nyla/commons/containers/set.h"
 #include "nyla/commons/logging/init.h"
-#include "nyla/commons/math/lerp.h"
-#include "nyla/commons/math/mat4.h"
-#include "nyla/commons/math/math.h"
-#include "nyla/commons/math/vec/vec2f.h"
-#include "nyla/commons/math/vec/vec3f.h"
 #include "nyla/commons/memory/tnew.h"
-#include "nyla/commons/readfile.h"
-#include "nyla/shipgame/circle.h"
 #include "nyla/shipgame/game.h"
-#include "nyla/shipgame/grid_renderer.h"
-#include "nyla/shipgame/renderer.h"
-#include "nyla/shipgame/text_renderer.h"
+#include "nyla/shipgame/game_renderer2.h"
+#include "nyla/shipgame/grid_renderer2.h"
+#include "nyla/shipgame/simple_graphics_pipeline.h"
+#include "nyla/shipgame/text_renderer2.h"
 #include "nyla/vulkan/vulkan.h"
 #include "nyla/x11/x11.h"
 #include "xcb/xcb.h"
@@ -51,8 +36,8 @@ static Set<xcb_button_index_t> pressed_buttons;
 static Set<xcb_button_index_t> released_buttons;
 
 VkExtent2D Vulkan_PlatformGetWindowExtent() {
-  xcb_get_geometry_reply_t* window_geometry = xcb_get_geometry_reply(
-      x11.conn, xcb_get_geometry(x11.conn, window), nullptr);
+  xcb_get_geometry_reply_t* window_geometry =
+      xcb_get_geometry_reply(x11.conn, xcb_get_geometry(x11.conn, window), nullptr);
 
   return {.width = window_geometry->width, .height = window_geometry->height};
 }
@@ -63,8 +48,7 @@ void Vulkan_PlatformSetSurface() {
       .connection = x11.conn,
       .window = window,
   };
-  VK_CHECK(vkCreateXcbSurfaceKHR(vk.instance, &surface_create_info, nullptr,
-                                 &vk.surface));
+  VK_CHECK(vkCreateXcbSurfaceKHR(vk.instance, &surface_create_info, nullptr, &vk.surface));
 }
 
 static void ProcessXEvents() {
@@ -96,25 +80,20 @@ static void ProcessXEvents() {
 
       case XCB_BUTTON_PRESS: {
         auto buttonpress = reinterpret_cast<xcb_button_press_event_t*>(event);
-        pressed_buttons.emplace(
-            static_cast<xcb_button_index_t>(buttonpress->detail));
+        pressed_buttons.emplace(static_cast<xcb_button_index_t>(buttonpress->detail));
         break;
       }
 
       case XCB_BUTTON_RELEASE: {
-        auto buttonrelease =
-            reinterpret_cast<xcb_button_release_event_t*>(event);
-        released_buttons.emplace(
-            static_cast<xcb_button_index_t>(buttonrelease->detail));
+        auto buttonrelease = reinterpret_cast<xcb_button_release_event_t*>(event);
+        released_buttons.emplace(static_cast<xcb_button_index_t>(buttonrelease->detail));
         break;
       }
 
       case XCB_CLIENT_MESSAGE: {
-        auto clientmessage =
-            reinterpret_cast<xcb_client_message_event_t*>(event);
+        auto clientmessage = reinterpret_cast<xcb_client_message_event_t*>(event);
 
-        if (clientmessage->format == 32 &&
-            clientmessage->type == x11.atoms.wm_protocols &&
+        if (clientmessage->format == 32 && clientmessage->type == x11.atoms.wm_protocols &&
             clientmessage->data.data32[0] == x11.atoms.wm_delete_window) {
           running = false;
         }
@@ -145,23 +124,18 @@ static int Main() {
     window = xcb_generate_id(x11.conn);
 
     CHECK(!xcb_request_check(
-        x11.conn,
-        xcb_create_window_checked(
-            x11.conn, XCB_COPY_FROM_PARENT, window, x11.screen->root, 0, 0,
-            x11.screen->width_in_pixels, x11.screen->height_in_pixels, 0,
-            XCB_WINDOW_CLASS_INPUT_OUTPUT, x11.screen->root_visual,
-            XCB_CW_OVERRIDE_REDIRECT | XCB_CW_EVENT_MASK,
-            (uint32_t[]){false, XCB_EVENT_MASK_KEY_PRESS |
-                                    XCB_EVENT_MASK_KEY_RELEASE |
-                                    XCB_EVENT_MASK_BUTTON_PRESS |
-                                    XCB_EVENT_MASK_BUTTON_RELEASE})));
+        x11.conn, xcb_create_window_checked(
+                      x11.conn, XCB_COPY_FROM_PARENT, window, x11.screen->root, 0, 0, x11.screen->width_in_pixels,
+                      x11.screen->height_in_pixels, 0, XCB_WINDOW_CLASS_INPUT_OUTPUT, x11.screen->root_visual,
+                      XCB_CW_OVERRIDE_REDIRECT | XCB_CW_EVENT_MASK,
+                      (uint32_t[]){false, XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_KEY_RELEASE |
+                                              XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE})));
 
     xcb_map_window(x11.conn, window);
     xcb_flush(x11.conn);
   }
 
-  const char* shader_watch_dirs[] = {"nyla/shipgame/shaders",
-                                     "nyla/shipgame/shaders/build"};
+  const char* shader_watch_dirs[] = {"nyla/shipgame/shaders", "nyla/shipgame/shaders/build"};
   Vulkan_Initialize(shader_watch_dirs);
 
   {
@@ -182,10 +156,11 @@ static int Main() {
 
   //
 
+  SimplePipelineInit(gamerenderer2_pipeline);
+  SimplePipelineInit(textrender2_pipeline);
+  SimplePipelineInit(gridrenderer2_pipeline);
+
   InitGame();
-  RenderGameObjectInitialize();
-  InitTextRenderer();
-  InitGridRenderer();
 
   struct Profiling {
     uint16_t xevent;
@@ -211,17 +186,16 @@ static int Main() {
     Vulkan_FrameBegin();
 
     if (vk.shaders_invalidated) {
-      RenderGameObjectInitialize();
-      InitTextRenderer();
-      InitGridRenderer();
+      SimplePipelineInit(gamerenderer2_pipeline);
+      SimplePipelineInit(textrender2_pipeline);
+      SimplePipelineInit(gridrenderer2_pipeline);
       vk.shaders_invalidated = false;
     }
 
     if (vk.current_frame_data.dt > .05f) {
       LOG(INFO) << "dts spike: " << vk.current_frame_data.dt << "s";
 
-      const Profiling& lastprof =
-          prof_data[(iprof + prof_data.size() - 2) % prof_data.size()];
+      const Profiling& lastprof = prof_data[(iprof + prof_data.size() - 2) % prof_data.size()];
       LOG(INFO) << "last frame prof: xevent=" << lastprof.xevent;
     }
 
@@ -245,20 +219,18 @@ static int Main() {
     }
 #endif
 
-    // RenderText(200, 200, "zoom: " + std::to_string(zoom));
-    RenderText(10, 10,
-               "fps= " + std::to_string(int(1.f / vk.current_frame_data.dt)));
-
-    ProcessInput(pressed_keys, released_keys, pressed_buttons,
-                 released_buttons);
-    PreRender();
-    TextRendererBefore();
+    ProcessInput(pressed_keys, released_keys, pressed_buttons, released_buttons);
 
     Vulkan_RenderingBegin();
     {
-      RenderGameObjectRecord();
-      TextRendererRecord();
-      GridRendererRecord();
+      SimplePipelineBegin(gamerenderer2_pipeline);
+      RenderGameObjects();
+
+      SimplePipelineBegin(gridrenderer2_pipeline);
+      GridRenderer2Render();
+
+      SimplePipelineBegin(textrender2_pipeline);
+      TextRenderer2Line(10, 10, "fps= " + std::to_string(int(1.f / vk.current_frame_data.dt)));
     }
     Vulkan_RenderingEnd();
     Vulkan_FrameEnd();
