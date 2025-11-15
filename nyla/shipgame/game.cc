@@ -3,13 +3,11 @@
 #include <complex>
 #include <cstring>
 
-#include "absl/log/log.h"
-#include "nyla/commons/charview.h"
-#include "nyla/commons/clock.h"
 #include "nyla/commons/containers/set.h"
 #include "nyla/commons/math/lerp.h"
 #include "nyla/commons/math/math.h"
 #include "nyla/commons/math/vec/vec2f.h"
+#include "nyla/commons/memory/charview.h"
 #include "nyla/shipgame/game_renderer2.h"
 #include "nyla/shipgame/simple_graphics_pipeline.h"
 #include "nyla/vulkan/vulkan.h"
@@ -80,7 +78,7 @@ static void RenderGameObject(GameObject& obj) {
 
     auto vertex_data = CharViewVector(obj.vertices);
     auto dynamic_uniform_data = CharViewRef(model);
-    SimplePipelineObject(gamerenderer2_pipeline, vertex_data, obj.vertices.size(), dynamic_uniform_data);
+    SgpObject(gamerenderer2_pipeline, vertex_data, obj.vertices.size(), dynamic_uniform_data);
   }
 
   for (GameObject& child : obj.children) {
@@ -91,7 +89,7 @@ static void RenderGameObject(GameObject& obj) {
 constexpr float game_units_on_screen_y = 2000.f;
 
 void RenderGameObjects() {
-  SimplePipelineBegin(gamerenderer2_pipeline);
+  SgpBegin(gamerenderer2_pipeline);
 
   {
     const float aspect = static_cast<float>(vk.surface_extent.width) / static_cast<float>(vk.surface_extent.height);
@@ -104,7 +102,7 @@ void RenderGameObjects() {
         .proj = Ortho(-world_w * .5f, world_w * .5f, world_h * .5f, -world_h * .5f, 0.f, 1.f),
     };
 
-    SimplePipelineStatic(gamerenderer2_pipeline, CharViewRef(scene_ubo));
+    SgpStatic(gamerenderer2_pipeline, CharViewRef(scene_ubo));
   }
 
   RenderGameObject(game_solar_system);

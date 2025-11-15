@@ -2,6 +2,6 @@
 
 namespace nyla {
 
-extern SimplePipeline gamerenderer2_pipeline;
+extern Sgp gamerenderer2_pipeline;
 
 }

@@ -1,4 +1,5 @@
 ---
-Language:     Cpp
+Language: Cpp
 BasedOnStyle: Google
-ColumnLimit:  120
+ColumnLimit: 120
+AllowShortFunctionsOnASingleLine: Empty

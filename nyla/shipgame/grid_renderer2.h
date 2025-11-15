@@ -2,7 +2,7 @@
 
 namespace nyla {
 
-extern SimplePipeline gridrenderer2_pipeline;
+extern Sgp gridrenderer2_pipeline;
 
 void GridRenderer2Render();
 

@@ -4,8 +4,6 @@
 #include <cstdint>
 #include <vector>
 
-#include "nyla/commons/rect.h"
-
 namespace nyla {
 
 void CycleLayoutType(LayoutType& layout) {
@@ -25,31 +23,25 @@ void CycleLayoutType(LayoutType& layout) {
   }
 }
 
-static void ComputeColumns(const Rect& bounding_rect, uint32_t n,
-                           uint32_t padding, std::vector<Rect>& out) {
+static void ComputeColumns(const Rect& bounding_rect, uint32_t n, uint32_t padding, std::vector<Rect>& out) {
   uint32_t width = bounding_rect.width() / n;
   for (uint32_t i = 0; i < n; ++i) {
-    out.emplace_back(
-        TryApplyPadding(Rect(static_cast<int32_t>(bounding_rect.x() + (i * width)),
-                          bounding_rect.y(), width, bounding_rect.height()),
-                     padding));
-  }
-}
-
-static void ComputeRows(const Rect& bounding_rect, uint32_t n, uint32_t padding,
-                        std::vector<Rect>& out) {
-  uint32_t height = bounding_rect.height() / n;
-  for (uint32_t i = 0; i < n; ++i) {
     out.emplace_back(TryApplyPadding(
-        Rect(bounding_rect.x(),
-             static_cast<int32_t>(bounding_rect.y() + (i * height)),
-             bounding_rect.width(), height),
+        Rect(static_cast<int32_t>(bounding_rect.x() + (i * width)), bounding_rect.y(), width, bounding_rect.height()),
         padding));
   }
 }
 
-static void ComputeGrid(const Rect& bounding_rect, uint32_t n, uint32_t padding,
-                        std::vector<Rect>& out) {
+static void ComputeRows(const Rect& bounding_rect, uint32_t n, uint32_t padding, std::vector<Rect>& out) {
+  uint32_t height = bounding_rect.height() / n;
+  for (uint32_t i = 0; i < n; ++i) {
+    out.emplace_back(TryApplyPadding(
+        Rect(bounding_rect.x(), static_cast<int32_t>(bounding_rect.y() + (i * height)), bounding_rect.width(), height),
+        padding));
+  }
+}
+
+static void ComputeGrid(const Rect& bounding_rect, uint32_t n, uint32_t padding, std::vector<Rect>& out) {
   if (n < 4) {
     ComputeColumns(bounding_rect, n, padding, out);
   } else {
@@ -62,18 +54,14 @@ static void ComputeGrid(const Rect& bounding_rect, uint32_t n, uint32_t padding,
 
     for (uint32_t i = 0; i < n; ++i) {
       out.emplace_back(
-          TryApplyPadding(Rect(static_cast<int32_t>(bounding_rect.x() +
-                                                 ((i % num_cols) * width)),
-                            static_cast<int32_t>(bounding_rect.y() +
-                                                 ((i / num_cols) * height)),
-                            width, height),
-                       padding));
+          TryApplyPadding(Rect(static_cast<int32_t>(bounding_rect.x() + ((i % num_cols) * width)),
+                               static_cast<int32_t>(bounding_rect.y() + ((i / num_cols) * height)), width, height),
+                          padding));
     }
   }
 }
 
-std::vector<Rect> ComputeLayout(const Rect& bounding_rect, uint32_t n,
-                                uint32_t padding, LayoutType layout_type) {
+std::vector<Rect> ComputeLayout(const Rect& bounding_rect, uint32_t n, uint32_t padding, LayoutType layout_type) {
   switch (n) {
     case 0:
       return {};
@@ -95,6 +83,30 @@ std::vector<Rect> ComputeLayout(const Rect& bounding_rect, uint32_t n,
       break;
   }
   return out;
+}
+
+Rect TryApplyPadding(const Rect& rect, uint32_t padding) {
+  if (rect.width() > 2 * padding && rect.height() > 2 * padding) {
+    return Rect(rect.x(), rect.y(), rect.width() - 2 * padding, rect.height() - 2 * padding);
+  } else {
+    return rect;
+  }
+}
+
+Rect TryApplyMarginTop(const Rect& rect, uint32_t margin_top) {
+  if (rect.height() > margin_top) {
+    return Rect(rect.x(), rect.y() + margin_top, rect.width(), rect.height() - margin_top);
+  } else {
+    return rect;
+  }
+}
+
+Rect TryApplyMargin(const Rect& rect, uint32_t margin) {
+  if (rect.width() > 2 * margin && rect.height() > 2 * margin) {
+    return Rect(rect.x() + margin, rect.y() + margin, rect.width() - 2 * margin, rect.height() - 2 * margin);
+  } else {
+    return rect;
+  }
 }
 
 }  // namespace nyla

@@ -12,7 +12,7 @@
 
 #include "absl/log/check.h"
 #include "absl/log/log.h"
-#include "nyla/commons/clock.h"
+#include "nyla/commons/os/clock.h"
 
 namespace nyla {
 
@@ -92,6 +92,8 @@ void Vulkan_Initialize(std::span<const char* const> shader_watch_directories) {
 
     return phys_devices.front();
   }();
+
+  vkGetPhysicalDeviceProperties(vk.phys_device, &vk.phys_device_props);
 
   uint32_t queue_family_property_count = 1;
   VkQueueFamilyProperties queue_family_property;

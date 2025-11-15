@@ -18,6 +18,7 @@ struct Vulkan_State {
   uint32_t queue_family_index;
   VkQueue queue;
   VkPhysicalDevice phys_device;
+  VkPhysicalDeviceProperties phys_device_props;
   VkSurfaceKHR surface;
   VkSurfaceCapabilitiesKHR surface_capabilities;
   VkSurfaceFormatKHR surface_format;

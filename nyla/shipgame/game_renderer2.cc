@@ -2,13 +2,13 @@
 
 #include <unistd.h>
 
-#include "nyla/commons/readfile.h"
+#include "nyla/commons/os/readfile.h"
 #include "nyla/shipgame/simple_graphics_pipeline.h"
 #include "nyla/vulkan/vulkan.h"
 
 namespace nyla {
 
-static void InternalInit(SimplePipeline& pipeline) {
+static void InternalInit(Sgp& pipeline) {
   pipeline.shader_stages.emplace_back(VkPipelineShaderStageCreateInfo{
       .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
       .stage = VK_SHADER_STAGE_VERTEX_BIT,
@@ -24,7 +24,7 @@ static void InternalInit(SimplePipeline& pipeline) {
   });
 }
 
-SimplePipeline gamerenderer2_pipeline{
+Sgp gamerenderer2_pipeline{
     .uniform =
         {
             .enabled = true,
@@ -41,10 +41,10 @@ SimplePipeline gamerenderer2_pipeline{
         {
             .enabled = true,
             .size = 1 << 22,
-            .slots =
+            .attrs =
                 {
-                    SimplePipelineVertexAttributeSlot::Float4,
-                    SimplePipelineVertexAttributeSlot::Float4,
+                    SgpVertexAttr::Float4,
+                    SgpVertexAttr::Float4,
                 },
         },
     .Init = InternalInit,

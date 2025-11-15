@@ -4,6 +4,7 @@
 
 #include <cstdint>
 
+#include "nyla/commons/memory/align.h"
 #include "nyla/vulkan/vulkan.h"
 
 namespace nyla {
@@ -42,13 +43,24 @@ static void CreateMappedUniformBuffer(VkDescriptorSet descriptor_set, uint32_t d
   vkUpdateDescriptorSets(vk.device, 1, &write_descriptor_set, 0, nullptr);
 }
 
-void SimplePipelineInit(SimplePipeline& pipeline) {
+static uint32_t CalcVertexBufferStride(Sgp& pipeline) {
+  uint32_t ret = 0;
+  for (auto attr : pipeline.vertex_buffer.attrs) {
+    ret += SgpVertexAttrSize(attr);
+  }
+  return ret;
+}
+
+void SgpInit(Sgp& pipeline) {
   pipeline.shader_stages.clear();
 
   pipeline.Init(pipeline);
 
   std::vector<VkDescriptorPoolSize> desc_pool_sizes;
   std::vector<VkDescriptorSetLayoutBinding> desc_layout_bindings;
+
+  const uint32_t num_uniforms = pipeline.uniform.enabled + pipeline.dynamic_uniform.enabled;
+  desc_pool_sizes.reserve(num_uniforms);
 
   if (pipeline.uniform.enabled) {
     desc_layout_bindings.emplace_back(VkDescriptorSetLayoutBinding{
@@ -79,9 +91,6 @@ void SimplePipelineInit(SimplePipeline& pipeline) {
         .descriptorCount = descriptor_count,
     });
   }
-
-  uint32_t num_uniforms = pipeline.uniform.enabled + pipeline.dynamic_uniform.enabled;
-  desc_pool_sizes.reserve(num_uniforms);
 
   const VkDescriptorPoolCreateInfo descriptor_pool_create_info{
       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
@@ -131,19 +140,19 @@ void SimplePipelineInit(SimplePipeline& pipeline) {
     };
 
     if (pipeline.uniform.enabled) {
-      SimplePipelineUniformBuffer& b = prepare(pipeline.uniform);
+      SgpUniformBuffer& b = prepare(pipeline.uniform);
       CreateMappedUniformBuffer(pipeline.descriptor_sets[i], 0, (bool)false, b.size, b.range, b.buffer[i], b.mem[i],
                                 reinterpret_cast<void*&>(b.mem_mapped[i]));
     }
 
     if (pipeline.dynamic_uniform.enabled) {
-      SimplePipelineUniformBuffer& b = prepare(pipeline.dynamic_uniform);
+      SgpUniformBuffer& b = prepare(pipeline.dynamic_uniform);
       CreateMappedUniformBuffer(pipeline.descriptor_sets[i], 1, true, b.size, b.range, b.buffer[i], b.mem[i],
                                 reinterpret_cast<void*&>(b.mem_mapped[i]));
     }
 
     if (pipeline.vertex_buffer.enabled) {
-      SimplePipelineVertexBuffer& b = prepare(pipeline.vertex_buffer);
+      SgpVertexBuf& b = prepare(pipeline.vertex_buffer);
       CreateMappedBuffer(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, b.size, b.buffer[i], b.mem[i],
                          reinterpret_cast<void*&>(b.mem_mapped[i]));
     }
@@ -156,33 +165,25 @@ void SimplePipelineInit(SimplePipeline& pipeline) {
   if (pipeline.vertex_buffer.enabled) {
     const VkVertexInputBindingDescription binding_description{
         .binding = 0,
-        .stride = static_cast<uint32_t>(pipeline.vertex_buffer.slots.size() * 16),
+        .stride = CalcVertexBufferStride(pipeline),
         .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
     };
 
-    std::vector<VkVertexInputAttributeDescription> vertex_attr_descriptions(pipeline.vertex_buffer.slots.size());
-    for (uint32_t i = 0; i < pipeline.vertex_buffer.slots.size(); ++i) {
-      auto slot = pipeline.vertex_buffer.slots[i];
-      vertex_attr_descriptions[i] = {
-          .location = i,
-          .binding = 0,
-          .format =
-              [slot] {
-                switch (slot) {
-                  case SimplePipelineVertexAttributeSlot::Float4:
-                    return VK_FORMAT_R32G32B32A32_SFLOAT;
-                  case SimplePipelineVertexAttributeSlot::Half2:
-                    return VK_FORMAT_R16G16_SFLOAT;
-                  case SimplePipelineVertexAttributeSlot::SNorm8x4:
-                    return VK_FORMAT_R8G8B8A8_SNORM;
-                  case SimplePipelineVertexAttributeSlot::UNorm8x4:
-                    return VK_FORMAT_R8G8B8A8_UNORM;
-                  default:
-                    CHECK(false);
-                }
-              }(),
-          .offset = i * 16,
-      };
+    std::vector<VkVertexInputAttributeDescription> vertex_attr_descriptions(pipeline.vertex_buffer.attrs.size());
+
+    {
+      uint32_t offset = 0;
+      for (uint32_t i = 0; i < pipeline.vertex_buffer.attrs.size(); ++i) {
+        auto attr = pipeline.vertex_buffer.attrs[i];
+        vertex_attr_descriptions[i] = {
+            .location = i,
+            .binding = 0,
+            .format = SgpVertexAttrVkFormat(attr),
+            .offset = offset,
+        };
+
+        offset += SgpVertexAttrSize(attr);
+      }
     }
 
     vertex_input_create_info.vertexBindingDescriptionCount = 1;
@@ -198,7 +199,7 @@ void SimplePipelineInit(SimplePipeline& pipeline) {
   }
 }
 
-void SimplePipelineBegin(SimplePipeline& pipeline) {
+void SgpBegin(Sgp& pipeline) {
   pipeline.uniform.written_this_frame = 0;
   pipeline.dynamic_uniform.written_this_frame = 0;
   pipeline.vertex_buffer.written_this_frame = 0;
@@ -208,13 +209,13 @@ void SimplePipelineBegin(SimplePipeline& pipeline) {
   vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipeline);
 }
 
-void SimplePipelineStatic(SimplePipeline& pipeline, std::span<const char> uniform_data) {
+void SgpStatic(Sgp& pipeline, std::span<const char> uniform_data) {
   CHECK_LT(uniform_data.size(), pipeline.uniform.size);
-  memcpy(pipeline.uniform.mem_mapped[vk.current_frame_data.iframe], uniform_data.data(), pipeline.uniform.size);
+  memcpy(pipeline.uniform.mem_mapped[vk.current_frame_data.iframe], uniform_data.data(), uniform_data.size());
 }
 
-void SimplePipelineObject(SimplePipeline& pipeline, std::span<const char> vertex_data, uint32_t vertex_count,
-                          std::span<const char> dynamic_uniform_data) {
+void SgpObject(Sgp& pipeline, std::span<const char> vertex_data, uint32_t vertex_count,
+               std::span<const char> dynamic_uniform_data) {
   CHECK_GT(vertex_count, 0);
 
   const VkCommandBuffer command_buffer = vk.command_buffers[vk.current_frame_data.iframe];
@@ -222,20 +223,23 @@ void SimplePipelineObject(SimplePipeline& pipeline, std::span<const char> vertex
   auto copy = [](auto& buffer, size_t size, std::span<const char> data) {
     CHECK_LT(buffer.written_this_frame + size, buffer.size);
 
-    memcpy(buffer.mem_mapped[vk.current_frame_data.iframe] + buffer.written_this_frame, data.data(), size);
-    buffer.written_this_frame += size;
+    memcpy(buffer.mem_mapped[vk.current_frame_data.iframe] + buffer.written_this_frame, data.data(), data.size());
+    buffer.written_this_frame += data.size();
   };
 
   if (pipeline.vertex_buffer.enabled) {
     const VkDeviceSize offset = pipeline.vertex_buffer.written_this_frame;
     vkCmdBindVertexBuffers(command_buffer, 0, 1, &pipeline.vertex_buffer.buffer[vk.current_frame_data.iframe], &offset);
 
-    const uint32_t size = vertex_count * pipeline.vertex_buffer.slots.size() * 16;
+    const uint32_t size = vertex_count * pipeline.vertex_buffer.attrs.size() * 16;
     CHECK_EQ(vertex_data.size(), size);
     copy(pipeline.vertex_buffer, size, vertex_data);
   }
 
   if (pipeline.dynamic_uniform.enabled) {
+    pipeline.dynamic_uniform.written_this_frame = AlignUp(pipeline.dynamic_uniform.written_this_frame,
+                                                          vk.phys_device_props.limits.minUniformBufferOffsetAlignment);
+
     const uint32_t dynamic_uniform_offset = pipeline.dynamic_uniform.written_this_frame;
     vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.layout, 0, 1,
                             &pipeline.descriptor_sets[vk.current_frame_data.iframe], 1, &dynamic_uniform_offset);
@@ -246,6 +250,32 @@ void SimplePipelineObject(SimplePipeline& pipeline, std::span<const char> vertex
   }
 
   vkCmdDraw(command_buffer, vertex_count, 1, 0, 0);
+}
+
+VkFormat SgpVertexAttrVkFormat(SgpVertexAttr attr) {
+  switch (attr) {
+    case SgpVertexAttr::Float4:
+      return VK_FORMAT_R32G32B32A32_SFLOAT;
+    case SgpVertexAttr::Half2:
+      return VK_FORMAT_R16G16_SFLOAT;
+    case SgpVertexAttr::SNorm8x4:
+      return VK_FORMAT_R8G8B8A8_SNORM;
+    case SgpVertexAttr::UNorm8x4:
+      return VK_FORMAT_R8G8B8A8_UNORM;
+  }
+}
+
+uint32_t SgpVertexAttrSize(SgpVertexAttr attr) {
+  switch (attr) {
+    case SgpVertexAttr::Float4:
+      return 16;
+    case SgpVertexAttr::Half2:
+      return 4;
+    case SgpVertexAttr::SNorm8x4:
+      return 4;
+    case SgpVertexAttr::UNorm8x4:
+      return 4;
+  }
 }
 
 }  // namespace nyla
