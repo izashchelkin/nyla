@@ -15,7 +15,7 @@
 #include "nyla/commons/os/clock.h"
 #include "nyla/shipgame/game.h"
 #include "nyla/shipgame/render.h"
-#include "nyla/vulkan/simple_graphics_pipeline.h"
+#include "nyla/vulkan/render_pipeline.h"
 #include "nyla/vulkan/vulkan.h"
 #include "nyla/x11/x11.h"
 #include "xcb/xcb.h"
@@ -154,9 +154,9 @@ static int Main() {
 
   //
 
-  SgpInit(gamerenderer2_pipeline);
-  SgpInit(textrender2_pipeline);
-  SgpInit(gridrenderer2_pipeline);
+  RpInit(gamerenderer2_pipeline);
+  RpInit(textrender2_pipeline);
+  RpInit(gridrenderer2_pipeline);
 
   InitGame();
 
@@ -184,9 +184,9 @@ static int Main() {
     Vulkan_FrameBegin();
 
     if (vk.shaders_invalidated) {
-      SgpInit(gamerenderer2_pipeline);
-      SgpInit(textrender2_pipeline);
-      SgpInit(gridrenderer2_pipeline);
+      RpInit(gamerenderer2_pipeline);
+      RpInit(textrender2_pipeline);
+      RpInit(gridrenderer2_pipeline);
       vk.shaders_invalidated = false;
     }
 
@@ -221,13 +221,13 @@ static int Main() {
 
     Vulkan_RenderingBegin();
     {
-      SgpBegin(gamerenderer2_pipeline);
+      RpBegin(gamerenderer2_pipeline);
       RenderGameObjects();
 
-      SgpBegin(gridrenderer2_pipeline);
+      RpBegin(gridrenderer2_pipeline);
       GridRenderer2Render();
 
-      SgpBegin(textrender2_pipeline);
+      RpBegin(textrender2_pipeline);
       TextRenderer2Line(10, 10, "fps= " + std::to_string(int(1.f / vk.current_frame_data.dt)));
     }
     Vulkan_RenderingEnd();

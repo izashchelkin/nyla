@@ -6,7 +6,7 @@
 
 namespace nyla {
 
-static void InitShaders(Sgp& pipeline, const std::string& path_vertex, const std::string& path_fragment) {
+static void InitShaders(RenderPipeline& pipeline, const std::string& path_vertex, const std::string& path_fragment) {
   pipeline.shader_stages.emplace_back(VkPipelineShaderStageCreateInfo{
       .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
       .stage = VK_SHADER_STAGE_VERTEX_BIT,
@@ -22,7 +22,7 @@ static void InitShaders(Sgp& pipeline, const std::string& path_vertex, const std
   });
 }
 
-Sgp gamerenderer2_pipeline{
+RenderPipeline gamerenderer2_pipeline{
     .uniform =
         {
             .enabled = true,
@@ -41,26 +41,26 @@ Sgp gamerenderer2_pipeline{
             .size = 1 << 22,
             .attrs =
                 {
-                    SgpVertexAttr::Float4,
-                    SgpVertexAttr::Float4,
+                    RpVertexAttr::Float4,
+                    RpVertexAttr::Float4,
                 },
         },
     .Init =
-        [](Sgp& pipeline) {
+        [](RenderPipeline& pipeline) {
           InitShaders(pipeline, "nyla/shipgame/shaders/build/vert.spv", "nyla/shipgame/shaders/build/frag.spv");
         },
 };
 
-Sgp gridrenderer2_pipeline{
+RenderPipeline gridrenderer2_pipeline{
     .Init =
-        [](Sgp& pipeline) {
+        [](RenderPipeline& pipeline) {
           InitShaders(pipeline, "nyla/shipgame/shaders/build/grid_vert.spv",
                       "nyla/shipgame/shaders/build/grid_frag.spv");
         },
 };
 
 void GridRenderer2Render() {
-  SgpObject(gridrenderer2_pipeline, {}, 3, {});
+  RpDraw(gridrenderer2_pipeline, 3, {}, {});
 }
 
 namespace {
@@ -75,7 +75,7 @@ struct TextRendererLineUBO {
 };
 }  // namespace
 
-Sgp textrender2_pipeline{
+RenderPipeline textrender2_pipeline{
     .dynamic_uniform =
         {
             .enabled = true,
@@ -83,7 +83,7 @@ Sgp textrender2_pipeline{
             .range = 1 << 9,
         },
     .Init =
-        [](Sgp& pipeline) {
+        [](RenderPipeline& pipeline) {
           InitShaders(pipeline, "nyla/shipgame/shaders/build/psf2_ansii_vert.spv",
                       "nyla/shipgame/shaders/build/psf2_ansii_frag.spv");
         },
@@ -114,7 +114,7 @@ void TextRenderer2Line(int32_t x, int32_t y, std::string_view text) {
     ubo.words[i] = w;
   }
 
-  SgpObject(textrender2_pipeline, {}, 3, CharViewRef(ubo));
+  RpDraw(textrender2_pipeline, 3, {}, CharViewRef(ubo));
 }
 
 }  // namespace nyla

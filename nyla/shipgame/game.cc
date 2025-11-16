@@ -9,7 +9,7 @@
 #include "nyla/commons/math/vec/vec2f.h"
 #include "nyla/commons/memory/charview.h"
 #include "nyla/shipgame/render.h"
-#include "nyla/vulkan/simple_graphics_pipeline.h"
+#include "nyla/vulkan/render_pipeline.h"
 #include "nyla/vulkan/vulkan.h"
 #include "xcb/xproto.h"
 
@@ -78,7 +78,7 @@ static void RenderGameObject(GameObject& obj) {
 
     auto vertex_data = CharViewVector(obj.vertices);
     auto dynamic_uniform_data = CharViewRef(model);
-    SgpObject(gamerenderer2_pipeline, vertex_data, obj.vertices.size(), dynamic_uniform_data);
+    RpDraw(gamerenderer2_pipeline, obj.vertices.size(), vertex_data, dynamic_uniform_data);
   }
 
   for (GameObject& child : obj.children) {
@@ -89,7 +89,7 @@ static void RenderGameObject(GameObject& obj) {
 constexpr float game_units_on_screen_y = 2000.f;
 
 void RenderGameObjects() {
-  SgpBegin(gamerenderer2_pipeline);
+  RpBegin(gamerenderer2_pipeline);
 
   {
     const float aspect = static_cast<float>(vk.surface_extent.width) / static_cast<float>(vk.surface_extent.height);
@@ -102,7 +102,7 @@ void RenderGameObjects() {
         .proj = Ortho(-world_w * .5f, world_w * .5f, world_h * .5f, -world_h * .5f, 0.f, 1.f),
     };
 
-    SgpStatic(gamerenderer2_pipeline, CharViewRef(scene_ubo));
+    RpSetStaticUniform(gamerenderer2_pipeline, CharViewRef(scene_ubo));
   }
 
   RenderGameObject(game_solar_system);

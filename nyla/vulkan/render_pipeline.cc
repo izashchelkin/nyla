@@ -1,4 +1,4 @@
-#include "nyla/vulkan/simple_graphics_pipeline.h"
+#include "nyla/vulkan/render_pipeline.h"
 
 #include <unistd.h>
 
@@ -43,15 +43,15 @@ static void CreateMappedUniformBuffer(VkDescriptorSet descriptor_set, uint32_t d
   vkUpdateDescriptorSets(vk.device, 1, &write_descriptor_set, 0, nullptr);
 }
 
-static uint32_t CalcVertexBufferStride(Sgp& pipeline) {
+static uint32_t CalcVertexBufferStride(RenderPipeline& pipeline) {
   uint32_t ret = 0;
   for (auto attr : pipeline.vertex_buffer.attrs) {
-    ret += SgpVertexAttrSize(attr);
+    ret += RpVertexAttrSize(attr);
   }
   return ret;
 }
 
-void SgpInit(Sgp& pipeline) {
+void RpInit(RenderPipeline& pipeline) {
   pipeline.shader_stages.clear();
 
   pipeline.Init(pipeline);
@@ -145,19 +145,19 @@ void SgpInit(Sgp& pipeline) {
 
   for (size_t i = 0; i < kVulkan_NumFramesInFlight; ++i) {
     if (pipeline.uniform.enabled) {
-      SgpUniformBuffer& b = pipeline.uniform;
+      RpUniformBuffer& b = pipeline.uniform;
       CreateMappedUniformBuffer(pipeline.descriptor_sets[i], 0, (bool)false, b.size, b.range, b.buffer[i], b.mem[i],
                                 reinterpret_cast<void*&>(b.mem_mapped[i]));
     }
 
     if (pipeline.dynamic_uniform.enabled) {
-      SgpUniformBuffer& b = pipeline.dynamic_uniform;
+      RpUniformBuffer& b = pipeline.dynamic_uniform;
       CreateMappedUniformBuffer(pipeline.descriptor_sets[i], 1, true, b.size, b.range, b.buffer[i], b.mem[i],
                                 reinterpret_cast<void*&>(b.mem_mapped[i]));
     }
 
     if (pipeline.vertex_buffer.enabled) {
-      SgpVertexBuf& b = pipeline.vertex_buffer;
+      RpVertexBuf& b = pipeline.vertex_buffer;
       CreateMappedBuffer(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, b.size, b.buffer[i], b.mem[i],
                          reinterpret_cast<void*&>(b.mem_mapped[i]));
     }
@@ -183,11 +183,11 @@ void SgpInit(Sgp& pipeline) {
         vertex_attr_descriptions[i] = {
             .location = i,
             .binding = 0,
-            .format = SgpVertexAttrVkFormat(attr),
+            .format = RpVertexAttrVkFormat(attr),
             .offset = offset,
         };
 
-        offset += SgpVertexAttrSize(attr);
+        offset += RpVertexAttrSize(attr);
       }
     }
 
@@ -204,7 +204,7 @@ void SgpInit(Sgp& pipeline) {
   }
 }
 
-void SgpBegin(Sgp& pipeline) {
+void RpBegin(RenderPipeline& pipeline) {
   pipeline.uniform.written_this_frame = 0;
   pipeline.dynamic_uniform.written_this_frame = 0;
   pipeline.vertex_buffer.written_this_frame = 0;
@@ -214,15 +214,15 @@ void SgpBegin(Sgp& pipeline) {
   vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipeline);
 }
 
-void SgpStatic(Sgp& pipeline, std::span<const char> uniform_data) {
+void RpSetStaticUniform(RenderPipeline& pipeline, std::span<const char> uniform_data) {
   CHECK(pipeline.uniform.enabled);
 
   CHECK_LE(uniform_data.size(), pipeline.uniform.size);
   memcpy(pipeline.uniform.mem_mapped[vk.current_frame_data.iframe], uniform_data.data(), uniform_data.size());
 }
 
-void SgpObject(Sgp& pipeline, std::span<const char> vertex_data, uint32_t vertex_count,
-               std::span<const char> dynamic_uniform_data) {
+void RpDraw(RenderPipeline& pipeline, uint32_t vertex_count, std::span<const char> vertex_data,
+            std::span<const char> dynamic_uniform_data) {
   CHECK_GT(vertex_count, 0);
 
   const VkCommandBuffer command_buffer = vk.command_buffers[vk.current_frame_data.iframe];
@@ -267,15 +267,15 @@ void SgpObject(Sgp& pipeline, std::span<const char> vertex_data, uint32_t vertex
   vkCmdDraw(command_buffer, vertex_count, 1, 0, 0);
 }
 
-VkFormat SgpVertexAttrVkFormat(SgpVertexAttr attr) {
+VkFormat RpVertexAttrVkFormat(RpVertexAttr attr) {
   switch (attr) {
-    case SgpVertexAttr::Float4:
+    case RpVertexAttr::Float4:
       return VK_FORMAT_R32G32B32A32_SFLOAT;
-    case SgpVertexAttr::Half2:
+    case RpVertexAttr::Half2:
       return VK_FORMAT_R16G16_SFLOAT;
-    case SgpVertexAttr::SNorm8x4:
+    case RpVertexAttr::SNorm8x4:
       return VK_FORMAT_R8G8B8A8_SNORM;
-    case SgpVertexAttr::UNorm8x4:
+    case RpVertexAttr::UNorm8x4:
       return VK_FORMAT_R8G8B8A8_UNORM;
   }
 
@@ -283,15 +283,15 @@ VkFormat SgpVertexAttrVkFormat(SgpVertexAttr attr) {
   return VK_FORMAT_UNDEFINED;
 }
 
-uint32_t SgpVertexAttrSize(SgpVertexAttr attr) {
+uint32_t RpVertexAttrSize(RpVertexAttr attr) {
   switch (attr) {
-    case SgpVertexAttr::Float4:
+    case RpVertexAttr::Float4:
       return 16;
-    case SgpVertexAttr::Half2:
+    case RpVertexAttr::Half2:
       return 4;
-    case SgpVertexAttr::SNorm8x4:
+    case RpVertexAttr::SNorm8x4:
       return 4;
-    case SgpVertexAttr::UNorm8x4:
+    case RpVertexAttr::UNorm8x4:
       return 4;
   }
 
