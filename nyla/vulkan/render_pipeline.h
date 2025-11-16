@@ -2,9 +2,10 @@
 
 #include <cstdint>
 #include <span>
+#include <string>
 #include <vector>
 
-#include "vulkan/vulkan.h"
+#include "nyla/vulkan/vulkan.h"
 
 namespace nyla {
 
@@ -52,6 +53,8 @@ struct RenderPipeline {
 };
 
 void RpInit(RenderPipeline& rp);
+void RpAttachVertShader(RenderPipeline& pipeline, const std::string& path);
+void RpAttachFragShader(RenderPipeline& pipeline, const std::string& path);
 void RpBegin(RenderPipeline& rp);
 void RpSetStaticUniform(RenderPipeline& rp, std::span<const char> uniform_data);
 void RpDraw(RenderPipeline& rp, uint32_t vertex_count, std::span<const char> vertex_data,

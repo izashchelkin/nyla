@@ -1,12 +1,11 @@
 #pragma once
 
 #include <span>
-#include <vector>
 
 namespace nyla {
 
 template <typename T>
-inline std::span<const char> CharViewVector(const std::vector<T>& in) {
+inline std::span<const char> CharViewSpan(std::span<T> in) {
   return {
       reinterpret_cast<const char*>(in.data()),
       in.size() * sizeof(T),
@@ -14,10 +13,10 @@ inline std::span<const char> CharViewVector(const std::vector<T>& in) {
 }
 
 template <typename T>
-inline std::span<const char> CharViewRef(const T& in) {
+inline std::span<const char> CharView(T* in) {
   return {
-      reinterpret_cast<const char*>(&in),
-      sizeof(in),
+      reinterpret_cast<const char*>(in),
+      sizeof(*in),
   };
 }
 

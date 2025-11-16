@@ -27,7 +27,9 @@ struct Vulkan_State {
   VkSwapchainKHR swapchain;
   VkCommandPool command_pool;
   std::vector<VkImage> swapchain_images;
-  uint32_t swapchain_image_count() { return swapchain_images.size(); }
+  uint32_t swapchain_image_count() {
+    return swapchain_images.size();
+  }
   std::vector<VkImageView> swapchain_image_views;
 
   std::vector<VkSemaphore> acquire_semaphores;

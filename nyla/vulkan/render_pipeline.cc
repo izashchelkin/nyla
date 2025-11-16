@@ -5,6 +5,7 @@
 #include <cstdint>
 
 #include "nyla/commons/memory/align.h"
+#include "nyla/commons/os/readfile.h"
 #include "nyla/vulkan/vulkan.h"
 
 namespace nyla {
@@ -256,7 +257,7 @@ void RpDraw(RenderPipeline& pipeline, uint32_t vertex_count, std::span<const cha
                             &dynamic_uniform_offset);
 
     const uint32_t size = pipeline.dynamic_uniform.range;
-    CHECK_LE(dynamic_uniform_data.size(), size);
+    CHECK_EQ(dynamic_uniform_data.size(), size);
     CHECK_LE(written_this_frame + size, pipeline.dynamic_uniform.size);
 
     void* dst = mem_mapped + written_this_frame;
@@ -297,6 +298,24 @@ uint32_t RpVertexAttrSize(RpVertexAttr attr) {
 
   CHECK(false);
   return 0;
+}
+
+void RpAttachVertShader(RenderPipeline& pipeline, const std::string& path) {
+  pipeline.shader_stages.emplace_back(VkPipelineShaderStageCreateInfo{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+      .stage = VK_SHADER_STAGE_VERTEX_BIT,
+      .module = Vulkan_CreateShaderModule(ReadFile(path)),
+      .pName = "main",
+  });
+}
+
+void RpAttachFragShader(RenderPipeline& pipeline, const std::string& path) {
+  pipeline.shader_stages.emplace_back(VkPipelineShaderStageCreateInfo{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+      .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+      .module = Vulkan_CreateShaderModule(ReadFile(path)),
+      .pName = "main",
+  });
 }
 
 }  // namespace nyla

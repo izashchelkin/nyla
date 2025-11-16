@@ -8,12 +8,16 @@
 #include "nyla/commons/math/math.h"
 #include "nyla/commons/math/vec/vec2f.h"
 #include "nyla/commons/memory/charview.h"
-#include "nyla/shipgame/render.h"
+#include "nyla/shipgame/world_renderer.h"
 #include "nyla/vulkan/render_pipeline.h"
 #include "nyla/vulkan/vulkan.h"
 #include "xcb/xproto.h"
 
 namespace nyla {
+
+namespace {
+using Vertex = WorldRendererVertex;
+}
 
 GameKeycodes game_keycodes{};
 
@@ -72,13 +76,7 @@ static void RenderGameObject(GameObject& obj) {
   }
 
   if (!obj.vertices.empty()) {
-    Mat4 model = Translate(obj.pos);
-    model = Mult(model, Rotate2D(obj.angle_radians));
-    model = Mult(model, Scale2D(200.f));
-
-    auto vertex_data = CharViewVector(obj.vertices);
-    auto dynamic_uniform_data = CharViewRef(model);
-    RpDraw(gamerenderer2_pipeline, obj.vertices.size(), vertex_data, dynamic_uniform_data);
+    WorldRender(obj.pos, obj.angle_radians, obj.vertices);
   }
 
   for (GameObject& child : obj.children) {
@@ -86,24 +84,8 @@ static void RenderGameObject(GameObject& obj) {
   }
 }
 
-constexpr float game_units_on_screen_y = 2000.f;
-
 void RenderGameObjects() {
-  RpBegin(gamerenderer2_pipeline);
-
-  {
-    const float aspect = static_cast<float>(vk.surface_extent.width) / static_cast<float>(vk.surface_extent.height);
-
-    const float world_h = game_units_on_screen_y * game_camera_zoom;
-    const float world_w = world_h * aspect;
-
-    const SceneUbo scene_ubo = {
-        .view = Translate(Vec2fNeg(game_camera_pos)),
-        .proj = Ortho(-world_w * .5f, world_w * .5f, world_h * .5f, -world_h * .5f, 0.f, 1.f),
-    };
-
-    RpSetStaticUniform(gamerenderer2_pipeline, CharViewRef(scene_ubo));
-  }
+  WorldSetUp(game_camera_pos, game_camera_zoom);
 
   RenderGameObject(game_solar_system);
   RenderGameObject(game_ship);

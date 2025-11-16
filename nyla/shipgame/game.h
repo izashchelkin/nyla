@@ -7,18 +7,11 @@
 #include "nyla/commons/math/mat4.h"
 #include "nyla/commons/math/vec/vec2f.h"
 #include "nyla/commons/math/vec/vec3f.h"
+#include "nyla/shipgame/world_renderer.h"
 #include "nyla/vulkan/vulkan.h"
+#include "nyla/x11/x11.h"
 
 namespace nyla {
-
-struct Vertex {
-  Vec2f pos;
-  float pad_a[2] = {666.f, 666.f};
-  Vec3f color;
-  float pad_b[1] = {777.f};
-
-  Vertex(Vec2f pos, Vec3f color) : pos{pos}, color{color} {}
-};
 
 struct GameObject {
   enum class Type : uint8_t {
@@ -37,7 +30,7 @@ struct GameObject {
   float orbit_radius;
   Vec2f velocity{};
 
-  std::vector<Vertex> vertices{};
+  std::vector<WorldRendererVertex> vertices{};
   std::span<GameObject> children{};
 };
 extern GameObject game_solar_system;
