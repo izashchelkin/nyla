@@ -14,10 +14,8 @@
 #include "nyla/commons/memory/tnew.h"
 #include "nyla/commons/os/clock.h"
 #include "nyla/shipgame/game.h"
-#include "nyla/shipgame/game_renderer2.h"
-#include "nyla/shipgame/grid_renderer2.h"
-#include "nyla/shipgame/simple_graphics_pipeline.h"
-#include "nyla/shipgame/text_renderer2.h"
+#include "nyla/shipgame/render.h"
+#include "nyla/vulkan/simple_graphics_pipeline.h"
 #include "nyla/vulkan/vulkan.h"
 #include "nyla/x11/x11.h"
 #include "xcb/xcb.h"
@@ -250,4 +248,6 @@ static int Main() {
 
 }  // namespace nyla
 
-int main() { return nyla::Main(); };
+int main() {
+  return nyla::Main();
+};

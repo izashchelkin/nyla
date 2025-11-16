@@ -8,8 +8,8 @@
 #include "nyla/commons/math/math.h"
 #include "nyla/commons/math/vec/vec2f.h"
 #include "nyla/commons/memory/charview.h"
-#include "nyla/shipgame/game_renderer2.h"
-#include "nyla/shipgame/simple_graphics_pipeline.h"
+#include "nyla/shipgame/render.h"
+#include "nyla/vulkan/simple_graphics_pipeline.h"
 #include "nyla/vulkan/vulkan.h"
 #include "xcb/xproto.h"
 

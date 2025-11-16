@@ -1,4 +1,4 @@
-#include "nyla/shipgame/simple_graphics_pipeline.h"
+#include "nyla/vulkan/simple_graphics_pipeline.h"
 
 #include <unistd.h>
 

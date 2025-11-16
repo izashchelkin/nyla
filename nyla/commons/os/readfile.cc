@@ -8,8 +8,7 @@
 
 namespace nyla {
 
-std::vector<char> ReadFile(const std::string& filename) {
-  std::ifstream file(filename, std::ios::ate | std::ios::binary);
+static std::vector<char> ReadFileInternal(std::ifstream& file) {
   CHECK(file.is_open());
 
   std::vector<char> buffer(file.tellg());
@@ -19,6 +18,11 @@ std::vector<char> ReadFile(const std::string& filename) {
 
   file.close();
   return buffer;
+}
+
+std::vector<char> ReadFile(const std::string& filename) {
+  std::ifstream file(filename, std::ios::ate | std::ios::binary);
+  return ReadFileInternal(file);
 }
 
 }  // namespace nyla
