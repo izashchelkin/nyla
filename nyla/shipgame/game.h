@@ -9,7 +9,6 @@
 #include "nyla/commons/math/vec/vec3f.h"
 #include "nyla/shipgame/world_renderer.h"
 #include "nyla/vulkan/vulkan.h"
-#include "nyla/x11/x11.h"
 
 namespace nyla {
 

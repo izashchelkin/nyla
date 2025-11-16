@@ -1,5 +1,7 @@
 #include "nyla/shipgame/world_renderer.h"
 
+#include <utility>
+
 #include "nyla/commons/math/mat4.h"
 #include "nyla/commons/math/vec/vec2f.h"
 #include "nyla/commons/memory/charview.h"
@@ -21,13 +23,24 @@ struct DynamicUbo {
 
 }  // namespace
 
-constexpr float kMetersOnScreenY = 64.f;
+constexpr float kMetersOnScreen = 64.f;
 
 void WorldSetUp(Vec2f camera_pos, float zoom) {
-  const float aspect = static_cast<float>(vk.surface_extent.width) / static_cast<float>(vk.surface_extent.height);
+  float world_w;
+  float world_h;
 
-  const float world_h = kMetersOnScreenY * zoom;
-  const float world_w = world_h * aspect;
+  const float base = kMetersOnScreen * zoom;
+
+  const float width = static_cast<float>(vk.surface_extent.width);
+  const float height = static_cast<float>(vk.surface_extent.height);
+  const float aspect = width / height;
+  if (aspect >= 1.0f) {
+    world_h = base;
+    world_w = base * aspect;
+  } else {
+    world_w = base;
+    world_h = base / aspect;
+  }
 
   const StaticUbo static_ubo = {
       .view = Translate(Vec2fNeg(camera_pos)),
