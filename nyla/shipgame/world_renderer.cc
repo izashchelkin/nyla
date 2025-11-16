@@ -47,8 +47,8 @@ void WorldSetUp(Vec2f camera_pos, float zoom) {
       .proj = Ortho(-world_w * .5f, world_w * .5f, world_h * .5f, -world_h * .5f, 0.f, 1.f),
   };
 
-  RpBufCopy(world_pipeline.static_uniform, CharViewPtr(&static_ubo));
-  RpBufCopy(grid_pipeline.static_uniform, CharViewPtr(&static_ubo));
+  RpStaticUniformCopy(world_pipeline, CharViewPtr(&static_ubo));
+  RpStaticUniformCopy(grid_pipeline, CharViewPtr(&static_ubo));
 }
 
 void WorldRender(Vec2f pos, float angle_radians, float scalar, std::span<WorldRendererVertex> vertices) {

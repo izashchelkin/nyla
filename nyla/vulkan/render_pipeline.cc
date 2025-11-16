@@ -214,7 +214,7 @@ void RpBegin(Rp& rp) {
   vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, rp.pipeline);
 }
 
-void RpBufCopy(RpBuf& buf, CharView data) {
+static void RpBufCopy(RpBuf& buf, CharView data) {
   CHECK(buf.enabled);
   CHECK(!data.empty());
   CHECK_LE(buf.written + data.size(), buf.size);
@@ -222,6 +222,11 @@ void RpBufCopy(RpBuf& buf, CharView data) {
   void* dst = buf.mem_mapped[vk.current_frame_data.iframe] + buf.written;
   memcpy(dst, data.data(), data.size());
   buf.written += data.size();
+}
+
+void RpStaticUniformCopy(Rp& rp, CharView data) {
+  CHECK_EQ(rp.static_uniform.size, data.size());
+  RpBufCopy(rp.static_uniform, data);
 }
 
 RpMesh RpVertCopy(Rp& rp, uint32_t vert_count, CharView vert_data) {
