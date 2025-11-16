@@ -145,10 +145,9 @@ static int Main() {
     game_keycodes.left = X11_ResolveKeyCode(key_resolver, "AC02");
     game_keycodes.down = X11_ResolveKeyCode(key_resolver, "AC03");
     game_keycodes.right = X11_ResolveKeyCode(key_resolver, "AC04");
-    game_keycodes.acceleration = X11_ResolveKeyCode(key_resolver, "AC07");
+    game_keycodes.fire = X11_ResolveKeyCode(key_resolver, "AC07");
     game_keycodes.boost = X11_ResolveKeyCode(key_resolver, "AC08");
     game_keycodes.brake = X11_ResolveKeyCode(key_resolver, "SPCE");
-    game_keycodes.fire = X11_ResolveKeyCode(key_resolver, "AC08");
 
     X11_FreeKeyResolver(key_resolver);
   }

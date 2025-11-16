@@ -19,7 +19,7 @@ extern RenderPipeline world_pipeline;
 extern RenderPipeline grid_pipeline;
 
 void WorldSetUp(Vec2f game_camera_pos, float game_camera_zoom);
-void WorldRender(Vec2f pos, float angle_radians, std::span<WorldRendererVertex> vertices);
+void WorldRender(Vec2f pos, float angle_radians, float scalar, std::span<WorldRendererVertex> vertices);
 void GridRender();
 
 }  // namespace nyla

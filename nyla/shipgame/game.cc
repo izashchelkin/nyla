@@ -76,7 +76,7 @@ static void RenderGameObject(GameObject& obj) {
   }
 
   if (!obj.vertices.empty()) {
-    WorldRender(obj.pos, obj.angle_radians, obj.vertices);
+    WorldRender(obj.pos, obj.angle_radians, obj.scale, obj.vertices);
   }
 
   for (GameObject& child : obj.children) {
@@ -98,7 +98,7 @@ void InitGame() {
         .pos = {0.f, 0.f},
         .color = {.1f, .1f, .1f},
         .mass = 100000.f,
-        .radius = 5000.f,
+        .scale = 5000.f,
         .velocity = {0.f, 0.f},
     };
 
@@ -114,30 +114,30 @@ void InitGame() {
 
       planet.color = {1.f, 0.f, 0.f};
 
-      planet.pos = {1000.f, 1000.f};
+      planet.pos = {100.f, 100.f};
       planet.mass = 100.f;
-      planet.radius = 20000.f;
-      planet.orbit_radius = 2000.f;
+      planet.scale = 20.f;
+      planet.orbit_radius = 4000.f;
     }
 
     {
       GameObject& planet = game_solar_system.children[iplanet++];
       planet.color = {0.f, 1.f, 0.f};
 
-      planet.pos = {-1000.f, 1000.f};
+      planet.pos = {-100.f, 100.f};
       planet.mass = 50000.f;
-      planet.radius = 100000.f;
-      planet.orbit_radius = 10000.f;
+      planet.scale = 10.f;
+      planet.orbit_radius = 2000.f;
     }
 
     {
       GameObject& planet = game_solar_system.children[iplanet++];
       planet.color = {0.f, 0.f, 1.f};
 
-      planet.pos = {0, -1000.f};
+      planet.pos = {0, -100.f};
       planet.mass = 50000.f;
-      planet.radius = 50000.f;
-      planet.orbit_radius = 30000.f;
+      planet.scale = 5.f;
+      planet.orbit_radius = 500.f;
     }
   }
 
@@ -147,7 +147,7 @@ void InitGame() {
         .pos = {0.f, 0.f},
         .color = {1.f, 1.f, 0.f},
         .mass = 25,
-        .radius = 10,
+        .scale = 1,
     };
   }
 }
@@ -179,11 +179,7 @@ void ProcessInput(Set<xcb_keycode_t>& pressed_keys, Set<xcb_keycode_t>& released
       } else if (pressed(boost)) {
         const Vec2f direction = Vec2fNorm(Vec2f{std::cos(game_ship.angle_radians), std::sin(game_ship.angle_radians)});
 
-        Lerp(game_ship.velocity, Vec2fMul(direction, 5000.f), step);
-      } else if (pressed(acceleration)) {
-        const Vec2f direction = Vec2fNorm(Vec2f{std::cos(game_ship.angle_radians), std::sin(game_ship.angle_radians)});
-
-        Lerp(game_ship.velocity, Vec2fMul(direction, 1000.f), step * 8.f);
+        Lerp(game_ship.velocity, Vec2fMul(direction, 50.f), step);
       } else {
         Lerp(game_ship.velocity, Vec2f{}, step);
       }
@@ -209,13 +205,13 @@ void ProcessInput(Set<xcb_keycode_t>& pressed_keys, Set<xcb_keycode_t>& released
 
         const Vec2f vv = Vec2fDif(v2, planet.pos);
 
-        float F = 10000.f * 6.7f * planet.mass * game_solar_system.mass / (r * r);
+        float F = 6.7f * planet.mass * game_solar_system.mass / (r * r);
         Vec2f Fv = Vec2fResized(vv, F);
 
         Vec2fAdd(planet.velocity, Vec2fMul(Fv, step / planet.mass));
 
-        if (Vec2fLen(planet.velocity) > 1000.f) {
-          planet.velocity = Vec2fResized(planet.velocity, 1000.f);
+        if (Vec2fLen(planet.velocity) > 10.f) {
+          planet.velocity = Vec2fResized(planet.velocity, 10.f);
         }
 
         Vec2fAdd(planet.pos, Vec2fMul(planet.velocity, step));

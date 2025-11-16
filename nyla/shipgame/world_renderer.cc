@@ -21,7 +21,7 @@ struct DynamicUbo {
 
 }  // namespace
 
-constexpr float kMetersOnScreenY = 2000.f;
+constexpr float kMetersOnScreenY = 64.f;
 
 void WorldSetUp(Vec2f camera_pos, float zoom) {
   const float aspect = static_cast<float>(vk.surface_extent.width) / static_cast<float>(vk.surface_extent.height);
@@ -38,10 +38,10 @@ void WorldSetUp(Vec2f camera_pos, float zoom) {
   RpSetStaticUniform(grid_pipeline, CharView(&static_ubo));
 }
 
-void WorldRender(Vec2f pos, float angle_radians, std::span<WorldRendererVertex> vertices) {
+void WorldRender(Vec2f pos, float angle_radians, float scalar, std::span<WorldRendererVertex> vertices) {
   Mat4 model = Translate(pos);
   model = Mult(model, Rotate2D(angle_radians));
-  model = Mult(model, Scale2D(200.f));
+  model = Mult(model, Scale2D(scalar));
 
   auto vertex_data = CharViewSpan(vertices);
   auto dynamic_uniform_data = CharView(&model);

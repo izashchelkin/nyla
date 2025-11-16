@@ -26,7 +26,7 @@ struct GameObject {
   Vec3f color{};
   float angle_radians;
   float mass;
-  float radius;
+  float scale;
   float orbit_radius;
   Vec2f velocity{};
 
@@ -41,7 +41,6 @@ extern struct GameKeycodes {
   xcb_keycode_t left;
   xcb_keycode_t down;
   xcb_keycode_t right;
-  xcb_keycode_t acceleration;
   xcb_keycode_t boost;
   xcb_keycode_t brake;
   xcb_keycode_t fire;

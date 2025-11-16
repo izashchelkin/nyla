@@ -9,8 +9,8 @@ layout(location = 0) in vec2 uv;
 layout(location = 0) out vec4 out_color;
 
 void main() {
-    const float kGridSize   = 2048.f;
-    const float KLineWidthPx = 2.f;
+    const float kGridSize   = 32.f;
+    const float KLineWidthPx = 1.2f;
 
     mat4 inv_vp = inverse(scene.proj * scene.view);
     vec4 world = inv_vp * vec4(uv, 0.0, 1.0);
