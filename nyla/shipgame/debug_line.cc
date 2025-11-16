@@ -1,4 +1,4 @@
-#include "nyla/shipgame/debug.h"
+#include "nyla/shipgame/debug_line.h"
 
 namespace nyla {
 
