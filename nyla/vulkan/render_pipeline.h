@@ -1,66 +1,62 @@
 #pragma once
 
 #include <cstdint>
-#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
 
+#include "nyla/commons/memory/charview.h"
 #include "nyla/vulkan/vulkan.h"
 
 namespace nyla {
 
-struct RpUniformBuffer {
-  bool enabled;
-  std::vector<VkBuffer> buffer;
-  std::vector<VkDeviceMemory> mem;
-  std::vector<char*> mem_mapped;
-  uint32_t size;
-  uint32_t range;
-  uint32_t written_this_frame;
-};
-
-enum class RpVertexAttr {
+enum class RpVertAttr {
   Float4,
   Half2,
   SNorm8x4,
   UNorm8x4,
 };
 
-VkFormat RpVertexAttrVkFormat(RpVertexAttr attr);
-uint32_t RpVertexAttrSize(RpVertexAttr attr);
-
-struct RpVertexBuf {
+struct RpBuf {
   bool enabled;
+  uint32_t size;
+  uint32_t range;
+  uint32_t written;
+  std::vector<RpVertAttr> attrs;
   std::vector<VkBuffer> buffer;
   std::vector<VkDeviceMemory> mem;
   std::vector<char*> mem_mapped;
-  uint32_t size;
-  uint32_t written_this_frame;
-  std::vector<RpVertexAttr> attrs;
 };
 
-struct RenderPipeline {
+struct Rp {
   std::string_view name;
 
   VkPipeline pipeline;
   VkPipelineLayout layout;
-  std::vector<VkDescriptorSet> descriptor_sets;
+  std::vector<VkDescriptorSet> desc_sets;
   std::vector<VkPipelineShaderStageCreateInfo> shader_stages;
 
-  RpUniformBuffer static_uniform;
-  RpUniformBuffer dynamic_uniform;
-  RpVertexBuf vertex_buffer;
+  RpBuf static_uniform;
+  RpBuf dynamic_uniform;
+  RpBuf vert_buf;
 
-  void (*Init)(RenderPipeline&);
+  void (*Init)(Rp&);
 };
 
-void RpInit(RenderPipeline& rp);
-void RpAttachVertShader(RenderPipeline& pipeline, const std::string& path);
-void RpAttachFragShader(RenderPipeline& pipeline, const std::string& path);
-void RpBegin(RenderPipeline& rp);
-void RpSetStaticUniform(RenderPipeline& rp, std::span<const char> uniform_data);
-void RpDraw(RenderPipeline& rp, uint32_t vertex_count, std::span<const char> vertex_data,
-            std::span<const char> dynamic_uniform_data);
+struct RpMesh {
+  VkDeviceSize offset;
+  uint32_t vert_count;
+};
+
+void RpInit(Rp& rp);
+void RpAttachVertShader(Rp& rp, const std::string& path);
+void RpAttachFragShader(Rp& rp, const std::string& path);
+void RpBegin(Rp& rp);
+void RpBufCopy(RpBuf& buf, CharView data);
+RpMesh RpVertCopy(Rp& rp, uint32_t vert_count, CharView vert_data);
+void RpDraw(Rp& rp, RpMesh mesh, CharView dynamic_uniform_data);
+
+VkFormat RpVertAttrVkFormat(RpVertAttr attr);
+uint32_t RpVertAttrSize(RpVertAttr attr);
 
 }  // namespace nyla

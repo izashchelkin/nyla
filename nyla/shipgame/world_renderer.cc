@@ -34,8 +34,8 @@ void WorldSetUp(Vec2f camera_pos, float zoom) {
       .proj = Ortho(-world_w * .5f, world_w * .5f, world_h * .5f, -world_h * .5f, 0.f, 1.f),
   };
 
-  RpSetStaticUniform(world_pipeline, CharView(&static_ubo));
-  RpSetStaticUniform(grid_pipeline, CharView(&static_ubo));
+  RpBufCopy(world_pipeline.static_uniform, CharViewPtr(&static_ubo));
+  RpBufCopy(grid_pipeline.static_uniform, CharViewPtr(&static_ubo));
 }
 
 void WorldRender(Vec2f pos, float angle_radians, float scalar, std::span<WorldRendererVertex> vertices) {
@@ -43,12 +43,13 @@ void WorldRender(Vec2f pos, float angle_radians, float scalar, std::span<WorldRe
   model = Mult(model, Rotate2D(angle_radians));
   model = Mult(model, Scale2D(scalar));
 
-  auto vertex_data = CharViewSpan(vertices);
-  auto dynamic_uniform_data = CharView(&model);
-  RpDraw(world_pipeline, vertices.size(), vertex_data, dynamic_uniform_data);
+  CharView vertex_data = CharViewSpan(vertices);
+  CharView dynamic_uniform_data = CharViewPtr(&model);
+  RpMesh mesh = RpVertCopy(world_pipeline, vertices.size(), vertex_data);
+  RpDraw(world_pipeline, mesh, dynamic_uniform_data);
 }
 
-RenderPipeline world_pipeline{
+Rp world_pipeline{
     .name = "World",
     .static_uniform =
         {
@@ -62,28 +63,28 @@ RenderPipeline world_pipeline{
             .size = 1 << 15,
             .range = sizeof(DynamicUbo),
         },
-    .vertex_buffer =
+    .vert_buf =
         {
             .enabled = true,
             .size = 1 << 22,
             .attrs =
                 {
-                    RpVertexAttr::Float4,
-                    RpVertexAttr::Float4,
+                    RpVertAttr::Float4,
+                    RpVertAttr::Float4,
                 },
         },
     .Init =
-        [](RenderPipeline& rp) {
+        [](Rp& rp) {
           RpAttachVertShader(rp, "nyla/shipgame/shaders/build/vert.spv");
           RpAttachFragShader(rp, "nyla/shipgame/shaders/build/frag.spv");
         },
 };
 
 void GridRender() {
-  RpDraw(grid_pipeline, 3, {}, {});
+  RpDraw(grid_pipeline, {.vert_count = 3}, {});
 }
 
-RenderPipeline grid_pipeline{
+Rp grid_pipeline{
     .name = "WorldGrid",
     .static_uniform =
         {
@@ -92,7 +93,7 @@ RenderPipeline grid_pipeline{
             .range = sizeof(StaticUbo),
         },
     .Init =
-        [](RenderPipeline& rp) {
+        [](Rp& rp) {
           RpAttachVertShader(rp, "nyla/shipgame/shaders/build/grid_vert.spv");
           RpAttachFragShader(rp, "nyla/shipgame/shaders/build/grid_frag.spv");
         },

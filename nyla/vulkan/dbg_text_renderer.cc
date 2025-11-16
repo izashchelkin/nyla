@@ -42,10 +42,10 @@ void DbgText(int32_t x, int32_t y, std::string_view text) {
     ubo.words[i] = w;
   }
 
-  RpDraw(dbg_text_pipeline, 3, {}, CharView(&ubo));
+  RpDraw(dbg_text_pipeline, {.vert_count = 3}, CharViewPtr(&ubo));
 }
 
-RenderPipeline dbg_text_pipeline{
+Rp dbg_text_pipeline{
     .name = "DbgText",
     .dynamic_uniform =
         {
@@ -54,7 +54,7 @@ RenderPipeline dbg_text_pipeline{
             .range = sizeof(DbgTextLine),
         },
     .Init =
-        [](RenderPipeline& rp) {
+        [](Rp& rp) {
           RpAttachVertShader(rp, "nyla/vulkan/shaders/build/psf2_ansii_vert.spv");
           RpAttachFragShader(rp, "nyla/vulkan/shaders/build/psf2_ansii_frag.spv");
         },

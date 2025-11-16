@@ -15,8 +15,8 @@ struct WorldRendererVertex {
   WorldRendererVertex(Vec2f pos, Vec3f color) : pos{pos}, color{color} {}
 };
 
-extern RenderPipeline world_pipeline;
-extern RenderPipeline grid_pipeline;
+extern Rp world_pipeline;
+extern Rp grid_pipeline;
 
 void WorldSetUp(Vec2f game_camera_pos, float game_camera_zoom);
 void WorldRender(Vec2f pos, float angle_radians, float scalar, std::span<WorldRendererVertex> vertices);

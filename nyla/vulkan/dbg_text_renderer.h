@@ -4,7 +4,7 @@
 
 namespace nyla {
 
-extern RenderPipeline dbg_text_pipeline;
+extern Rp dbg_text_pipeline;
 
 void DbgText(int32_t x, int32_t y, std::string_view text);
 

@@ -6,6 +6,7 @@
 
 #include "absl/log/log.h"
 #include "nyla/commons/memory/align.h"
+#include "nyla/commons/memory/charview.h"
 #include "nyla/commons/os/readfile.h"
 #include "nyla/vulkan/vulkan.h"
 
@@ -45,15 +46,15 @@ static void CreateMappedUniformBuffer(VkDescriptorSet descriptor_set, uint32_t d
   vkUpdateDescriptorSets(vk.device, 1, &write_descriptor_set, 0, nullptr);
 }
 
-static uint32_t CalcVertexBufferStride(RenderPipeline& rp) {
+static uint32_t CalcVertexBufferStride(Rp& rp) {
   uint32_t ret = 0;
-  for (auto attr : rp.vertex_buffer.attrs) {
-    ret += RpVertexAttrSize(attr);
+  for (auto attr : rp.vert_buf.attrs) {
+    ret += RpVertAttrSize(attr);
   }
   return ret;
 }
 
-void RpInit(RenderPipeline& rp) {
+void RpInit(Rp& rp) {
   rp.shader_stages.clear();
 
   rp.Init(rp);
@@ -130,8 +131,8 @@ void RpInit(RenderPipeline& rp) {
       .pSetLayouts = descriptor_sets_layouts.data(),
   };
 
-  rp.descriptor_sets.resize(kVulkan_NumFramesInFlight);
-  VK_CHECK(vkAllocateDescriptorSets(vk.device, &descriptor_set_alloc_info, rp.descriptor_sets.data()));
+  rp.desc_sets.resize(kVulkan_NumFramesInFlight);
+  VK_CHECK(vkAllocateDescriptorSets(vk.device, &descriptor_set_alloc_info, rp.desc_sets.data()));
 
   auto resize = [](auto& b) {
     if (!b.enabled) return;
@@ -143,23 +144,23 @@ void RpInit(RenderPipeline& rp) {
 
   resize(rp.static_uniform);
   resize(rp.dynamic_uniform);
-  resize(rp.vertex_buffer);
+  resize(rp.vert_buf);
 
   for (size_t i = 0; i < kVulkan_NumFramesInFlight; ++i) {
     if (rp.static_uniform.enabled) {
-      RpUniformBuffer& b = rp.static_uniform;
-      CreateMappedUniformBuffer(rp.descriptor_sets[i], 0, (bool)false, b.size, b.range, b.buffer[i], b.mem[i],
+      RpBuf& b = rp.static_uniform;
+      CreateMappedUniformBuffer(rp.desc_sets[i], 0, (bool)false, b.size, b.range, b.buffer[i], b.mem[i],
                                 reinterpret_cast<void*&>(b.mem_mapped[i]));
     }
 
     if (rp.dynamic_uniform.enabled) {
-      RpUniformBuffer& b = rp.dynamic_uniform;
-      CreateMappedUniformBuffer(rp.descriptor_sets[i], 1, true, b.size, b.range, b.buffer[i], b.mem[i],
+      RpBuf& b = rp.dynamic_uniform;
+      CreateMappedUniformBuffer(rp.desc_sets[i], 1, true, b.size, b.range, b.buffer[i], b.mem[i],
                                 reinterpret_cast<void*&>(b.mem_mapped[i]));
     }
 
-    if (rp.vertex_buffer.enabled) {
-      RpVertexBuf& b = rp.vertex_buffer;
+    if (rp.vert_buf.enabled) {
+      RpBuf& b = rp.vert_buf;
       CreateMappedBuffer(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, b.size, b.buffer[i], b.mem[i],
                          reinterpret_cast<void*&>(b.mem_mapped[i]));
     }
@@ -169,27 +170,27 @@ void RpInit(RenderPipeline& rp) {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
   };
 
-  if (rp.vertex_buffer.enabled) {
+  if (rp.vert_buf.enabled) {
     const VkVertexInputBindingDescription binding_description{
         .binding = 0,
         .stride = CalcVertexBufferStride(rp),
         .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
     };
 
-    std::vector<VkVertexInputAttributeDescription> vertex_attr_descriptions(rp.vertex_buffer.attrs.size());
+    std::vector<VkVertexInputAttributeDescription> vertex_attr_descriptions(rp.vert_buf.attrs.size());
 
     {
       uint32_t offset = 0;
-      for (uint32_t i = 0; i < rp.vertex_buffer.attrs.size(); ++i) {
-        auto attr = rp.vertex_buffer.attrs[i];
+      for (uint32_t i = 0; i < rp.vert_buf.attrs.size(); ++i) {
+        auto attr = rp.vert_buf.attrs[i];
         vertex_attr_descriptions[i] = {
             .location = i,
             .binding = 0,
-            .format = RpVertexAttrVkFormat(attr),
+            .format = RpVertAttrVkFormat(attr),
             .offset = offset,
         };
 
-        offset += RpVertexAttrSize(attr);
+        offset += RpVertAttrSize(attr);
       }
     }
 
@@ -204,81 +205,72 @@ void RpInit(RenderPipeline& rp) {
   }
 }
 
-void RpBegin(RenderPipeline& rp) {
-  rp.static_uniform.written_this_frame = 0;
-  rp.dynamic_uniform.written_this_frame = 0;
-  rp.vertex_buffer.written_this_frame = 0;
+void RpBegin(Rp& rp) {
+  rp.static_uniform.written = 0;
+  rp.dynamic_uniform.written = 0;
+  rp.vert_buf.written = 0;
 
   const VkCommandBuffer command_buffer = vk.command_buffers[vk.current_frame_data.iframe];
   vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, rp.pipeline);
 }
 
-void RpSetStaticUniform(RenderPipeline& rp, std::span<const char> uniform_data) {
-  CHECK(rp.static_uniform.enabled);
+void RpBufCopy(RpBuf& buf, CharView data) {
+  CHECK(buf.enabled);
+  CHECK(!data.empty());
+  CHECK_LE(buf.written + data.size(), buf.size);
 
-  CHECK_LE(uniform_data.size(), rp.static_uniform.size);
-  memcpy(rp.static_uniform.mem_mapped[vk.current_frame_data.iframe], uniform_data.data(), uniform_data.size());
+  void* dst = buf.mem_mapped[vk.current_frame_data.iframe] + buf.written;
+  memcpy(dst, data.data(), data.size());
+  buf.written += data.size();
 }
 
-void RpDraw(RenderPipeline& rp, uint32_t vertex_count, std::span<const char> vertex_data,
-            std::span<const char> dynamic_uniform_data) {
-  CHECK_GT(vertex_count, 0);
+RpMesh RpVertCopy(Rp& rp, uint32_t vert_count, CharView vert_data) {
+  const uint32_t offset = rp.vert_buf.written;
+  const uint32_t size = vert_count * CalcVertexBufferStride(rp);
+  CHECK_EQ(vert_data.size(), size);
 
-  const VkCommandBuffer command_buffer = vk.command_buffers[vk.current_frame_data.iframe];
+  RpBufCopy(rp.vert_buf, vert_data);
 
-  if (rp.vertex_buffer.enabled) {
-    auto& written_this_frame = rp.vertex_buffer.written_this_frame;
-    const auto& buffer = rp.vertex_buffer.buffer[vk.current_frame_data.iframe];
-    const auto& mem_mapped = rp.vertex_buffer.mem_mapped[vk.current_frame_data.iframe];
-
-    const VkDeviceSize offset = rp.vertex_buffer.written_this_frame;
-    vkCmdBindVertexBuffers(command_buffer, 0, 1, &buffer, &offset);
-
-    const uint32_t size = vertex_count * CalcVertexBufferStride(rp);
-    CHECK_EQ(vertex_data.size(), size);
-    CHECK_LE(rp.vertex_buffer.written_this_frame + size, rp.vertex_buffer.size);
-
-    void* dst = mem_mapped + written_this_frame;
-    memcpy(dst, vertex_data.data(), size);
-    written_this_frame += size;
-  }
-
-  const auto descriptor_set = rp.descriptor_sets[vk.current_frame_data.iframe];
-
-  if (rp.dynamic_uniform.enabled) {
-    auto& written_this_frame = rp.dynamic_uniform.written_this_frame;
-    written_this_frame = AlignUp(written_this_frame, vk.phys_device_props.limits.minUniformBufferOffsetAlignment);
-
-    const auto& mem_mapped = rp.dynamic_uniform.mem_mapped[vk.current_frame_data.iframe];
-
-    const uint32_t dynamic_uniform_offset = rp.dynamic_uniform.written_this_frame;
-    vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, rp.layout, 0, 1, &descriptor_set, 1,
-                            &dynamic_uniform_offset);
-
-    const uint32_t size = rp.dynamic_uniform.range;
-    CHECK_EQ(dynamic_uniform_data.size(), size);
-    CHECK_LE(written_this_frame + size, rp.dynamic_uniform.size);
-
-    void* dst = mem_mapped + written_this_frame;
-    memcpy(dst, dynamic_uniform_data.data(), dynamic_uniform_data.size());
-    written_this_frame += size;
-  } else if (rp.static_uniform.enabled) {
-    vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, rp.layout, 0, 1, &descriptor_set, 0,
-                            nullptr);
-  }
-
-  vkCmdDraw(command_buffer, vertex_count, 1, 0, 0);
+  return {offset, vert_count};
 }
 
-VkFormat RpVertexAttrVkFormat(RpVertexAttr attr) {
+void RpDraw(Rp& rp, RpMesh mesh, CharView dynamic_uniform_data) {
+  const VkCommandBuffer cmd = vk.command_buffers[vk.current_frame_data.iframe];
+
+  if (rp.vert_buf.enabled) {
+    VkBuffer buf = rp.vert_buf.buffer[vk.current_frame_data.iframe];
+    vkCmdBindVertexBuffers(cmd, 0, 1, &buf, &mesh.offset);
+  }
+
+  if (rp.dynamic_uniform.enabled || rp.static_uniform.enabled) {
+    uint32_t offset_count = 0;
+    uint32_t offset = 0;
+
+    if (rp.dynamic_uniform.enabled) {
+      offset_count = 1;
+      offset = rp.dynamic_uniform.written;
+
+      rp.dynamic_uniform.written =
+          AlignUp(rp.dynamic_uniform.written, vk.phys_device_props.limits.minUniformBufferOffsetAlignment);
+      RpBufCopy(rp.dynamic_uniform, dynamic_uniform_data);
+    }
+
+    const VkDescriptorSet desc_set = rp.desc_sets[vk.current_frame_data.iframe];
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, rp.layout, 0, 1, &desc_set, offset_count, &offset);
+  }
+
+  vkCmdDraw(cmd, mesh.vert_count, 1, 0, 0);
+}
+
+VkFormat RpVertAttrVkFormat(RpVertAttr attr) {
   switch (attr) {
-    case RpVertexAttr::Float4:
+    case RpVertAttr::Float4:
       return VK_FORMAT_R32G32B32A32_SFLOAT;
-    case RpVertexAttr::Half2:
+    case RpVertAttr::Half2:
       return VK_FORMAT_R16G16_SFLOAT;
-    case RpVertexAttr::SNorm8x4:
+    case RpVertAttr::SNorm8x4:
       return VK_FORMAT_R8G8B8A8_SNORM;
-    case RpVertexAttr::UNorm8x4:
+    case RpVertAttr::UNorm8x4:
       return VK_FORMAT_R8G8B8A8_UNORM;
   }
 
@@ -286,15 +278,15 @@ VkFormat RpVertexAttrVkFormat(RpVertexAttr attr) {
   return VK_FORMAT_UNDEFINED;
 }
 
-uint32_t RpVertexAttrSize(RpVertexAttr attr) {
+uint32_t RpVertAttrSize(RpVertAttr attr) {
   switch (attr) {
-    case RpVertexAttr::Float4:
+    case RpVertAttr::Float4:
       return 16;
-    case RpVertexAttr::Half2:
+    case RpVertAttr::Half2:
       return 4;
-    case RpVertexAttr::SNorm8x4:
+    case RpVertAttr::SNorm8x4:
       return 4;
-    case RpVertexAttr::UNorm8x4:
+    case RpVertAttr::UNorm8x4:
       return 4;
   }
 
@@ -302,7 +294,7 @@ uint32_t RpVertexAttrSize(RpVertexAttr attr) {
   return 0;
 }
 
-void RpAttachVertShader(RenderPipeline& rp, const std::string& path) {
+void RpAttachVertShader(Rp& rp, const std::string& path) {
   rp.shader_stages.emplace_back(VkPipelineShaderStageCreateInfo{
       .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
       .stage = VK_SHADER_STAGE_VERTEX_BIT,
@@ -311,7 +303,7 @@ void RpAttachVertShader(RenderPipeline& rp, const std::string& path) {
   });
 }
 
-void RpAttachFragShader(RenderPipeline& rp, const std::string& path) {
+void RpAttachFragShader(Rp& rp, const std::string& path) {
   rp.shader_stages.emplace_back(VkPipelineShaderStageCreateInfo{
       .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
       .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
