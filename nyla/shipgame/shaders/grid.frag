@@ -1,25 +1,37 @@
 #version 460
 
-// layout(set = 0, binding = 0) uniform SceneUbo {
-//   mat4 view;
-//   mat4 proj;
-// } scene;
+layout(set = 0, binding = 0) uniform SceneUbo {
+    mat4 view;
+    mat4 proj;
+} scene;
 
 layout(location = 0) in vec2 uv;
-
 layout(location = 0) out vec4 out_color;
 
 void main() {
-  // mat4 invvp = inverse(proj * view);
+    const float kGridSize   = 2048.f;
+    const float KLineWidthPx = 2.f;
 
-  float grid_size = .1f;
-  float grid_thickness = .005f;
+    mat4 inv_vp = inverse(scene.proj * scene.view);
+    vec4 world = inv_vp * vec4(uv, 0.0, 1.0);
+    world /= world.w;
+    vec2 wp = world.xy;
 
-  if (mod(uv.x, grid_size) >= grid_thickness && mod(uv.y, grid_size) >= grid_thickness)
-    discard;
+    vec2 cell = wp / kGridSize;
+    vec2 cell_mod = mod(cell, 64.f);
 
-  // if (mod(uv.y, 0.20f) < .01f)
-  //   discard;
+    vec2 fw = fwidth(cell);
+    float pixel_in_cells = max(fw.x, fw.y);
 
-  out_color = vec4(1.f, 1.f, 1.f, 1.f - length(vec2(0.5, 0.5) - uv)*3);
+    vec2 frac_cell = fract(cell_mod);
+    vec2 dist1d = min(frac_cell, 1.0 - frac_cell);
+    float d = min(dist1d.x, dist1d.y);
+
+    float half_thickness_cells = 0.5 * KLineWidthPx * pixel_in_cells;
+
+    float alpha = 1.0 - smoothstep(half_thickness_cells,
+                                   half_thickness_cells + pixel_in_cells,
+                                   d);
+
+    out_color = vec4(1.0, 1.0, 1.0, alpha * 0.01);
 }

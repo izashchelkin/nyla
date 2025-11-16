@@ -46,6 +46,7 @@ void DbgText(int32_t x, int32_t y, std::string_view text) {
 }
 
 RenderPipeline dbg_text_pipeline{
+    .name = "DbgText",
     .dynamic_uniform =
         {
             .enabled = true,

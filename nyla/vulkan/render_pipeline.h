@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "nyla/vulkan/vulkan.h"
@@ -40,12 +41,14 @@ struct RpVertexBuf {
 };
 
 struct RenderPipeline {
+  std::string_view name;
+
   VkPipeline pipeline;
   VkPipelineLayout layout;
   std::vector<VkDescriptorSet> descriptor_sets;
   std::vector<VkPipelineShaderStageCreateInfo> shader_stages;
 
-  RpUniformBuffer uniform;
+  RpUniformBuffer static_uniform;
   RpUniformBuffer dynamic_uniform;
   RpVertexBuf vertex_buffer;
 

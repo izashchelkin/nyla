@@ -4,6 +4,7 @@
 
 #include <cstdint>
 
+#include "absl/log/log.h"
 #include "nyla/commons/memory/align.h"
 #include "nyla/commons/os/readfile.h"
 #include "nyla/vulkan/vulkan.h"
@@ -44,26 +45,26 @@ static void CreateMappedUniformBuffer(VkDescriptorSet descriptor_set, uint32_t d
   vkUpdateDescriptorSets(vk.device, 1, &write_descriptor_set, 0, nullptr);
 }
 
-static uint32_t CalcVertexBufferStride(RenderPipeline& pipeline) {
+static uint32_t CalcVertexBufferStride(RenderPipeline& rp) {
   uint32_t ret = 0;
-  for (auto attr : pipeline.vertex_buffer.attrs) {
+  for (auto attr : rp.vertex_buffer.attrs) {
     ret += RpVertexAttrSize(attr);
   }
   return ret;
 }
 
-void RpInit(RenderPipeline& pipeline) {
-  pipeline.shader_stages.clear();
+void RpInit(RenderPipeline& rp) {
+  rp.shader_stages.clear();
 
-  pipeline.Init(pipeline);
+  rp.Init(rp);
 
   std::vector<VkDescriptorPoolSize> desc_pool_sizes;
   std::vector<VkDescriptorSetLayoutBinding> desc_layout_bindings;
 
-  const uint32_t num_uniforms = pipeline.uniform.enabled + pipeline.dynamic_uniform.enabled;
+  const uint32_t num_uniforms = rp.static_uniform.enabled + rp.dynamic_uniform.enabled;
   desc_pool_sizes.reserve(num_uniforms);
 
-  if (pipeline.uniform.enabled) {
+  if (rp.static_uniform.enabled) {
     desc_layout_bindings.emplace_back(VkDescriptorSetLayoutBinding{
         .binding = 0,
         .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
@@ -78,7 +79,7 @@ void RpInit(RenderPipeline& pipeline) {
     });
   }
 
-  if (pipeline.dynamic_uniform.enabled) {
+  if (rp.dynamic_uniform.enabled) {
     desc_layout_bindings.emplace_back(VkDescriptorSetLayoutBinding{
         .binding = 1,
         .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
@@ -118,7 +119,7 @@ void RpInit(RenderPipeline& pipeline) {
       .pSetLayouts = &descriptor_set_layout,
   };
 
-  vkCreatePipelineLayout(vk.device, &pipeline_layout_create_info, nullptr, &pipeline.layout);
+  vkCreatePipelineLayout(vk.device, &pipeline_layout_create_info, nullptr, &rp.layout);
 
   const std::vector<VkDescriptorSetLayout> descriptor_sets_layouts(kVulkan_NumFramesInFlight, descriptor_set_layout);
 
@@ -129,8 +130,8 @@ void RpInit(RenderPipeline& pipeline) {
       .pSetLayouts = descriptor_sets_layouts.data(),
   };
 
-  pipeline.descriptor_sets.resize(kVulkan_NumFramesInFlight);
-  VK_CHECK(vkAllocateDescriptorSets(vk.device, &descriptor_set_alloc_info, pipeline.descriptor_sets.data()));
+  rp.descriptor_sets.resize(kVulkan_NumFramesInFlight);
+  VK_CHECK(vkAllocateDescriptorSets(vk.device, &descriptor_set_alloc_info, rp.descriptor_sets.data()));
 
   auto resize = [](auto& b) {
     if (!b.enabled) return;
@@ -140,25 +141,25 @@ void RpInit(RenderPipeline& pipeline) {
     b.mem_mapped.resize(kVulkan_NumFramesInFlight);
   };
 
-  resize(pipeline.uniform);
-  resize(pipeline.dynamic_uniform);
-  resize(pipeline.vertex_buffer);
+  resize(rp.static_uniform);
+  resize(rp.dynamic_uniform);
+  resize(rp.vertex_buffer);
 
   for (size_t i = 0; i < kVulkan_NumFramesInFlight; ++i) {
-    if (pipeline.uniform.enabled) {
-      RpUniformBuffer& b = pipeline.uniform;
-      CreateMappedUniformBuffer(pipeline.descriptor_sets[i], 0, (bool)false, b.size, b.range, b.buffer[i], b.mem[i],
+    if (rp.static_uniform.enabled) {
+      RpUniformBuffer& b = rp.static_uniform;
+      CreateMappedUniformBuffer(rp.descriptor_sets[i], 0, (bool)false, b.size, b.range, b.buffer[i], b.mem[i],
                                 reinterpret_cast<void*&>(b.mem_mapped[i]));
     }
 
-    if (pipeline.dynamic_uniform.enabled) {
-      RpUniformBuffer& b = pipeline.dynamic_uniform;
-      CreateMappedUniformBuffer(pipeline.descriptor_sets[i], 1, true, b.size, b.range, b.buffer[i], b.mem[i],
+    if (rp.dynamic_uniform.enabled) {
+      RpUniformBuffer& b = rp.dynamic_uniform;
+      CreateMappedUniformBuffer(rp.descriptor_sets[i], 1, true, b.size, b.range, b.buffer[i], b.mem[i],
                                 reinterpret_cast<void*&>(b.mem_mapped[i]));
     }
 
-    if (pipeline.vertex_buffer.enabled) {
-      RpVertexBuf& b = pipeline.vertex_buffer;
+    if (rp.vertex_buffer.enabled) {
+      RpVertexBuf& b = rp.vertex_buffer;
       CreateMappedBuffer(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, b.size, b.buffer[i], b.mem[i],
                          reinterpret_cast<void*&>(b.mem_mapped[i]));
     }
@@ -168,19 +169,19 @@ void RpInit(RenderPipeline& pipeline) {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
   };
 
-  if (pipeline.vertex_buffer.enabled) {
+  if (rp.vertex_buffer.enabled) {
     const VkVertexInputBindingDescription binding_description{
         .binding = 0,
-        .stride = CalcVertexBufferStride(pipeline),
+        .stride = CalcVertexBufferStride(rp),
         .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
     };
 
-    std::vector<VkVertexInputAttributeDescription> vertex_attr_descriptions(pipeline.vertex_buffer.attrs.size());
+    std::vector<VkVertexInputAttributeDescription> vertex_attr_descriptions(rp.vertex_buffer.attrs.size());
 
     {
       uint32_t offset = 0;
-      for (uint32_t i = 0; i < pipeline.vertex_buffer.attrs.size(); ++i) {
-        auto attr = pipeline.vertex_buffer.attrs[i];
+      for (uint32_t i = 0; i < rp.vertex_buffer.attrs.size(); ++i) {
+        auto attr = rp.vertex_buffer.attrs[i];
         vertex_attr_descriptions[i] = {
             .location = i,
             .binding = 0,
@@ -197,72 +198,73 @@ void RpInit(RenderPipeline& pipeline) {
     vertex_input_create_info.vertexAttributeDescriptionCount = vertex_attr_descriptions.size();
     vertex_input_create_info.pVertexAttributeDescriptions = vertex_attr_descriptions.data();
 
-    pipeline.pipeline =
-        Vulkan_CreateGraphicsPipeline(vertex_input_create_info, pipeline.layout, pipeline.shader_stages);
+    rp.pipeline = Vulkan_CreateGraphicsPipeline(vertex_input_create_info, rp.layout, rp.shader_stages);
   } else {
-    pipeline.pipeline =
-        Vulkan_CreateGraphicsPipeline(vertex_input_create_info, pipeline.layout, pipeline.shader_stages);
+    rp.pipeline = Vulkan_CreateGraphicsPipeline(vertex_input_create_info, rp.layout, rp.shader_stages);
   }
 }
 
-void RpBegin(RenderPipeline& pipeline) {
-  pipeline.uniform.written_this_frame = 0;
-  pipeline.dynamic_uniform.written_this_frame = 0;
-  pipeline.vertex_buffer.written_this_frame = 0;
+void RpBegin(RenderPipeline& rp) {
+  rp.static_uniform.written_this_frame = 0;
+  rp.dynamic_uniform.written_this_frame = 0;
+  rp.vertex_buffer.written_this_frame = 0;
 
   const VkCommandBuffer command_buffer = vk.command_buffers[vk.current_frame_data.iframe];
-
-  vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipeline);
+  vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, rp.pipeline);
 }
 
-void RpSetStaticUniform(RenderPipeline& pipeline, std::span<const char> uniform_data) {
-  CHECK(pipeline.uniform.enabled);
+void RpSetStaticUniform(RenderPipeline& rp, std::span<const char> uniform_data) {
+  CHECK(rp.static_uniform.enabled);
 
-  CHECK_LE(uniform_data.size(), pipeline.uniform.size);
-  memcpy(pipeline.uniform.mem_mapped[vk.current_frame_data.iframe], uniform_data.data(), uniform_data.size());
+  CHECK_LE(uniform_data.size(), rp.static_uniform.size);
+  memcpy(rp.static_uniform.mem_mapped[vk.current_frame_data.iframe], uniform_data.data(), uniform_data.size());
 }
 
-void RpDraw(RenderPipeline& pipeline, uint32_t vertex_count, std::span<const char> vertex_data,
+void RpDraw(RenderPipeline& rp, uint32_t vertex_count, std::span<const char> vertex_data,
             std::span<const char> dynamic_uniform_data) {
   CHECK_GT(vertex_count, 0);
 
   const VkCommandBuffer command_buffer = vk.command_buffers[vk.current_frame_data.iframe];
 
-  if (pipeline.vertex_buffer.enabled) {
-    auto& written_this_frame = pipeline.vertex_buffer.written_this_frame;
-    const auto& buffer = pipeline.vertex_buffer.buffer[vk.current_frame_data.iframe];
-    const auto& mem_mapped = pipeline.vertex_buffer.mem_mapped[vk.current_frame_data.iframe];
+  if (rp.vertex_buffer.enabled) {
+    auto& written_this_frame = rp.vertex_buffer.written_this_frame;
+    const auto& buffer = rp.vertex_buffer.buffer[vk.current_frame_data.iframe];
+    const auto& mem_mapped = rp.vertex_buffer.mem_mapped[vk.current_frame_data.iframe];
 
-    const VkDeviceSize offset = pipeline.vertex_buffer.written_this_frame;
+    const VkDeviceSize offset = rp.vertex_buffer.written_this_frame;
     vkCmdBindVertexBuffers(command_buffer, 0, 1, &buffer, &offset);
 
-    const uint32_t size = vertex_count * CalcVertexBufferStride(pipeline);
+    const uint32_t size = vertex_count * CalcVertexBufferStride(rp);
     CHECK_EQ(vertex_data.size(), size);
-    CHECK_LE(pipeline.vertex_buffer.written_this_frame + size, pipeline.vertex_buffer.size);
+    CHECK_LE(rp.vertex_buffer.written_this_frame + size, rp.vertex_buffer.size);
 
     void* dst = mem_mapped + written_this_frame;
     memcpy(dst, vertex_data.data(), size);
     written_this_frame += size;
   }
 
-  if (pipeline.dynamic_uniform.enabled) {
-    auto& written_this_frame = pipeline.dynamic_uniform.written_this_frame;
+  const auto descriptor_set = rp.descriptor_sets[vk.current_frame_data.iframe];
+
+  if (rp.dynamic_uniform.enabled) {
+    auto& written_this_frame = rp.dynamic_uniform.written_this_frame;
     written_this_frame = AlignUp(written_this_frame, vk.phys_device_props.limits.minUniformBufferOffsetAlignment);
 
-    const auto& mem_mapped = pipeline.dynamic_uniform.mem_mapped[vk.current_frame_data.iframe];
+    const auto& mem_mapped = rp.dynamic_uniform.mem_mapped[vk.current_frame_data.iframe];
 
-    const auto descriptor_set = pipeline.descriptor_sets[vk.current_frame_data.iframe];
-    const uint32_t dynamic_uniform_offset = pipeline.dynamic_uniform.written_this_frame;
-    vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.layout, 0, 1, &descriptor_set, 1,
+    const uint32_t dynamic_uniform_offset = rp.dynamic_uniform.written_this_frame;
+    vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, rp.layout, 0, 1, &descriptor_set, 1,
                             &dynamic_uniform_offset);
 
-    const uint32_t size = pipeline.dynamic_uniform.range;
+    const uint32_t size = rp.dynamic_uniform.range;
     CHECK_EQ(dynamic_uniform_data.size(), size);
-    CHECK_LE(written_this_frame + size, pipeline.dynamic_uniform.size);
+    CHECK_LE(written_this_frame + size, rp.dynamic_uniform.size);
 
     void* dst = mem_mapped + written_this_frame;
     memcpy(dst, dynamic_uniform_data.data(), dynamic_uniform_data.size());
     written_this_frame += size;
+  } else if (rp.static_uniform.enabled) {
+    vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, rp.layout, 0, 1, &descriptor_set, 0,
+                            nullptr);
   }
 
   vkCmdDraw(command_buffer, vertex_count, 1, 0, 0);
@@ -300,8 +302,8 @@ uint32_t RpVertexAttrSize(RpVertexAttr attr) {
   return 0;
 }
 
-void RpAttachVertShader(RenderPipeline& pipeline, const std::string& path) {
-  pipeline.shader_stages.emplace_back(VkPipelineShaderStageCreateInfo{
+void RpAttachVertShader(RenderPipeline& rp, const std::string& path) {
+  rp.shader_stages.emplace_back(VkPipelineShaderStageCreateInfo{
       .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
       .stage = VK_SHADER_STAGE_VERTEX_BIT,
       .module = Vulkan_CreateShaderModule(ReadFile(path)),
@@ -309,8 +311,8 @@ void RpAttachVertShader(RenderPipeline& pipeline, const std::string& path) {
   });
 }
 
-void RpAttachFragShader(RenderPipeline& pipeline, const std::string& path) {
-  pipeline.shader_stages.emplace_back(VkPipelineShaderStageCreateInfo{
+void RpAttachFragShader(RenderPipeline& rp, const std::string& path) {
+  rp.shader_stages.emplace_back(VkPipelineShaderStageCreateInfo{
       .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
       .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
       .module = Vulkan_CreateShaderModule(ReadFile(path)),

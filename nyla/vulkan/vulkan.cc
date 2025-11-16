@@ -5,6 +5,7 @@
 #include <xkbcommon/xkbcommon.h>
 
 #include <array>
+#include <csignal>
 #include <cstdint>
 #include <limits>
 #include <string_view>
@@ -12,6 +13,7 @@
 
 #include "absl/log/check.h"
 #include "absl/log/log.h"
+#include "nyla/commons/debug/debugger.h"
 #include "nyla/commons/os/clock.h"
 
 namespace nyla {
@@ -52,7 +54,18 @@ void Vulkan_Initialize(std::span<const char* const> shader_watch_directories) {
         .pfnUserCallback =
             [](VkDebugUtilsMessageSeverityFlagBitsEXT message_severity, VkDebugUtilsMessageTypeFlagsEXT message_type,
                const VkDebugUtilsMessengerCallbackDataEXT* callback_data, void* user_data) {
-              LOG(ERROR) << "\n" << callback_data->pMessage << "\n";
+              switch (message_severity) {
+                case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT: {
+                  LOG(ERROR) << callback_data->pMessage;
+                  DebugBreak;
+                }
+                case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT: {
+                  LOG(WARNING) << callback_data->pMessage;
+                }
+                default: {
+                  LOG(INFO) << callback_data->pMessage;
+                }
+              }
               return VK_FALSE;
             },
     };

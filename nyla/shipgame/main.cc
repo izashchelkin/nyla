@@ -14,7 +14,6 @@
 #include "nyla/commons/memory/tnew.h"
 #include "nyla/commons/os/clock.h"
 #include "nyla/shipgame/game.h"
-#include "nyla/shipgame/grid_renderer.h"
 #include "nyla/shipgame/world_renderer.h"
 #include "nyla/vulkan/dbg_text_renderer.h"
 #include "nyla/vulkan/render_pipeline.h"

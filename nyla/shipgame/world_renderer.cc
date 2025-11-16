@@ -21,8 +21,6 @@ struct DynamicUbo {
 
 }  // namespace
 
-extern RenderPipeline world_pipeline;
-
 constexpr float kMetersOnScreenY = 2000.f;
 
 void WorldSetUp(Vec2f camera_pos, float zoom) {
@@ -37,6 +35,7 @@ void WorldSetUp(Vec2f camera_pos, float zoom) {
   };
 
   RpSetStaticUniform(world_pipeline, CharView(&static_ubo));
+  RpSetStaticUniform(grid_pipeline, CharView(&static_ubo));
 }
 
 void WorldRender(Vec2f pos, float angle_radians, std::span<WorldRendererVertex> vertices) {
@@ -50,7 +49,8 @@ void WorldRender(Vec2f pos, float angle_radians, std::span<WorldRendererVertex> 
 }
 
 RenderPipeline world_pipeline{
-    .uniform =
+    .name = "World",
+    .static_uniform =
         {
             .enabled = true,
             .size = sizeof(StaticUbo),
@@ -76,6 +76,25 @@ RenderPipeline world_pipeline{
         [](RenderPipeline& rp) {
           RpAttachVertShader(rp, "nyla/shipgame/shaders/build/vert.spv");
           RpAttachFragShader(rp, "nyla/shipgame/shaders/build/frag.spv");
+        },
+};
+
+void GridRender() {
+  RpDraw(grid_pipeline, 3, {}, {});
+}
+
+RenderPipeline grid_pipeline{
+    .name = "WorldGrid",
+    .static_uniform =
+        {
+            .enabled = true,
+            .size = sizeof(StaticUbo),
+            .range = sizeof(StaticUbo),
+        },
+    .Init =
+        [](RenderPipeline& rp) {
+          RpAttachVertShader(rp, "nyla/shipgame/shaders/build/grid_vert.spv");
+          RpAttachFragShader(rp, "nyla/shipgame/shaders/build/grid_frag.spv");
         },
 };
 
