@@ -9,7 +9,7 @@ layout(location = 0) in vec2 uv;
 layout(location = 0) out vec4 out_color;
 
 void main() {
-    const float kGridSize   = 32.f;
+    const float kGridSize   = 16.f;
     const float KLineWidthPx = 1.2f;
 
     mat4 inv_vp = inverse(scene.proj * scene.view);
@@ -33,5 +33,5 @@ void main() {
                                    half_thickness_cells + pixel_in_cells,
                                    d);
 
-    out_color = vec4(1.0, 1.0, 1.0, alpha * 0.01);
+    out_color = vec4(1.0, 1.0, 1.0, alpha * 0.02);
 }

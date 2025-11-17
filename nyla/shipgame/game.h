@@ -3,14 +3,26 @@
 #include <cstdint>
 #include <vector>
 
+#include "nyla/commons/containers/map.h"
 #include "nyla/commons/containers/set.h"
 #include "nyla/commons/math/mat4.h"
 #include "nyla/commons/math/vec/vec2f.h"
 #include "nyla/commons/math/vec/vec3f.h"
+#include "nyla/fwk/input.h"
 #include "nyla/shipgame/world_renderer.h"
 #include "nyla/vulkan/vulkan.h"
 
 namespace nyla {
+
+extern const InputMappingId kRight;
+extern const InputMappingId kLeft;
+extern const InputMappingId kUp;
+extern const InputMappingId kDown;
+extern const InputMappingId kBrake;
+extern const InputMappingId kBoost;
+extern const InputMappingId kFire;
+extern const InputMappingId kZoomLess;
+extern const InputMappingId kZoomMore;
 
 struct GameObject {
   enum class Type : uint8_t {
@@ -35,16 +47,6 @@ struct GameObject {
 extern GameObject game_solar_system;
 extern GameObject game_ship;
 
-extern struct GameKeycodes {
-  xcb_keycode_t up;
-  xcb_keycode_t left;
-  xcb_keycode_t down;
-  xcb_keycode_t right;
-  xcb_keycode_t boost;
-  xcb_keycode_t brake;
-  xcb_keycode_t fire;
-} game_keycodes;
-
 struct SceneUbo {
   Mat4 view;
   Mat4 proj;
@@ -55,8 +57,7 @@ struct GameObjectUbo {
 };
 
 void InitGame();
-void ProcessInput(Set<xcb_keycode_t>& pressed_keys, Set<xcb_keycode_t>& released_keys,
-                  Set<xcb_button_index_t>& pressed_buttons, Set<xcb_button_index_t>& released_buttons);
+void ProcessInput();
 void RenderGameObjects();
 
 }  // namespace nyla

@@ -5,9 +5,7 @@ cc_binary(
         "*.h",
     ]),
     deps = [
-        "//nyla/vulkan",
-        "//nyla/commons",
-        "//nyla/x11",
+        "//nyla/fwk",
         "@abseil-cpp//absl/log",
         "@abseil-cpp//absl/log:check",
         "@abseil-cpp//absl/log:initialize",

@@ -1,6 +1,8 @@
 #include "nyla/shipgame/game.h"
 
+#include <cmath>
 #include <complex>
+#include <cstdint>
 #include <cstring>
 
 #include "nyla/commons/containers/set.h"
@@ -8,18 +10,27 @@
 #include "nyla/commons/math/math.h"
 #include "nyla/commons/math/vec/vec2f.h"
 #include "nyla/commons/memory/charview.h"
+#include "nyla/commons/os/clock.h"
+#include "nyla/fwk/input.h"
 #include "nyla/shipgame/world_renderer.h"
 #include "nyla/vulkan/render_pipeline.h"
 #include "nyla/vulkan/vulkan.h"
-#include "xcb/xproto.h"
 
 namespace nyla {
+
+const InputMappingId kRight;
+const InputMappingId kLeft;
+const InputMappingId kUp;
+const InputMappingId kDown;
+const InputMappingId kBrake;
+const InputMappingId kBoost;
+const InputMappingId kFire;
+const InputMappingId kZoomLess;
+const InputMappingId kZoomMore;
 
 namespace {
 using Vertex = WorldRendererVertex;
 }
-
-GameKeycodes game_keycodes{};
 
 GameObject game_solar_system{};
 GameObject game_ship{};
@@ -102,9 +113,7 @@ void InitGame() {
         .velocity = {0.f, 0.f},
     };
 
-    auto* planets = new std::vector<GameObject>(3, {
-                                                       .type = GameObject::Type::kPlanet,
-                                                   });
+    auto* planets = new std::vector<GameObject>(3, {.type = GameObject::Type::kPlanet});
     game_solar_system.children = {planets->data(), planets->size()};
 
     size_t iplanet = 0;
@@ -152,12 +161,9 @@ void InitGame() {
   }
 }
 
-void ProcessInput(Set<xcb_keycode_t>& pressed_keys, Set<xcb_keycode_t>& released_keys,
-                  Set<xcb_button_index_t>& pressed_buttons, Set<xcb_button_index_t>& released_buttons) {
-#define pressed(key) pressed_keys.contains(game_keycodes.key)
-
-  const int dx = pressed(right) - pressed(left);
-  const int dy = pressed(down) - pressed(up);
+void ProcessInput() {
+  const int dx = Pressed(kRight) - Pressed(kLeft);
+  const int dy = Pressed(kDown) - Pressed(kUp);
 
   static float dt_accumulator = 0.f;
   dt_accumulator += vk.current_frame_data.dt;
@@ -174,12 +180,28 @@ void ProcessInput(Set<xcb_keycode_t>& pressed_keys, Set<xcb_keycode_t>& released
         game_ship.angle_radians = LerpAngle(game_ship.angle_radians, angle, step * 5.f);
       }
 
-      if (pressed(brake)) {
+      if (Pressed(kBrake)) {
+        InputRelease(kBoost);
+
         Lerp(game_ship.velocity, Vec2f{}, step * 5.f);
-      } else if (pressed(boost)) {
+      } else if (Pressed(kBoost)) {
         const Vec2f direction = Vec2fNorm(Vec2f{std::cos(game_ship.angle_radians), std::sin(game_ship.angle_radians)});
 
-        Lerp(game_ship.velocity, Vec2fMul(direction, 50.f), step);
+        uint32_t duration = PressedFor(kBoost, GetMonotonicTimeMicros());
+
+        float max_speed;
+        if (duration < 100000) {
+          max_speed = 100;
+        } else {
+          max_speed = 100 + (duration - 100000) / 10000.f;
+        }
+
+        Lerp(game_ship.velocity, Vec2fMul(direction, max_speed), step);
+
+        if (Vec2fLen(game_ship.velocity) < 20) {
+          game_ship.velocity = Vec2fResized(game_ship.velocity, 20);
+        }
+
       } else {
         Lerp(game_ship.velocity, Vec2f{}, step);
       }
@@ -188,7 +210,7 @@ void ProcessInput(Set<xcb_keycode_t>& pressed_keys, Set<xcb_keycode_t>& released
     }
 
     {
-      Lerp(game_camera_pos, game_ship.pos, 5.f * step);
+      Lerp(game_camera_pos, game_ship.pos, Vec2fLen(Vec2fDif(game_camera_pos, game_ship.pos)) * step);
     }
 
     {
@@ -290,10 +312,10 @@ void ProcessInput(Set<xcb_keycode_t>& pressed_keys, Set<xcb_keycode_t>& released
   }
 
   {
-    if (pressed_buttons.contains(XCB_BUTTON_INDEX_5)) game_camera_zoom *= 1.1f;
-    if (pressed_buttons.contains(XCB_BUTTON_INDEX_4)) game_camera_zoom /= 1.1f;
+    if (Pressed(kZoomMore)) game_camera_zoom *= 1.1f;
+    if (Pressed(kZoomLess)) game_camera_zoom /= 1.1f;
 
-    game_camera_zoom = std::clamp(game_camera_zoom, .05f, 50.f);
+    game_camera_zoom = std::clamp(game_camera_zoom, .1f, 2.5f);
   }
 
 #undef pressed

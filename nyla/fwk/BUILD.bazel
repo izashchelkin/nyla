@@ -1,0 +1,22 @@
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "fwk",
+    srcs = glob([
+        "*.cc",
+    ]),
+    hdrs = glob([
+        "*.h",
+    ]),
+    deps = [
+        "//nyla/commons",
+        "//nyla/vulkan",
+        "//nyla/x11",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/log",
+        "@abseil-cpp//absl/log:check",
+        "@abseil-cpp//absl/log:initialize",
+    ],
+)

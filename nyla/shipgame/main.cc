@@ -9,10 +9,12 @@
 
 #include "absl/cleanup/cleanup.h"
 #include "absl/log/log.h"
+#include "nyla/commons/containers/map.h"
 #include "nyla/commons/containers/set.h"
 #include "nyla/commons/logging/init.h"
 #include "nyla/commons/memory/tnew.h"
 #include "nyla/commons/os/clock.h"
+#include "nyla/fwk/input.h"
 #include "nyla/shipgame/game.h"
 #include "nyla/shipgame/world_renderer.h"
 #include "nyla/vulkan/dbg_text_renderer.h"
@@ -28,11 +30,6 @@ uint16_t ientity;
 
 static bool running = true;
 static xcb_window_t window;
-
-static Set<xcb_keycode_t> pressed_keys;
-static Set<xcb_keycode_t> released_keys;
-static Set<xcb_button_index_t> pressed_buttons;
-static Set<xcb_button_index_t> released_buttons;
 
 VkExtent2D Vulkan_PlatformGetWindowExtent() {
   xcb_get_geometry_reply_t* window_geometry =
@@ -51,6 +48,8 @@ void Vulkan_PlatformSetSurface() {
 }
 
 static void ProcessXEvents() {
+  InputHandleFrame();
+
   for (;;) {
     if (xcb_connection_has_error(x11.conn)) {
       running = false;
@@ -63,29 +62,30 @@ static void ProcessXEvents() {
     absl::Cleanup event_freer = [=]() { free(event); };
     const uint8_t event_type = event->response_type & 0x7F;
 
+    uint64_t now = GetMonotonicTimeMicros();
+
     switch (event_type) {
       case XCB_KEY_PRESS: {
         auto keypress = reinterpret_cast<xcb_key_press_event_t*>(event);
-        pressed_keys.emplace(keypress->detail);
-        released_keys.erase(keypress->detail);
+        InputHandlePressed({1, keypress->detail}, now);
         break;
       }
 
       case XCB_KEY_RELEASE: {
         auto keyrelease = reinterpret_cast<xcb_key_release_event_t*>(event);
-        released_keys.emplace(keyrelease->detail);
+        InputHandleReleased({1, keyrelease->detail});
         break;
       }
 
       case XCB_BUTTON_PRESS: {
         auto buttonpress = reinterpret_cast<xcb_button_press_event_t*>(event);
-        pressed_buttons.emplace(static_cast<xcb_button_index_t>(buttonpress->detail));
+        InputHandlePressed({2, buttonpress->detail}, now);
         break;
       }
 
       case XCB_BUTTON_RELEASE: {
         auto buttonrelease = reinterpret_cast<xcb_button_release_event_t*>(event);
-        released_buttons.emplace(static_cast<xcb_button_index_t>(buttonrelease->detail));
+        InputHandleReleased({2, buttonrelease->detail});
         break;
       }
 
@@ -141,13 +141,15 @@ static int Main() {
     X11_KeyResolver key_resolver;
     X11_InitializeKeyResolver(key_resolver);
 
-    game_keycodes.up = X11_ResolveKeyCode(key_resolver, "AD03");
-    game_keycodes.left = X11_ResolveKeyCode(key_resolver, "AC02");
-    game_keycodes.down = X11_ResolveKeyCode(key_resolver, "AC03");
-    game_keycodes.right = X11_ResolveKeyCode(key_resolver, "AC04");
-    game_keycodes.fire = X11_ResolveKeyCode(key_resolver, "AC07");
-    game_keycodes.boost = X11_ResolveKeyCode(key_resolver, "AC08");
-    game_keycodes.brake = X11_ResolveKeyCode(key_resolver, "SPCE");
+    InputMapId(kUp, {1, X11_ResolveKeyCode(key_resolver, "AD03")});
+    InputMapId(kLeft, {1, X11_ResolveKeyCode(key_resolver, "AC02")});
+    InputMapId(kDown, {1, X11_ResolveKeyCode(key_resolver, "AC03")});
+    InputMapId(kRight, {1, X11_ResolveKeyCode(key_resolver, "AC04")});
+    InputMapId(kFire, {1, X11_ResolveKeyCode(key_resolver, "AC07")});
+    InputMapId(kBoost, {1, X11_ResolveKeyCode(key_resolver, "AC08")});
+    InputMapId(kBrake, {1, X11_ResolveKeyCode(key_resolver, "SPCE")});
+    InputMapId(kZoomMore, {2, XCB_BUTTON_INDEX_5});
+    InputMapId(kZoomLess, {2, XCB_BUTTON_INDEX_4});
 
     X11_FreeKeyResolver(key_resolver);
   }
@@ -217,7 +219,7 @@ static int Main() {
     }
 #endif
 
-    ProcessInput(pressed_keys, released_keys, pressed_buttons, released_buttons);
+    ProcessInput();
 
     Vulkan_RenderingBegin();
     {
@@ -232,16 +234,6 @@ static int Main() {
     }
     Vulkan_RenderingEnd();
     Vulkan_FrameEnd();
-
-    for (auto key : released_keys) {
-      pressed_keys.erase(key);
-    }
-    released_keys.clear();
-
-    for (auto button : released_buttons) {
-      pressed_buttons.erase(button);
-    }
-    released_buttons.clear();
   }
   return 0;
 }

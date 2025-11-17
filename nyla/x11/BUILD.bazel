@@ -15,6 +15,7 @@ cc_library(
         "-lxcb-xinput",
     ],
     deps = [
+        "//nyla/commons",
         "@abseil-cpp//absl/log",
         "@abseil-cpp//absl/strings",
     ],
