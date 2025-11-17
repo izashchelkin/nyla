@@ -1,4 +1,4 @@
-#include "nyla/layout/layout.h"
+#include "nyla/wm/layout.h"
 
 #include <cmath>
 #include <cstdint>

@@ -15,7 +15,6 @@ cc_binary(
         "//nyla/commons",
         "//nyla/dbus",
         "//nyla/debugfs",
-        "//nyla/layout",
         "//nyla/x11",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/log",
