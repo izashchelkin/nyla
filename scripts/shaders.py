@@ -3,11 +3,17 @@ from os import system
 from time import time
 
 def main():
-    srcs = (glob("nyla/*/shaders/*.frag") + glob("nyla/*/shaders/*.vert"))
+    srcs = (
+        glob("nyla/**/shaders/*.frag", recursive=True) +
+        glob("nyla/*/shaders/*.vert", recursive=True)
+    )
+
     for src in srcs:
         parts = src.split("/")
         parts.insert(len(parts) - 1, "build")
         outfile = "/".join(parts) + ".spv"
+
+        system("mkdir -p " + "/".join(parts[0:-1]))
 
         begin = int(time() * 1000)
         print(src, end=" ")

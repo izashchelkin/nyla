@@ -1,4 +1,4 @@
-#include "nyla/wm/screen_saver_inhibitor.h"
+#include "nyla/apps/wm/screen_saver_inhibitor.h"
 
 #include <cstdint>
 #include <string_view>
@@ -17,8 +17,7 @@ namespace nyla {
 static uint32_t next_inhibit_cookie = 1;
 static Map<uint32_t, std::string> inhibit_cookies;
 
-static void HandleNameOwnerChange(const char* name, const char* old_owner,
-                                  const char* new_owner) {
+static void HandleNameOwnerChange(const char* name, const char* old_owner, const char* new_owner) {
   if (new_owner && *new_owner == '\0' && old_owner && *old_owner != '\0') {
     absl::erase_if(inhibit_cookies, [old_owner](auto& ent) {
       const auto& [cookie, owner] = ent;
@@ -28,8 +27,7 @@ static void HandleNameOwnerChange(const char* name, const char* old_owner,
 }
 
 static void HandleMessage(DBusMessage* msg) {
-  if (dbus_message_is_method_call(msg, "org.freedesktop.ScreenSaver",
-                                  "Inhibit")) {
+  if (dbus_message_is_method_call(msg, "org.freedesktop.ScreenSaver", "Inhibit")) {
     const char* in_name;
     const char* in_reason;
 
@@ -56,8 +54,7 @@ static void HandleMessage(DBusMessage* msg) {
     return;
   }
 
-  if (dbus_message_is_method_call(msg, "org.freedesktop.ScreenSaver",
-                                  "UnInhibit")) {
+  if (dbus_message_is_method_call(msg, "org.freedesktop.ScreenSaver", "UnInhibit")) {
     uint32_t in_cookie;
 
     DBusErrorWrapper err;
@@ -69,8 +66,7 @@ static void HandleMessage(DBusMessage* msg) {
     }
 
     auto it = inhibit_cookies.find(in_cookie);
-    if (it != inhibit_cookies.end() &&
-        it->second == dbus_message_get_sender(msg)) {
+    if (it != inhibit_cookies.end() && it->second == dbus_message_get_sender(msg)) {
       inhibit_cookies.erase(it);
     }
 
@@ -82,8 +78,7 @@ static void HandleMessage(DBusMessage* msg) {
     return;
   }
 
-  if (dbus_message_is_method_call(msg, "org.freedesktop.ScreenSaver",
-                                  "SimulateUserActivity")) {
+  if (dbus_message_is_method_call(msg, "org.freedesktop.ScreenSaver", "SimulateUserActivity")) {
     DBus_ReplyNone(msg);
     return;
   }
@@ -120,8 +115,7 @@ void ScreenSaverInhibitorInit() {
       .name_owner_changed_handler = HandleNameOwnerChange,
   };
 
-  DBus_RegisterHandler("org.freedesktop.ScreenSaver",
-                       "/org/freedesktop/ScreenSaver", handler);
+  DBus_RegisterHandler("org.freedesktop.ScreenSaver", "/org/freedesktop/ScreenSaver", handler);
   DBus_RegisterHandler("org.freedesktop.ScreenSaver", "/ScreenSaver", handler);
 
   DebugFsRegister(

@@ -28,8 +28,8 @@ Rp gui_pipeline{
         },
     .Init =
         [](Rp& rp) {
-          RpAttachVertShader(rp, "nyla/fwk/shaders/build/gui_vert.spv");
-          RpAttachFragShader(rp, "nyla/fwk/shaders/build/gui_frag.spv");
+          RpAttachVertShader(rp, "nyla/fwk/shaders/build/gui.vert.spv");
+          RpAttachFragShader(rp, "nyla/fwk/shaders/build/gui.frag.spv");
         },
 };
 

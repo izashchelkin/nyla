@@ -55,8 +55,8 @@ Rp dbg_text_pipeline{
         },
     .Init =
         [](Rp& rp) {
-          RpAttachVertShader(rp, "nyla/vulkan/shaders/build/psf2_ansii_vert.spv");
-          RpAttachFragShader(rp, "nyla/vulkan/shaders/build/psf2_ansii_frag.spv");
+          RpAttachVertShader(rp, "nyla/vulkan/shaders/build/dbgtext.vert.spv");
+          RpAttachFragShader(rp, "nyla/vulkan/shaders/build/dbgtext.frag.spv");
         },
 };
 

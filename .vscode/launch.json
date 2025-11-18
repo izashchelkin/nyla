@@ -4,7 +4,7 @@
             "name": "(gdb) Launch",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/bazel-out/k8-dbg/bin/nyla/shipgame/shipgame",
+            "program": "${workspaceFolder}/bazel-out/k8-dbg/bin/nyla/apps/shipgame/shipgame",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

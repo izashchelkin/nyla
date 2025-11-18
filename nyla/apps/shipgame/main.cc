@@ -9,14 +9,14 @@
 
 #include "absl/cleanup/cleanup.h"
 #include "absl/log/log.h"
+#include "nyla/apps/shipgame/game.h"
+#include "nyla/apps/shipgame/world_renderer.h"
 #include "nyla/commons/containers/map.h"
 #include "nyla/commons/containers/set.h"
 #include "nyla/commons/logging/init.h"
 #include "nyla/commons/memory/tnew.h"
 #include "nyla/commons/os/clock.h"
 #include "nyla/fwk/input.h"
-#include "nyla/shipgame/game.h"
-#include "nyla/shipgame/world_renderer.h"
 #include "nyla/vulkan/dbg_text_renderer.h"
 #include "nyla/vulkan/render_pipeline.h"
 #include "nyla/vulkan/vulkan.h"
@@ -134,7 +134,7 @@ static int Main() {
     xcb_flush(x11.conn);
   }
 
-  const char* shader_watch_dirs[] = {"nyla/shipgame/shaders", "nyla/shipgame/shaders/build"};
+  const char* shader_watch_dirs[] = {"nyla/apps/shipgame/shaders", "nyla/apps/shipgame/shaders/build"};
   Vulkan_Initialize(shader_watch_dirs);
 
   {

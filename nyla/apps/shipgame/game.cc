@@ -1,19 +1,17 @@
-#include "nyla/shipgame/game.h"
+#include "nyla/apps/shipgame/game.h"
 
 #include <cmath>
 #include <complex>
 #include <cstdint>
 #include <cstring>
 
+#include "nyla/apps/shipgame/world_renderer.h"
 #include "nyla/commons/containers/set.h"
 #include "nyla/commons/math/lerp.h"
 #include "nyla/commons/math/math.h"
 #include "nyla/commons/math/vec/vec2f.h"
-#include "nyla/commons/memory/charview.h"
 #include "nyla/commons/os/clock.h"
 #include "nyla/fwk/input.h"
-#include "nyla/shipgame/world_renderer.h"
-#include "nyla/vulkan/render_pipeline.h"
 #include "nyla/vulkan/vulkan.h"
 
 namespace nyla {

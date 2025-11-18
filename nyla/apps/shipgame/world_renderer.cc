@@ -1,4 +1,4 @@
-#include "nyla/shipgame/world_renderer.h"
+#include "nyla/apps/shipgame/world_renderer.h"
 
 #include <utility>
 
@@ -88,8 +88,8 @@ Rp world_pipeline{
         },
     .Init =
         [](Rp& rp) {
-          RpAttachVertShader(rp, "nyla/shipgame/shaders/build/vert.spv");
-          RpAttachFragShader(rp, "nyla/shipgame/shaders/build/frag.spv");
+          RpAttachVertShader(rp, "nyla/apps/shipgame/shaders/build/world.vert.spv");
+          RpAttachFragShader(rp, "nyla/apps/shipgame/shaders/build/world.frag.spv");
         },
 };
 
@@ -107,8 +107,8 @@ Rp grid_pipeline{
         },
     .Init =
         [](Rp& rp) {
-          RpAttachVertShader(rp, "nyla/shipgame/shaders/build/grid_vert.spv");
-          RpAttachFragShader(rp, "nyla/shipgame/shaders/build/grid_frag.spv");
+          RpAttachVertShader(rp, "nyla/apps/shipgame/shaders/build/grid.vert.spv");
+          RpAttachFragShader(rp, "nyla/apps/shipgame/shaders/build/grid.frag.spv");
         },
 };
 

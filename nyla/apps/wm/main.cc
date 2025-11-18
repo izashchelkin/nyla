@@ -14,7 +14,7 @@
 #include "nyla/commons/os/timerfd.h"
 #include "nyla/dbus/dbus.h"
 #include "nyla/debugfs/debugfs.h"
-#include "nyla/wm/window_manager.h"
+#include "nyla/apps/wm/window_manager.h"
 #include "nyla/x11/x11.h"
 #include "xcb/xcb.h"
 #include "xcb/xproto.h"

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "nyla/shipgame/game.h"
+#include "nyla/apps/shipgame/game.h"
 
 namespace nyla {
 

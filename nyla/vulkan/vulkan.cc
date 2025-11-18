@@ -5,7 +5,6 @@
 #include <xkbcommon/xkbcommon.h>
 
 #include <array>
-#include <csignal>
 #include <cstdint>
 #include <limits>
 #include <string_view>
@@ -469,7 +468,7 @@ void Vulkan_FrameBegin() {
       vk.shaders_invalidated = false;
 
       LOG(INFO) << "shaders recompiling";
-      system("bash build_shaders.sh");
+      system("python3 scripts/shaders.py");
       vk.shaders_recompile = false;
     }
 

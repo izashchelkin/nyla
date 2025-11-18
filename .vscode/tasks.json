@@ -9,7 +9,7 @@
                 "--compilation_mode=dbg"
             ],
             "targets": [
-                "//nyla/shipgame"
+                "//nyla/apps/shipgame"
             ]
         }
     ]
