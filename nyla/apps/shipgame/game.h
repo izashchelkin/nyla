@@ -14,15 +14,11 @@
 
 namespace nyla {
 
-extern const InputMappingId kRight;
-extern const InputMappingId kLeft;
-extern const InputMappingId kUp;
-extern const InputMappingId kDown;
-extern const InputMappingId kBrake;
-extern const InputMappingId kBoost;
-extern const InputMappingId kFire;
-extern const InputMappingId kZoomLess;
-extern const InputMappingId kZoomMore;
+#define NYLA_SHIPGAME_INPUT_MAPPING(X) X(Right) X(Left) X(Up) X(Down) X(Brake) X(Boost) X(Fire) X(ZoomLess) X(ZoomMore)
+
+#define X(key) extern const InputMappingId k##key;
+NYLA_SHIPGAME_INPUT_MAPPING(X)
+#undef X
 
 struct GameObject {
   enum class Type : uint8_t {

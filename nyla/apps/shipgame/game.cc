@@ -16,15 +16,9 @@
 
 namespace nyla {
 
-const InputMappingId kRight;
-const InputMappingId kLeft;
-const InputMappingId kUp;
-const InputMappingId kDown;
-const InputMappingId kBrake;
-const InputMappingId kBoost;
-const InputMappingId kFire;
-const InputMappingId kZoomLess;
-const InputMappingId kZoomMore;
+#define X(key) const InputMappingId k##key;
+NYLA_SHIPGAME_INPUT_MAPPING(X)
+#undef X
 
 namespace {
 using Vertex = WorldRendererVertex;

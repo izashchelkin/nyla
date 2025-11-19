@@ -49,7 +49,7 @@ struct Vulkan_State {
 };
 extern Vulkan_State vk;
 
-#define VK_GET_INSTANCE_PROC_ADDR(name) reinterpret_cast<PFN_##name>(vkGetInstanceProcAddr(instance, #name))
+#define VK_GET_INSTANCE_PROC_ADDR(name) reinterpret_cast<PFN_##name>(vkGetInstanceProcAddr(vk.instance, #name))
 
 #define VK_CHECK(res) CHECK_EQ(res, VK_SUCCESS) << "Vulkan error: " << VkResultStr(res);
 

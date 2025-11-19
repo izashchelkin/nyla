@@ -1,5 +1,6 @@
 #include "nyla/vulkan/vulkan.h"
 
+#include <dlfcn.h>
 #include <sys/inotify.h>
 #include <unistd.h>
 #include <xkbcommon/xkbcommon.h>
@@ -17,12 +18,22 @@
 
 namespace nyla {
 
-static void CreateSwapchain();
-
 Vulkan_State vk;
 
+static void CreateSwapchain();
+
+#ifndef NDEBUG
+
+static VkBool32 DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
+                                       VkDebugUtilsMessageTypeFlagsEXT message_type,
+                                       const VkDebugUtilsMessengerCallbackDataEXT* callback_data, void* user_data);
+#endif
+
 void Vulkan_Initialize(std::span<const char* const> shader_watch_directories) {
-  vk.instance = []() {
+#ifndef NDEBUG
+#endif
+
+  {
     const VkApplicationInfo app_info{
         .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
         .pApplicationName = "nyla",
@@ -35,11 +46,10 @@ void Vulkan_Initialize(std::span<const char* const> shader_watch_directories) {
     const auto instance_extensions = std::to_array({
         VK_KHR_SURFACE_EXTENSION_NAME,
         VK_KHR_XCB_SURFACE_EXTENSION_NAME,
-        VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
-    });
 
-    const auto validation_layers = std::to_array({
-        "VK_LAYER_KHRONOS_validation",
+#ifndef NDEBUG
+        VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
+#endif
     });
 
 #ifndef NDEBUG
@@ -50,24 +60,14 @@ void Vulkan_Initialize(std::span<const char* const> shader_watch_directories) {
                            VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
         .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
                        VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
-        .pfnUserCallback =
-            [](VkDebugUtilsMessageSeverityFlagBitsEXT message_severity, VkDebugUtilsMessageTypeFlagsEXT message_type,
-               const VkDebugUtilsMessengerCallbackDataEXT* callback_data, void* user_data) {
-              switch (message_severity) {
-                case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT: {
-                  LOG(ERROR) << callback_data->pMessage;
-                  DebugBreak;
-                }
-                case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT: {
-                  LOG(WARNING) << callback_data->pMessage;
-                }
-                default: {
-                  LOG(INFO) << callback_data->pMessage;
-                }
-              }
-              return VK_FALSE;
-            },
+        .pfnUserCallback = DebugMessengerCallback,
     };
+#endif
+
+    std::vector<const char*> layers;
+
+#ifndef NDEBUG
+    layers.emplace_back("VK_LAYER_KHRONOS_validation");
 #endif
 
     const VkInstanceCreateInfo instance_create_info{
@@ -76,24 +76,21 @@ void Vulkan_Initialize(std::span<const char* const> shader_watch_directories) {
         .pNext = &debug_messenger_create_info,
 #endif
         .pApplicationInfo = &app_info,
-        .enabledLayerCount = validation_layers.size(),
-        .ppEnabledLayerNames = validation_layers.data(),
+        .enabledLayerCount = static_cast<uint32_t>(layers.size()),
+        .ppEnabledLayerNames = layers.data(),
         .enabledExtensionCount = instance_extensions.size(),
         .ppEnabledExtensionNames = instance_extensions.data(),
     };
 
-    VkInstance instance;
-    CHECK_EQ(vkCreateInstance(&instance_create_info, nullptr, &instance), VK_SUCCESS);
+    CHECK_EQ(vkCreateInstance(&instance_create_info, nullptr, &vk.instance), VK_SUCCESS);
 
 #ifndef NDEBUG
     VkDebugUtilsMessengerEXT debug_messenger;
-    CHECK_EQ(VK_GET_INSTANCE_PROC_ADDR(vkCreateDebugUtilsMessengerEXT)(instance, &debug_messenger_create_info, nullptr,
-                                                                       &debug_messenger),
+    CHECK_EQ(VK_GET_INSTANCE_PROC_ADDR(vkCreateDebugUtilsMessengerEXT)(vk.instance, &debug_messenger_create_info,
+                                                                       nullptr, &debug_messenger),
              VK_SUCCESS);
 #endif
-
-    return instance;
-  }();
+  };
 
   vk.phys_device = [=]() {
     uint32_t num_phys_devices = 0;
@@ -130,19 +127,23 @@ void Vulkan_Initialize(std::span<const char* const> shader_watch_directories) {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
     });
 
-    VkPhysicalDeviceVulkan13Features v13{
+    VkPhysicalDeviceVulkan14Features v1_4{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES,
+    };
+    VkPhysicalDeviceVulkan13Features v1_3{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
+        .pNext = &v1_4,
         .synchronization2 = VK_TRUE,
         .dynamicRendering = VK_TRUE,
     };
-    VkPhysicalDeviceVulkan12Features v12{
+    VkPhysicalDeviceVulkan12Features v1_2{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
-        .pNext = &v13,
+        .pNext = &v1_3,
         .scalarBlockLayout = VK_TRUE,
     };
     VkPhysicalDeviceFeatures2 features{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-        .pNext = &v12,
+        .pNext = &v1_2,
     };
 
     const VkDeviceCreateInfo device_create_info{
@@ -733,5 +734,25 @@ void Vulkan_CreateBuffer(VkCommandPool command_pool, VkQueue transfer_queue, VkD
   vkDestroyBuffer(vk.device, staging_buffer, nullptr);
   vkFreeMemory(vk.device, staging_buffer_memory, nullptr);
 }
+
+#ifndef NDEBUG
+static VkBool32 DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
+                                       VkDebugUtilsMessageTypeFlagsEXT message_type,
+                                       const VkDebugUtilsMessengerCallbackDataEXT* callback_data, void* user_data) {
+  switch (message_severity) {
+    case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT: {
+      LOG(ERROR) << callback_data->pMessage;
+      DebugBreak;
+    }
+    case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT: {
+      LOG(WARNING) << callback_data->pMessage;
+    }
+    default: {
+      LOG(INFO) << callback_data->pMessage;
+    }
+  }
+  return VK_FALSE;
+}
+#endif
 
 }  // namespace nyla
