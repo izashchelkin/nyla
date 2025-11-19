@@ -3,6 +3,8 @@
 #include "absl/cleanup/cleanup.h"
 #include "nyla/commons/logging/init.h"
 #include "nyla/fwk/gui.h"
+#include "nyla/vulkan/dbg_text_renderer.h"
+#include "nyla/vulkan/render_pipeline.h"
 #include "nyla/vulkan/vulkan.h"
 #include "nyla/x11/x11.h"
 #include "xcb/xproto.h"
@@ -75,10 +77,11 @@ static int Main() {
     xcb_flush(x11.conn);
   }
 
-  const char* shader_watch_dirs[] = {"nyla/apps/shipgame/shaders", "nyla/apps/shipgame/shaders/build"};
+  const char* shader_watch_dirs[] = {"nyla/fwk/shaders", "nyla/fwk/shaders/build"};
   Vulkan_Initialize(shader_watch_dirs);
 
   RpInit(gui_pipeline);
+  RpInit(dbg_text_pipeline);
 
   for (;;) {
     ProcessXEvents();
@@ -90,11 +93,21 @@ static int Main() {
 
     if (vk.shaders_invalidated) {
       RpInit(gui_pipeline);
+      RpInit(dbg_text_pipeline);
       vk.shaders_invalidated = false;
     }
 
+    UI_FrameBegin();
+
     Vulkan_RenderingBegin();
     {
+      RpBegin(gui_pipeline);
+      UI_BoxBegin(50, 50, 200, 120);
+      UI_BoxBegin(-200, 120, -50, 50);  // TODO: fix
+      UI_Text("Hello world");
+
+      RpBegin(dbg_text_pipeline);
+      DbgText(10, 10, "fps= " + std::to_string(int(1.f / vk.current_frame_data.dt)));
     }
     Vulkan_RenderingEnd();
 

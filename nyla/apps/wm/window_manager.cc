@@ -20,7 +20,6 @@
 #include "nyla/apps/wm/screen_saver_inhibitor.h"
 #include "nyla/commons/containers/map.h"
 #include "nyla/commons/memory/optional.h"
-#include "nyla/dbus/dbus.h"
 #include "nyla/debugfs/debugfs.h"
 #include "nyla/x11/error.h"
 #include "nyla/x11/wm_hints.h"
