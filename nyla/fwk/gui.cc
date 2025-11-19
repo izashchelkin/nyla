@@ -26,6 +26,15 @@ Rp gui_pipeline{
             .size = 1 << 20,
             .range = sizeof(Ubo),
         },
+    .vert_buf =
+        {
+            .enabled = true,
+            .size = 1 << 20,
+            .attrs =
+                {
+                    RpVertAttr::Float4,
+                },
+        },
     .Init =
         [](Rp& rp) {
           RpAttachVertShader(rp, "nyla/fwk/shaders/build/gui.vert.spv");

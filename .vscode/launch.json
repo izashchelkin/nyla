@@ -1,7 +1,7 @@
 {
     "configurations": [
         {
-            "name": "(gdb) Launch",
+            "name": "Shipgame",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/bazel-out/k8-dbg/bin/nyla/apps/shipgame/shipgame",
@@ -12,6 +12,31 @@
             "externalConsole": false,
             "MIMode": "gdb",
             "preLaunchTask": "build_shipgame_dbg",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ],
+        },
+        {
+            "name": "GUI Demo",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/bazel-out/k8-dbg/bin/nyla/apps/guidemo/guidemo",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "preLaunchTask": "build_guidemo_dbg",
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",
