@@ -19,7 +19,7 @@
 
 namespace nyla {
 
-static xcb_window_t background_window;
+xcb_window_t background_window;
 
 void DrawBar(std::string_view bar_text) {
   if (vk.shaders_invalidated) {

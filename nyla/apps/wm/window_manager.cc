@@ -834,7 +834,9 @@ void ProcessWMEvents(
       }
       case XCB_EXPOSE: {
         auto expose = reinterpret_cast<xcb_expose_event_t*>(event);
-        // if (expose->window == scene_window) wm_bar_dirty = true;
+        if (expose->window == background_window) {
+          wm_bar_dirty = true;
+        }
         break;
       }
 
@@ -873,39 +875,18 @@ void ProcessWMEvents(
 
 void UpdateBar() {
   wm_bar_dirty = false;
-  if (true) return;
 
-  // const WindowStack& stack = GetActiveStack();
-  // if (stack.zoom) {
-  //   return;
-  // }
-  //
-  // if (vk.shaders_invalidated) {
-  //   RpInit(dbg_text_pipeline);
-  //   vk.shaders_invalidated = false;
-  // }
-  //
-  // Vulkan_FrameBegin();
-  //
-  // Vulkan_RenderingBegin();
-  // {
-  //   RpBegin(dbg_text_pipeline);
-  //
-  //   const std::string& active_client_name = stack.active_window ? wm_clients.at(stack.active_window).name
-  //                                                               : ("nylawm " + std::to_string(wm_active_stack_idx));
-  //
-  //   double load_avg[3];
-  //   getloadavg(load_avg, std::size(load_avg));
-  //
-  //   std::string bar_text =
-  //       absl::StrFormat("%.2f, %.2f, %.2f %s %v", load_avg[0], load_avg[1], load_avg[2],
-  //                       absl::FormatTime("%H:%M:%S %d.%m.%Y", absl::Now(), absl::LocalTimeZone()),
-  //                       active_client_name);
-  //   DbgText(0, 0, bar_text);
-  // }
-  // Vulkan_RenderingEnd();
-  //
-  // Vulkan_FrameEnd();
+  const WindowStack& stack = GetActiveStack();
+  const std::string& active_client_name =
+      stack.active_window ? wm_clients.at(stack.active_window).name : ("nylawm " + std::to_string(wm_active_stack_idx));
+
+  double load_avg[3];
+  getloadavg(load_avg, std::size(load_avg));
+
+  std::string bar_text =
+      absl::StrFormat("%.2f, %.2f, %.2f %s %v", load_avg[0], load_avg[1], load_avg[2],
+                      absl::FormatTime("%H:%M:%S %d.%m.%Y", absl::Now(), absl::LocalTimeZone()), active_client_name);
+  DrawBar(bar_text);
 }
 
 static std::string DumpClients() {
