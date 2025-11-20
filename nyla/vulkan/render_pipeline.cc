@@ -7,6 +7,7 @@
 #include "absl/log/log.h"
 #include "nyla/commons/memory/align.h"
 #include "nyla/commons/memory/charview.h"
+#include "nyla/commons/memory/temp.h"
 #include "nyla/commons/os/readfile.h"
 #include "nyla/vulkan/vulkan.h"
 
@@ -171,38 +172,44 @@ void RpInit(Rp& rp) {
   };
 
   if (rp.vert_buf.enabled) {
-    const VkVertexInputBindingDescription binding_description{
+    auto& binding_description = Tmake<VkVertexInputBindingDescription>({
         .binding = 0,
         .stride = CalcVertexBufferStride(rp),
         .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
-    };
+    });
 
-    std::vector<VkVertexInputAttributeDescription> vertex_attr_descriptions(rp.vert_buf.attrs.size());
+    auto vertex_attr_descriptions = Tarr<VkVertexInputAttributeDescription>(rp.vert_buf.attrs.size());
 
-    {
-      uint32_t offset = 0;
-      for (uint32_t i = 0; i < rp.vert_buf.attrs.size(); ++i) {
-        auto attr = rp.vert_buf.attrs[i];
-        vertex_attr_descriptions[i] = {
-            .location = i,
-            .binding = 0,
-            .format = RpVertAttrVkFormat(attr),
-            .offset = offset,
-        };
-
-        offset += RpVertAttrSize(attr);
-      }
+    uint32_t offset = 0;
+    for (uint32_t i = 0; i < rp.vert_buf.attrs.size(); ++i) {
+      auto attr = rp.vert_buf.attrs[i];
+      vertex_attr_descriptions[i] = {
+          .location = i,
+          .binding = 0,
+          .format = RpVertAttrVkFormat(attr),
+          .offset = offset,
+      };
+      offset += RpVertAttrSize(attr);
     }
 
     vertex_input_create_info.vertexBindingDescriptionCount = 1;
     vertex_input_create_info.pVertexBindingDescriptions = &binding_description;
     vertex_input_create_info.vertexAttributeDescriptionCount = vertex_attr_descriptions.size();
     vertex_input_create_info.pVertexAttributeDescriptions = vertex_attr_descriptions.data();
-
-    rp.pipeline = Vulkan_CreateGraphicsPipeline(vertex_input_create_info, rp.layout, rp.shader_stages);
-  } else {
-    rp.pipeline = Vulkan_CreateGraphicsPipeline(vertex_input_create_info, rp.layout, rp.shader_stages);
   }
+
+  const VkPipelineRasterizationStateCreateInfo rasterizer_create_info{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+      .depthClampEnable = VK_FALSE,
+      .rasterizerDiscardEnable = VK_FALSE,
+      .polygonMode = VK_POLYGON_MODE_FILL,
+      .cullMode = rp.disable_culling ? VK_CULL_MODE_NONE : VK_CULL_MODE_BACK_BIT,
+      .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+      .lineWidth = 1.0f,
+  };
+
+  rp.pipeline =
+      Vulkan_CreateGraphicsPipeline(vertex_input_create_info, rp.layout, rp.shader_stages, rasterizer_create_info);
 }
 
 void RpBegin(Rp& rp) {

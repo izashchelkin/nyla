@@ -104,7 +104,7 @@ static void ProcessXEvents() {
 
 static int Main() {
   InitLogging();
-  TNewInit();
+  TArenaInit();
 
   {
     struct sigaction sa;

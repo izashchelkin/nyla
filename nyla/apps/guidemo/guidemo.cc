@@ -2,6 +2,7 @@
 
 #include "absl/cleanup/cleanup.h"
 #include "nyla/commons/logging/init.h"
+#include "nyla/commons/memory/temp.h"
 #include "nyla/fwk/gui.h"
 #include "nyla/vulkan/dbg_text_renderer.h"
 #include "nyla/vulkan/render_pipeline.h"
@@ -59,6 +60,7 @@ static void ProcessXEvents() {
 
 static int Main() {
   InitLogging();
+  TArenaInit();
 
   X11_Initialize();
 
@@ -103,7 +105,9 @@ static int Main() {
     {
       RpBegin(gui_pipeline);
       UI_BoxBegin(50, 50, 200, 120);
-      UI_BoxBegin(-200, 120, -50, 50);  // TODO: fix
+      UI_BoxBegin(-50, 50, 200, 120);
+      UI_BoxBegin(-50, -50, 200, 120);
+      UI_BoxBegin(50, -50, 200, 120);
       UI_Text("Hello world");
 
       RpBegin(dbg_text_pipeline);

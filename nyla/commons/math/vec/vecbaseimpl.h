@@ -7,14 +7,22 @@
 #include <complex>
 
 #include "absl/log/check.h"
-#include "nyla/commons/memory/tnew.h"
+#include "nyla/commons/memory/temp.h"
 
 namespace nyla {
 
-Vec::operator VecSpanConst() const& { return VecSpanConst{v, kVecDimension}; }
-Vec::operator VecSpan() & { return VecSpan{v, kVecDimension}; }
-Vec::operator VecSpanConst() const&& { return *Tnew_from(std::move(*this)); };
-Vec::operator VecSpan() && { return *Tnew_from(std::move(*this)); };
+Vec::operator VecSpanConst() const& {
+  return VecSpanConst{v, kVecDimension};
+}
+Vec::operator VecSpan() & {
+  return VecSpan{v, kVecDimension};
+}
+Vec::operator VecSpanConst() const&& {
+  return Tmake(std::move(*this));
+};
+Vec::operator VecSpan() && {
+  return Tmake(std::move(*this));
+};
 
 const VecComponentType& nyla__Vec::operator[](size_t i) const {
   CHECK(i < kVecDimension);

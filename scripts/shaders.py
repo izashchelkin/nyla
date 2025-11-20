@@ -1,11 +1,13 @@
 from glob import glob
-from os import system
+from os import makedirs
+from os.path import dirname
 from time import time
+import subprocess
 
 def main():
     srcs = (
         glob("nyla/**/shaders/*.frag", recursive=True) +
-        glob("nyla/*/shaders/*.vert", recursive=True)
+        glob("nyla/**/shaders/*.vert", recursive=True)
     )
 
     for src in srcs:
@@ -13,11 +15,13 @@ def main():
         parts.insert(len(parts) - 1, "build")
         outfile = "/".join(parts) + ".spv"
 
-        system("mkdir -p " + "/".join(parts[0:-1]))
+        makedirs(dirname(outfile), exist_ok=True)
 
         begin = int(time() * 1000)
-        print(src, end=" ")
-        system("glslc " + src + " -o " + outfile)
+
+        cmd = ["glslangValidator", "-V", "-gVS", "-o", outfile, src]
+        subprocess.run(cmd, check=False)
+
         end = int(time() * 1000)
         print(str(end - begin) + "ms")
 

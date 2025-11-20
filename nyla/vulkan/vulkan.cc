@@ -325,7 +325,8 @@ static void CreateSwapchain() {
 
 VkPipeline Vulkan_CreateGraphicsPipeline(const VkPipelineVertexInputStateCreateInfo& vertex_input_create_info,
                                          VkPipelineLayout pipeline_layout,
-                                         std::span<const VkPipelineShaderStageCreateInfo> stages) {
+                                         std::span<const VkPipelineShaderStageCreateInfo> stages,
+                                         VkPipelineRasterizationStateCreateInfo rasterizer_create_info) {
   const VkPipelineInputAssemblyStateCreateInfo input_assembly_create_info{
       .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
       .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
@@ -335,16 +336,6 @@ VkPipeline Vulkan_CreateGraphicsPipeline(const VkPipelineVertexInputStateCreateI
       .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
       .viewportCount = 1,
       .scissorCount = 1,
-  };
-
-  const VkPipelineRasterizationStateCreateInfo rasterizer_create_info{
-      .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-      .depthClampEnable = VK_FALSE,
-      .rasterizerDiscardEnable = VK_FALSE,
-      .polygonMode = VK_POLYGON_MODE_FILL,
-      .cullMode = VK_CULL_MODE_BACK_BIT,
-      .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
-      .lineWidth = 1.0f,
   };
 
   const VkPipelineMultisampleStateCreateInfo multisampling_create_info{

@@ -1,5 +1,7 @@
 #include "nyla/fwk/gui.h"
 
+#include <cstdint>
+
 #include "nyla/commons/math/vec/vec4f.h"
 #include "nyla/commons/memory/charview.h"
 #include "nyla/vulkan/render_pipeline.h"
@@ -20,38 +22,33 @@ void UI_FrameBegin() {
   RpStaticUniformCopy(gui_pipeline, CharViewPtr(&ubo));
 }
 
-void UI_BoxBegin(uint32_t x, uint32_t y, uint32_t width, uint32_t height) {
-  const float xf = x;
-  const float yf = y;
-  const float zf = 0.f;
-  const float wf = 0.f;
+static void UI_BoxBegin(float x, float y, float width, float height) {
+  const float z = 0.f;
+  const float w = 0.f;
 
-#if 1
-  const Vec4f rect[] = {
-      {xf, yf, zf, wf},
-      {xf + width, yf + height, zf, wf},
-      {xf + width, yf, zf, wf},
-      //
-      {xf, yf, zf, wf},
-      {xf, yf + height, zf, wf},
-      {xf + width, yf + height, zf, wf},
-  };
-#else
-  const Vec4f rect[] = {
-      {xf, yf + height, zf, wf},
-      {xf + width, yf, zf, wf},
-      {xf, yf, zf, wf},
-      //
-      {xf + width, yf + height, zf, wf},
-      {xf + width, yf, zf, wf},
-      {xf, yf, zf, wf},
-  };
-#endif
+  if (x < 0.f) {
+    x += vk.surface_extent.width - width;
+  }
+  if (y < 0.f) {
+    y += vk.surface_extent.height - height;
+  }
 
-  RpMesh mesh = RpVertCopy(gui_pipeline, 6, CharViewSpan(std::span{rect, 6}));
+  const Vec4f rect[] = {
+      {x, y, z, w},
+      {x + width, y + height, z, w},
+      {x + width, y, z, w},
+      //
+      {x, y, z, w},
+      {x, y + height, z, w},
+      {x + width, y + height, z, w},
+  };
+
+  RpMesh mesh = RpVertCopy(gui_pipeline, std::size(rect), CharViewSpan(std::span{rect, std::size(rect)}));
   RpDraw(gui_pipeline, mesh, {});
+}
 
-  //
+void UI_BoxBegin(int32_t x, int32_t y, uint32_t width, uint32_t height) {
+  UI_BoxBegin((float)x, (float)y, (float)width, (float)height);
 }
 
 void UI_Text(std::string_view text) {
@@ -60,6 +57,7 @@ void UI_Text(std::string_view text) {
 
 Rp gui_pipeline{
     .name = "GUI",
+    .disable_culling = true,
     .static_uniform =
         {
             .enabled = true,

@@ -71,7 +71,8 @@ void Vulkan_CreateBuffer(VkCommandPool command_pool, VkQueue transfer_queue, VkD
 
 VkPipeline Vulkan_CreateGraphicsPipeline(const VkPipelineVertexInputStateCreateInfo& vertex_input_create_info,
                                          VkPipelineLayout pipeline_layout,
-                                         std::span<const VkPipelineShaderStageCreateInfo> stages);
+                                         std::span<const VkPipelineShaderStageCreateInfo> stages,
+                                         VkPipelineRasterizationStateCreateInfo rasterizer_create_info);
 
 VkShaderModule Vulkan_CreateShaderModule(const std::vector<char>& code);
 

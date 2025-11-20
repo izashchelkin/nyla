@@ -36,6 +36,7 @@ struct Rp {
   std::vector<VkDescriptorSet> desc_sets;
   std::vector<VkPipelineShaderStageCreateInfo> shader_stages;
 
+  bool disable_culling;
   RpBuf static_uniform;
   RpBuf dynamic_uniform;
   RpBuf vert_buf;

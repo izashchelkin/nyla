@@ -47,6 +47,7 @@ void DbgText(int32_t x, int32_t y, std::string_view text) {
 
 Rp dbg_text_pipeline{
     .name = "DbgText",
+    .disable_culling = true,
     .dynamic_uniform =
         {
             .enabled = true,
