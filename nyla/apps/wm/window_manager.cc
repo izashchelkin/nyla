@@ -7,6 +7,7 @@
 #include <iterator>
 #include <limits>
 #include <span>
+#include <thread>
 #include <variant>
 #include <vector>
 
@@ -18,9 +19,12 @@
 #include "nyla/apps/wm/layout.h"
 #include "nyla/apps/wm/palette.h"
 #include "nyla/apps/wm/screen_saver_inhibitor.h"
+#include "nyla/apps/wm/wm_background.h"
 #include "nyla/commons/containers/map.h"
 #include "nyla/commons/memory/optional.h"
 #include "nyla/debugfs/debugfs.h"
+#include "nyla/vulkan/dbg_text_renderer.h"
+#include "nyla/vulkan/vulkan.h"
 #include "nyla/x11/error.h"
 #include "nyla/x11/wm_hints.h"
 #include "nyla/x11/x11.h"
@@ -67,10 +71,7 @@ void AbslStringify(Sink& sink, const Client& c) {
 }
 
 static uint32_t wm_bar_height = 20;
-static xcb_window_t wm_bar_window;
-static xcb_gcontext_t wm_bar_gc;
 bool wm_bar_dirty;
-bool wm_bar_hidden;
 
 static bool wm_layout_dirty;
 static bool wm_follow;
@@ -176,39 +177,6 @@ void InitializeWM() {
   wm_property_change_handlers.try_emplace(XCB_ATOM_WM_NAME, Handle_WM_Name);
   wm_property_change_handlers.try_emplace(x11.atoms.wm_protocols, Handle_WM_Protocols);
   wm_property_change_handlers.try_emplace(XCB_ATOM_WM_TRANSIENT_FOR, Handle_WM_Transient_For);
-
-  wm_bar_window = xcb_generate_id(x11.conn);
-
-  if (xcb_request_check(x11.conn,
-                        xcb_create_window_checked(x11.conn, XCB_COPY_FROM_PARENT, wm_bar_window, x11.screen->root, 0, 0,
-                                                  x11.screen->width_in_pixels, wm_bar_height, 0,
-                                                  XCB_WINDOW_CLASS_INPUT_OUTPUT, x11.screen->root_visual,
-                                                  XCB_CW_BACK_PIXEL | XCB_CW_OVERRIDE_REDIRECT | XCB_CW_EVENT_MASK,
-                                                  (uint32_t[]){
-                                                      x11.screen->black_pixel,
-                                                      true,
-                                                      XCB_EVENT_MASK_EXPOSURE,
-                                                  }))) {
-    LOG(ERROR) << "could not create bar window";
-  }
-
-  xcb_map_window(x11.conn, wm_bar_window);
-
-  constexpr const char* kFontName = "fixed";
-
-  xcb_font_t font = xcb_generate_id(x11.conn);
-
-  if (xcb_request_check(x11.conn, xcb_open_font_checked(x11.conn, font, strlen(kFontName), kFontName))) {
-    LOG(ERROR) << "could not create bar font";
-  }
-
-  wm_bar_gc = xcb_generate_id(x11.conn);
-  if (xcb_request_check(
-          x11.conn,
-          xcb_create_gc_checked(x11.conn, wm_bar_gc, wm_bar_window, XCB_GC_FOREGROUND | XCB_GC_BACKGROUND | XCB_GC_FONT,
-                                (uint32_t[]){x11.screen->white_pixel, x11.screen->black_pixel, font}))) {
-    LOG(ERROR) << "could not create bar GC";
-  }
 
   DebugFsRegister(
       "windows", nullptr,                                //
@@ -866,7 +834,7 @@ void ProcessWMEvents(
       }
       case XCB_EXPOSE: {
         auto expose = reinterpret_cast<xcb_expose_event_t*>(event);
-        if (expose->window == wm_bar_window) wm_bar_dirty = true;
+        // if (expose->window == scene_window) wm_bar_dirty = true;
         break;
       }
 
@@ -905,35 +873,39 @@ void ProcessWMEvents(
 
 void UpdateBar() {
   wm_bar_dirty = false;
+  if (true) return;
 
-  const WindowStack& stack = GetActiveStack();
-
-  if (stack.zoom) {
-    if (!wm_bar_hidden) {
-      xcb_unmap_window(x11.conn, wm_bar_window);
-      wm_bar_hidden = true;
-    }
-
-    return;
-  }
-
-  if (wm_bar_hidden) {
-    xcb_map_window(x11.conn, wm_bar_window);
-    wm_bar_hidden = false;
-  }
-
-  const std::string& active_client_name =
-      stack.active_window ? wm_clients.at(stack.active_window).name : ("nylawm " + std::to_string(wm_active_stack_idx));
-
-  double load_avg[3];
-  getloadavg(load_avg, std::size(load_avg));
-
-  std::string bar_text =
-      absl::StrFormat("%.2f, %.2f, %.2f %s %v", load_avg[0], load_avg[1], load_avg[2],
-                      absl::FormatTime("%H:%M:%S %d.%m.%Y", absl::Now(), absl::LocalTimeZone()), active_client_name);
-
-  xcb_clear_area(x11.conn, 0, wm_bar_window, 0, 0, x11.screen->width_in_pixels, wm_bar_height);
-  xcb_image_text_8(x11.conn, bar_text.size(), wm_bar_window, wm_bar_gc, 8, 16, bar_text.data());
+  // const WindowStack& stack = GetActiveStack();
+  // if (stack.zoom) {
+  //   return;
+  // }
+  //
+  // if (vk.shaders_invalidated) {
+  //   RpInit(dbg_text_pipeline);
+  //   vk.shaders_invalidated = false;
+  // }
+  //
+  // Vulkan_FrameBegin();
+  //
+  // Vulkan_RenderingBegin();
+  // {
+  //   RpBegin(dbg_text_pipeline);
+  //
+  //   const std::string& active_client_name = stack.active_window ? wm_clients.at(stack.active_window).name
+  //                                                               : ("nylawm " + std::to_string(wm_active_stack_idx));
+  //
+  //   double load_avg[3];
+  //   getloadavg(load_avg, std::size(load_avg));
+  //
+  //   std::string bar_text =
+  //       absl::StrFormat("%.2f, %.2f, %.2f %s %v", load_avg[0], load_avg[1], load_avg[2],
+  //                       absl::FormatTime("%H:%M:%S %d.%m.%Y", absl::Now(), absl::LocalTimeZone()),
+  //                       active_client_name);
+  //   DbgText(0, 0, bar_text);
+  // }
+  // Vulkan_RenderingEnd();
+  //
+  // Vulkan_FrameEnd();
 }
 
 static std::string DumpClients() {

@@ -1,20 +1,25 @@
+#include <signal.h>
 #include <sys/poll.h>
 #include <sys/time.h>
 #include <unistd.h>
 
 #include <chrono>
 #include <cstdint>
+#include <future>
+#include <thread>
 #include <variant>
 
 #include "absl/cleanup/cleanup.h"
 #include "absl/log/check.h"
 #include "absl/log/log.h"
+#include "nyla/apps/wm/window_manager.h"
+#include "nyla/apps/wm/wm_background.h"
 #include "nyla/commons/logging/init.h"
+#include "nyla/commons/memory/temp.h"
 #include "nyla/commons/os/spawn.h"
 #include "nyla/commons/os/timerfd.h"
 #include "nyla/dbus/dbus.h"
 #include "nyla/debugfs/debugfs.h"
-#include "nyla/apps/wm/window_manager.h"
 #include "nyla/x11/x11.h"
 #include "xcb/xcb.h"
 #include "xcb/xproto.h"
@@ -22,7 +27,19 @@
 namespace nyla {
 
 int Main(int argc, char** argv) {
+  {
+    struct sigaction sa;
+    sa.sa_handler = [](int signum) { CHECK(false); };
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART;
+    if (sigaction(SIGINT, &sa, NULL) == -1) {
+      LOG(ERROR) << "sigaction failed";
+      return false;
+    }
+  }
+
   InitLogging();
+  TArenaInit();
 
   bool is_running = true;
 
@@ -30,17 +47,13 @@ int Main(int argc, char** argv) {
 
   xcb_grab_server(x11.conn);
 
-  if (xcb_request_check(
-          x11.conn,
-          xcb_change_window_attributes_checked(
-              x11.conn, x11.screen->root, XCB_CW_EVENT_MASK,
-              (uint32_t[]){
-                  XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT |
-                  XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY |
-                  XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_KEY_RELEASE |
-                  XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE |
-                  XCB_EVENT_MASK_FOCUS_CHANGE |
-                  XCB_EVENT_MASK_POINTER_MOTION}))) {
+  if (xcb_request_check(x11.conn,
+                        xcb_change_window_attributes_checked(
+                            x11.conn, x11.screen->root, XCB_CW_EVENT_MASK,
+                            (uint32_t[]){XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT | XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY |
+                                         XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_KEY_RELEASE |
+                                         XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE |
+                                         XCB_EVENT_MASK_FOCUS_CHANGE | XCB_EVENT_MASK_POINTER_MOTION}))) {
     LOG(QFATAL) << "another wm is already running";
   }
 
@@ -49,10 +62,7 @@ int Main(int argc, char** argv) {
   InitializeWM();
 
   uint16_t modifier = XCB_MOD_MASK_4;
-  std::vector<
-      std::pair<xcb_keycode_t,
-                std::variant<void (*)(xcb_timestamp_t timestamp), void (*)()>>>
-      keybinds;
+  std::vector<std::pair<xcb_keycode_t, std::variant<void (*)(xcb_timestamp_t timestamp), void (*)()>>> keybinds;
 
   {
     X11_KeyResolver key_resolver;
@@ -61,39 +71,31 @@ int Main(int argc, char** argv) {
     // W
     keybinds.emplace_back(X11_ResolveKeyCode(key_resolver, "AD02"), NextLayout);
     // E
-    keybinds.emplace_back(X11_ResolveKeyCode(key_resolver, "AD03"),
-                          MoveStackPrev);
+    keybinds.emplace_back(X11_ResolveKeyCode(key_resolver, "AD03"), MoveStackPrev);
     // R
-    keybinds.emplace_back(X11_ResolveKeyCode(key_resolver, "AD04"),
-                          MoveStackNext);
+    keybinds.emplace_back(X11_ResolveKeyCode(key_resolver, "AD04"), MoveStackNext);
     // D
-    keybinds.emplace_back(X11_ResolveKeyCode(key_resolver, "AC03"),
-                          MoveLocalPrev);
+    keybinds.emplace_back(X11_ResolveKeyCode(key_resolver, "AC03"), MoveLocalPrev);
     // F
-    keybinds.emplace_back(X11_ResolveKeyCode(key_resolver, "AC04"),
-                          MoveLocalNext);
+    keybinds.emplace_back(X11_ResolveKeyCode(key_resolver, "AC04"), MoveLocalNext);
     // G
     keybinds.emplace_back(X11_ResolveKeyCode(key_resolver, "AC05"), ToggleZoom);
     // X
-    keybinds.emplace_back(X11_ResolveKeyCode(key_resolver, "AB02"),
-                          CloseActive);
+    keybinds.emplace_back(X11_ResolveKeyCode(key_resolver, "AB02"), CloseActive);
     // V
-    keybinds.emplace_back(X11_ResolveKeyCode(key_resolver, "AB04"),
-                          ToggleFollow);
+    keybinds.emplace_back(X11_ResolveKeyCode(key_resolver, "AB04"), ToggleFollow);
     // T
-    keybinds.emplace_back(
-        X11_ResolveKeyCode(key_resolver, "AD05"),
-        [](xcb_timestamp_t time) { Spawn({{"ghostty", nullptr}}); });
+    keybinds.emplace_back(X11_ResolveKeyCode(key_resolver, "AD05"),
+                          [](xcb_timestamp_t time) { Spawn({{"ghostty", nullptr}}); });
     // S
-    keybinds.emplace_back(
-        X11_ResolveKeyCode(key_resolver, "AC02"),
-        [](xcb_timestamp_t time) { Spawn({{"dmenu_run", nullptr}}); });
+    keybinds.emplace_back(X11_ResolveKeyCode(key_resolver, "AC02"),
+                          [](xcb_timestamp_t time) { Spawn({{"dmenu_run", nullptr}}); });
 
     X11_FreeKeyResolver(key_resolver);
 
     for (const auto& [keycode, _] : keybinds) {
-      xcb_grab_key(x11.conn, false, x11.screen->root, XCB_MOD_MASK_4, keycode,
-                   XCB_GRAB_MODE_ASYNC, XCB_GRAB_MODE_ASYNC);
+      xcb_grab_key(x11.conn, false, x11.screen->root, XCB_MOD_MASK_4, keycode, XCB_GRAB_MODE_ASYNC,
+                   XCB_GRAB_MODE_ASYNC);
     }
   }
 
@@ -129,6 +131,15 @@ int Main(int argc, char** argv) {
 
   xcb_ungrab_server(x11.conn);
 
+  auto init_background_future = std::async(std::launch::async, [] { InitWMBackground(); });
+  while (is_running && !xcb_connection_has_error(x11.conn)) {
+    ProcessWMEvents(is_running, modifier, keybinds);
+    using namespace std::chrono_literals;
+    if (init_background_future.wait_for(0ms) == std::future_status::ready) {
+      break;
+    }
+  }
+
   while (is_running && !xcb_connection_has_error(x11.conn)) {
     DBus_Process();
 
@@ -163,4 +174,6 @@ int Main(int argc, char** argv) {
 
 }  // namespace nyla
 
-int main(int argc, char** argv) { return nyla::Main(argc, argv); }
+int main(int argc, char** argv) {
+  return nyla::Main(argc, argv);
+}

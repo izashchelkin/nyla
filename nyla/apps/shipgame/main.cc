@@ -14,7 +14,7 @@
 #include "nyla/commons/containers/map.h"
 #include "nyla/commons/containers/set.h"
 #include "nyla/commons/logging/init.h"
-#include "nyla/commons/memory/tnew.h"
+#include "nyla/commons/memory/temp.h"
 #include "nyla/commons/os/clock.h"
 #include "nyla/fwk/input.h"
 #include "nyla/vulkan/dbg_text_renderer.h"

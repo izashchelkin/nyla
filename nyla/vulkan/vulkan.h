@@ -53,7 +53,7 @@ extern Vulkan_State vk;
 
 #define VK_CHECK(res) CHECK_EQ(res, VK_SUCCESS) << "Vulkan error: " << VkResultStr(res);
 
-void Vulkan_Initialize(std::span<const char* const> shader_watch_directories);
+void Vulkan_Initialize(const char* appname, std::span<const char* const> shader_watch_directories);
 
 void Vulkan_PlatformSetSurface();
 VkExtent2D Vulkan_PlatformGetWindowExtent();

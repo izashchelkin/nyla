@@ -51,6 +51,31 @@
                     "ignoreFailures": true
                 }
             ],
+        },
+        {
+            "name": "Window Manager Background",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/bazel-out/k8-dbg/bin/nyla/apps/wm/wmbackground",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "/home/izashchelkin",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "preLaunchTask": "build_wm_background_dbg",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ],
         }
     ]
 }

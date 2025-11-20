@@ -5,7 +5,7 @@ cc_import(
     hdrs = glob([
         "vulkansdk/x86_64/include/**/*.h",
     ]),
-    shared_library = "vulkansdk/x86_64/lib/libvulkan.so.1",
+    # shared_library = "vulkansdk/x86_64/lib/libvulkan.so.1",
     strip_include_prefix = "vulkansdk/x86_64/include/",
     visibility = ["//visibility:public"],
     deps = [],

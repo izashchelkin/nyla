@@ -11,6 +11,7 @@
 #include "xcb/xcb.h"
 #include "xcb/xcb_aux.h"
 #include "xcb/xinput.h"
+#include "xcb/xproto.h"
 #include "xkbcommon/xkbcommon-x11.h"
 #include "xkbcommon/xkbcommon.h"
 
@@ -38,7 +39,9 @@ X11_State x11;
 void X11_Initialize() {
   int iscreen;
   x11.conn = xcb_connect(nullptr, &iscreen);
-  if (xcb_connection_has_error(x11.conn)) LOG(QFATAL) << "could not connect to X server";
+  if (xcb_connection_has_error(x11.conn)) {
+    LOG(QFATAL) << "could not connect to X server";
+  }
 
   x11.screen = xcb_aux_get_screen(x11.conn, iscreen);
   CHECK(x11.screen);
@@ -94,6 +97,24 @@ void X11_Initialize() {
       LOG(QFATAL) << "could not setup XI2 extension";
     }
   }
+}
+
+xcb_window_t X11_CreateWindow(uint32_t width, uint32_t height, bool override_redirect, xcb_event_mask_t event_mask) {
+  const xcb_window_t window = xcb_generate_id(x11.conn);
+
+  xcb_create_window(x11.conn, XCB_COPY_FROM_PARENT, window, x11.screen->root, 0, 0, width, height, 0,
+                    XCB_WINDOW_CLASS_INPUT_OUTPUT, x11.screen->root_visual,
+                    XCB_CW_BACK_PIXEL | XCB_CW_OVERRIDE_REDIRECT | XCB_CW_EVENT_MASK,
+                    (uint32_t[]){0, override_redirect, event_mask});
+
+  xcb_configure_window(x11.conn, window, XCB_CONFIG_WINDOW_STACK_MODE, (uint32_t[]){XCB_STACK_MODE_BELOW});
+  xcb_map_window(x11.conn, window);
+
+  return window;
+}
+
+void X11_Flush() {
+  xcb_flush(x11.conn);
 }
 
 xcb_atom_t X11_InternAtom(xcb_connection_t* conn, std::string_view name,

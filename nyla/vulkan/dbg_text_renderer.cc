@@ -56,8 +56,8 @@ Rp dbg_text_pipeline{
         },
     .Init =
         [](Rp& rp) {
-          RpAttachVertShader(rp, "nyla/vulkan/shaders/build/dbgtext.vert.spv");
-          RpAttachFragShader(rp, "nyla/vulkan/shaders/build/dbgtext.frag.spv");
+          RpAttachVertShader(rp, "/home/izashchelkin/nyla/nyla/vulkan/shaders/build/dbgtext.vert.spv");
+          RpAttachFragShader(rp, "/home/izashchelkin/nyla/nyla/vulkan/shaders/build/dbgtext.frag.spv");
         },
 };
 

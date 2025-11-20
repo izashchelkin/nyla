@@ -29,14 +29,14 @@ static VkBool32 DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT me
                                        const VkDebugUtilsMessengerCallbackDataEXT* callback_data, void* user_data);
 #endif
 
-void Vulkan_Initialize(std::span<const char* const> shader_watch_directories) {
+void Vulkan_Initialize(const char* appname, std::span<const char* const> shader_watch_directories) {
 #ifndef NDEBUG
 #endif
 
   {
     const VkApplicationInfo app_info{
         .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
-        .pApplicationName = "nyla",
+        .pApplicationName = appname,
         .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
         .pEngineName = "nyla",
         .engineVersion = VK_MAKE_VERSION(1, 0, 0),
@@ -66,7 +66,7 @@ void Vulkan_Initialize(std::span<const char* const> shader_watch_directories) {
 
     std::vector<const char*> layers;
 
-#ifndef NDEBUG
+#if 0
     layers.emplace_back("VK_LAYER_KHRONOS_validation");
 #endif
 
@@ -460,7 +460,7 @@ void Vulkan_FrameBegin() {
       vk.shaders_invalidated = false;
 
       LOG(INFO) << "shaders recompiling";
-      system("python3 scripts/shaders.py");
+      system("python3 /home/izashchelkin/nyla/scripts/shaders.py");
       vk.shaders_recompile = false;
     }
 

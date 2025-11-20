@@ -8,17 +8,27 @@ cc_binary(
             "*.h",
         ],
     ),
+    defines = ["NYLA_ENTRYPOINT"],
     linkopts = [
+        "-lvulkan",
         "-lxcb-screensaver",
     ],
     deps = [
-        "//nyla/commons",
         "//nyla/dbus",
         "//nyla/debugfs",
-        "//nyla/x11",
-        "@abseil-cpp//absl/container:flat_hash_map",
-        "@abseil-cpp//absl/log",
-        "@abseil-cpp//absl/log:check",
-        "@abseil-cpp//absl/log:initialize",
+        "//nyla/fwk",
+    ],
+)
+
+cc_binary(
+    name = "wmbackground",
+    srcs = glob([
+        "wm_background.cc",
+        "wm_background.h",
+    ]),
+    deps = [
+        "//nyla/dbus",
+        "//nyla/debugfs",
+        "//nyla/fwk",
     ],
 )
