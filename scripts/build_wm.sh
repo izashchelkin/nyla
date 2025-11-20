@@ -1,0 +1,1 @@
+bazel build //nyla/apps/wm --compilation_mode=dbg
