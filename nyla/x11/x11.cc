@@ -104,10 +104,8 @@ xcb_window_t X11_CreateWindow(uint32_t width, uint32_t height, bool override_red
 
   xcb_create_window(x11.conn, XCB_COPY_FROM_PARENT, window, x11.screen->root, 0, 0, width, height, 0,
                     XCB_WINDOW_CLASS_INPUT_OUTPUT, x11.screen->root_visual,
-                    XCB_CW_BACK_PIXEL | XCB_CW_OVERRIDE_REDIRECT | XCB_CW_EVENT_MASK,
-                    (uint32_t[]){0, override_redirect, event_mask});
+                    XCB_CW_OVERRIDE_REDIRECT | XCB_CW_EVENT_MASK, (uint32_t[]){override_redirect, event_mask});
 
-  xcb_configure_window(x11.conn, window, XCB_CONFIG_WINDOW_STACK_MODE, (uint32_t[]){XCB_STACK_MODE_BELOW});
   xcb_map_window(x11.conn, window);
 
   return window;

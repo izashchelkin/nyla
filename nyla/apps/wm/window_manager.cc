@@ -886,7 +886,7 @@ void UpdateBar() {
   std::string bar_text =
       absl::StrFormat("%.2f, %.2f, %.2f %s %v", load_avg[0], load_avg[1], load_avg[2],
                       absl::FormatTime("%H:%M:%S %d.%m.%Y", absl::Now(), absl::LocalTimeZone()), active_client_name);
-  DrawBar(bar_text);
+  DrawBackground(wm_clients.size(), bar_text);
 }
 
 static std::string DumpClients() {

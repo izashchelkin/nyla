@@ -80,7 +80,7 @@ static int Main() {
   }
 
   const char* shader_watch_dirs[] = {"nyla/fwk/shaders", "nyla/fwk/shaders/build"};
-  Vulkan_Initialize(shader_watch_dirs);
+  Vulkan_Initialize("guidemo", shader_watch_dirs);
 
   RpInit(gui_pipeline);
   RpInit(dbg_text_pipeline);

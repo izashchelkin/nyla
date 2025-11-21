@@ -4,6 +4,7 @@ cc_binary(
         "*.cc",
         "*.h",
     ]),
+    linkopts = ["-lvulkan"],
     deps = [
         "//nyla/fwk",
         "@abseil-cpp//absl/log",

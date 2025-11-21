@@ -135,7 +135,7 @@ static int Main() {
   }
 
   const char* shader_watch_dirs[] = {"nyla/apps/shipgame/shaders", "nyla/apps/shipgame/shaders/build"};
-  Vulkan_Initialize(shader_watch_dirs);
+  Vulkan_Initialize("shipgame", shader_watch_dirs);
 
   {
     X11_KeyResolver key_resolver;
