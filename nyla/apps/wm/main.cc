@@ -5,8 +5,6 @@
 
 #include <chrono>
 #include <cstdint>
-#include <future>
-#include <thread>
 #include <variant>
 
 #include "absl/cleanup/cleanup.h"
@@ -14,6 +12,7 @@
 #include "absl/log/log.h"
 #include "nyla/apps/wm/window_manager.h"
 #include "nyla/apps/wm/wm_background.h"
+#include "nyla/commons/future.h"
 #include "nyla/commons/logging/init.h"
 #include "nyla/commons/memory/temp.h"
 #include "nyla/commons/os/spawn.h"
@@ -102,9 +101,6 @@ int Main(int argc, char** argv) {
   using namespace std::chrono_literals;
   int tfd = MakeTimerFd(501ms);
 
-  if (!tfd) LOG(QFATAL) << "MakeTimerFdMillis";
-  absl::Cleanup tfd_closer = [tfd] { close(tfd); };
-
   ManageClientsStartup();
 
   std::vector<pollfd> fds;
@@ -113,11 +109,14 @@ int Main(int argc, char** argv) {
       .events = POLLIN,
   });
   fds.emplace_back(pollfd{
-      .fd = tfd,
+      .fd = debugfs.fd,
       .events = POLLIN,
   });
+
+  if (!tfd) LOG(QFATAL) << "MakeTimerFdMillis";
+  absl::Cleanup tfd_closer = [tfd] { close(tfd); };
   fds.emplace_back(pollfd{
-      .fd = debugfs.fd,
+      .fd = tfd,
       .events = POLLIN,
   });
 
@@ -129,45 +128,59 @@ int Main(int argc, char** argv) {
         LOG(INFO) << "exit requested";
       });
 
+  xcb_flush(x11.conn);
   xcb_ungrab_server(x11.conn);
 
-  auto init_background_future = std::async(std::launch::async, [] { InitWMBackground(); });
-  while (is_running && !xcb_connection_has_error(x11.conn)) {
-    ProcessWMEvents(is_running, modifier, keybinds);
-    using namespace std::chrono_literals;
-    if (init_background_future.wait_for(0ms) == std::future_status::ready) {
-      break;
+  //
+
+  {
+    std::future<void> fut = InitWMBackground();
+    while (!IsFutureReady(fut) && is_running && !xcb_connection_has_error(x11.conn)) {
+      if (poll(fds.data(), fds.size(), -1) == -1) {
+        continue;
+      }
+
+      if (fds[0].revents & POLLIN) {
+        ProcessWMEvents(is_running, modifier, keybinds);
+        ProcessWM();
+        xcb_flush(x11.conn);
+      }
     }
   }
 
-  while (is_running && !xcb_connection_has_error(x11.conn)) {
-    DBus_Process();
+  {
+    while (is_running && !xcb_connection_has_error(x11.conn)) {
+      if (poll(fds.data(), fds.size(), -1) == -1) {
+        continue;
+      }
 
-    xcb_flush(x11.conn);
-    ProcessWM();
-    xcb_flush(x11.conn);
+      if (fds[0].revents & POLLIN) {
+        ProcessWMEvents(is_running, modifier, keybinds);
+        ProcessWM();
+        xcb_flush(x11.conn);
+      }
 
-    if (poll(fds.data(), fds.size(), -1) == -1) {
-      continue;
-    }
+      if (fds[1].revents & POLLIN) {
+        DebugFsProcess();
+      }
 
-    if (fds[0].revents & POLLIN) {
-      ProcessWMEvents(is_running, modifier, keybinds);
-    }
+      if (fds[2].revents & POLLIN) {
+        uint64_t expirations;
+        read(tfd, &expirations, sizeof(expirations));
+        if (expirations > 0) {
+          wm_background_dirty = true;
+        }
+      }
 
-    const bool update_bar = fds[1].revents & POLLIN;
-    if (update_bar) {
-      uint64_t expirations;
-      read(tfd, &expirations, sizeof(expirations));
-    }
-    if (update_bar || wm_bar_dirty) {
-      UpdateBar();
-    }
+      if (wm_background_dirty) {
+        UpdateBackground();
+      }
 
-    if (fds[2].revents & POLLIN) {
-      DebugFsProcess();
+      DBus_Process();
     }
   }
+
+  //
 
   return 0;
 }

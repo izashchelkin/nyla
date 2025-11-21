@@ -71,7 +71,7 @@ void AbslStringify(Sink& sink, const Client& c) {
 }
 
 static uint32_t wm_bar_height = 20;
-bool wm_bar_dirty;
+bool wm_background_dirty;
 
 static bool wm_layout_dirty;
 static bool wm_follow;
@@ -227,7 +227,7 @@ static void Activate(WindowStack& stack, xcb_window_t client_window, xcb_timesta
   if (stack.active_window != client_window) {
     ApplyBorder(x11.conn, stack.active_window, Color::kNone);
     stack.active_window = client_window;
-    wm_bar_dirty = true;
+    wm_background_dirty = true;
   }
 
   Activate(stack, time);
@@ -462,7 +462,7 @@ static void MoveStack(xcb_timestamp_t time, auto compute_idx) {
 
   if (iold == inew) return;
 
-  wm_bar_dirty = true;
+  wm_background_dirty = true;
 
   WindowStack& oldstack = GetActiveStack();
   wm_active_stack_idx = inew;
@@ -570,7 +570,7 @@ void CloseActive() {
 void ToggleZoom() {
   WindowStack& stack = GetActiveStack();
   stack.zoom ^= 1;
-  wm_bar_dirty = true;
+  wm_background_dirty = true;
   wm_layout_dirty = true;
   wm_border_dirty = true;
 }
@@ -835,7 +835,7 @@ void ProcessWMEvents(
       case XCB_EXPOSE: {
         auto expose = reinterpret_cast<xcb_expose_event_t*>(event);
         if (expose->window == background_window) {
-          wm_bar_dirty = true;
+          wm_background_dirty = true;
         }
         break;
       }
@@ -873,8 +873,8 @@ void ProcessWMEvents(
   }
 }
 
-void UpdateBar() {
-  wm_bar_dirty = false;
+void UpdateBackground() {
+  wm_background_dirty = false;
 
   const WindowStack& stack = GetActiveStack();
   const std::string& active_client_name =

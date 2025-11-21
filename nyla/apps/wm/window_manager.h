@@ -8,7 +8,7 @@
 
 namespace nyla {
 
-extern bool wm_bar_dirty;
+extern bool wm_background_dirty;
 
 //
 
@@ -21,7 +21,7 @@ void ProcessWMEvents(
         keybinds);
 
 void ProcessWM();
-void UpdateBar();
+void UpdateBackground();
 
 void ManageClientsStartup();
 

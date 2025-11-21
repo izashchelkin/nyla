@@ -5,12 +5,11 @@
 #include <unistd.h>
 
 #include <cstdint>
-#include <span>
+#include <future>
 
 #include "nyla/commons/containers/map.h"
 #include "nyla/commons/logging/init.h"
 #include "nyla/commons/memory/optional.h"
-#include "nyla/commons/memory/temp.h"
 #include "nyla/fwk/gui.h"
 #include "nyla/vulkan/dbg_text_renderer.h"
 #include "nyla/vulkan/vulkan.h"
@@ -47,34 +46,14 @@ void DrawBackground(uint32_t num_clients, std::string_view bar_text) {
   Vulkan_FrameEnd();
 }
 
-void InitWMBackground() {
+std::future<void> InitWMBackground() {
   background_window =
       X11_CreateWindow(x11.screen->width_in_pixels, x11.screen->height_in_pixels, true, XCB_EVENT_MASK_EXPOSURE);
   xcb_configure_window(x11.conn, background_window, XCB_CONFIG_WINDOW_STACK_MODE, (uint32_t[]){XCB_STACK_MODE_BELOW});
   X11_Flush();
 
-  Vulkan_Initialize("wm_background", {});
-
-  RpInit(dbg_text_pipeline);
-  RpInit(gui_pipeline);
+  return std::async(std::launch::async, [] { Vulkan_Initialize("wm_background", {}); });
 }
-
-#if !defined(NYLA_ENTRYPOINT)
-static int Main() {
-  InitLogging();
-  TArenaInit();
-
-  X11_Initialize();
-
-  InitWMBackground();
-
-  for (;;) {
-    DrawBackground(5, "Hello world");
-  }
-
-  return 0;
-}
-#endif
 
 VkExtent2D Vulkan_PlatformGetWindowExtent() {
   xcb_get_geometry_reply_t* window_geometry =
@@ -93,13 +72,3 @@ void Vulkan_PlatformSetSurface() {
 }
 
 }  // namespace nyla
-
-#if !defined(NYLA_ENTRYPOINT)
-int main() {
-  return nyla::Main();
-}
-#endif
-
-#if !defined(NYLA_ENTRYPOINT)
-#define NYLA_ENTRYPOINT
-#endif
