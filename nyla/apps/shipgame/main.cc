@@ -31,9 +31,14 @@ uint16_t ientity;
 static bool running = true;
 static xcb_window_t window;
 
+static xcb_connection_t* GetVkXcbConn() {
+  static xcb_connection_t* vk_xcb_conn = xcb_connect(nullptr, nullptr);
+  return vk_xcb_conn;
+}
+
 VkExtent2D Vulkan_PlatformGetWindowExtent() {
-  xcb_get_geometry_reply_t* window_geometry =
-      xcb_get_geometry_reply(x11.conn, xcb_get_geometry(x11.conn, window), nullptr);
+  xcb_connection_t* conn = GetVkXcbConn();
+  xcb_get_geometry_reply_t* window_geometry = xcb_get_geometry_reply(conn, xcb_get_geometry(conn, window), nullptr);
 
   return {.width = window_geometry->width, .height = window_geometry->height};
 }
@@ -41,7 +46,7 @@ VkExtent2D Vulkan_PlatformGetWindowExtent() {
 void Vulkan_PlatformSetSurface() {
   const VkXcbSurfaceCreateInfoKHR surface_create_info{
       .sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR,
-      .connection = x11.conn,
+      .connection = GetVkXcbConn(),
       .window = window,
   };
   VK_CHECK(vkCreateXcbSurfaceKHR(vk.instance, &surface_create_info, nullptr, &vk.surface));
