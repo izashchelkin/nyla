@@ -165,9 +165,8 @@ int Main(int argc, char** argv) {
       }
 
       if (fds[2].revents & POLLIN) {
-        uint64_t expirations;
-        read(tfd, &expirations, sizeof(expirations));
-        if (expirations > 0) {
+        uint64_t expirations = 0;
+        if (read(tfd, &expirations, sizeof(expirations)) > 0 && expirations > 0) {
           wm_background_dirty = true;
         }
       }

@@ -53,10 +53,10 @@ bool RenderDocCaptureEnd() {
 
 #else
 
-void RenderDocCaptureStart() {
+bool RenderDocCaptureStart() {
   return false;
 }
-void RenderDocCaptureEnd() {
+bool RenderDocCaptureEnd() {
   return false;
 }
 
