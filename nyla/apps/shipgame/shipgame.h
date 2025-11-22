@@ -37,7 +37,7 @@ struct GameObject {
   float orbit_radius;
   Vec2f velocity{};
 
-  std::vector<WorldRendererVertex> vertices{};
+  std::vector<Vertex> vertices{};
   std::span<GameObject> children{};
 };
 extern GameObject game_solar_system;

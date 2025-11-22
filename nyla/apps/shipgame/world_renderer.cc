@@ -51,7 +51,7 @@ void WorldSetUp(Vec2f camera_pos, float zoom) {
   RpStaticUniformCopy(grid_pipeline, CharViewPtr(&static_ubo));
 }
 
-void WorldRender(Vec2f pos, float angle_radians, float scalar, std::span<WorldRendererVertex> vertices) {
+void WorldRender(Vec2f pos, float angle_radians, float scalar, std::span<Vertex> vertices) {
   Mat4 model = Translate(pos);
   model = Mult(model, Rotate2D(angle_radians));
   model = Mult(model, Scale2D(scalar));

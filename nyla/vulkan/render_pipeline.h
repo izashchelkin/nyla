@@ -10,6 +10,8 @@
 
 namespace nyla {
 
+constexpr uint32_t kPushConstantMaxSize = 128;
+
 enum class RpVertAttr {
   Float4,
   Half2,
@@ -53,6 +55,7 @@ void RpInit(Rp& rp);
 void RpAttachVertShader(Rp& rp, const std::string& path);
 void RpAttachFragShader(Rp& rp, const std::string& path);
 void RpBegin(Rp& rp);
+void RpPushConst(Rp& rp, CharView data);
 void RpStaticUniformCopy(Rp& rp, CharView data);
 RpMesh RpVertCopy(Rp& rp, uint32_t vert_count, CharView vert_data);
 void RpDraw(Rp& rp, RpMesh mesh, CharView dynamic_uniform_data);

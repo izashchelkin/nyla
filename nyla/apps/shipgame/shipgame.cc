@@ -21,7 +21,7 @@ NYLA_SHIPGAME_INPUT_MAPPING(X)
 #undef X
 
 namespace {
-using Vertex = WorldRendererVertex;
+using Vertex = Vertex;
 }
 
 GameObject game_solar_system{};

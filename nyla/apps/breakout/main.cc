@@ -8,6 +8,7 @@
 #include "absl/cleanup/cleanup.h"
 #include "absl/log/log.h"
 #include "nyla/apps/breakout/breakout.h"
+#include "nyla/apps/breakout/world_renderer.h"
 #include "nyla/commons/containers/map.h"
 #include "nyla/commons/containers/set.h"
 #include "nyla/commons/logging/init.h"
@@ -137,6 +138,7 @@ static int Main() {
   for (;;) {
     if (vk.shaders_invalidated) {
       RpInit(dbg_text_pipeline);
+      RpInit(world_pipeline);
       vk.shaders_invalidated = false;
     }
 
@@ -146,8 +148,13 @@ static int Main() {
     ProcessInput();
 
     Vulkan_FrameBegin();
+
+    WorldSetUp();
+
     Vulkan_RenderingBegin();
     {
+      RpBegin(world_pipeline);
+
       RpBegin(dbg_text_pipeline);
       DbgText(500, 10, "fps= " + std::to_string(GetFps()));
     }

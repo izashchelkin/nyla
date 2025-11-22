@@ -115,10 +115,18 @@ void RpInit(Rp& rp) {
   VkDescriptorSetLayout descriptor_set_layout;
   VK_CHECK(vkCreateDescriptorSetLayout(vk.device, &descriptor_set_layout_create_info, nullptr, &descriptor_set_layout));
 
+  const VkPushConstantRange push_constant_range{
+      .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT,
+      .offset = 0,
+      .size = kPushConstantMaxSize,
+  };
+
   const VkPipelineLayoutCreateInfo pipeline_layout_create_info{
       .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
       .setLayoutCount = static_cast<uint32_t>(num_uniforms ? 1 : 0),
       .pSetLayouts = &descriptor_set_layout,
+      .pushConstantRangeCount = 1,
+      .pPushConstantRanges = &push_constant_range,
   };
 
   vkCreatePipelineLayout(vk.device, &pipeline_layout_create_info, nullptr, &rp.layout);
@@ -244,6 +252,15 @@ RpMesh RpVertCopy(Rp& rp, uint32_t vert_count, CharView vert_data) {
   RpBufCopy(rp.vert_buf, vert_data);
 
   return {offset, vert_count};
+}
+
+void RpPushConst(Rp& rp, CharView data) {
+  CHECK(!data.empty());
+  CHECK_LE(data.size(), kPushConstantMaxSize);
+
+  const VkCommandBuffer cmd = vk.command_buffers[vk.current_frame_data.iframe];
+  vkCmdPushConstants(cmd, rp.layout, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT, 0, data.size(),
+                     data.data());
 }
 
 void RpDraw(Rp& rp, RpMesh mesh, CharView dynamic_uniform_data) {
