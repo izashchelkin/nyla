@@ -1,18 +1,24 @@
 #include "nyla/apps/breakout/breakout.h"
 
+#include <algorithm>
 #include <cmath>
 #include <complex>
 #include <cstdint>
 #include <cstring>
+#include <vector>
 
 #include "nyla/apps/breakout/world_renderer.h"
+#include "nyla/commons/color.h"
 #include "nyla/commons/containers/set.h"
 #include "nyla/commons/math/lerp.h"
 #include "nyla/commons/math/math.h"
 #include "nyla/commons/math/vec/vec2f.h"
+#include "nyla/commons/math/vec/vec3f.h"
 #include "nyla/commons/math/vec/vec4f.h"
+#include "nyla/commons/memory/charview.h"
 #include "nyla/commons/os/clock.h"
 #include "nyla/fwk/input.h"
+#include "nyla/vulkan/render_pipeline.h"
 #include "nyla/vulkan/vulkan.h"
 
 namespace nyla {
@@ -23,6 +29,22 @@ NYLA_INPUT_MAPPING(X)
 
 static float pos_x = 0.f;
 
+namespace {
+
+struct Brick {
+  float x;
+  float y;
+  float width;
+  float height;
+  Vec3f color;
+};
+
+struct Level {
+  std ::vector<Brick> bricks;
+};
+
+}  // namespace
+
 void ProcessInput() {
   const int dx = Pressed(kRight) - Pressed(kLeft);
 
@@ -32,28 +54,59 @@ void ProcessInput() {
   constexpr float step = 1.f / 120.f;
   for (; dt_accumulator >= step; dt_accumulator -= step) {
     pos_x += 100.f * step * dx;
+    pos_x = std::clamp(pos_x, -30.f, 30.f);
   }
 }
 
-void BreakoutInit() {}
+static Level level;
+
+void BreakoutInit() {
+  for (size_t i = 0; i < 12; ++i) {
+    float h = std::fmod(static_cast<float>(i) + 825.f, 12.f) / 12.f;
+    float s = .97f;
+    float v = .97f;
+
+    Vec3f color = ConvertHsvToRgb(h, s, v);
+
+    for (size_t j = 0; j < 16; ++j) {
+      level.bricks.emplace_back(Brick{
+          -28.f + j * 3.5f,
+          20.f - i * 1.5f,
+          3.f,
+          1.f,
+          color,
+      });
+    }
+  }
+}
+
+static std::vector<Vertex> GetUnitRect() {
+  std::vector<Vertex> vertices;
+  vertices.reserve(6);
+
+  const float x = -.5f;
+  const float y = .5f;
+
+  vertices.emplace_back(Vertex{Vec2f{x, y}});
+  vertices.emplace_back(Vertex{Vec2f{x + 1.f, y + -1.f}});
+  vertices.emplace_back(Vertex{Vec2f{x + 1.f, y}});
+
+  vertices.emplace_back(Vertex{Vec2f{x, y}});
+  vertices.emplace_back(Vertex{Vec2f{x, y + -1.f}});
+  vertices.emplace_back(Vertex{Vec2f{x + 1.f, y + -1.f}});
+
+  return vertices;
+}
 
 void BreakoutRender() {
-  {
-    const float width = 3.f;
-    const float height = .8f;
+  std::vector<Vertex> unit_rect = GetUnitRect();
+  RpMesh unit_rect_mesh = RpVertCopy(world_pipeline, unit_rect.size(), CharViewSpan(std::span{unit_rect}));
 
-    std::vector<Vertex> vertices;
-
-    vertices.emplace_back(Vertex{Vec2f{0, 0}, Vec3f{1.f, 1.f, 1.f}});
-    vertices.emplace_back(Vertex{Vec2f{width, 0 - height}, Vec3f{1.f, 1.f, 1.f}});
-    vertices.emplace_back(Vertex{Vec2f{width, 0}, Vec3f{1.f, 1.f, 1.f}});
-
-    vertices.emplace_back(Vertex{Vec2f{0, 0}, Vec3f{1.f, 1.f, 1.f}});
-    vertices.emplace_back(Vertex{Vec2f{0, 0 - height}, Vec3f{1.f, 1.f, 1.f}});
-    vertices.emplace_back(Vertex{Vec2f{width, 0 - height}, Vec3f{1.f, 1.f, 1.f}});
-
-    WorldRender(Vec2f{pos_x, -30.f}, vertices);
+  for (Brick& brick : level.bricks) {
+    WorldRender(Vec2f{brick.x, brick.y}, brick.color, brick.width, brick.height, unit_rect_mesh);
   }
+
+  WorldRender(Vec2f{pos_x, -30.f}, Vec3f{.1f, .1f, .99f}, 3.f, .8f, unit_rect_mesh);
 }
 
 }  // namespace nyla

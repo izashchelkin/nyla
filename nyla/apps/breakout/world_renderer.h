@@ -9,15 +9,13 @@ namespace nyla {
 struct Vertex {
   Vec2f pos;
   float pad0[2] = {666.f, 666.f};
-  Vec3f color;
-  float pad1[1] = {777.f};
 
-  Vertex(Vec2f pos, Vec3f color) : pos{pos}, color{color} {}
+  Vertex(Vec2f pos) : pos{pos} {}
 };
 
 extern Rp world_pipeline;
 
 void WorldSetUp();
-void WorldRender(Vec2f pos, std::span<Vertex> vertices);
+void WorldRender(Vec2f pos, Vec3f color, float scale_x, float scale_y, const RpMesh& mesh);
 
 }  // namespace nyla

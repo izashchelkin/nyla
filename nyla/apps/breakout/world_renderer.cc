@@ -17,6 +17,8 @@ struct PushConstData {
 
 struct DynamicUbo {
   Mat4 model;
+  Vec3f color;
+  float pad;
 };
 
 }  // namespace
@@ -43,13 +45,14 @@ void WorldSetUp() {
   RpPushConst(world_pipeline, CharViewPtr(&push_const));
 }
 
-void WorldRender(Vec2f pos, std::span<Vertex> vertices) {
-  Mat4 model = Translate(pos);
+void WorldRender(Vec2f pos, Vec3f color, float width, float height, const RpMesh& mesh) {
+  DynamicUbo dynamic_data{};
+  dynamic_data.color = color;
 
-  CharView vertex_data = CharViewSpan(vertices);
-  CharView dynamic_uniform_data = CharViewPtr(&model);
-  RpMesh mesh = RpVertCopy(world_pipeline, vertices.size(), vertex_data);
-  RpDraw(world_pipeline, mesh, dynamic_uniform_data);
+  dynamic_data.model = Translate(pos);
+  dynamic_data.model = Mult(dynamic_data.model, ScaleXY(width, height));
+
+  RpDraw(world_pipeline, mesh, CharViewPtr(&dynamic_data));
 }
 
 Rp world_pipeline{
@@ -57,7 +60,7 @@ Rp world_pipeline{
     .dynamic_uniform =
         {
             .enabled = true,
-            .size = 1 << 15,
+            .size = 1 << 20,
             .range = sizeof(DynamicUbo),
         },
     .vert_buf =
@@ -66,7 +69,6 @@ Rp world_pipeline{
             .size = 1 << 22,
             .attrs =
                 {
-                    RpVertAttr::Float4,
                     RpVertAttr::Float4,
                 },
         },

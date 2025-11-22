@@ -38,10 +38,10 @@ inline Mat4 Translate(std::span<const float> v) {
   return ret;
 }
 
-inline Mat4 Scale2D(float scalar) {
+inline Mat4 ScaleXY(float x, float y) {
   Mat4 ret = Identity4;
-  ret[0][0] = scalar;
-  ret[1][1] = scalar;
+  ret[0][0] = x;
+  ret[1][1] = y;
   return ret;
 }
 
@@ -52,17 +52,18 @@ inline Mat4 Rotate2D(float radians) {
   return ret;
 }
 
-inline Mat4 Ortho(float left, float right, float top, float bottom, float near,
-                  float far) {
-  return {Mat4Col{2.f / (right - left), 0.f, 0.f, 0.f},
-          Mat4Col{0.f, 2.f / (top - bottom), 0.f, 0.f},
-          Mat4Col{0.f, 0.f, 1.f / (far - near), 0.f},
-          Mat4Col{
-              -(right + left) / (right - left),
-              -(top + bottom) / (top - bottom),
-              -near / (far - near),
-              1.f,
-          }};
+inline Mat4 Ortho(float left, float right, float top, float bottom, float near, float far) {
+  return {
+      Mat4Col{2.f / (right - left), 0.f, 0.f, 0.f},
+      Mat4Col{0.f, 2.f / (top - bottom), 0.f, 0.f},
+      Mat4Col{0.f, 0.f, 1.f / (far - near), 0.f},
+      Mat4Col{
+          -(right + left) / (right - left),
+          -(top + bottom) / (top - bottom),
+          -near / (far - near),
+          1.f,
+      },
+  };
 }
 
 }  // namespace nyla

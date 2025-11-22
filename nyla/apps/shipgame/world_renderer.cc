@@ -54,7 +54,7 @@ void WorldSetUp(Vec2f camera_pos, float zoom) {
 void WorldRender(Vec2f pos, float angle_radians, float scalar, std::span<Vertex> vertices) {
   Mat4 model = Translate(pos);
   model = Mult(model, Rotate2D(angle_radians));
-  model = Mult(model, Scale2D(scalar));
+  model = Mult(model, ScaleXY(scalar, scalar));
 
   CharView vertex_data = CharViewSpan(vertices);
   CharView dynamic_uniform_data = CharViewPtr(&model);

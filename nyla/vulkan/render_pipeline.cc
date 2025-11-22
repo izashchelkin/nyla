@@ -276,11 +276,11 @@ void RpDraw(Rp& rp, RpMesh mesh, CharView dynamic_uniform_data) {
     uint32_t offset = 0;
 
     if (rp.dynamic_uniform.enabled) {
-      offset_count = 1;
-      offset = rp.dynamic_uniform.written;
-
       rp.dynamic_uniform.written =
           AlignUp(rp.dynamic_uniform.written, vk.phys_device_props.limits.minUniformBufferOffsetAlignment);
+
+      offset_count = 1;
+      offset = rp.dynamic_uniform.written;
       RpBufCopy(rp.dynamic_uniform, dynamic_uniform_data);
     }
 
