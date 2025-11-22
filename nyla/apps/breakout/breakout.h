@@ -13,13 +13,14 @@
 
 namespace nyla {
 
-#define NYLA_SHIPGAME_INPUT_MAPPING(X) X(Right) X(Left) X(Boost) X(Fire)
+#define NYLA_INPUT_MAPPING(X) X(Right) X(Left) X(Boost) X(Fire)
 
 #define X(key) extern const InputMappingId k##key;
-NYLA_SHIPGAME_INPUT_MAPPING(X)
+NYLA_INPUT_MAPPING(X)
 #undef X
 
 void BreakoutInit();
 void ProcessInput();
+void BreakoutRender();
 
 }  // namespace nyla

@@ -148,12 +148,12 @@ static int Main() {
     ProcessInput();
 
     Vulkan_FrameBegin();
-
     WorldSetUp();
 
     Vulkan_RenderingBegin();
     {
       RpBegin(world_pipeline);
+      BreakoutRender();
 
       RpBegin(dbg_text_pipeline);
       DbgText(500, 10, "fps= " + std::to_string(GetFps()));
