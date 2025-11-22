@@ -235,7 +235,7 @@ static int Main() {
       GridRender();
 
       RpBegin(dbg_text_pipeline);
-      DbgText(10, 10, "fps= " + std::to_string(int(1.f / vk.current_frame_data.dt)));
+      DbgText(500, 10, "fps= " + std::to_string(GetFps()));
     }
     Vulkan_RenderingEnd();
     Vulkan_FrameEnd();

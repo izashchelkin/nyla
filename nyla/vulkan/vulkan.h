@@ -109,6 +109,8 @@ void Vulkan_RenderingBegin();
 void Vulkan_RenderingEnd();
 void Vulkan_FrameEnd();
 
+uint32_t GetFps();
+
 //
 
 }  // namespace nyla

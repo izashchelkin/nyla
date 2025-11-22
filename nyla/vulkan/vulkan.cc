@@ -19,6 +19,11 @@
 namespace nyla {
 
 Vulkan_State vk;
+static uint32_t fps = 0;
+
+uint32_t GetFps() {
+  return fps;
+}
 
 static void CreateSwapchain();
 
@@ -486,7 +491,20 @@ void Vulkan_FrameBegin() {
   const uint64_t dtnanos = now - last;
   last = now;
 
-  vk.current_frame_data.dt = dtnanos / (float)1e9;
+  vk.current_frame_data.dt = dtnanos / 1e9;
+
+  static float dtnanosaccum = .0f;
+  dtnanosaccum += dtnanos;
+
+  static uint32_t fps_frames = 0;
+  ++fps_frames;
+
+  if (dtnanosaccum >= .5f * 1e9) {
+    fps = (1e9 / dtnanosaccum) * fps_frames;
+
+    fps_frames = 0;
+    dtnanosaccum = .0f;
+  }
 
   const VkCommandBuffer command_buffer = vk.command_buffers[vk.current_frame_data.iframe];
 
