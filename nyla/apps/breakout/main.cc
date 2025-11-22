@@ -1,5 +1,3 @@
-#include <signal.h>
-
 #include <csignal>
 #include <cstddef>
 #include <cstdint>
@@ -9,8 +7,7 @@
 
 #include "absl/cleanup/cleanup.h"
 #include "absl/log/log.h"
-#include "nyla/apps/shipgame/shipgame.h"
-#include "nyla/apps/shipgame/world_renderer.h"
+#include "nyla/apps/breakout/breakout.h"
 #include "nyla/commons/containers/map.h"
 #include "nyla/commons/containers/set.h"
 #include "nyla/commons/logging/init.h"
@@ -26,31 +23,8 @@
 
 namespace nyla {
 
-uint16_t ientity;
-
 static bool running = true;
 static xcb_window_t window;
-
-static xcb_connection_t* GetVkXcbConn() {
-  static xcb_connection_t* vk_xcb_conn = xcb_connect(nullptr, nullptr);
-  return vk_xcb_conn;
-}
-
-VkExtent2D Vulkan_PlatformGetWindowExtent() {
-  xcb_connection_t* conn = GetVkXcbConn();
-  xcb_get_geometry_reply_t* window_geometry = xcb_get_geometry_reply(conn, xcb_get_geometry(conn, window), nullptr);
-
-  return {.width = window_geometry->width, .height = window_geometry->height};
-}
-
-void Vulkan_PlatformSetSurface() {
-  const VkXcbSurfaceCreateInfoKHR surface_create_info{
-      .sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR,
-      .connection = GetVkXcbConn(),
-      .window = window,
-  };
-  VK_CHECK(vkCreateXcbSurfaceKHR(vk.instance, &surface_create_info, nullptr, &vk.surface));
-}
 
 static void ProcessXEvents() {
   InputHandleFrame();
@@ -139,112 +113,74 @@ static int Main() {
     xcb_flush(x11.conn);
   }
 
-  const char* shader_watch_dirs[] = {"nyla/apps/shipgame/shaders", "nyla/apps/shipgame/shaders/build"};
-  Vulkan_Initialize("shipgame", shader_watch_dirs);
+  const char* shader_watch_dirs[] = {
+      "nyla/apps/breakout/shaders", "nyla/apps/breakout/shaders/build",  //
+      "nyla/fwk/shaders",           "nyla/fwk/shaders/build",            //
+      "nyla/vulkan/shaders",        "nyla/vulkan/shaders/build",         //
+  };
+  Vulkan_Initialize("breakout", shader_watch_dirs);
 
   {
     X11_KeyResolver key_resolver;
     X11_InitializeKeyResolver(key_resolver);
 
-    InputMapId(kUp, {1, X11_ResolveKeyCode(key_resolver, "AD03")});
     InputMapId(kLeft, {1, X11_ResolveKeyCode(key_resolver, "AC02")});
-    InputMapId(kDown, {1, X11_ResolveKeyCode(key_resolver, "AC03")});
     InputMapId(kRight, {1, X11_ResolveKeyCode(key_resolver, "AC04")});
     InputMapId(kFire, {1, X11_ResolveKeyCode(key_resolver, "AC07")});
     InputMapId(kBoost, {1, X11_ResolveKeyCode(key_resolver, "AC08")});
-    InputMapId(kBrake, {1, X11_ResolveKeyCode(key_resolver, "SPCE")});
-    InputMapId(kZoomMore, {2, XCB_BUTTON_INDEX_5});
-    InputMapId(kZoomLess, {2, XCB_BUTTON_INDEX_4});
 
     X11_FreeKeyResolver(key_resolver);
   }
 
-  //
-
-  RpInit(world_pipeline);
-  RpInit(dbg_text_pipeline);
-  RpInit(grid_pipeline);
-
-  InitGame();
-
-  struct Profiling {
-    uint16_t xevent;
-  };
-  std::array<Profiling, 3> prof_data;
-  uint8_t iprof = 0;
+  BreakoutInit();
 
   for (;;) {
-    Profiling& prof = prof_data[iprof];
-    prof = {};
-    iprof = (iprof + 1) % prof_data.size();
-
-    //
-
-    prof.xevent = GetMonotonicTimeMicros();
-    ProcessXEvents();
-    prof.xevent = GetMonotonicTimeMicros() - prof.xevent;
-
-    //
-
-    if (!running) break;
-
-    Vulkan_FrameBegin();
-
     if (vk.shaders_invalidated) {
-      RpInit(world_pipeline);
       RpInit(dbg_text_pipeline);
-      RpInit(grid_pipeline);
       vk.shaders_invalidated = false;
     }
 
-    if (vk.current_frame_data.dt > .05f) {
-      LOG(INFO) << "dts spike: " << vk.current_frame_data.dt << "s";
-
-      const Profiling& lastprof = prof_data[(iprof + prof_data.size() - 2) % prof_data.size()];
-      LOG(INFO) << "last frame prof: xevent=" << lastprof.xevent;
-    }
-
-#if 0
-    {
-      Entity& line = entities[100];
-
-      line.exists = false;
-      line.affected_by_gravity = false;
-      line.vertex_count = 6;
-
-      Vulkan_CreateBuffer(1024, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                              VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                          line.vertex_buffer, line.vertex_buffer_memory);
-
-      vkMapMemory(vk.device, line.vertex_buffer_memory, 0, 1024, 0, &line.data);
-
-      auto vertices = TriangulateLine({0, 0}, {100, 100}, 2.f);
-      memcpy(line.data, vertices.data(), vertices.size() * sizeof(Vertex));
-    }
-#endif
+    ProcessXEvents();
+    if (!running) break;
 
     ProcessInput();
 
+    Vulkan_FrameBegin();
     Vulkan_RenderingBegin();
     {
-      RpBegin(world_pipeline);
-      RenderGameObjects();
-
-      RpBegin(grid_pipeline);
-      GridRender();
-
       RpBegin(dbg_text_pipeline);
       DbgText(10, 10, "fps= " + std::to_string(int(1.f / vk.current_frame_data.dt)));
     }
     Vulkan_RenderingEnd();
     Vulkan_FrameEnd();
   }
+
   return 0;
+}
+
+static xcb_connection_t* GetVkXcbConn() {
+  static xcb_connection_t* vk_xcb_conn = xcb_connect(nullptr, nullptr);
+  return vk_xcb_conn;
+}
+
+VkExtent2D Vulkan_PlatformGetWindowExtent() {
+  xcb_connection_t* conn = GetVkXcbConn();
+  xcb_get_geometry_reply_t* window_geometry = xcb_get_geometry_reply(conn, xcb_get_geometry(conn, window), nullptr);
+
+  return {.width = window_geometry->width, .height = window_geometry->height};
+}
+
+void Vulkan_PlatformSetSurface() {
+  const VkXcbSurfaceCreateInfoKHR surface_create_info{
+      .sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR,
+      .connection = GetVkXcbConn(),
+      .window = window,
+  };
+  VK_CHECK(vkCreateXcbSurfaceKHR(vk.instance, &surface_create_info, nullptr, &vk.surface));
 }
 
 }  // namespace nyla
 
 int main() {
   return nyla::Main();
-};
+}

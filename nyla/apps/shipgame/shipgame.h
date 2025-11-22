@@ -43,15 +43,6 @@ struct GameObject {
 extern GameObject game_solar_system;
 extern GameObject game_ship;
 
-struct SceneUbo {
-  Mat4 view;
-  Mat4 proj;
-};
-
-struct GameObjectUbo {
-  Mat4 model;
-};
-
 void InitGame();
 void ProcessInput();
 void RenderGameObjects();

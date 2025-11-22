@@ -1,4 +1,4 @@
-#include "nyla/apps/shipgame/game.h"
+#include "nyla/apps/shipgame/shipgame.h"
 
 #include <cmath>
 #include <complex>
@@ -309,8 +309,6 @@ void ProcessInput() {
 
     game_camera_zoom = std::clamp(game_camera_zoom, .1f, 2.5f);
   }
-
-#undef pressed
 }
 
 }  // namespace nyla

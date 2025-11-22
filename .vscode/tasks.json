@@ -2,6 +2,17 @@
     "version": "2.0.0",
     "tasks": [
         {
+            "label": "build_breakout_dbg",
+            "type": "bazel",
+            "command": "build",
+            "options": [
+                "--compilation_mode=dbg"
+            ],
+            "targets": [
+                "//nyla/apps/breakout"
+            ]
+        },
+        {
             "label": "build_shipgame_dbg",
             "type": "bazel",
             "command": "build",

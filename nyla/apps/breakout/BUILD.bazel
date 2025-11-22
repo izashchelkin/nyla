@@ -1,0 +1,11 @@
+cc_binary(
+    name = "breakout",
+    srcs = glob([
+        "*.cc",
+        "*.h",
+    ]),
+    linkopts = ["-lvulkan"],
+    deps = [
+        "//nyla/fwk",
+    ],
+)
