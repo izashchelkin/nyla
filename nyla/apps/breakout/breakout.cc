@@ -7,6 +7,7 @@
 #include <cstring>
 #include <vector>
 
+#include "nyla/apps/breakout/unitshapes.h"
 #include "nyla/apps/breakout/world_renderer.h"
 #include "nyla/commons/color.h"
 #include "nyla/commons/containers/set.h"
@@ -68,7 +69,7 @@ void BreakoutInit() {
 
     Vec3f color = ConvertHsvToRgb(h, s, v);
 
-    for (size_t j = 0; j < 16; ++j) {
+    for (size_t j = 0; j < 17; ++j) {
       level.bricks.emplace_back(Brick{
           -28.f + j * 3.5f,
           20.f - i * 1.5f,
@@ -79,34 +80,26 @@ void BreakoutInit() {
     }
   }
 }
-
-static std::vector<Vertex> GetUnitRect() {
-  std::vector<Vertex> vertices;
-  vertices.reserve(6);
-
-  const float x = -.5f;
-  const float y = .5f;
-
-  vertices.emplace_back(Vertex{Vec2f{x, y}});
-  vertices.emplace_back(Vertex{Vec2f{x + 1.f, y + -1.f}});
-  vertices.emplace_back(Vertex{Vec2f{x + 1.f, y}});
-
-  vertices.emplace_back(Vertex{Vec2f{x, y}});
-  vertices.emplace_back(Vertex{Vec2f{x, y + -1.f}});
-  vertices.emplace_back(Vertex{Vec2f{x + 1.f, y + -1.f}});
-
-  return vertices;
-}
-
 void BreakoutRender() {
-  std::vector<Vertex> unit_rect = GetUnitRect();
+  std::vector<Vertex> unit_rect;
+  unit_rect.reserve(6);
+  GenUnitRect([&unit_rect](float x, float y) { unit_rect.emplace_back(Vertex{Vec2f{x, y}}); });
+
   RpMesh unit_rect_mesh = RpVertCopy(world_pipeline, unit_rect.size(), CharViewSpan(std::span{unit_rect}));
+
+  std::vector<Vertex> unit_circle;
+  unit_circle.reserve(32 * 3);
+  GenUnitCircle(32, [&unit_circle](float x, float y) { unit_circle.emplace_back(Vertex{Vec2f{x, y}}); });
+
+  RpMesh unit_circle_mesh = RpVertCopy(world_pipeline, unit_circle.size(), CharViewSpan(std::span{unit_circle}));
 
   for (Brick& brick : level.bricks) {
     WorldRender(Vec2f{brick.x, brick.y}, brick.color, brick.width, brick.height, unit_rect_mesh);
   }
 
   WorldRender(Vec2f{pos_x, -30.f}, Vec3f{.1f, .1f, .99f}, 3.f, .8f, unit_rect_mesh);
+
+  WorldRender(Vec2f{0, 0}, Vec3f{.5f, 0.f, 1.f}, .8f, .8f, unit_circle_mesh);
 }
 
 }  // namespace nyla
