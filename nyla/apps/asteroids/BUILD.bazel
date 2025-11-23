@@ -1,5 +1,5 @@
 cc_binary(
-    name = "shipgame",
+    name = "asteroids",
     srcs = glob([
         "*.cc",
         "*.h",
@@ -7,6 +7,5 @@ cc_binary(
     linkopts = ["-lvulkan"],
     deps = [
         "//nyla/fwk",
-        "//nyla/platform",
     ],
 )

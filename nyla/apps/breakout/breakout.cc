@@ -19,14 +19,14 @@
 #include "nyla/commons/math/vec/vec4f.h"
 #include "nyla/commons/memory/charview.h"
 #include "nyla/commons/os/clock.h"
-#include "nyla/fwk/input.h"
+#include "nyla/platform/abstract_input.h"
 #include "nyla/vulkan/dbg_text_renderer.h"
 #include "nyla/vulkan/render_pipeline.h"
 #include "nyla/vulkan/vulkan.h"
 
 namespace nyla {
 
-#define X(key) const InputMappingId k##key;
+#define X(key) const AbstractInputMapping k##key;
 NYLA_INPUT_MAPPING(X)
 #undef X
 
@@ -143,6 +143,8 @@ void BreakoutProcess() {
       }
     }
   }
+
+  WorldSetUp();
 }
 
 enum class GameStage {

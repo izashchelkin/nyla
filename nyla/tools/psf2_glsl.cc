@@ -24,7 +24,7 @@ static uint16_t rd16(const uint8_t* p) {
 }
 
 int Main() {
-  InitLogging();
+  LoggingInit();
 
   std::vector<uint8_t> buf;
   {

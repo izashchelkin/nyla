@@ -1,5 +1,7 @@
+#pragma once
+
 namespace nyla {
 
-const char* VkResultStr(int res);
+void SigIntCoreDump();
 
 }  // namespace nyla

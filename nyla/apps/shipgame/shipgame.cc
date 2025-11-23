@@ -11,13 +11,14 @@
 #include "nyla/commons/math/math.h"
 #include "nyla/commons/math/vec/vec2f.h"
 #include "nyla/commons/os/clock.h"
-#include "nyla/fwk/input.h"
+#include "nyla/platform/abstract_input.h"
+#include "nyla/vulkan/dbg_text_renderer.h"
 #include "nyla/vulkan/vulkan.h"
 
 namespace nyla {
 
-#define X(key) const InputMappingId k##key;
-NYLA_SHIPGAME_INPUT_MAPPING(X)
+#define X(key) const AbstractInputMapping k##key;
+NYLA_INPUT_MAPPING(X)
 #undef X
 
 namespace {
@@ -87,14 +88,21 @@ static void RenderGameObject(GameObject& obj) {
   }
 }
 
-void RenderGameObjects() {
+void ShipgameRender() {
+  RpBegin(world_pipeline);
   WorldSetUp(game_camera_pos, game_camera_zoom);
 
   RenderGameObject(game_solar_system);
   RenderGameObject(game_ship);
+
+  RpBegin(grid_pipeline);
+  GridRender();
+
+  RpBegin(dbg_text_pipeline);
+  DbgText(500, 10, "fps= " + std::to_string(GetFps()));
 }
 
-void InitGame() {
+void ShipgameInit() {
   {
     game_solar_system = {
         .type = GameObject::Type::kSolarSystem,
@@ -153,7 +161,7 @@ void InitGame() {
   }
 }
 
-void ProcessInput() {
+void ShipgameProcess() {
   const int dx = Pressed(kRight) - Pressed(kLeft);
   const int dy = Pressed(kDown) - Pressed(kUp);
 
@@ -173,7 +181,7 @@ void ProcessInput() {
       }
 
       if (Pressed(kBrake)) {
-        InputRelease(kBoost);
+        AbstractInputRelease(kBoost);
 
         Lerp(game_ship.velocity, Vec2f{}, step * 5.f);
       } else if (Pressed(kBoost)) {

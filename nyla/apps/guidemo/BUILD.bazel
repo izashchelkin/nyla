@@ -11,5 +11,6 @@ cc_binary(
     linkopts = ["-lvulkan"],
     deps = [
         "//nyla/fwk",
+        "//nyla/platform",
     ],
 )

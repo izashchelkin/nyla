@@ -37,7 +37,7 @@ int Main(int argc, char** argv) {
     }
   }
 
-  InitLogging();
+  LoggingInit();
   TArenaInit();
 
   bool is_running = true;

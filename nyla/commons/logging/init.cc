@@ -5,7 +5,7 @@
 
 namespace nyla {
 
-void InitLogging() {
+void LoggingInit() {
   absl::InitializeLog();
   absl::SetStderrThreshold(absl::LogSeverityAtLeast::kInfo);
 }

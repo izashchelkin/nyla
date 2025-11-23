@@ -1,5 +1,5 @@
 namespace nyla {
 
-void InitLogging();
+void LoggingInit();
 
 }  // namespace nyla

@@ -1,24 +1,24 @@
-#include "nyla/fwk/input.h"
+#include "nyla/platform/abstract_input.h"
 
 #include <cstdint>
 
 namespace nyla {
 
 template <typename H>
-H AbslHashValue(H h, const InputId& id) {
+H AbslHashValue(H h, const AbstractInputId& id) {
   return H::combine(std::move(h), id.tag, id.code);
 }
 
-bool operator==(const InputId& lhs, const InputId& rhs) {
+bool operator==(const AbstractInputId& lhs, const AbstractInputId& rhs) {
   return lhs.tag == rhs.tag && lhs.code == rhs.code;
 }
 
 template <typename H>
-H AbslHashValue(H h, const InputMappingId& id) {
+H AbslHashValue(H h, const AbstractInputMapping& id) {
   return H::combine(std::move(h), id.val);
 }
 
-bool operator==(const InputMappingId& lhs, const InputMappingId& rhs) {
+bool operator==(const AbstractInputMapping& lhs, const AbstractInputMapping& rhs) {
   return lhs.val == rhs.val;
 }
 
@@ -31,10 +31,10 @@ struct InputState {
 
 }  // namespace
 
-static Map<InputId, InputState> inputstate;
-static Map<InputMappingId, InputId> inputmapping;
+static Map<AbstractInputId, InputState> inputstate;
+static Map<AbstractInputMapping, AbstractInputId> inputmapping;
 
-void InputHandlePressed(InputId id, uint64_t ts) {
+void AbstractInputHandlePressed(AbstractInputId id, uint64_t ts) {
   auto [it, ok] = inputstate.try_emplace(id, InputState{.pressed_at = ts});
   if (ok) return;
 
@@ -44,7 +44,7 @@ void InputHandlePressed(InputId id, uint64_t ts) {
   state.pressed_at = ts;
 }
 
-void InputHandleReleased(InputId id) {
+void AbstractInputHandleReleased(AbstractInputId id) {
   auto [it, ok] = inputstate.try_emplace(id, InputState{.released = true});
   if (ok) return;
 
@@ -52,7 +52,7 @@ void InputHandleReleased(InputId id) {
   state.released = true;
 }
 
-void InputRelease(InputMappingId mapping) {
+void AbstractInputRelease(AbstractInputMapping mapping) {
   auto id = inputmapping.at(mapping);
   auto it = inputstate.find(id);
   if (it == inputstate.end()) {
@@ -63,7 +63,7 @@ void InputRelease(InputMappingId mapping) {
   state.released = true;
 }
 
-void InputHandleFrame() {
+void AbstractInputProcessFrame() {
   for (auto& [_, state] : inputstate) {
     if (state.released) {
       state.pressed_at = 0;
@@ -72,11 +72,11 @@ void InputHandleFrame() {
   }
 }
 
-void InputMapId(InputMappingId mapping, InputId id) {
+void AbstractInputMapId(AbstractInputMapping mapping, AbstractInputId id) {
   inputmapping.emplace(mapping, id);
 }
 
-bool Pressed(InputMappingId mapping) {
+bool Pressed(AbstractInputMapping mapping) {
   auto id = inputmapping.at(mapping);
   auto it = inputstate.find(id);
   if (it == inputstate.end()) {
@@ -87,7 +87,7 @@ bool Pressed(InputMappingId mapping) {
   return state.pressed_at > 0;
 }
 
-uint32_t PressedFor(InputMappingId mapping, uint64_t now) {
+uint32_t PressedFor(AbstractInputMapping mapping, uint64_t now) {
   auto id = inputmapping.at(mapping);
   auto it = inputstate.find(id);
   if (it == inputstate.end()) {

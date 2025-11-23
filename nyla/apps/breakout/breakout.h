@@ -8,14 +8,14 @@
 #include "nyla/commons/math/mat4.h"
 #include "nyla/commons/math/vec/vec2f.h"
 #include "nyla/commons/math/vec/vec3f.h"
-#include "nyla/fwk/input.h"
+#include "nyla/platform/abstract_input.h"
 #include "nyla/vulkan/vulkan.h"
 
 namespace nyla {
 
 #define NYLA_INPUT_MAPPING(X) X(Right) X(Left) X(Boost) X(Fire)
 
-#define X(key) extern const InputMappingId k##key;
+#define X(key) extern const AbstractInputMapping k##key;
 NYLA_INPUT_MAPPING(X)
 #undef X
 

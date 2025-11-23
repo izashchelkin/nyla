@@ -5,7 +5,7 @@
 #include <cstdint>
 
 #include "absl/log/check.h"
-#include "nyla/vulkan/vkresult.h"
+#include "vulkan/vk_enum_string_helper.h"
 #include "vulkan/vulkan.h"
 
 namespace nyla {
@@ -51,7 +51,7 @@ extern Vulkan_State vk;
 
 #define VK_GET_INSTANCE_PROC_ADDR(name) reinterpret_cast<PFN_##name>(vkGetInstanceProcAddr(vk.instance, #name))
 
-#define VK_CHECK(res) CHECK_EQ(res, VK_SUCCESS) << "Vulkan error: " << VkResultStr(res);
+#define VK_CHECK(res) CHECK_EQ(res, VK_SUCCESS) << "Vulkan error: " << string_VkResult(res);
 
 void Vulkan_Initialize(const char* appname, std::span<const char* const> shader_watch_directories);
 

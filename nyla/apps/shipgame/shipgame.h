@@ -6,18 +6,16 @@
 #include "nyla/apps/shipgame/world_renderer.h"
 #include "nyla/commons/containers/map.h"
 #include "nyla/commons/containers/set.h"
-#include "nyla/commons/math/mat4.h"
 #include "nyla/commons/math/vec/vec2f.h"
 #include "nyla/commons/math/vec/vec3f.h"
-#include "nyla/fwk/input.h"
-#include "nyla/vulkan/vulkan.h"
+#include "nyla/platform/abstract_input.h"
 
 namespace nyla {
 
-#define NYLA_SHIPGAME_INPUT_MAPPING(X) X(Right) X(Left) X(Up) X(Down) X(Brake) X(Boost) X(Fire) X(ZoomLess) X(ZoomMore)
+#define NYLA_INPUT_MAPPING(X) X(Right) X(Left) X(Up) X(Down) X(Brake) X(Boost) X(Fire) X(ZoomLess) X(ZoomMore)
 
-#define X(key) extern const InputMappingId k##key;
-NYLA_SHIPGAME_INPUT_MAPPING(X)
+#define X(key) extern const AbstractInputMapping k##key;
+NYLA_INPUT_MAPPING(X)
 #undef X
 
 struct GameObject {
@@ -43,8 +41,8 @@ struct GameObject {
 extern GameObject game_solar_system;
 extern GameObject game_ship;
 
-void InitGame();
-void ProcessInput();
-void RenderGameObjects();
+void ShipgameInit();
+void ShipgameProcess();
+void ShipgameRender();
 
 }  // namespace nyla
