@@ -149,7 +149,7 @@ static int Main() {
     ProcessXEvents();
     if (!running) break;
 
-    ProcessInput();
+    BreakoutProcess();
 
     Vulkan_FrameBegin();
     WorldSetUp();

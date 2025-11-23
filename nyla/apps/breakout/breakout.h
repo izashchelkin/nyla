@@ -20,7 +20,7 @@ NYLA_INPUT_MAPPING(X)
 #undef X
 
 void BreakoutInit();
-void ProcessInput();
+void BreakoutProcess();
 void BreakoutRender();
 
 }  // namespace nyla

@@ -28,8 +28,6 @@ namespace nyla {
 NYLA_INPUT_MAPPING(X)
 #undef X
 
-static float pos_x = 0.f;
-
 namespace {
 
 struct Brick {
@@ -46,7 +44,17 @@ struct Level {
 
 }  // namespace
 
-void ProcessInput() {
+constexpr Vec2f kWorldBoundaryX{-35.f, 35.f};
+constexpr Vec2f kWorldBoundaryY{-30.f, 30.f};
+constexpr float kBallRadius = .8f;
+
+static float player_pos_x = 0.f;
+static float player_width = 3.f;
+
+static Vec2f ball_pos = {};
+static Vec2f ball_vel = {20.f, 20.f};
+
+void BreakoutProcess() {
   const int dx = Pressed(kRight) - Pressed(kLeft);
 
   static float dt_accumulator = 0.f;
@@ -54,8 +62,21 @@ void ProcessInput() {
 
   constexpr float step = 1.f / 120.f;
   for (; dt_accumulator >= step; dt_accumulator -= step) {
-    pos_x += 100.f * step * dx;
-    pos_x = std::clamp(pos_x, -30.f, 30.f);
+    player_pos_x += 100.f * step * dx;
+    player_pos_x =
+        std::clamp(player_pos_x, kWorldBoundaryX[0] + player_width / 2.f, kWorldBoundaryX[1] - player_width / 2.f);
+
+    Vec2fAdd(ball_pos, Vec2fMul(ball_vel, step));
+
+    if (ball_pos[0] >= kWorldBoundaryX[1] - kBallRadius / 2.f ||
+        ball_pos[0] <= kWorldBoundaryX[0] + kBallRadius / 2.f) {
+      ball_vel[0] = -ball_vel[0];
+    }
+
+    if (ball_pos[1] >= kWorldBoundaryY[1] - kBallRadius / 2.f ||
+        ball_pos[1] <= kWorldBoundaryY[0] + kBallRadius / 2.f) {
+      ball_vel[1] = -ball_vel[1];
+    }
   }
 }
 
@@ -118,9 +139,10 @@ void BreakoutRender() {
       WorldRender(Vec2f{brick.x, brick.y}, brick.color, brick.width, brick.height, unit_rect_mesh);
     }
 
-    WorldRender(Vec2f{pos_x, -30.f}, Vec3f{.1f, .1f, .99f}, 3.f, .8f, unit_rect_mesh);
+    WorldRender(Vec2f{player_pos_x, kWorldBoundaryY[0] + 1.6f}, Vec3f{.1f, .1f, 1.f}, player_width, .8f,
+                unit_rect_mesh);
 
-    WorldRender(Vec2f{0, 0}, Vec3f{.5f, 0.f, 1.f}, .8f, .8f, unit_circle_mesh);
+    WorldRender(ball_pos, Vec3f{.5f, 0.f, 1.f}, kBallRadius, kBallRadius, unit_circle_mesh);
   }
 }
 
