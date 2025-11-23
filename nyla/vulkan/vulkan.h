@@ -69,6 +69,8 @@ void Vulkan_CreateBuffer(VkCommandPool command_pool, VkQueue transfer_queue, VkD
 
 //
 
+void VulkanNameHandle(void* object_handle, const std::string& name);
+
 VkPipeline Vulkan_CreateGraphicsPipeline(const VkPipelineVertexInputStateCreateInfo& vertex_input_create_info,
                                          VkPipelineLayout pipeline_layout,
                                          std::span<const VkPipelineShaderStageCreateInfo> stages,

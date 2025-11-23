@@ -21,6 +21,7 @@ enum class RpVertAttr {
 
 struct RpBuf {
   bool enabled;
+  uint32_t stage_flags;
   uint32_t size;
   uint32_t range;
   uint32_t written;
@@ -29,6 +30,13 @@ struct RpBuf {
   std::vector<VkDeviceMemory> mem;
   std::vector<char*> mem_mapped;
 };
+
+inline VkShaderStageFlags RpBufStageFlags(const RpBuf& buf) {
+  if (buf.stage_flags)
+    return buf.stage_flags;
+  else
+    return VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+}
 
 struct Rp {
   std::string_view name;

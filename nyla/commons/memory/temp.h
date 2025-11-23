@@ -22,7 +22,7 @@ std::remove_cvref_t<T>& Tmake(T&& value) {
 }
 
 template <class T>
-std::span<T> Tarr(size_t n) {
+std::span<T> Tmakearr(size_t n) {
   T* p = reinterpret_cast<T*>(TAlloc(sizeof(T) * n, alignof(T)));
   for (size_t i = 0; i < n; ++i) {
     ::new (p + i) T;

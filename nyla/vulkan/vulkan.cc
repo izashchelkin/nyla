@@ -15,6 +15,7 @@
 #include "absl/log/log.h"
 #include "nyla/commons/debug/debugger.h"
 #include "nyla/commons/os/clock.h"
+#include "nyla/vulkan/renderdoc.h"
 
 namespace nyla {
 
@@ -54,12 +55,27 @@ void Vulkan_Initialize(const char* appname, std::span<const char* const> shader_
 
 #ifndef NDEBUG
         VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
+        VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME,
 #endif
     });
 
 #ifndef NDEBUG
+    const VkValidationFeatureEnableEXT enabled_validations[] = {
+        VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT,
+        VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_RESERVE_BINDING_SLOT_EXT,
+        VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT,
+        VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT,
+    };
+
+    const VkValidationFeaturesEXT validation_features{
+        .sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT,
+        .enabledValidationFeatureCount = static_cast<uint32_t>(std::size(enabled_validations)),
+        .pEnabledValidationFeatures = enabled_validations,
+    };
+
     const VkDebugUtilsMessengerCreateInfoEXT debug_messenger_create_info{
         .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+        .pNext = &validation_features,
         .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
                            VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
                            VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
@@ -426,7 +442,15 @@ VkShaderModule Vulkan_CreateShaderModule(const std::vector<char>& code) {
   return shader_module;
 }
 
+#if 0
+#define RENDERDOC_CAPTURE_EVERY_FRAME
+#endif
+
 void Vulkan_FrameBegin() {
+#if defined(RENDERDOC_CAPTURE_EVERY_FRAME)
+  RenderDocCaptureStart();
+#endif
+
   const VkFence frame_fence = vk.frame_fences[vk.current_frame_data.iframe];
 
   vkWaitForFences(vk.device, 1, &frame_fence, VK_TRUE, std::numeric_limits<uint64_t>::max());
@@ -647,6 +671,10 @@ void Vulkan_FrameEnd() {
   }
 
   vk.current_frame_data.iframe = (vk.current_frame_data.iframe + 1) % kVulkan_NumFramesInFlight;
+
+#if defined(RENDERDOC_CAPTURE_EVERY_FRAME)
+  RenderDocCaptureEnd();
+#endif
 }
 
 void Vulkan_CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
@@ -742,6 +770,19 @@ void Vulkan_CreateBuffer(VkCommandPool command_pool, VkQueue transfer_queue, VkD
   vkFreeCommandBuffers(vk.device, command_pool, 1, &command_buffer);
   vkDestroyBuffer(vk.device, staging_buffer, nullptr);
   vkFreeMemory(vk.device, staging_buffer_memory, nullptr);
+}
+
+void VulkanNameHandle(void* object_handle, const std::string& name) {
+  static PFN_vkSetDebugUtilsObjectNameEXT vkSetDebugUtilsObjectNameEXT =
+      VK_GET_INSTANCE_PROC_ADDR(vkSetDebugUtilsObjectNameEXT);
+
+  const VkDebugUtilsObjectNameInfoEXT name_info{
+      .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+      .objectType = VK_OBJECT_TYPE_BUFFER,
+      .objectHandle = reinterpret_cast<uint64_t>(object_handle),
+      .pObjectName = name.c_str(),
+  };
+  vkSetDebugUtilsObjectNameEXT(vk.device, &name_info);
 }
 
 #ifndef NDEBUG

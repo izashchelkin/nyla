@@ -11,6 +11,7 @@
 #include "nyla/apps/breakout/world_renderer.h"
 #include "nyla/commons/containers/map.h"
 #include "nyla/commons/containers/set.h"
+#include "nyla/commons/debug/debugger.h"
 #include "nyla/commons/logging/init.h"
 #include "nyla/commons/memory/temp.h"
 #include "nyla/commons/os/clock.h"

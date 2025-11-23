@@ -4,7 +4,8 @@
 
 #include <cstdint>
 
-#include "absl/log/log.h"
+#include "absl/strings/str_format.h"
+#include "nyla/commons/debug/debugger.h"
 #include "nyla/commons/memory/align.h"
 #include "nyla/commons/memory/charview.h"
 #include "nyla/commons/memory/temp.h"
@@ -21,18 +22,15 @@ static void CreateMappedBuffer(VkBufferUsageFlags usage, size_t buffer_size, VkB
   vkMapMemory(vk.device, memory, 0, buffer_size, 0, &mapped);
 }
 
-static void CreateMappedUniformBuffer(VkDescriptorSet descriptor_set, uint32_t dst_binding, bool dynamic,
-                                      uint32_t buffer_size, uint32_t range, VkBuffer& buffer, VkDeviceMemory& memory,
-                                      void*& mapped) {
-  CreateMappedBuffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, buffer_size, buffer, memory, mapped);
-
-  VkDescriptorBufferInfo descriptor_buffer_info{
+static void UpdateDescriptorSet(VkDescriptorSet descriptor_set, uint32_t dst_binding, bool dynamic, uint32_t range,
+                                VkBuffer& buffer) {
+  const VkDescriptorBufferInfo descriptor_buffer_info{
       .buffer = buffer,
       .offset = 0,
       .range = range,
   };
 
-  VkWriteDescriptorSet write_descriptor_set{
+  const VkWriteDescriptorSet write_descriptor_set{
       .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
       .dstSet = descriptor_set,
       .dstBinding = dst_binding,
@@ -55,8 +53,41 @@ static uint32_t CalcVertexBufferStride(Rp& rp) {
   return ret;
 }
 
-// FIXME:
+static void RpInitBuffer(Rp& rp, VkImageUsageFlags usage, RpBuf& b, const char* name, auto visitor) {
+  if (!b.enabled) return;
+
+  b.buffer.reserve(kVulkan_NumFramesInFlight);
+  b.mem.reserve(kVulkan_NumFramesInFlight);
+  b.mem_mapped.reserve(kVulkan_NumFramesInFlight);
+
+  for (size_t i = 0; i < kVulkan_NumFramesInFlight; ++i) {
+    if (b.buffer.size() <= i) {
+      b.buffer.resize(i + 1);
+      b.mem.resize(i + 1);
+      b.mem_mapped.resize(i + 1);
+
+      CreateMappedBuffer(usage, b.size, b.buffer[i], b.mem[i], reinterpret_cast<void*&>(b.mem_mapped[i]));
+      VulkanNameHandle(b.buffer[i], absl::StrFormat("Rp %s %s %d", rp.name, name, i));
+    }
+
+    visitor(rp, i, b);
+  }
+}
+
 void RpInit(Rp& rp) {
+  CHECK(!rp.name.empty());
+
+  if (rp.layout) {
+    vkDeviceWaitIdle(vk.device);
+    vkDestroyPipelineLayout(vk.device, rp.layout, nullptr);
+  }
+  if (rp.pipeline) {
+    vkDeviceWaitIdle(vk.device);
+    vkDestroyPipeline(vk.device, rp.pipeline, nullptr);
+  }
+
+  //
+
   rp.shader_stages.clear();
 
   rp.Init(rp);
@@ -72,7 +103,7 @@ void RpInit(Rp& rp) {
         .binding = 0,
         .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
         .descriptorCount = 1,
-        .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+        .stageFlags = RpBufStageFlags(rp.static_uniform),
     });
 
     uint32_t descriptor_count = kVulkan_NumFramesInFlight;
@@ -87,7 +118,7 @@ void RpInit(Rp& rp) {
         .binding = 1,
         .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
         .descriptorCount = 1,
-        .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+        .stageFlags = RpBufStageFlags(rp.dynamic_uniform),
     });
 
     uint32_t descriptor_count = kVulkan_NumFramesInFlight;
@@ -144,46 +175,18 @@ void RpInit(Rp& rp) {
   rp.desc_sets.resize(kVulkan_NumFramesInFlight);
   VK_CHECK(vkAllocateDescriptorSets(vk.device, &descriptor_set_alloc_info, rp.desc_sets.data()));
 
-  auto resize = [](auto& b) {
-    if (!b.enabled) return false;
-    if (!b.buffer.empty()) return false;
-
-    b.buffer.resize(kVulkan_NumFramesInFlight);
-    b.mem.resize(kVulkan_NumFramesInFlight);
-    b.mem_mapped.resize(kVulkan_NumFramesInFlight);
-
-    return true;
-  };
-
-  if (resize(rp.static_uniform)) {
-    for (size_t i = 0; i < kVulkan_NumFramesInFlight; ++i) {
-      if (rp.static_uniform.enabled) {
-        RpBuf& b = rp.static_uniform;
-        CreateMappedUniformBuffer(rp.desc_sets[i], 0, (bool)false, b.size, b.range, b.buffer[i], b.mem[i],
-                                  reinterpret_cast<void*&>(b.mem_mapped[i]));
-      }
-    }
-  }
-
-  if (resize(rp.dynamic_uniform)) {
-    for (size_t i = 0; i < kVulkan_NumFramesInFlight; ++i) {
-      if (rp.dynamic_uniform.enabled) {
-        RpBuf& b = rp.dynamic_uniform;
-        CreateMappedUniformBuffer(rp.desc_sets[i], 1, true, b.size, b.range, b.buffer[i], b.mem[i],
-                                  reinterpret_cast<void*&>(b.mem_mapped[i]));
-      }
-    }
-  }
-
-  if (resize(rp.vert_buf)) {
-    for (size_t i = 0; i < kVulkan_NumFramesInFlight; ++i) {
-      if (rp.vert_buf.enabled) {
-        RpBuf& b = rp.vert_buf;
-        CreateMappedBuffer(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, b.size, b.buffer[i], b.mem[i],
-                           reinterpret_cast<void*&>(b.mem_mapped[i]));
-      }
-    }
-  }
+  RpInitBuffer(rp, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, rp.static_uniform, "Static Uniform",
+               [](Rp& rp, size_t i, RpBuf& b) {
+                 UpdateDescriptorSet(rp.desc_sets[i], 0, false, b.range, b.buffer[i]);  //
+               });
+  RpInitBuffer(rp, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, rp.dynamic_uniform, "Dynamic Uniform",
+               [](Rp& rp, size_t i, RpBuf& b) {
+                 UpdateDescriptorSet(rp.desc_sets[i], 1, true, b.range, b.buffer[i]);  //
+               });
+  RpInitBuffer(rp, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, rp.vert_buf, "Vertex Buffer",  //
+               [](Rp& rp, size_t i, RpBuf& b) {
+                 //
+               });
 
   VkPipelineVertexInputStateCreateInfo vertex_input_create_info{
       .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
@@ -196,7 +199,7 @@ void RpInit(Rp& rp) {
         .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
     });
 
-    auto vertex_attr_descriptions = Tarr<VkVertexInputAttributeDescription>(rp.vert_buf.attrs.size());
+    auto vertex_attr_descriptions = Tmakearr<VkVertexInputAttributeDescription>(rp.vert_buf.attrs.size());
 
     uint32_t offset = 0;
     for (uint32_t i = 0; i < rp.vert_buf.attrs.size(); ++i) {
@@ -228,6 +231,7 @@ void RpInit(Rp& rp) {
 
   rp.pipeline =
       Vulkan_CreateGraphicsPipeline(vertex_input_create_info, rp.layout, rp.shader_stages, rasterizer_create_info);
+  VulkanNameHandle(rp.pipeline, absl::StrFormat("Rp %v", rp.name));
 }
 
 void RpBegin(Rp& rp) {
