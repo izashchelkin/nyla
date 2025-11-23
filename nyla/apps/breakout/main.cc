@@ -14,6 +14,7 @@
 #include "nyla/commons/logging/init.h"
 #include "nyla/commons/memory/temp.h"
 #include "nyla/commons/os/clock.h"
+#include "nyla/fwk/gui.h"
 #include "nyla/fwk/input.h"
 #include "nyla/vulkan/dbg_text_renderer.h"
 #include "nyla/vulkan/render_pipeline.h"
@@ -138,7 +139,9 @@ static int Main() {
   for (;;) {
     if (vk.shaders_invalidated) {
       RpInit(dbg_text_pipeline);
+      RpInit(gui_pipeline);
       RpInit(world_pipeline);
+
       vk.shaders_invalidated = false;
     }
 

@@ -80,26 +80,37 @@ void BreakoutInit() {
     }
   }
 }
+
+enum class GameStage {
+  kStartMenu,
+  kGame,
+};
+static GameStage stage = GameStage::kGame;
+
 void BreakoutRender() {
-  std::vector<Vertex> unit_rect;
-  unit_rect.reserve(6);
-  GenUnitRect([&unit_rect](float x, float y) { unit_rect.emplace_back(Vertex{Vec2f{x, y}}); });
+  static RpMesh unit_rect_mesh = [] {
+    std::vector<Vertex> unit_rect;
+    unit_rect.reserve(6);
+    GenUnitRect([&unit_rect](float x, float y) { unit_rect.emplace_back(Vertex{Vec2f{x, y}}); });
+    return RpVertCopy(world_pipeline, unit_rect.size(), CharViewSpan(std::span{unit_rect}));
+  }();
 
-  RpMesh unit_rect_mesh = RpVertCopy(world_pipeline, unit_rect.size(), CharViewSpan(std::span{unit_rect}));
+  static RpMesh unit_circle_mesh = [] {
+    std::vector<Vertex> unit_circle;
+    unit_circle.reserve(32 * 3);
+    GenUnitCircle(32, [&unit_circle](float x, float y) { unit_circle.emplace_back(Vertex{Vec2f{x, y}}); });
+    return RpVertCopy(world_pipeline, unit_circle.size(), CharViewSpan(std::span{unit_circle}));
+  }();
 
-  std::vector<Vertex> unit_circle;
-  unit_circle.reserve(32 * 3);
-  GenUnitCircle(32, [&unit_circle](float x, float y) { unit_circle.emplace_back(Vertex{Vec2f{x, y}}); });
+  if (stage == GameStage::kGame) {
+    for (Brick& brick : level.bricks) {
+      WorldRender(Vec2f{brick.x, brick.y}, brick.color, brick.width, brick.height, unit_rect_mesh);
+    }
 
-  RpMesh unit_circle_mesh = RpVertCopy(world_pipeline, unit_circle.size(), CharViewSpan(std::span{unit_circle}));
+    WorldRender(Vec2f{pos_x, -30.f}, Vec3f{.1f, .1f, .99f}, 3.f, .8f, unit_rect_mesh);
 
-  for (Brick& brick : level.bricks) {
-    WorldRender(Vec2f{brick.x, brick.y}, brick.color, brick.width, brick.height, unit_rect_mesh);
+    WorldRender(Vec2f{0, 0}, Vec3f{.5f, 0.f, 1.f}, .8f, .8f, unit_circle_mesh);
   }
-
-  WorldRender(Vec2f{pos_x, -30.f}, Vec3f{.1f, .1f, .99f}, 3.f, .8f, unit_rect_mesh);
-
-  WorldRender(Vec2f{0, 0}, Vec3f{.5f, 0.f, 1.f}, .8f, .8f, unit_circle_mesh);
 }
 
 }  // namespace nyla

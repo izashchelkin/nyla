@@ -55,6 +55,7 @@ static uint32_t CalcVertexBufferStride(Rp& rp) {
   return ret;
 }
 
+// FIXME:
 void RpInit(Rp& rp) {
   rp.shader_stages.clear();
 
@@ -144,34 +145,43 @@ void RpInit(Rp& rp) {
   VK_CHECK(vkAllocateDescriptorSets(vk.device, &descriptor_set_alloc_info, rp.desc_sets.data()));
 
   auto resize = [](auto& b) {
-    if (!b.enabled) return;
+    if (!b.enabled) return false;
+    if (!b.buffer.empty()) return false;
 
     b.buffer.resize(kVulkan_NumFramesInFlight);
     b.mem.resize(kVulkan_NumFramesInFlight);
     b.mem_mapped.resize(kVulkan_NumFramesInFlight);
+
+    return true;
   };
 
-  resize(rp.static_uniform);
-  resize(rp.dynamic_uniform);
-  resize(rp.vert_buf);
-
-  for (size_t i = 0; i < kVulkan_NumFramesInFlight; ++i) {
-    if (rp.static_uniform.enabled) {
-      RpBuf& b = rp.static_uniform;
-      CreateMappedUniformBuffer(rp.desc_sets[i], 0, (bool)false, b.size, b.range, b.buffer[i], b.mem[i],
-                                reinterpret_cast<void*&>(b.mem_mapped[i]));
+  if (resize(rp.static_uniform)) {
+    for (size_t i = 0; i < kVulkan_NumFramesInFlight; ++i) {
+      if (rp.static_uniform.enabled) {
+        RpBuf& b = rp.static_uniform;
+        CreateMappedUniformBuffer(rp.desc_sets[i], 0, (bool)false, b.size, b.range, b.buffer[i], b.mem[i],
+                                  reinterpret_cast<void*&>(b.mem_mapped[i]));
+      }
     }
+  }
 
-    if (rp.dynamic_uniform.enabled) {
-      RpBuf& b = rp.dynamic_uniform;
-      CreateMappedUniformBuffer(rp.desc_sets[i], 1, true, b.size, b.range, b.buffer[i], b.mem[i],
-                                reinterpret_cast<void*&>(b.mem_mapped[i]));
+  if (resize(rp.dynamic_uniform)) {
+    for (size_t i = 0; i < kVulkan_NumFramesInFlight; ++i) {
+      if (rp.dynamic_uniform.enabled) {
+        RpBuf& b = rp.dynamic_uniform;
+        CreateMappedUniformBuffer(rp.desc_sets[i], 1, true, b.size, b.range, b.buffer[i], b.mem[i],
+                                  reinterpret_cast<void*&>(b.mem_mapped[i]));
+      }
     }
+  }
 
-    if (rp.vert_buf.enabled) {
-      RpBuf& b = rp.vert_buf;
-      CreateMappedBuffer(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, b.size, b.buffer[i], b.mem[i],
-                         reinterpret_cast<void*&>(b.mem_mapped[i]));
+  if (resize(rp.vert_buf)) {
+    for (size_t i = 0; i < kVulkan_NumFramesInFlight; ++i) {
+      if (rp.vert_buf.enabled) {
+        RpBuf& b = rp.vert_buf;
+        CreateMappedBuffer(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, b.size, b.buffer[i], b.mem[i],
+                           reinterpret_cast<void*&>(b.mem_mapped[i]));
+      }
     }
   }
 
@@ -268,6 +278,9 @@ void RpDraw(Rp& rp, RpMesh mesh, CharView dynamic_uniform_data) {
 
   if (rp.vert_buf.enabled) {
     VkBuffer buf = rp.vert_buf.buffer[vk.current_frame_data.iframe];
+
+    auto a = std::span{rp.vert_buf.mem_mapped[vk.current_frame_data.iframe], 20};
+
     vkCmdBindVertexBuffers(cmd, 0, 1, &buf, &mesh.offset);
   }
 
