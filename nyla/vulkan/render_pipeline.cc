@@ -282,9 +282,6 @@ void RpDraw(Rp& rp, RpMesh mesh, CharView dynamic_uniform_data) {
 
   if (rp.vert_buf.enabled) {
     VkBuffer buf = rp.vert_buf.buffer[vk.current_frame_data.iframe];
-
-    auto a = std::span{rp.vert_buf.mem_mapped[vk.current_frame_data.iframe], 20};
-
     vkCmdBindVertexBuffers(cmd, 0, 1, &buf, &mesh.offset);
   }
 
