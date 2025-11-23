@@ -53,7 +53,7 @@ static uint32_t CalcVertexBufferStride(Rp& rp) {
   return ret;
 }
 
-static void RpInitBuffer(Rp& rp, VkImageUsageFlags usage, RpBuf& b, const char* name, auto visitor) {
+static void RpBufInit(Rp& rp, VkImageUsageFlags usage, RpBuf& b, const char* name, auto visitor) {
   if (!b.enabled) return;
 
   b.buffer.reserve(kVulkan_NumFramesInFlight);
@@ -175,18 +175,18 @@ void RpInit(Rp& rp) {
   rp.desc_sets.resize(kVulkan_NumFramesInFlight);
   VK_CHECK(vkAllocateDescriptorSets(vk.device, &descriptor_set_alloc_info, rp.desc_sets.data()));
 
-  RpInitBuffer(rp, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, rp.static_uniform, "Static Uniform",
-               [](Rp& rp, size_t i, RpBuf& b) {
-                 UpdateDescriptorSet(rp.desc_sets[i], 0, false, b.range, b.buffer[i]);  //
-               });
-  RpInitBuffer(rp, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, rp.dynamic_uniform, "Dynamic Uniform",
-               [](Rp& rp, size_t i, RpBuf& b) {
-                 UpdateDescriptorSet(rp.desc_sets[i], 1, true, b.range, b.buffer[i]);  //
-               });
-  RpInitBuffer(rp, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, rp.vert_buf, "Vertex Buffer",  //
-               [](Rp& rp, size_t i, RpBuf& b) {
-                 //
-               });
+  RpBufInit(rp, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, rp.static_uniform, "Static Uniform",
+            [](Rp& rp, size_t i, RpBuf& b) {
+              UpdateDescriptorSet(rp.desc_sets[i], 0, false, b.range, b.buffer[i]);  //
+            });
+  RpBufInit(rp, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, rp.dynamic_uniform, "Dynamic Uniform",
+            [](Rp& rp, size_t i, RpBuf& b) {
+              UpdateDescriptorSet(rp.desc_sets[i], 1, true, b.range, b.buffer[i]);  //
+            });
+  RpBufInit(rp, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, rp.vert_buf, "Vertex Buffer",  //
+            [](Rp& rp, size_t i, RpBuf& b) {
+              //
+            });
 
   VkPipelineVertexInputStateCreateInfo vertex_input_create_info{
       .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,

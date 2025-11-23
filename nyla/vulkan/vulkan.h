@@ -10,7 +10,7 @@
 
 namespace nyla {
 
-constexpr uint8_t kVulkan_NumFramesInFlight = 1;
+constexpr uint8_t kVulkan_NumFramesInFlight = 2;
 
 struct Vulkan_State {
   VkInstance instance;

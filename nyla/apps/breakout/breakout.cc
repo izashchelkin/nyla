@@ -87,20 +87,31 @@ enum class GameStage {
 };
 static GameStage stage = GameStage::kGame;
 
+template <typename T>
+static T& FrameLocal(std::vector<T>& vec, auto create) {
+  vec.reserve(kVulkan_NumFramesInFlight);
+  if (vk.current_frame_data.iframe >= vec.size()) {
+    vec.emplace_back(create());
+  }
+  return vec.at(vk.current_frame_data.iframe);
+}
+
 void BreakoutRender() {
-  static RpMesh unit_rect_mesh = [] {
+  static std ::vector<RpMesh> unit_rect_meshes;
+  RpMesh unit_rect_mesh = FrameLocal(unit_rect_meshes, [] {
     std::vector<Vertex> unit_rect;
     unit_rect.reserve(6);
     GenUnitRect([&unit_rect](float x, float y) { unit_rect.emplace_back(Vertex{Vec2f{x, y}}); });
     return RpVertCopy(world_pipeline, unit_rect.size(), CharViewSpan(std::span{unit_rect}));
-  }();
+  });
 
-  static RpMesh unit_circle_mesh = [] {
+  static std ::vector<RpMesh> unit_circle_meshes;
+  RpMesh unit_circle_mesh = FrameLocal(unit_circle_meshes, [] {
     std::vector<Vertex> unit_circle;
     unit_circle.reserve(32 * 3);
     GenUnitCircle(32, [&unit_circle](float x, float y) { unit_circle.emplace_back(Vertex{Vec2f{x, y}}); });
     return RpVertCopy(world_pipeline, unit_circle.size(), CharViewSpan(std::span{unit_circle}));
-  }();
+  });
 
   if (stage == GameStage::kGame) {
     for (Brick& brick : level.bricks) {
