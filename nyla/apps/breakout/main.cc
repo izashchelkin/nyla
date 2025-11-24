@@ -1,5 +1,8 @@
+#include <unistd.h>
+
 #include <cstdint>
 
+#include "absl/log/log.h"
 #include "nyla/apps/breakout/breakout.h"
 #include "nyla/apps/breakout/world_renderer.h"
 #include "nyla/commons/containers/map.h"
@@ -8,11 +11,12 @@
 #include "nyla/commons/logging/init.h"
 #include "nyla/commons/memory/temp.h"
 #include "nyla/commons/signal/signal.h"
+#include "nyla/fwk/dbg_text_renderer.h"
 #include "nyla/fwk/gui.h"
+#include "nyla/fwk/render_pipeline.h"
+#include "nyla/fwk/staging.h"
 #include "nyla/platform/key_physical.h"
 #include "nyla/platform/platform.h"
-#include "nyla/vulkan/dbg_text_renderer.h"
-#include "nyla/vulkan/render_pipeline.h"
 #include "nyla/vulkan/vulkan.h"
 #include "xcb/xcb.h"
 
@@ -37,35 +41,27 @@ static int Main() {
   }
   PlatformMapInputEnd();
 
-  const char* shader_watch_dirs[] = {
-      "nyla/apps/breakout/shaders", "nyla/apps/breakout/shaders/build",  //
-      "nyla/fwk/shaders",           "nyla/fwk/shaders/build",            //
-      "nyla/vulkan/shaders",        "nyla/vulkan/shaders/build",         //
-  };
-  Vulkan_Initialize("breakout", shader_watch_dirs);
+  Vulkan_Initialize("breakout");
 
   BreakoutInit();
 
   for (;;) {
-    if (vk.shaders_invalidated) {
-      RpInit(dbg_text_pipeline);
-      RpInit(gui_pipeline);
-      RpInit(world_pipeline);
-
-      vk.shaders_invalidated = false;
-    }
-
     PlatformProcessEvents();
-    if (PlatformShouldExit()) {
-      break;
+    if (PlatformShouldExit()) break;
+
+    if (RecompileShadersIfNeeded()) {
+      RpInit(world_pipeline);
+      RpInit(gui_pipeline);
+      RpInit(dbg_text_pipeline);
     }
 
     Vulkan_FrameBegin();
-    BreakoutProcess();
-
-    Vulkan_RenderingBegin();
-    BreakoutRender();
-    Vulkan_RenderingEnd();
+    {
+      BreakoutProcess();
+      Vulkan_RenderingBegin();
+      BreakoutRender();
+      Vulkan_RenderingEnd();
+    }
     Vulkan_FrameEnd();
   }
 

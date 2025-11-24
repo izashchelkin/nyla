@@ -1,4 +1,4 @@
-#include "nyla/vulkan/render_pipeline.h"
+#include "nyla/fwk/render_pipeline.h"
 
 #include <unistd.h>
 
@@ -10,6 +10,7 @@
 #include "nyla/commons/memory/charview.h"
 #include "nyla/commons/memory/temp.h"
 #include "nyla/commons/os/readfile.h"
+#include "nyla/platform/platform.h"
 #include "nyla/vulkan/vulkan.h"
 
 namespace nyla {
@@ -344,6 +345,8 @@ void RpAttachVertShader(Rp& rp, const std::string& path) {
       .module = Vulkan_CreateShaderModule(ReadFile(path)),
       .pName = "main",
   });
+
+  PlatformFsWatch(path);
 }
 
 void RpAttachFragShader(Rp& rp, const std::string& path) {
@@ -353,6 +356,8 @@ void RpAttachFragShader(Rp& rp, const std::string& path) {
       .module = Vulkan_CreateShaderModule(ReadFile(path)),
       .pName = "main",
   });
+
+  PlatformFsWatch(path);
 }
 
 }  // namespace nyla

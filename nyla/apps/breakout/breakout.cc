@@ -2,8 +2,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <complex>
-#include <cstdint>
 #include <cstring>
 #include <vector>
 
@@ -12,16 +10,12 @@
 #include "nyla/commons/color.h"
 #include "nyla/commons/containers/set.h"
 #include "nyla/commons/debug/debugger.h"
-#include "nyla/commons/math/lerp.h"
-#include "nyla/commons/math/math.h"
 #include "nyla/commons/math/vec/vec2f.h"
 #include "nyla/commons/math/vec/vec3f.h"
-#include "nyla/commons/math/vec/vec4f.h"
 #include "nyla/commons/memory/charview.h"
-#include "nyla/commons/os/clock.h"
+#include "nyla/fwk/dbg_text_renderer.h"
+#include "nyla/fwk/render_pipeline.h"
 #include "nyla/platform/abstract_input.h"
-#include "nyla/vulkan/dbg_text_renderer.h"
-#include "nyla/vulkan/render_pipeline.h"
 #include "nyla/vulkan/vulkan.h"
 
 namespace nyla {

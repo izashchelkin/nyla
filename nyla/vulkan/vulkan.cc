@@ -28,15 +28,15 @@ uint32_t GetFps() {
 
 static void CreateSwapchain();
 
-#ifndef NDEBUG
+#if !defined(NDEBUG) && !defined(NYLA_VULKAN_NDEBUG)
 
 static VkBool32 DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
                                        VkDebugUtilsMessageTypeFlagsEXT message_type,
                                        const VkDebugUtilsMessengerCallbackDataEXT* callback_data, void* user_data);
 #endif
 
-void Vulkan_Initialize(const char* appname, std::span<const char* const> shader_watch_directories) {
-#ifndef NDEBUG
+void Vulkan_Initialize(const char* appname) {
+#if !defined(NDEBUG) && !defined(NYLA_VULKAN_NDEBUG)
 #endif
 
   {
@@ -53,13 +53,13 @@ void Vulkan_Initialize(const char* appname, std::span<const char* const> shader_
         VK_KHR_SURFACE_EXTENSION_NAME,
         VK_KHR_XCB_SURFACE_EXTENSION_NAME,
 
-#ifndef NDEBUG
+#if !defined(NDEBUG) && !defined(NYLA_VULKAN_NDEBUG)
         VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
         VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME,
 #endif
     });
 
-#ifndef NDEBUG
+#if !defined(NDEBUG) && !defined(NYLA_VULKAN_NDEBUG)
     const VkValidationFeatureEnableEXT enabled_validations[] = {
         VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT,
         VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_RESERVE_BINDING_SLOT_EXT,
@@ -93,7 +93,7 @@ void Vulkan_Initialize(const char* appname, std::span<const char* const> shader_
 
     const VkInstanceCreateInfo instance_create_info{
         .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-#ifndef NDEBUG
+#ifdef NYLA_VULKAN_DEBUG
         .pNext = &debug_messenger_create_info,
 #endif
         .pApplicationInfo = &app_info,
@@ -103,9 +103,9 @@ void Vulkan_Initialize(const char* appname, std::span<const char* const> shader_
         .ppEnabledExtensionNames = instance_extensions.data(),
     };
 
-    CHECK_EQ(vkCreateInstance(&instance_create_info, nullptr, &vk.instance), VK_SUCCESS);
+    VK_CHECK(vkCreateInstance(&instance_create_info, nullptr, &vk.instance));
 
-#ifndef NDEBUG
+#if !defined(NDEBUG) && !defined(NYLA_VULKAN_NDEBUG)
     VkDebugUtilsMessengerEXT debug_messenger;
     CHECK_EQ(VK_GET_INSTANCE_PROC_ADDR(vkCreateDebugUtilsMessengerEXT)(vk.instance, &debug_messenger_create_info,
                                                                        nullptr, &debug_messenger),
@@ -213,17 +213,6 @@ void Vulkan_Initialize(const char* appname, std::span<const char* const> shader_
   vk.submit_semaphores.resize(vk.swapchain_image_count());
   for (uint8_t i = 0; i < vk.swapchain_image_count(); ++i) {
     vk.submit_semaphores[i] = CreateSemaphore();
-  }
-
-  //
-
-  {
-    vk.shaderdir_inotify_fd = inotify_init1(IN_NONBLOCK);
-    CHECK(vk.shaderdir_inotify_fd > 0);
-
-    for (const char* dir : shader_watch_directories) {
-      CHECK_GT(inotify_add_watch(vk.shaderdir_inotify_fd, dir, IN_MODIFY), 0);
-    }
   }
 }
 
@@ -455,48 +444,6 @@ void Vulkan_FrameBegin() {
 
   vkWaitForFences(vk.device, 1, &frame_fence, VK_TRUE, std::numeric_limits<uint64_t>::max());
   vkResetFences(vk.device, 1, &frame_fence);
-
-  {
-    char buf[4096] __attribute__((aligned(__alignof__(struct inotify_event))));
-    char* bufp = buf;
-
-    int numread;
-
-    while ((numread = read(vk.shaderdir_inotify_fd, buf, sizeof(buf))) > 0) {
-      while (bufp != buf + numread) {
-        inotify_event* event = reinterpret_cast<inotify_event*>(bufp);
-        bufp += sizeof(inotify_event);
-
-        if (event->mask & IN_ISDIR) {
-          bufp += event->len;
-        } else {
-          std::string_view name = {bufp, strlen(bufp)};
-          bufp += event->len;
-
-          if (name.ends_with(".spv")) {
-            vk.shaders_invalidated = true;
-            continue;
-          }
-
-          if (name.ends_with(".vert") || name.ends_with(".frag")) {
-            vk.shaders_recompile = true;
-          }
-        }
-      }
-    }
-
-    if (vk.shaders_recompile) {
-      vk.shaders_invalidated = false;
-
-      LOG(INFO) << "shaders recompiling";
-      system("python3 /home/izashchelkin/nyla/scripts/shaders.py");
-      vk.shaders_recompile = false;
-    }
-
-    if (vk.shaders_invalidated) {
-      LOG(INFO) << "shaders invalidated";
-    }
-  }
 
   const VkSemaphore acquire_semaphore = vk.acquire_semaphores[vk.current_frame_data.iframe];
   VkResult acquire_result =
@@ -773,6 +720,7 @@ void Vulkan_CreateBuffer(VkCommandPool command_pool, VkQueue transfer_queue, VkD
 }
 
 void VulkanNameHandle(void* object_handle, const std::string& name) {
+#if !defined(NDEBUG) && !defined(NYLA_VULKAN_NDEBUG)
   static PFN_vkSetDebugUtilsObjectNameEXT vkSetDebugUtilsObjectNameEXT =
       VK_GET_INSTANCE_PROC_ADDR(vkSetDebugUtilsObjectNameEXT);
 
@@ -783,9 +731,11 @@ void VulkanNameHandle(void* object_handle, const std::string& name) {
       .pObjectName = name.c_str(),
   };
   vkSetDebugUtilsObjectNameEXT(vk.device, &name_info);
+#endif
 }
 
-#ifndef NDEBUG
+#if !defined(NDEBUG) && !defined(NYLA_VULKAN_NDEBUG)
+
 static VkBool32 DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
                                        VkDebugUtilsMessageTypeFlagsEXT message_type,
                                        const VkDebugUtilsMessengerCallbackDataEXT* callback_data, void* user_data) {
@@ -803,6 +753,7 @@ static VkBool32 DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT me
   }
   return VK_FALSE;
 }
+
 #endif
 
 }  // namespace nyla

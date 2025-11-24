@@ -11,5 +11,7 @@ cc_library(
         "@abseil-cpp//absl/log:check",
         "@abseil-cpp//absl/log:initialize",
         "@abseil-cpp//absl/strings:str_format",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/container:flat_hash_map",
     ],
 )

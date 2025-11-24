@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 
 #include "nyla/platform/abstract_input.h"
 #include "nyla/platform/key_physical.h"
@@ -22,6 +23,15 @@ struct PlatformWindowSize {
 };
 
 PlatformWindowSize PlatformGetWindowSize(PlatformWindow window);
+
+void PlatformFsWatch(const std::string& path);
+
+struct PlatformFsChange {
+  bool isdir;
+  bool seen;
+  std::string path;
+};
+std::span<PlatformFsChange> PlatformFsGetChanges();
 
 void PlatformProcessEvents();
 bool PlatformShouldExit();

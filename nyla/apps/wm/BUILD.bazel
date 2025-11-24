@@ -8,27 +8,12 @@ cc_binary(
             "*.h",
         ],
     ),
-    defines = ["NYLA_ENTRYPOINT"],
     linkopts = [
-        "-lvulkan",
         "-lxcb-screensaver",
     ],
     deps = [
         "//nyla/dbus",
         "//nyla/debugfs",
-        "//nyla/fwk",
-    ],
-)
-
-cc_binary(
-    name = "wmbackground",
-    srcs = glob([
-        "wm_background.cc",
-        "wm_background.h",
-    ]),
-    deps = [
-        "//nyla/dbus",
-        "//nyla/debugfs",
-        "//nyla/fwk",
+        "//nyla/fwk:fwk_nvkdbg",
     ],
 )

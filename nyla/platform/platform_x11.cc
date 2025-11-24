@@ -1,3 +1,6 @@
+#include <sys/inotify.h>
+#include <unistd.h>
+
 #include <cstdint>
 
 #include "absl/cleanup/cleanup.h"
@@ -60,8 +63,48 @@ PlatformWindowSize PlatformGetWindowSize(PlatformWindow window) {
   return {window_geometry->width, window_geometry->height};
 }
 
+static int fs_notify_fd = 0;
+static std::array<PlatformFsChange, 16> fs_changes;
+static uint32_t fs_changes_at = 0;
+static std::vector<std::string> fs_watched;
+
+void PlatformFsWatch(const std::string& filepath) {
+  if (!fs_notify_fd) {
+    fs_notify_fd = inotify_init1(IN_NONBLOCK);
+    CHECK_GT(fs_notify_fd, 0);
+  }
+
+  fs_watched.emplace_back(filepath);
+}
+
+std::span<PlatformFsChange> PlatformFsGetChanges() {
+  return fs_changes;
+}
+
 void PlatformProcessEvents() {
   AbstractInputProcessFrame();
+
+  if (fs_notify_fd) {
+    char buf[4096] __attribute__((aligned(__alignof__(struct inotify_event))));
+    char* bufp = buf;
+
+    int numread;
+    while ((numread = read(fs_notify_fd, buf, sizeof(buf))) > 0) {
+      while (bufp != buf + numread) {
+        inotify_event* event = reinterpret_cast<inotify_event*>(bufp);
+        bufp += sizeof(inotify_event);
+
+        std::string path = {bufp, strlen(bufp)};
+        bufp += event->len;
+
+        fs_changes[fs_changes_at] = {
+            .isdir = static_cast<bool>(event->mask & IN_ISDIR),
+            .path = path,
+        };
+        fs_changes_at = (fs_changes_at + 1) % fs_changes.size();
+      }
+    }
+  }
 
   for (;;) {
     if (xcb_connection_has_error(x11.conn)) {

@@ -10,8 +10,9 @@
 #include "nyla/commons/containers/map.h"
 #include "nyla/commons/logging/init.h"
 #include "nyla/commons/memory/optional.h"
+#include "nyla/fwk/dbg_text_renderer.h"
 #include "nyla/fwk/gui.h"
-#include "nyla/vulkan/dbg_text_renderer.h"
+#include "nyla/fwk/staging.h"
 #include "nyla/vulkan/vulkan.h"
 #include "nyla/x11/error.h"
 #include "nyla/x11/x11.h"
@@ -23,10 +24,9 @@ namespace nyla {
 xcb_window_t background_window;
 
 void DrawBackground(uint32_t num_clients, std::string_view bar_text) {
-  if (vk.shaders_invalidated) {
+  if (RecompileShadersIfNeeded()) {
     RpInit(dbg_text_pipeline);
     RpInit(gui_pipeline);
-    vk.shaders_invalidated = false;
   }
 
   Vulkan_FrameBegin();
@@ -53,7 +53,7 @@ std::future<void> InitWMBackground() {
   xcb_configure_window(x11.conn, background_window, XCB_CONFIG_WINDOW_STACK_MODE, (uint32_t[]){XCB_STACK_MODE_BELOW});
   X11_Flush();
 
-  return std::async(std::launch::async, [] { Vulkan_Initialize("wm_background", {}); });
+  return std::async(std::launch::async, [] { Vulkan_Initialize("wm_background"); });
 }
 
 static xcb_connection_t* GetVkXcbConn() {

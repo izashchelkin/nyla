@@ -1,0 +1,5 @@
+namespace nyla {
+
+bool RecompileShadersIfNeeded();
+
+}

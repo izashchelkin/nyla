@@ -3,10 +3,11 @@
 #include "nyla/commons/logging/init.h"
 #include "nyla/commons/memory/temp.h"
 #include "nyla/commons/signal/signal.h"
+#include "nyla/fwk/dbg_text_renderer.h"
 #include "nyla/fwk/gui.h"
+#include "nyla/fwk/render_pipeline.h"
+#include "nyla/fwk/staging.h"
 #include "nyla/platform/platform.h"
-#include "nyla/vulkan/dbg_text_renderer.h"
-#include "nyla/vulkan/render_pipeline.h"
 #include "nyla/vulkan/vulkan.h"
 
 namespace nyla {
@@ -21,25 +22,17 @@ static int Main() {
 
   window = PlatformCreateWindow();
 
-  const char* shader_watch_dirs[] = {
-      "nyla/fwk/shaders",
-      "nyla/fwk/shaders/build",
-      "nyla/vulkan/shaders",
-      "nyla/vulkan/shaders/build",
-  };
-  Vulkan_Initialize("guidemo", shader_watch_dirs);
+  Vulkan_Initialize("guidemo");
 
   for (;;) {
-    if (vk.shaders_invalidated) {
-      RpInit(gui_pipeline);
-      RpInit(dbg_text_pipeline);
-
-      vk.shaders_invalidated = false;
-    }
-
     PlatformProcessEvents();
     if (PlatformShouldExit()) {
       break;
+    }
+
+    if (RecompileShadersIfNeeded()) {
+      RpInit(gui_pipeline);
+      RpInit(dbg_text_pipeline);
     }
 
     Vulkan_FrameBegin();

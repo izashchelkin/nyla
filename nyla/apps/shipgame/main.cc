@@ -8,10 +8,11 @@
 #include "nyla/commons/logging/init.h"
 #include "nyla/commons/memory/temp.h"
 #include "nyla/commons/signal/signal.h"
+#include "nyla/fwk/dbg_text_renderer.h"
+#include "nyla/fwk/render_pipeline.h"
+#include "nyla/fwk/staging.h"
 #include "nyla/platform/key_physical.h"
 #include "nyla/platform/platform.h"
-#include "nyla/vulkan/dbg_text_renderer.h"
-#include "nyla/vulkan/render_pipeline.h"
 #include "nyla/vulkan/vulkan.h"
 #include "xcb/xcb.h"
 
@@ -43,37 +44,30 @@ static int Main() {
   }
   PlatformMapInputEnd();
 
-  const char* shader_watch_dirs[] = {
-      "nyla/apps/shipgame/shaders", "nyla/apps/shipgame/shaders/build",  //
-      "nyla/fwk/shaders",           "nyla/fwk/shaders/build",            //
-      "nyla/vulkan/shaders",        "nyla/vulkan/shaders/build",         //
-  };
-  Vulkan_Initialize("shipgame", shader_watch_dirs);
+  Vulkan_Initialize("shipgame");
 
   ShipgameInit();
 
   for (;;) {
-    if (vk.shaders_invalidated) {
+    PlatformProcessEvents();
+    if (PlatformShouldExit()) break;
+
+    if (RecompileShadersIfNeeded()) {
       RpInit(world_pipeline);
       RpInit(dbg_text_pipeline);
       RpInit(grid_pipeline);
-
-      vk.shaders_invalidated = false;
-    }
-
-    PlatformProcessEvents();
-    if (PlatformShouldExit()) {
-      break;
     }
 
     Vulkan_FrameBegin();
-    ShipgameProcess();
-
-    Vulkan_RenderingBegin();
-    ShipgameRender();
-    Vulkan_RenderingEnd();
+    {
+      ShipgameProcess();
+      Vulkan_RenderingBegin();
+      ShipgameRender();
+      Vulkan_RenderingEnd();
+    }
     Vulkan_FrameEnd();
   }
+
   return 0;
 }
 

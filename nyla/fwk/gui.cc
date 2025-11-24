@@ -4,7 +4,7 @@
 
 #include "nyla/commons/math/vec/vec4f.h"
 #include "nyla/commons/memory/charview.h"
-#include "nyla/vulkan/render_pipeline.h"
+#include "nyla/fwk/render_pipeline.h"
 
 namespace nyla {
 

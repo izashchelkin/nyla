@@ -1,9 +1,9 @@
-#include "nyla/vulkan/dbg_text_renderer.h"
+#include "nyla/fwk/dbg_text_renderer.h"
 
 #include <cstdint>
 
 #include "nyla/commons/memory/charview.h"
-#include "nyla/vulkan/render_pipeline.h"
+#include "nyla/fwk/render_pipeline.h"
 
 namespace nyla {
 
@@ -56,8 +56,8 @@ Rp dbg_text_pipeline{
         },
     .Init =
         [](Rp& rp) {
-          RpAttachVertShader(rp, "/home/izashchelkin/nyla/nyla/vulkan/shaders/build/dbgtext.vert.spv");
-          RpAttachFragShader(rp, "/home/izashchelkin/nyla/nyla/vulkan/shaders/build/dbgtext.frag.spv");
+          RpAttachVertShader(rp, "/home/izashchelkin/nyla/nyla/fwk/shaders/build/dbgtext.vert.spv");
+          RpAttachFragShader(rp, "/home/izashchelkin/nyla/nyla/fwk/shaders/build/dbgtext.frag.spv");
         },
 };
 

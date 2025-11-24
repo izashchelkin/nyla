@@ -37,10 +37,6 @@ struct Vulkan_State {
   std::vector<VkSemaphore> submit_semaphores;
   std::vector<VkCommandBuffer> command_buffers;
 
-  int shaderdir_inotify_fd;
-  bool shaders_recompile = true;
-  bool shaders_invalidated = true;
-
   struct {
     uint32_t swapchain_image_index;
     float dt;
@@ -53,7 +49,7 @@ extern Vulkan_State vk;
 
 #define VK_CHECK(res) CHECK_EQ(res, VK_SUCCESS) << "Vulkan error: " << string_VkResult(res);
 
-void Vulkan_Initialize(const char* appname, std::span<const char* const> shader_watch_directories);
+void Vulkan_Initialize(const char* appname);
 
 void Vulkan_PlatformSetSurface();
 VkExtent2D Vulkan_PlatformGetWindowExtent();

@@ -8,7 +8,6 @@ cc_binary(
             "*.h",
         ],
     ),
-    linkopts = ["-lvulkan"],
     deps = [
         "//nyla/fwk",
         "//nyla/platform",

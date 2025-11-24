@@ -4,7 +4,6 @@ cc_binary(
         "*.cc",
         "*.h",
     ]),
-    linkopts = ["-lvulkan"],
     deps = [
         "//nyla/fwk",
     ],

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "nyla/vulkan/render_pipeline.h"
+#include "nyla/fwk/render_pipeline.h"
 
 namespace nyla {
 

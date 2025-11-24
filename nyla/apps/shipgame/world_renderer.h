@@ -2,7 +2,7 @@
 
 #include "nyla/commons/math/vec/vec2f.h"
 #include "nyla/commons/math/vec/vec3f.h"
-#include "nyla/vulkan/render_pipeline.h"
+#include "nyla/fwk/render_pipeline.h"
 
 namespace nyla {
 

@@ -11,8 +11,8 @@
 #include "nyla/commons/math/math.h"
 #include "nyla/commons/math/vec/vec2f.h"
 #include "nyla/commons/os/clock.h"
+#include "nyla/fwk/dbg_text_renderer.h"
 #include "nyla/platform/abstract_input.h"
-#include "nyla/vulkan/dbg_text_renderer.h"
 #include "nyla/vulkan/vulkan.h"
 
 namespace nyla {

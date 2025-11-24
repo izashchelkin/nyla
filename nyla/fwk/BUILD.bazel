@@ -11,12 +11,21 @@ cc_library(
         "*.h",
     ]),
     deps = [
-        "//nyla/commons",
+        "//nyla/platform",
         "//nyla/vulkan",
-        "//nyla/x11",
-        "@abseil-cpp//absl/container:flat_hash_set",
-        "@abseil-cpp//absl/log",
-        "@abseil-cpp//absl/log:check",
-        "@abseil-cpp//absl/log:initialize",
+    ],
+)
+
+cc_library(
+    name = "fwk_nvkdbg",
+    srcs = glob([
+        "*.cc",
+    ]),
+    hdrs = glob([
+        "*.h",
+    ]),
+    deps = [
+        "//nyla/platform",
+        "//nyla/vulkan:vulkan_nvkdbg",
     ],
 )

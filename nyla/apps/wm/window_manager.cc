@@ -7,7 +7,6 @@
 #include <iterator>
 #include <limits>
 #include <span>
-#include <thread>
 #include <variant>
 #include <vector>
 
@@ -23,8 +22,6 @@
 #include "nyla/commons/containers/map.h"
 #include "nyla/commons/memory/optional.h"
 #include "nyla/debugfs/debugfs.h"
-#include "nyla/vulkan/dbg_text_renderer.h"
-#include "nyla/vulkan/vulkan.h"
 #include "nyla/x11/error.h"
 #include "nyla/x11/wm_hints.h"
 #include "nyla/x11/x11.h"
