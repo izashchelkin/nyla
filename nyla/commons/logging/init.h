@@ -1,3 +1,5 @@
+#pragma once
+
 namespace nyla {
 
 void LoggingInit();
