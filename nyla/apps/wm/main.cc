@@ -1,4 +1,3 @@
-#include <signal.h>
 #include <sys/poll.h>
 #include <sys/time.h>
 #include <unistd.h>
@@ -17,6 +16,7 @@
 #include "nyla/commons/memory/temp.h"
 #include "nyla/commons/os/spawn.h"
 #include "nyla/commons/os/timerfd.h"
+#include "nyla/commons/signal/signal.h"
 #include "nyla/dbus/dbus.h"
 #include "nyla/debugfs/debugfs.h"
 #include "nyla/x11/x11.h"
@@ -26,19 +26,10 @@
 namespace nyla {
 
 int Main(int argc, char** argv) {
-  {
-    struct sigaction sa;
-    sa.sa_handler = [](int signum) { CHECK(false); };
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_RESTART;
-    if (sigaction(SIGINT, &sa, NULL) == -1) {
-      LOG(ERROR) << "sigaction failed";
-      return false;
-    }
-  }
-
   LoggingInit();
   TArenaInit();
+  SigIntCoreDump();
+  SigSegvExitZero();
 
   bool is_running = true;
 
