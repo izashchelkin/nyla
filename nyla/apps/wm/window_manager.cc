@@ -874,8 +874,18 @@ void UpdateBackground() {
   wm_background_dirty = false;
 
   const WindowStack& stack = GetActiveStack();
-  const std::string& active_client_name =
-      stack.active_window ? wm_clients.at(stack.active_window).name : ("nylawm " + std::to_string(wm_active_stack_idx));
+
+  std::string active_client_name;
+
+  if (stack.active_window) {
+    auto it = wm_clients.find(stack.active_window);
+    if (it == wm_clients.end())
+      active_client_name = absl::StrFormat("invalid %v", stack.active_window);
+    else
+      active_client_name = it->second.name;
+  } else {
+    active_client_name = absl::StrFormat("nylawm %v", wm_active_stack_idx);
+  }
 
   double load_avg[3];
   getloadavg(load_avg, std::size(load_avg));
