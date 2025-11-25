@@ -10,9 +10,9 @@
 
 namespace nyla {
 
-constexpr uint8_t kVulkan_NumFramesInFlight = 2;
-
 struct Vulkan_State {
+  uint32_t max_frames_inflight;
+
   VkInstance instance;
   VkDevice device;
   uint32_t queue_family_index;
@@ -53,15 +53,6 @@ void Vulkan_Initialize(const char* appname);
 
 void Vulkan_PlatformSetSurface();
 VkExtent2D Vulkan_PlatformGetWindowExtent();
-
-//
-
-void Vulkan_CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
-                         VkBuffer& buffer, VkDeviceMemory& buffer_memory);
-
-void Vulkan_CreateBuffer(VkCommandPool command_pool, VkQueue transfer_queue, VkDeviceSize data_size,
-                         const void* src_data, VkBufferUsageFlags usage, VkBuffer& buffer,
-                         VkDeviceMemory& buffer_memory);
 
 //
 
