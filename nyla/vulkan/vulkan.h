@@ -1,22 +1,41 @@
 #pragma once
 
-#define VK_USE_PLATFORM_XCB_KHR
-
 #include <cstdint>
 
 #include "absl/log/check.h"
 #include "vulkan/vk_enum_string_helper.h"
-#include "vulkan/vulkan.h"
+#include "vulkan/vulkan_core.h"
 
 namespace nyla {
 
-struct Vulkan_State {
-  uint32_t max_frames_inflight;
+struct GraphicsFence {
+  uint64_t val;
+};
+
+struct TransferFence {
+  uint64_t val;
+};
+
+constexpr static uint32_t kInvalidQueueFamilyIndex = std::numeric_limits<uint32_t>::max();
+
+struct VkQueueState {
+  uint32_t family_index;
+  VkQueue queue;
+  VkSemaphore timeline;
+  uint64_t timeline_next;
+};
+
+struct VkState {
+  uint32_t frames_inflight;
 
   VkInstance instance;
   VkDevice device;
-  uint32_t queue_family_index;
-  VkQueue queue;
+
+  VkQueueState graphics_queue;
+  std::vector<GraphicsFence> frame_done;
+  VkQueueState transfer_queue;
+  TransferFence transfer_done;
+
   VkPhysicalDevice phys_device;
   VkPhysicalDeviceProperties phys_device_props;
   VkSurfaceKHR surface;
@@ -33,17 +52,15 @@ struct Vulkan_State {
   std::vector<VkImageView> swapchain_image_views;
 
   std::vector<VkSemaphore> acquire_semaphores;
-  std::vector<VkFence> frame_fences;
-  std::vector<VkSemaphore> submit_semaphores;
-  std::vector<VkCommandBuffer> command_buffers;
+  std::vector<VkCommandBuffer> cmd;
 
   struct {
     uint32_t swapchain_image_index;
     float dt;
     uint8_t iframe;
-  } current_frame_data;
+  } cur;
 };
-extern Vulkan_State vk;
+extern VkState vk;
 
 #define VK_GET_INSTANCE_PROC_ADDR(name) reinterpret_cast<PFN_##name>(vkGetInstanceProcAddr(vk.instance, #name))
 
@@ -65,31 +82,9 @@ VkPipeline Vulkan_CreateGraphicsPipeline(const VkPipelineVertexInputStateCreateI
 
 VkShaderModule Vulkan_CreateShaderModule(const std::vector<char>& code);
 
-//
-
-inline VkSemaphore CreateSemaphore() {
-  const VkSemaphoreCreateInfo create_info{
-      .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
-  };
-
-  VkSemaphore semaphore;
-  VK_CHECK(vkCreateSemaphore(vk.device, &create_info, nullptr, &semaphore));
-  return semaphore;
-}
-
-inline VkFence CreateFence(bool signaled = false) {
-  VkFenceCreateFlags flags{};
-  if (signaled) flags += VK_FENCE_CREATE_SIGNALED_BIT;
-
-  const VkFenceCreateInfo create_info{
-      .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
-      .flags = flags,
-  };
-
-  VkFence fence;
-  VK_CHECK(vkCreateFence(vk.device, &create_info, nullptr, &fence));
-  return fence;
-}
+VkSemaphore VkCreateTimelineSemaphore(uint64_t initial_value);
+VkSemaphore VkCreateSemaphore();
+VkFence VkCreateFence(bool signaled = false);
 
 //
 
