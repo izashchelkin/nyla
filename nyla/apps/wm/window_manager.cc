@@ -218,6 +218,7 @@ static void Activate(const WindowStack& stack, xcb_timestamp_t time) {
 
 revert_to_root:
   xcb_set_input_focus(x11.conn, XCB_INPUT_FOCUS_NONE, x11.screen->root, time);
+  last_entered_window = 0;
 }
 
 static void Activate(WindowStack& stack, xcb_window_t client_window, xcb_timestamp_t time) {
@@ -234,9 +235,15 @@ static void MaybeActivateUnderPointer(WindowStack& stack, xcb_timestamp_t ts) {
   if (stack.zoom) return;
   if (wm_follow) return;
 
-  if (!last_entered_window) return;
-  if (last_entered_window == x11.screen->root) return;
-  if (last_entered_window == stack.active_window) return;
+  if (!last_entered_window) {
+    return;
+  }
+  if (last_entered_window == x11.screen->root) {
+    return;
+  }
+  if (last_entered_window == stack.active_window) {
+    return;
+  }
 
   if (last_rawmotion_ts > ts) return;
   if (ts - last_rawmotion_ts > 3) return;
