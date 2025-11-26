@@ -1,12 +1,14 @@
 #include "nyla/vulkan/vulkan.h"
 
 #include <dlfcn.h>
+#include <fcntl.h>
 #include <sys/inotify.h>
 #include <unistd.h>
 #include <xkbcommon/xkbcommon.h>
 
 #include <array>
 #include <cstdint>
+#include <ctime>
 #include <limits>
 #include <string_view>
 #include <vector>
@@ -231,46 +233,45 @@ void Vulkan_Initialize(const char* appname) {
       .enabledExtensionCount = device_extensions.size(),
       .ppEnabledExtensionNames = device_extensions.data(),
   };
-  VK_CHECK(vkCreateDevice(vk.phys_device, &device_create_info, nullptr, &vk.device));
+  VK_CHECK(vkCreateDevice(vk.phys_device, &device_create_info, nullptr, &vk.dev));
 
-  vkGetDeviceQueue(vk.device, vk.graphics_queue.family_index, 0, &vk.graphics_queue.queue);
+  vkGetDeviceQueue(vk.dev, vk.graphics_queue.family_index, 0, &vk.graphics_queue.queue);
   if (vk.transfer_queue.family_index == kInvalidQueueFamilyIndex) {
     vk.transfer_queue.family_index = vk.graphics_queue.family_index;
     vk.transfer_queue.queue = vk.graphics_queue.queue;
   } else {
-    vkGetDeviceQueue(vk.device, vk.transfer_queue.family_index, 0, &vk.transfer_queue.queue);
+    vkGetDeviceQueue(vk.dev, vk.transfer_queue.family_index, 0, &vk.transfer_queue.queue);
   }
 
-  Vulkan_PlatformSetSurface();
-  CreateSwapchain();
+  auto init_queue = [](VkQueueState& queue, uint32_t num_command_buffers) {
+    const VkCommandPoolCreateInfo command_pool_create_info{
+        .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+        .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+        .queueFamilyIndex = queue.family_index,
+    };
+    VK_CHECK(vkCreateCommandPool(vk.dev, &command_pool_create_info, nullptr, &queue.cmd_pool));
 
-  const VkCommandPoolCreateInfo command_pool_create_info{
-      .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-      .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-      .queueFamilyIndex = vk.queue_family_index,
-  };
-
-  CHECK(vkCreateCommandPool(vk.device, &command_pool_create_info, nullptr, &vk.command_pool) == VK_SUCCESS);
-
-  vk.cmd.resize(vk.frames_inflight);
-  for (uint8_t i = 0; i < vk.frames_inflight; ++i) {
     const VkCommandBufferAllocateInfo alloc_info{
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-        .commandPool = vk.command_pool,
+        .commandPool = queue.cmd_pool,
         .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-        .commandBufferCount = 1,
+        .commandBufferCount = num_command_buffers,
     };
+    VK_CHECK(vkAllocateCommandBuffers(vk.dev, &alloc_info, queue.cmd));
 
-    VK_CHECK(vkAllocateCommandBuffers(vk.device, &alloc_info, vk.cmd.data() + i));
-  }
-
-  vk.timeline = VkCreateTimelineSemaphore(0);
-  vk.timeline_next = 1;
+    queue.timeline = VkCreateTimelineSemaphore(0);
+    queue.timeline_next = 1;
+  };
+  init_queue(vk.graphics_queue, vk.frames_inflight);
+  init_queue(vk.transfer_queue, 1);
 
   vk.acquire_semaphores.resize(vk.frames_inflight);
   for (size_t i = 0; i < vk.frames_inflight; ++i) {
     vk.acquire_semaphores[i] = VkCreateSemaphore();
   }
+
+  Vulkan_PlatformSetSurface();
+  CreateSwapchain();
 }
 
 static void CreateSwapchain() {
@@ -342,17 +343,17 @@ static void CreateSwapchain() {
         .clipped = VK_TRUE,
         .oldSwapchain = vk.swapchain,
     };
-    VK_CHECK(vkCreateSwapchainKHR(vk.device, &create_info, nullptr, &vk.swapchain));
+    VK_CHECK(vkCreateSwapchainKHR(vk.dev, &create_info, nullptr, &vk.swapchain));
   }
 
   {
     uint32_t swapchain_image_count;
-    vkGetSwapchainImagesKHR(vk.device, vk.swapchain, &swapchain_image_count, nullptr);
+    vkGetSwapchainImagesKHR(vk.dev, vk.swapchain, &swapchain_image_count, nullptr);
 
     vk.swapchain_images.resize(swapchain_image_count);
     vk.swapchain_image_views.resize(swapchain_image_count);
 
-    vkGetSwapchainImagesKHR(vk.device, vk.swapchain, &swapchain_image_count, vk.swapchain_images.data());
+    vkGetSwapchainImagesKHR(vk.dev, vk.swapchain, &swapchain_image_count, vk.swapchain_images.data());
 
     for (size_t i = 0; i < swapchain_image_count; ++i) {
       const VkImageViewCreateInfo create_info{
@@ -377,16 +378,16 @@ static void CreateSwapchain() {
               },
       };
 
-      VK_CHECK(vkCreateImageView(vk.device, &create_info, nullptr, &vk.swapchain_image_views[i]));
+      VK_CHECK(vkCreateImageView(vk.dev, &create_info, nullptr, &vk.swapchain_image_views[i]));
     }
   }
 
   if (old_swapchain) {
-    vkDeviceWaitIdle(vk.device);
+    vkDeviceWaitIdle(vk.dev);
 
-    for (const VkImageView image_view : old_image_views) vkDestroyImageView(vk.device, image_view, nullptr);
+    for (const VkImageView image_view : old_image_views) vkDestroyImageView(vk.dev, image_view, nullptr);
 
-    vkDestroySwapchainKHR(vk.device, old_swapchain, nullptr);
+    vkDestroySwapchainKHR(vk.dev, old_swapchain, nullptr);
   }
 }
 
@@ -472,7 +473,7 @@ VkPipeline Vulkan_CreateGraphicsPipeline(const VkPipelineVertexInputStateCreateI
   };
 
   VkPipeline graphics_pipeline;
-  VK_CHECK(vkCreateGraphicsPipelines(vk.device, VK_NULL_HANDLE, 1, &pipeline_create_info, nullptr, &graphics_pipeline));
+  VK_CHECK(vkCreateGraphicsPipelines(vk.dev, VK_NULL_HANDLE, 1, &pipeline_create_info, nullptr, &graphics_pipeline));
   return graphics_pipeline;
 }
 
@@ -484,7 +485,7 @@ VkShaderModule Vulkan_CreateShaderModule(const std::vector<char>& code) {
   };
 
   VkShaderModule shader_module;
-  VK_CHECK(vkCreateShaderModule(vk.device, &create_info, nullptr, &shader_module));
+  VK_CHECK(vkCreateShaderModule(vk.dev, &create_info, nullptr, &shader_module));
   return shader_module;
 }
 
@@ -497,13 +498,10 @@ void Vulkan_FrameBegin() {
   RenderDocCaptureStart();
 #endif
 
-  const VkFence frame_fence = vk.frame_fences[vk.cur.iframe];
-
-  vkWaitForFences(vk.device, 1, &frame_fence, VK_TRUE, std::numeric_limits<uint64_t>::max());
-  vkResetFences(vk.device, 1, &frame_fence);
+  VulkWaitTimeline(vk.graphics_queue.timeline, vk.graphics_queue.cmd_done[vk.cur.iframe]);
 
   const VkSemaphore acquire_semaphore = vk.acquire_semaphores[vk.cur.iframe];
-  VkResult acquire_result = vkAcquireNextImageKHR(vk.device, vk.swapchain, std::numeric_limits<uint64_t>::max(),
+  VkResult acquire_result = vkAcquireNextImageKHR(vk.dev, vk.swapchain, std::numeric_limits<uint64_t>::max(),
                                                   acquire_semaphore, VK_NULL_HANDLE, &vk.cur.swapchain_image_index);
 
   if (acquire_result == VK_ERROR_OUT_OF_DATE_KHR || acquire_result == VK_SUBOPTIMAL_KHR) {
@@ -533,18 +531,17 @@ void Vulkan_FrameBegin() {
     dtnanosaccum = .0f;
   }
 
-  const VkCommandBuffer command_buffer = vk.cmd[vk.cur.iframe];
-
-  VK_CHECK(vkResetCommandBuffer(command_buffer, 0));
+  const VkCommandBuffer cmd = vk.graphics_queue.cmd[vk.cur.iframe];
+  VK_CHECK(vkResetCommandBuffer(cmd, 0));
 
   const VkCommandBufferBeginInfo command_buffer_begin_info{
       .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
   };
-  VK_CHECK(vkBeginCommandBuffer(command_buffer, &command_buffer_begin_info));
+  VK_CHECK(vkBeginCommandBuffer(cmd, &command_buffer_begin_info));
 }
 
 void Vulkan_RenderingBegin() {
-  const VkCommandBuffer command_buffer = vk.cmd[vk.cur.iframe];
+  const VkCommandBuffer cmd = vk.graphics_queue.cmd[vk.cur.iframe];
 
   {
     const VkImageMemoryBarrier image_memory_barrier{
@@ -563,9 +560,8 @@ void Vulkan_RenderingBegin() {
             },
     };
 
-    vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, nullptr, 0, nullptr, 1,
-                         &image_memory_barrier);
+    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0,
+                         nullptr, 0, nullptr, 1, &image_memory_barrier);
   }
 
   const VkRenderingAttachmentInfo color_attachment_info{
@@ -585,7 +581,7 @@ void Vulkan_RenderingBegin() {
       .pColorAttachments = &color_attachment_info,
   };
 
-  vkCmdBeginRendering(command_buffer, &rendering_info);
+  vkCmdBeginRendering(cmd, &rendering_info);
   {
     const VkViewport viewport{
         .x = 0.f,
@@ -595,20 +591,20 @@ void Vulkan_RenderingBegin() {
         .minDepth = 0.0f,
         .maxDepth = 1.0f,
     };
-    vkCmdSetViewport(command_buffer, 0, 1, &viewport);
+    vkCmdSetViewport(cmd, 0, 1, &viewport);
 
     const VkRect2D scissor{
         .offset = {0, 0},
         .extent = vk.surface_extent,
     };
-    vkCmdSetScissor(command_buffer, 0, 1, &scissor);
+    vkCmdSetScissor(cmd, 0, 1, &scissor);
   }
 }
 
 void Vulkan_RenderingEnd() {
-  const VkCommandBuffer command_buffer = vk.cmd[vk.cur.iframe];
+  const VkCommandBuffer cmd = vk.graphics_queue.cmd[vk.cur.iframe];
 
-  vkCmdEndRendering(command_buffer);
+  vkCmdEndRendering(cmd);
 
   {
     const VkImageMemoryBarrier image_memory_barrier{
@@ -627,46 +623,54 @@ void Vulkan_RenderingEnd() {
             },
     };
 
-    vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                         VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1, &image_memory_barrier);
+    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0,
+                         nullptr, 0, nullptr, 1, &image_memory_barrier);
   }
 
-  CHECK_EQ(vkEndCommandBuffer(command_buffer), VK_SUCCESS);
+  CHECK_EQ(vkEndCommandBuffer(cmd), VK_SUCCESS);
 }
 
 void Vulkan_FrameEnd() {
-  const VkCommandBuffer command_buffer = vk.cmd[vk.cur.iframe];
+  const VkCommandBuffer cmd = vk.graphics_queue.cmd[vk.cur.iframe];
 
   const VkPipelineStageFlags wait_stages[] = {
       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
   };
 
   const VkSemaphore acquire_semaphore = vk.acquire_semaphores[vk.cur.iframe];
-  const VkSemaphore submit_semaphore = vk.submit_semaphores[vk.cur.swapchain_image_index];
+  const VkTimelineSemaphoreSubmitInfo timeline_submit_info{
+      .sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
+      .signalSemaphoreValueCount = 1,
+      .pSignalSemaphoreValues = &(vk.graphics_queue.cmd_done[vk.cur.iframe] = vk.graphics_queue.timeline_next++),
+  };
   const VkSubmitInfo submit_info{
       .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+      .pNext = &timeline_submit_info,
       .waitSemaphoreCount = 1,
       .pWaitSemaphores = &acquire_semaphore,
       .pWaitDstStageMask = wait_stages,
       .commandBufferCount = 1,
-      .pCommandBuffers = &command_buffer,
+      .pCommandBuffers = &cmd,
       .signalSemaphoreCount = 1,
-      .pSignalSemaphores = &submit_semaphore,
+      .pSignalSemaphores = &vk.graphics_queue.timeline,
   };
+  VK_CHECK(vkQueueSubmit(vk.graphics_queue.queue, 1, &submit_info, VK_NULL_HANDLE));
 
-  const VkFence frame_fence = vk.frame_fences[vk.cur.iframe];
-  VK_CHECK(vkQueueSubmit(vk.queue, 1, &submit_info, frame_fence));
-
+  const VkTimelineSemaphoreSubmitInfo timeline_present_info{
+      .sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
+      .waitSemaphoreValueCount = 1,
+      .pWaitSemaphoreValues = &vk.graphics_queue.cmd_done[vk.cur.iframe],
+  };
   const VkPresentInfoKHR present_info{
       .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+      .pNext = &timeline_present_info,
       .waitSemaphoreCount = 1,
-      .pWaitSemaphores = &submit_semaphore,
+      .pWaitSemaphores = &vk.graphics_queue.timeline,
       .swapchainCount = 1,
       .pSwapchains = &vk.swapchain,
       .pImageIndices = &vk.cur.swapchain_image_index,
   };
-
-  VkResult present_result = vkQueuePresentKHR(vk.queue, &present_info);
+  const VkResult present_result = vkQueuePresentKHR(vk.graphics_queue.queue, &present_info);
   if (present_result == VK_ERROR_OUT_OF_DATE_KHR || present_result == VK_SUBOPTIMAL_KHR) {
     CreateSwapchain();
   } else {
@@ -691,7 +695,7 @@ void VulkanNameHandle(void* object_handle, const std::string& name) {
       .objectHandle = reinterpret_cast<uint64_t>(object_handle),
       .pObjectName = name.c_str(),
   };
-  vkSetDebugUtilsObjectNameEXT(vk.device, &name_info);
+  vkSetDebugUtilsObjectNameEXT(vk.dev, &name_info);
 #endif
 }
 
@@ -708,8 +712,20 @@ VkSemaphore VkCreateTimelineSemaphore(uint64_t initial_value) {
   };
 
   VkSemaphore semaphore;
-  vkCreateSemaphore(vk.device, &semaphore_create_info, nullptr, &semaphore);
+  vkCreateSemaphore(vk.dev, &semaphore_create_info, nullptr, &semaphore);
   return semaphore;
+}
+
+void VulkWaitTimeline(VkSemaphore timeline, uint64_t wait_value) {
+  const VkSemaphoreWaitInfo wait_info{
+      .sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO,
+      .pNext = NULL,
+      .flags = 0,
+      .semaphoreCount = 1,
+      .pSemaphores = &timeline,
+      .pValues = &wait_value,
+  };
+  vkWaitSemaphores(vk.dev, &wait_info, std::numeric_limits<uint64_t>::max());
 }
 
 VkSemaphore VkCreateSemaphore() {
@@ -718,7 +734,7 @@ VkSemaphore VkCreateSemaphore() {
   };
 
   VkSemaphore semaphore;
-  VK_CHECK(vkCreateSemaphore(vk.device, &create_info, nullptr, &semaphore));
+  VK_CHECK(vkCreateSemaphore(vk.dev, &create_info, nullptr, &semaphore));
   return semaphore;
 }
 
@@ -732,7 +748,7 @@ VkFence VkCreateFence(bool signaled) {
   };
 
   VkFence fence;
-  VK_CHECK(vkCreateFence(vk.device, &create_info, nullptr, &fence));
+  VK_CHECK(vkCreateFence(vk.dev, &create_info, nullptr, &fence));
   return fence;
 }
 

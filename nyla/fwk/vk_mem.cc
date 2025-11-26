@@ -51,10 +51,10 @@ static void InitBuf(Buf& buf) {
       .usage = buf.usage,
       .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
   };
-  VK_CHECK(vkCreateBuffer(vk.device, &buffer_create_info, nullptr, &buf.buf));
+  VK_CHECK(vkCreateBuffer(vk.dev, &buffer_create_info, nullptr, &buf.buf));
 
   VkMemoryRequirements mem_requirements;
-  vkGetBufferMemoryRequirements(vk.device, buf.buf, &mem_requirements);
+  vkGetBufferMemoryRequirements(vk.dev, buf.buf, &mem_requirements);
 
   const VkMemoryAllocateInfo memory_alloc_info{
       .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
@@ -62,19 +62,19 @@ static void InitBuf(Buf& buf) {
       .memoryTypeIndex = FindMemoryTypeIndex(mem_requirements, buf.mem_properties),
   };
 
-  VK_CHECK(vkAllocateMemory(vk.device, &memory_alloc_info, nullptr, &buf.mem));
-  VK_CHECK(vkBindBufferMemory(vk.device, buf.buf, buf.mem, 0));
+  VK_CHECK(vkAllocateMemory(vk.dev, &memory_alloc_info, nullptr, &buf.mem));
+  VK_CHECK(vkBindBufferMemory(vk.dev, buf.buf, buf.mem, 0));
 }
 
 static void MapBuf(const Buf& buf) {
-  vkMapMemory(vk.device, buf.mem, 0, buf.size, 0, (void**)&buf.mapped);
+  vkMapMemory(vk.dev, buf.mem, 0, buf.size, 0, (void**)&buf.mapped);
 }
 
 static Buf static_buf;
 static Buf staging_buf;
 static Buf dynamic_buf;
 
-void VkMemInit(uint32_t static_vertbuf_size, uint32_t dynamic_vertbuf_size) {
+void VulkMemInit(uint32_t static_vertbuf_size, uint32_t dynamic_vertbuf_size) {
   staging_buf = {
       .size = 64 * (1 << 20),
       .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -99,42 +99,41 @@ void VkMemInit(uint32_t static_vertbuf_size, uint32_t dynamic_vertbuf_size) {
   MapBuf(dynamic_buf);
 }
 
-void VkMemStaticCopy(CharView data) {
+void VulkMemStaticCopy(CharView data) {
   // CHECK_LE(static_buf.written + data.size(), static_buf.size);
 
-  const VkCommandBufferAllocateInfo command_buffer_alloc_info{
-      .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-      .commandPool = vk.command_pool,
-      .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-      .commandBufferCount = 1,
-  };
-
-  VkCommandBuffer command_buffer;
-  VK_CHECK(vkAllocateCommandBuffers(vk.device, &command_buffer_alloc_info, &command_buffer));
+  VulkWaitTimeline(vk.transfer_queue.timeline, *vk.transfer_queue.cmd_done);
 
   const VkCommandBufferBeginInfo command_buffer_begin_info{
       .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
       .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
   };
 
-  VK_CHECK(vkBeginCommandBuffer(command_buffer, &command_buffer_begin_info));
+  VK_CHECK(vkBeginCommandBuffer(*vk.transfer_queue.cmd, &command_buffer_begin_info));
+  {
+    const VkBufferCopy copy_region{
+        .srcOffset = 0,
+        .dstOffset = static_buf.written,
+        .size = VK_WHOLE_SIZE,
+    };
+    vkCmdCopyBuffer(*vk.transfer_queue.cmd, staging_buf.buf, static_buf.buf, 1, &copy_region);
+  }
+  VK_CHECK(vkEndCommandBuffer(*vk.transfer_queue.cmd));
 
-  const VkBufferCopy copy_region{
-      .srcOffset = 0,
-      .dstOffset = static_buf.written,
-      .size = VK_WHOLE_SIZE,
+  const VkTimelineSemaphoreSubmitInfo timeline_submit_info{
+      .sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
+      .signalSemaphoreValueCount = 1,
+      .pSignalSemaphoreValues = &(*vk.transfer_queue.cmd_done = vk.transfer_queue.timeline_next++),
   };
-  vkCmdCopyBuffer(command_buffer, staging_buf.buf, static_buf.buf, 1, &copy_region);
-  vkEndCommandBuffer(command_buffer);
-
   const VkSubmitInfo submit_info{
       .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+      .pNext = &timeline_submit_info,
       .commandBufferCount = 1,
-      .pCommandBuffers = &command_buffer,
+      .pCommandBuffers = vk.transfer_queue.cmd,
+      .signalSemaphoreCount = 1,
+      .pSignalSemaphores = &vk.transfer_queue.timeline,
   };
-  vkQueueSubmit(vk.queue, 1, &submit_info, VK_NULL_HANDLE);
-  vkQueueWaitIdle(vk.queue);
-  vkFreeCommandBuffers(vk.device, vk.command_pool, 1, &command_buffer);
+  vkQueueSubmit(vk.transfer_queue.queue, 1, &submit_info, VK_NULL_HANDLE);
 }
 
 void VkMemStaticFlush() {
@@ -154,9 +153,9 @@ static void Test(VkCommandPool command_pool, VkQueue transfer_queue, VkDeviceSiz
                       staging_buffer_memory);
 
   void* dst_data;
-  vkMapMemory(vk.device, staging_buffer_memory, 0, data_size, 0, &dst_data);
+  vkMapMemory(vk.dev, staging_buffer_memory, 0, data_size, 0, &dst_data);
   memcpy(dst_data, src_data, data_size);
-  vkUnmapMemory(vk.device, staging_buffer_memory);
+  vkUnmapMemory(vk.dev, staging_buffer_memory);
 
   Vulkan_CreateBuffer(data_size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | usage, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, buffer,
                       buffer_memory);
@@ -169,7 +168,7 @@ static void Test(VkCommandPool command_pool, VkQueue transfer_queue, VkDeviceSiz
   };
 
   VkCommandBuffer command_buffer;
-  VK_CHECK(vkAllocateCommandBuffers(vk.device, &command_buffer_alloc_info, &command_buffer));
+  VK_CHECK(vkAllocateCommandBuffers(vk.dev, &command_buffer_alloc_info, &command_buffer));
 
   const VkCommandBufferBeginInfo command_buffer_begin_info{
       .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
@@ -194,9 +193,9 @@ static void Test(VkCommandPool command_pool, VkQueue transfer_queue, VkDeviceSiz
   };
   vkQueueSubmit(transfer_queue, 1, &submit_info, VK_NULL_HANDLE);
   vkQueueWaitIdle(transfer_queue);
-  vkFreeCommandBuffers(vk.device, command_pool, 1, &command_buffer);
-  vkDestroyBuffer(vk.device, staging_buffer, nullptr);
-  vkFreeMemory(vk.device, staging_buffer_memory, nullptr);
+  vkFreeCommandBuffers(vk.dev, command_pool, 1, &command_buffer);
+  vkDestroyBuffer(vk.dev, staging_buffer, nullptr);
+  vkFreeMemory(vk.dev, staging_buffer_memory, nullptr);
 }
 
 }  // namespace nyla

@@ -8,33 +8,28 @@
 
 namespace nyla {
 
-struct GraphicsFence {
-  uint64_t val;
-};
-
-struct TransferFence {
-  uint64_t val;
-};
-
 constexpr static uint32_t kInvalidQueueFamilyIndex = std::numeric_limits<uint32_t>::max();
 
 struct VkQueueState {
   uint32_t family_index;
   VkQueue queue;
+
   VkSemaphore timeline;
   uint64_t timeline_next;
+
+  VkCommandPool cmd_pool;
+  VkCommandBuffer cmd[3];
+  uint64_t cmd_done[3];
 };
 
 struct VkState {
   uint32_t frames_inflight;
 
   VkInstance instance;
-  VkDevice device;
+  VkDevice dev;
 
   VkQueueState graphics_queue;
-  std::vector<GraphicsFence> frame_done;
   VkQueueState transfer_queue;
-  TransferFence transfer_done;
 
   VkPhysicalDevice phys_device;
   VkPhysicalDeviceProperties phys_device_props;
@@ -44,7 +39,6 @@ struct VkState {
   VkExtent2D surface_extent;
   VkPresentModeKHR present_mode;
   VkSwapchainKHR swapchain;
-  VkCommandPool command_pool;
   std::vector<VkImage> swapchain_images;
   uint32_t swapchain_image_count() {
     return swapchain_images.size();
@@ -52,7 +46,6 @@ struct VkState {
   std::vector<VkImageView> swapchain_image_views;
 
   std::vector<VkSemaphore> acquire_semaphores;
-  std::vector<VkCommandBuffer> cmd;
 
   struct {
     uint32_t swapchain_image_index;
@@ -83,6 +76,7 @@ VkPipeline Vulkan_CreateGraphicsPipeline(const VkPipelineVertexInputStateCreateI
 VkShaderModule Vulkan_CreateShaderModule(const std::vector<char>& code);
 
 VkSemaphore VkCreateTimelineSemaphore(uint64_t initial_value);
+void VulkWaitTimeline(VkSemaphore timeline, uint64_t wait_value);
 VkSemaphore VkCreateSemaphore();
 VkFence VkCreateFence(bool signaled = false);
 
