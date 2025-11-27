@@ -8,7 +8,7 @@
 
 namespace nyla {
 
-constexpr static uint32_t kInvalidQueueFamilyIndex = std::numeric_limits<uint32_t>::max();
+constexpr inline uint32_t kInvalidQueueFamilyIndex = std::numeric_limits<uint32_t>::max();
 
 struct VkQueueState {
   uint32_t family_index;
