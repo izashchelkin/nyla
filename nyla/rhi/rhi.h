@@ -42,13 +42,6 @@ enum class RhiFrontFace : uint32_t {
   CW,
 };
 
-enum class RhiCompareOp : uint32_t {
-  LessEqual,
-  Less,
-  Greater,
-  Always,
-};
-
 enum class RhiInputRate : uint32_t {
   PerVertex,
   PerInstance,

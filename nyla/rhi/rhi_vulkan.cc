@@ -27,11 +27,6 @@ namespace nyla {
 
 namespace {
 
-struct HandleSlot {
-  void* data;
-  uint32_t gen;
-};
-
 struct DeviceQueue {
   VkQueue queue;
   uint32_t queue_family_index;
@@ -50,6 +45,7 @@ static struct {
 
   PlatformWindow window;
   VkSurfaceKHR surface;
+  VkExtent2D surface_extent;
   VkSurfaceFormatKHR surface_format;
   VkSwapchainKHR swapchain;
   VkImage swapchain_images[8];
@@ -153,7 +149,7 @@ static void CreateSwapchain() {
     return VK_PRESENT_MODE_FIFO_KHR;  // TODO:
   }();
 
-  VkExtent2D surface_extent = [surface_capabilities] {
+  vk.surface_extent = [surface_capabilities] {
     if (surface_capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
       return surface_capabilities.currentExtent;
     }
@@ -178,7 +174,7 @@ static void CreateSwapchain() {
       .minImageCount = swapchain_min_image_count,
       .imageFormat = vk.surface_format.format,
       .imageColorSpace = vk.surface_format.colorSpace,
-      .imageExtent = surface_extent,
+      .imageExtent = vk.surface_extent,
       .imageArrayLayers = 1,
       .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
       .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
@@ -725,10 +721,13 @@ RhiCmdList RhiFrameBegin() {
 
     default: {
       VK_CHECK(acquire_result);
+      break;
     }
   }
 
   const VkCommandBuffer cmd = vk.graphics_queue_cmd[vk.frame_index];
+  RhiCmdList ret_handle = static_cast<RhiCmdList>(HandleAcquire(handle_pools.cmdlist, cmd, true));
+
   VK_CHECK(vkResetCommandBuffer(cmd, 0));
 
   const VkCommandBufferBeginInfo command_buffer_begin_info{
@@ -736,10 +735,147 @@ RhiCmdList RhiFrameBegin() {
   };
   VK_CHECK(vkBeginCommandBuffer(cmd, &command_buffer_begin_info));
 
-  return static_cast<RhiCmdList>(HandleAcquire(handle_pools.cmdlist, cmd));
+  const VkImageMemoryBarrier image_memory_barrier{
+      .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+      .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+      .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,  // TODO:
+      .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+      .image = vk.swapchain_images[vk.swapchain_image_index],
+      .subresourceRange =
+          {
+              .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+              .baseMipLevel = 0,
+              .levelCount = 1,
+              .baseArrayLayer = 0,
+              .layerCount = 1,
+          },
+  };
+
+  vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0,
+                       nullptr, 0, nullptr, 1, &image_memory_barrier);
+
+  const VkRenderingAttachmentInfo color_attachment_info{
+      .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+      .imageView = vk.swapchain_image_views[vk.swapchain_image_index],
+      .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+      .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+      .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+      .clearValue = {{{0.0f, 0.0f, 0.0f, 1.0f}}},
+  };
+
+  const VkRenderingInfo rendering_info{
+      .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
+      .renderArea = {{0, 0}, vk.surface_extent},
+      .layerCount = 1,
+      .colorAttachmentCount = 1,
+      .pColorAttachments = &color_attachment_info,
+  };
+
+  vkCmdBeginRendering(cmd, &rendering_info);
+
+  const VkViewport viewport{
+      .x = 0.f,
+      .y = static_cast<float>(vk.surface_extent.height),
+      .width = static_cast<float>(vk.surface_extent.width),
+      .height = -static_cast<float>(vk.surface_extent.height),
+      .minDepth = 0.0f,
+      .maxDepth = 1.0f,
+  };
+  vkCmdSetViewport(cmd, 0, 1, &viewport);
+
+  const VkRect2D scissor{
+      .offset = {0, 0},
+      .extent = vk.surface_extent,
+  };
+  vkCmdSetScissor(cmd, 0, 1, &scissor);
+
+  return ret_handle;
 }
 
-void RhiFrameEnd() {}
+void RhiFrameEnd() {
+  const VkCommandBuffer cmd = vk.graphics_queue_cmd[vk.frame_index];
+  vkCmdEndRendering(cmd);
+
+  const VkImageMemoryBarrier image_memory_barrier{
+      .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+      .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT,
+      .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+      .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+      .image = vk.swapchain_images[vk.swapchain_image_index],
+      .subresourceRange =
+          {
+              .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+              .baseMipLevel = 0,
+              .levelCount = 1,
+              .baseArrayLayer = 0,
+              .layerCount = 1,
+          },
+  };
+
+  vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0,
+                       nullptr, 0, nullptr, 1, &image_memory_barrier);
+
+  CHECK_EQ(vkEndCommandBuffer(cmd), VK_SUCCESS);
+
+  const VkPipelineStageFlags wait_stages[] = {
+      VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+  };
+
+  uint64_t& cmd_done = vk.graphics_queue_cmd_done[vk.frame_index];
+  cmd_done = vk.graphics_queue.timeline_next++;
+
+  const VkTimelineSemaphoreSubmitInfo timeline_submit_info{
+      .sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
+      .signalSemaphoreValueCount = 1,
+      .pSignalSemaphoreValues = &cmd_done,
+  };
+
+  const VkSemaphore acquire_semaphore = vk.swapchain_acquire_semaphores[vk.frame_index];
+  const VkSubmitInfo submit_info{
+      .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+      .pNext = &timeline_submit_info,
+      .waitSemaphoreCount = 1,
+      .pWaitSemaphores = &acquire_semaphore,
+      .pWaitDstStageMask = wait_stages,
+      .commandBufferCount = 1,
+      .pCommandBuffers = &cmd,
+      .signalSemaphoreCount = 1,
+      .pSignalSemaphores = &vk.graphics_queue.timeline,
+  };
+  VK_CHECK(vkQueueSubmit(vk.graphics_queue.queue, 1, &submit_info, VK_NULL_HANDLE));
+
+  const VkTimelineSemaphoreSubmitInfo timeline_present_info{
+      .sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
+      .waitSemaphoreValueCount = 1,
+      .pWaitSemaphoreValues = &cmd_done,
+  };
+  const VkPresentInfoKHR present_info{
+      .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+      .pNext = &timeline_present_info,
+      .waitSemaphoreCount = 1,
+      .pWaitSemaphores = &vk.graphics_queue.timeline,
+      .swapchainCount = 1,
+      .pSwapchains = &vk.swapchain,
+      .pImageIndices = &vk.swapchain_image_index,
+  };
+
+  const VkResult present_result = vkQueuePresentKHR(vk.graphics_queue.queue, &present_info);
+  switch (present_result) {
+    case VK_ERROR_OUT_OF_DATE_KHR:
+    case VK_SUBOPTIMAL_KHR: {
+      vkQueueWaitIdle(vk.graphics_queue.queue);
+      CreateSwapchain();
+      break;
+    }
+
+    default: {
+      VK_CHECK(present_result);
+      break;
+    }
+  }
+
+  vk.frame_index = (vk.frame_index + 1) % vk.num_frames_in_flight;
+}
 
 }  // namespace nyla
 
