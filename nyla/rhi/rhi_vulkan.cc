@@ -1,7 +1,10 @@
+#include "nyla/rhi/rhi_vulkan.h"
+
 #include <cstdint>
 #include <cstring>
 
 #include "absl/log/check.h"
+#include "nyla/rhi/handle_pool.h"
 #include "nyla/rhi/rhi.h"
 #include "vulkan/vk_enum_string_helper.h"
 #include "vulkan/vulkan_core.h"
@@ -22,6 +25,11 @@ constexpr inline uint32_t kInvalidIndex = std::numeric_limits<uint32_t>::max();
 namespace nyla {
 
 namespace {
+
+struct HandleSlot {
+  void* data;
+  uint32_t gen;
+};
 
 struct DeviceQueue {
   VkQueue queue;
@@ -45,6 +53,14 @@ static struct {
 
   uint32_t num_frames_in_flight;
 } vk;
+
+static HandlePool<VkShaderModule, 16> shader_pool;
+
+struct VulkanPipeline {
+  VkPipelineLayout layout;
+  VkPipeline pipeline;
+};
+static HandlePool<VulkanPipeline, 16> pipeline_pool;
 
 #if !defined(NDEBUG)
 
@@ -71,7 +87,9 @@ static VkSemaphore CreateTimeline(uint64_t initial_value) {
   return semaphore;
 }
 
-void Init(RhiDesc rhi_desc) {
+}  // namespace
+
+void RhiInit(RhiDesc rhi_desc) {
   CHECK_LT(rhi_desc.num_frames_in_flight, RhiDesc::kMaxFramesInFlight);
   if (!rhi_desc.num_frames_in_flight) {
     rhi_desc.num_frames_in_flight = RhiDesc::kMaxFramesInFlight;
@@ -316,11 +334,215 @@ void Init(RhiDesc rhi_desc) {
   init_queue(vk.transfer_queue, vk.num_frames_in_flight);
 }
 
-}  // namespace
+RhiShader RhiCreateShader(RhiShaderDesc desc) {
+  const VkShaderModuleCreateInfo create_info{
+      .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+      .codeSize = desc.code.size(),
+      .pCode = reinterpret_cast<const uint32_t*>(desc.code.data()),
+  };
 
-Rhi rhi = {
-    .Init = Init,
-};
+  VkShaderModule shader_module;
+  VK_CHECK(vkCreateShaderModule(vk.dev, &create_info, nullptr, &shader_module));
+
+  return static_cast<RhiShader>(HandleAcquire(shader_pool, shader_module));
+}
+
+void RhiDestroyShader(RhiShader shader) {
+  VkShaderModule shader_module = HandleGet(shader_pool, shader);
+  vkDestroyShaderModule(vk.dev, shader_module, nullptr);
+
+  HandleRelease(shader_pool, shader);
+}
+
+// static VkPipeline Vulkan_CreateGraphicsPipeline(const VkPipelineVertexInputStateCreateInfo& vertex_input_create_info,
+//                                                 VkPipelineLayout pipeline_layout,
+//                                                 std::span<const VkPipelineShaderStageCreateInfo> stages,
+//                                                 VkPipelineRasterizationStateCreateInfo rasterizer_create_info) {
+
+RhiGraphicsPipeline RhiCreateGraphicsPipeline(RhiGraphicsPipelineDesc desc) {
+  VkPipelineLayout layout;
+  {
+    VkDescriptorSetLayout descriptor_set_layouts[std::size(desc.bind_layouts)];
+    CHECK_LE(desc.bind_layout_count, std::size(desc.bind_layouts));
+
+    for (uint32_t ilayout = 0; ilayout < desc.bind_layout_count; ++ilayout) {
+      const auto& bind_layout = desc.bind_layouts[ilayout];
+      CHECK_LE(bind_layout.binding_count, std::size(bind_layout.bindings));
+      VkDescriptorSetLayoutBinding descriptor_set_layout_bindings[std::size(bind_layout.bindings)];
+
+      for (uint32_t ibinding = 0; ibinding < bind_layout.binding_count; ++ibinding) {
+        const auto& binding = bind_layout.bindings[ibinding];
+        descriptor_set_layout_bindings[ibinding] = {
+            .binding = binding.binding,
+            .descriptorType = ConvertVulkanBindingType(binding.type),
+            .descriptorCount = binding.array_size,
+            .stageFlags = ConvertVulkanStageFlags(binding.stage_flags),
+        };
+      }
+
+      const VkDescriptorSetLayoutCreateInfo descriptor_set_layout_create_info{
+          .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+          .bindingCount = bind_layout.binding_count,
+          .pBindings = descriptor_set_layout_bindings,
+      };
+
+      VK_CHECK(vkCreateDescriptorSetLayout(vk.dev, &descriptor_set_layout_create_info, nullptr,
+                                           descriptor_set_layouts + ilayout));
+    }
+
+    const VkPushConstantRange push_constant_range{
+        .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT,
+        .offset = 0,
+        .size = kRhiPushConstantMaxSize,
+    };
+
+    const VkPipelineLayoutCreateInfo pipeline_layout_create_info{
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+        .setLayoutCount = desc.bind_layout_count,
+        .pSetLayouts = descriptor_set_layouts,
+        .pushConstantRangeCount = 1,
+        .pPushConstantRanges = &push_constant_range,
+    };
+
+    vkCreatePipelineLayout(vk.dev, &pipeline_layout_create_info, nullptr, &layout);
+  }
+
+  const VkPipelineRasterizationStateCreateInfo rasterizer_create_info{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+      .depthClampEnable = VK_FALSE,
+      .rasterizerDiscardEnable = VK_FALSE,
+      .polygonMode = VK_POLYGON_MODE_FILL,
+      .cullMode = ConvertVulkanCullMode(desc.cull_mode),
+      .frontFace = ConvertVulkanFrontFace(desc.front_face),
+      .lineWidth = 1.0f,
+  };
+
+  const VkPipelineInputAssemblyStateCreateInfo input_assembly_create_info{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+      .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+  };
+
+  const VkPipelineViewportStateCreateInfo viewport_state_create_info{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+      .viewportCount = 1,
+      .scissorCount = 1,
+  };
+
+  const VkPipelineMultisampleStateCreateInfo multisampling_create_info{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+      .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
+      .sampleShadingEnable = VK_FALSE,
+      .minSampleShading = 1.0f,
+      .alphaToCoverageEnable = VK_FALSE,
+      .alphaToOneEnable = VK_FALSE,
+  };
+
+  const VkPipelineColorBlendAttachmentState color_blend_attachment{
+      .blendEnable = VK_TRUE,
+      .srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
+      .dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+      .colorBlendOp = VK_BLEND_OP_ADD,
+      .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
+      .dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
+      .alphaBlendOp = VK_BLEND_OP_ADD,
+      .colorWriteMask =
+          VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
+  };
+
+  const VkPipelineColorBlendStateCreateInfo color_blending_create_info{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+      .logicOpEnable = VK_FALSE,
+      .logicOp = VK_LOGIC_OP_COPY,
+      .attachmentCount = 1,
+      .pAttachments = &color_blend_attachment,
+      .blendConstants = {},
+  };
+
+  const auto dynamic_states = std::to_array<VkDynamicState>({
+      VK_DYNAMIC_STATE_VIEWPORT,
+      VK_DYNAMIC_STATE_SCISSOR,
+  });
+
+  const VkPipelineDynamicStateCreateInfo dynamic_state_create_info{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+      .dynamicStateCount = dynamic_states.size(),
+      .pDynamicStates = dynamic_states.data(),
+  };
+
+  const VkPipelineRenderingCreateInfo pipeline_rendering_create_info{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+      .colorAttachmentCount = 1,
+      .pColorAttachmentFormats = &vk.surface_format.format,
+  };
+
+  VkPipelineShaderStageCreateInfo stages[2];
+  uint32_t stage_count = 0;
+
+  if (HandleIsSet(desc.vert_shader)) {
+    stages[stage_count++] = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+        .stage = VK_SHADER_STAGE_VERTEX_BIT,
+        .module = HandleGet(shader_pool, desc.vert_shader),
+        .pName = "main",
+    };
+  }
+  if (HandleIsSet(desc.frag_shader)) {
+    stages[stage_count++] = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+        .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+        .module = HandleGet(shader_pool, desc.frag_shader),
+        .pName = "main",
+    };
+  }
+
+  /*
+    const void*                                 pNext;
+    VkPipelineVertexInputStateCreateFlags       flags;
+    uint32_t                                    vertexBindingDescriptionCount;
+    const VkVertexInputBindingDescription*      pVertexBindingDescriptions;
+    uint32_t                                    vertexAttributeDescriptionCount;
+    const VkVertexInputAttributeDescription*    pVertexAttributeDescriptions;
+   */
+
+  VkPipelineVertexInputStateCreateInfo vertex_input_create_info{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+  };
+
+  const VkGraphicsPipelineCreateInfo pipeline_create_info{
+      .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+      .pNext = &pipeline_rendering_create_info,
+      .stageCount = stage_count,
+      .pStages = stages,
+      .pVertexInputState = &vertex_input_create_info,
+      .pInputAssemblyState = &input_assembly_create_info,
+      .pViewportState = &viewport_state_create_info,
+      .pRasterizationState = &rasterizer_create_info,
+      .pMultisampleState = &multisampling_create_info,
+      .pDepthStencilState = nullptr,
+      .pColorBlendState = &color_blending_create_info,
+      .pDynamicState = &dynamic_state_create_info,
+      .layout = layout,
+      .subpass = 0,
+      .basePipelineHandle = VK_NULL_HANDLE,
+      .basePipelineIndex = -1,
+  };
+
+  VkPipeline graphics_pipeline;
+  VK_CHECK(vkCreateGraphicsPipelines(vk.dev, VK_NULL_HANDLE, 1, &pipeline_create_info, nullptr, &graphics_pipeline));
+  return graphics_pipeline;
+}
+
+VkShaderModule Vulkan_CreateShaderModule(const std::vector<char>& code) {
+  const VkShaderModuleCreateInfo create_info{
+      .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+      .codeSize = code.size(),
+      .pCode = reinterpret_cast<const uint32_t*>(code.data()),
+  };
+
+  VkShaderModule shader_module;
+  VK_CHECK(vkCreateShaderModule(vk.dev, &create_info, nullptr, &shader_module));
+  return shader_module;
+}
 
 }  // namespace nyla
 
