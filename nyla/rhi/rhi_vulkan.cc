@@ -35,12 +35,10 @@ struct HandleSlot {
 struct DeviceQueue {
   VkQueue queue;
   uint32_t queue_family_index;
+  VkCommandPool cmd_pool;
 
   VkSemaphore timeline;
   uint64_t timeline_next;
-
-  VkCommandPool cmd_pool;
-  VkCommandBuffer cmd[RhiDesc::kMaxFramesInFlight];
 };
 
 static struct {
@@ -55,22 +53,33 @@ static struct {
   VkSurfaceFormatKHR surface_format;
   VkSwapchainKHR swapchain;
   VkImage swapchain_images[8];
-  VkImageView swapchain_image_views[8];
   uint32_t swapchain_image_count;
+  VkImageView swapchain_image_views[8];
+  VkSemaphore swapchain_acquire_semaphores[8];
 
   DeviceQueue graphics_queue;
+  VkCommandBuffer graphics_queue_cmd[RhiDesc::kMaxFramesInFlight];
+  uint64_t graphics_queue_cmd_done[RhiDesc::kMaxFramesInFlight];
+
   DeviceQueue transfer_queue;
+  VkCommandBuffer transfer_queue_cmd;
+  uint64_t transfer_queue_cmd_done;
 
   uint32_t num_frames_in_flight;
+  uint32_t frame_index;
+  uint32_t swapchain_image_index;
 } vk;
 
-static HandlePool<VkShaderModule, 16> shader_hpool;
-
-struct VulkanPipeline {
+struct VulkanPipelineData {
   VkPipelineLayout layout;
   VkPipeline pipeline;
 };
-static HandlePool<VulkanPipeline, 16> gfx_pipeline_hpool;
+
+static struct {
+  HandlePool<VkShaderModule, 16> shader;
+  HandlePool<VkCommandBuffer, 16> cmdlist;
+  HandlePool<VulkanPipelineData, 16> gfx_pipeline;
+} handle_pools;
 
 #if !defined(NDEBUG)
 
@@ -95,6 +104,18 @@ static VkSemaphore CreateTimeline(uint64_t initial_value) {
   VkSemaphore semaphore;
   vkCreateSemaphore(vk.dev, &semaphore_create_info, nullptr, &semaphore);
   return semaphore;
+}
+
+static void WaitTimeline(VkSemaphore timeline, uint64_t wait_value) {
+  const VkSemaphoreWaitInfo wait_info{
+      .sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO,
+      .pNext = NULL,
+      .flags = 0,
+      .semaphoreCount = 1,
+      .pSemaphores = &timeline,
+      .pValues = &wait_value,
+  };
+  vkWaitSemaphores(vk.dev, &wait_info, std::numeric_limits<uint64_t>::max());
 }
 
 static void CreateSwapchain() {
@@ -202,8 +223,6 @@ static void CreateSwapchain() {
   }
 
   if (old_swapchain) {
-    vkDeviceWaitIdle(vk.dev);
-
     for (const VkImageView image_view : old_image_views) {
       vkDestroyImageView(vk.dev, image_view, nullptr);
     }
@@ -435,7 +454,7 @@ void RhiInit(RhiDesc rhi_desc) {
     vkGetDeviceQueue(vk.dev, vk.transfer_queue.queue_family_index, 0, &vk.transfer_queue.queue);
   }
 
-  auto init_queue = [](DeviceQueue& queue, uint32_t num_command_buffers) {
+  auto init_queue = [](DeviceQueue& queue, VkCommandBuffer* cmd, uint32_t cmd_count) {
     const VkCommandPoolCreateInfo command_pool_create_info{
         .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
         .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
@@ -443,19 +462,19 @@ void RhiInit(RhiDesc rhi_desc) {
     };
     VK_CHECK(vkCreateCommandPool(vk.dev, &command_pool_create_info, nullptr, &queue.cmd_pool));
 
+    queue.timeline = CreateTimeline(0);
+    queue.timeline_next = 1;
+
     const VkCommandBufferAllocateInfo alloc_info{
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
         .commandPool = queue.cmd_pool,
         .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-        .commandBufferCount = num_command_buffers,
+        .commandBufferCount = cmd_count,
     };
-    VK_CHECK(vkAllocateCommandBuffers(vk.dev, &alloc_info, queue.cmd));
-
-    queue.timeline = CreateTimeline(0);
-    queue.timeline_next = 1;
+    VK_CHECK(vkAllocateCommandBuffers(vk.dev, &alloc_info, cmd));
   };
-  init_queue(vk.graphics_queue, 1);
-  init_queue(vk.transfer_queue, vk.num_frames_in_flight);
+  init_queue(vk.graphics_queue, vk.graphics_queue_cmd, vk.num_frames_in_flight);
+  init_queue(vk.transfer_queue, &vk.transfer_queue_cmd, 1);
 }
 
 RhiShader RhiCreateShader(RhiShaderDesc desc) {
@@ -468,29 +487,25 @@ RhiShader RhiCreateShader(RhiShaderDesc desc) {
   VkShaderModule shader_module;
   VK_CHECK(vkCreateShaderModule(vk.dev, &create_info, nullptr, &shader_module));
 
-  return static_cast<RhiShader>(HandleAcquire(shader_hpool, shader_module));
+  return static_cast<RhiShader>(HandleAcquire(handle_pools.shader, shader_module));
 }
 
 void RhiDestroyShader(RhiShader shader) {
-  VkShaderModule shader_module = HandleGetData(shader_hpool, shader);
+  VkShaderModule shader_module = HandleRelease(handle_pools.shader, shader);
   vkDestroyShaderModule(vk.dev, shader_module, nullptr);
-
-  HandleRelease(shader_hpool, shader);
 }
 
 void RhiDestroyGraphicsPipeline(RhiGraphicsPipeline pipeline) {
-  auto& data = HandleGetData(gfx_pipeline_hpool, pipeline);
+  auto pipeline_data = HandleRelease(handle_pools.gfx_pipeline, pipeline);
 
-  if (data.layout) {
+  if (pipeline_data.layout) {
     vkDeviceWaitIdle(vk.dev);
-    vkDestroyPipelineLayout(vk.dev, data.layout, nullptr);
+    vkDestroyPipelineLayout(vk.dev, pipeline_data.layout, nullptr);
   }
-  if (data.pipeline) {
+  if (pipeline_data.pipeline) {
     vkDeviceWaitIdle(vk.dev);
-    vkDestroyPipeline(vk.dev, data.pipeline, nullptr);
+    vkDestroyPipeline(vk.dev, pipeline_data.pipeline, nullptr);
   }
-
-  HandleRelease(gfx_pipeline_hpool, pipeline);
 }
 
 RhiGraphicsPipeline RhiCreateGraphicsPipeline(RhiGraphicsPipelineDesc desc) {
@@ -600,7 +615,7 @@ RhiGraphicsPipeline RhiCreateGraphicsPipeline(RhiGraphicsPipelineDesc desc) {
     stages[stage_count++] = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
         .stage = VK_SHADER_STAGE_VERTEX_BIT,
-        .module = HandleGetData(shader_hpool, desc.vert_shader),
+        .module = HandleGetData(handle_pools.shader, desc.vert_shader),
         .pName = "main",
     };
   }
@@ -608,7 +623,7 @@ RhiGraphicsPipeline RhiCreateGraphicsPipeline(RhiGraphicsPipelineDesc desc) {
     stages[stage_count++] = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
         .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-        .module = HandleGetData(shader_hpool, desc.frag_shader),
+        .module = HandleGetData(handle_pools.shader, desc.frag_shader),
         .pName = "main",
     };
   }
@@ -680,20 +695,51 @@ RhiGraphicsPipeline RhiCreateGraphicsPipeline(RhiGraphicsPipelineDesc desc) {
   VkPipeline pipeline;
   VK_CHECK(vkCreateGraphicsPipelines(vk.dev, VK_NULL_HANDLE, 1, &pipeline_create_info, nullptr, &pipeline));
 
-  return static_cast<RhiGraphicsPipeline>(HandleAcquire(gfx_pipeline_hpool, VulkanPipeline{layout, pipeline}));
+  RhiGraphicsPipeline ret_handle =
+      static_cast<RhiGraphicsPipeline>(HandleAcquire(handle_pools.gfx_pipeline, VulkanPipelineData{layout, pipeline}));
+
+  for (size_t i = 0; i < vk.num_frames_in_flight; ++i) {
+    const VkSemaphoreCreateInfo semaphore_create_info{
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+    };
+    VK_CHECK(vkCreateSemaphore(vk.dev, &semaphore_create_info, nullptr, vk.swapchain_acquire_semaphores + i));
+  }
+
+  return ret_handle;
 }
 
-VkShaderModule Vulkan_CreateShaderModule(const std::vector<char>& code) {
-  const VkShaderModuleCreateInfo create_info{
-      .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-      .codeSize = code.size(),
-      .pCode = reinterpret_cast<const uint32_t*>(code.data()),
+RhiCmdList RhiFrameBegin() {
+  WaitTimeline(vk.graphics_queue.timeline, vk.graphics_queue_cmd_done[vk.frame_index]);
+
+  VkResult acquire_result =
+      vkAcquireNextImageKHR(vk.dev, vk.swapchain, std::numeric_limits<uint64_t>::max(),
+                            vk.swapchain_acquire_semaphores[vk.frame_index], VK_NULL_HANDLE, &vk.swapchain_image_index);
+  switch (acquire_result) {
+    case VK_ERROR_OUT_OF_DATE_KHR:
+    case VK_SUBOPTIMAL_KHR: {
+      vkDeviceWaitIdle(vk.dev);
+      CreateSwapchain();
+
+      return RhiFrameBegin();
+    }
+
+    default: {
+      VK_CHECK(acquire_result);
+    }
+  }
+
+  const VkCommandBuffer cmd = vk.graphics_queue_cmd[vk.frame_index];
+  VK_CHECK(vkResetCommandBuffer(cmd, 0));
+
+  const VkCommandBufferBeginInfo command_buffer_begin_info{
+      .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
   };
+  VK_CHECK(vkBeginCommandBuffer(cmd, &command_buffer_begin_info));
 
-  VkShaderModule shader_module;
-  VK_CHECK(vkCreateShaderModule(vk.dev, &create_info, nullptr, &shader_module));
-  return shader_module;
+  return static_cast<RhiCmdList>(HandleAcquire(handle_pools.cmdlist, cmd));
 }
+
+void RhiFrameEnd() {}
 
 }  // namespace nyla
 

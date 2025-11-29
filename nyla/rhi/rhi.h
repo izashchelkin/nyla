@@ -10,25 +10,77 @@ namespace nyla {
 
 constexpr uint32_t kRhiPushConstantMaxSize = 256;
 
-enum class RhiShaderType { Vertex, Fragment };
-enum class RhiQueueType { Graphics, Transfer };
-enum class RhiBindingType { UniformBuffer };
-enum class RhiVertexAttribute { Float4, Half2, SNorm8x4, UNorm8x4 };
-enum class RhiCullMode { None, Back, Front };
-enum class RhiFrontFace { CCW, CW };
-enum class RhiCompareOp { LessEqual, Less, Greater, Always };
-enum class RhiInputRate { PerVertex, PerInstance };
-enum class RhiFormat { Float4, Half2, SNorm8x4, UNorm8x4 };
-
-class RhiStageFlag {
-  static inline uint32_t Vert = 1;
-  static inline uint32_t Frag = 2;
+enum class RhiShaderType : uint32_t {
+  Vertex,
+  Fragment,
 };
+
+enum class RhiQueueType : uint32_t {
+  Graphics,
+  Transfer,
+};
+
+enum class RhiBindingType : uint32_t {
+  UniformBuffer,
+};
+
+enum class RhiVertexAttributeType : uint32_t {
+  Float4,
+  Half2,
+  SNorm8x4,
+  UNorm8x4,
+};
+
+enum class RhiCullMode : uint32_t {
+  None,
+  Back,
+  Front,
+};
+
+enum class RhiFrontFace : uint32_t {
+  CCW,
+  CW,
+};
+
+enum class RhiCompareOp : uint32_t {
+  LessEqual,
+  Less,
+  Greater,
+  Always,
+};
+
+enum class RhiInputRate : uint32_t {
+  PerVertex,
+  PerInstance,
+};
+
+enum class RhiFormat : uint32_t {
+  Float4,
+  Half2,
+  SNorm8x4,
+  UNorm8x4,
+};
+
+enum class RhiShaderStage : uint32_t {
+  None = 0,
+  Vertex = 1 << 0,
+  Fragment = 1 << 1,
+};
+
+inline RhiShaderStage operator|(RhiShaderStage a, RhiShaderStage b) {
+  return static_cast<RhiShaderStage>(static_cast<uint32_t>(a) | static_cast<uint32_t>(b));
+}
+
+inline uint32_t operator&(RhiShaderStage a, RhiShaderStage b) {
+  return static_cast<uint32_t>(a) & static_cast<uint32_t>(b);
+}
 
 //
 
 struct RhiShader : Handle {};
 struct RhiGraphicsPipeline : Handle {};
+struct RhiCmdList : Handle {};
+struct RhiBuffer : Handle {};
 
 //
 
@@ -42,7 +94,7 @@ struct RhiVertexBindingDesc {
   RhiInputRate input_rate;
 };
 
-struct RhiVertexAtributeDesc {
+struct RhiVertexAttributeDesc {
   uint32_t location;
   uint32_t binding;
   RhiFormat format;
@@ -53,7 +105,7 @@ struct RhiBindingDesc {
   uint32_t binding;
   RhiBindingType type;
   uint32_t array_size;
-  uint32_t stage_flags;
+  RhiShaderStage stage_flags;
 };
 
 struct RhiBindGroupLayout {
@@ -73,7 +125,7 @@ struct RhiGraphicsPipelineDesc {
   RhiVertexBindingDesc vertex_bindings[4];
   uint32_t vertex_bindings_count;
 
-  RhiVertexAtributeDesc vertex_attributes[16];
+  RhiVertexAttributeDesc vertex_attributes[16];
   uint32_t vertex_attribute_count;
 
   RhiCullMode cull_mode;
@@ -90,5 +142,7 @@ struct RhiDesc {
 void RhiInit(RhiDesc);
 RhiShader RhiCreateShader(RhiShaderDesc);
 RhiGraphicsPipeline RhiCreateGraphicsPipeline(RhiGraphicsPipelineDesc);
+RhiCmdList RhiFrameBegin();
+void RhiFrameEnd();
 
 }  // namespace nyla

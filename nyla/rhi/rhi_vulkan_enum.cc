@@ -11,13 +11,13 @@ VkDescriptorType ConvertVulkanBindingType(RhiBindingType binding_type) {
   CHECK(false);
 }
 
-VkShaderStageFlags ConvertVulkanStageFlags(uint32_t stage_flags) {
+VkShaderStageFlags ConvertVulkanStageFlags(RhiShaderStage stage_flags) {
   VkShaderStageFlags ret = 0;
 
-  if (stage_flags & static_cast<uint32_t>(RhiShaderType::Vertex)) {
+  if (stage_flags & RhiShaderType::Vertex) {
     ret |= VK_SHADER_STAGE_VERTEX_BIT;
   }
-  if (stage_flags & static_cast<uint32_t>(RhiShaderType::Fragment)) {
+  if (stage_flags & RhiShaderType::Fragment) {
     ret |= VK_SHADER_STAGE_FRAGMENT_BIT;
   }
 

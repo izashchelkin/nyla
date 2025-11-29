@@ -6,7 +6,7 @@
 namespace nyla {
 
 VkDescriptorType ConvertVulkanBindingType(RhiBindingType);
-VkShaderStageFlags ConvertVulkanStageFlags(uint32_t);
+VkShaderStageFlags ConvertVulkanStageFlags(RhiShaderStage stage_flags);
 VkCullModeFlags ConvertVulkanCullMode(RhiCullMode);
 VkFrontFace ConvertVulkanFrontFace(RhiFrontFace);
 VkCompareOp ConvertVulkanCompareOp(RhiCompareOp);

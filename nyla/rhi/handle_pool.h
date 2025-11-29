@@ -26,19 +26,26 @@ struct HandlePool {
 };
 
 template <typename Data, size_t Size>
-inline Handle HandleAcquire(HandlePool<Data, Size>& pool, Data data) {
+inline Handle HandleAcquire(HandlePool<Data, Size>& pool, Data data, bool allow_intern = false) {
+  Handle ret_handle;
+
   for (uint32_t i = 0; i < Size; ++i) {
     auto& slot = pool.slots[i];
-    if (slot.used) continue;
+    if (slot.used) {
+      CHECK(slot.data != data || allow_intern);
+      continue;
+    }
 
-    ++slot.gen;
-    slot.used = true;
-    slot.data = data;
+    if (HandleIsSet(ret_handle)) {
+      ++slot.gen;
+      slot.used = true;
+      slot.data = data;
 
-    return Handle{
-        .gen = slot.gen,
-        .index = i,
-    };
+      ret_handle = Handle{
+          .gen = slot.gen,
+          .index = i,
+      };
+    }
   }
 
   CHECK(false);
@@ -58,14 +65,14 @@ inline Data& HandleGetData(HandlePool<Data, Size>& pool, Handle handle) {
 }
 
 template <typename Data, size_t Size>
-inline bool HandleRelease(HandlePool<Data, Size>& pool, Handle handle) {
+inline Data HandleRelease(HandlePool<Data, Size>& pool, Handle handle) {
   CHECK(handle.gen);
   CHECK_LT(handle.index, Size);
 
   auto& slot = pool.slots[handle.index];
   if (slot.used && handle.gen == slot.gen) {
     slot.used = false;
-    return true;
+    return slot.data;
   }
 
   CHECK(false);

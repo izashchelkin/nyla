@@ -274,8 +274,7 @@ void Vulkan_Initialize(const char* appname) {
   CreateSwapchain();
 }
 
-static void CreateSwapchain() {
-}
+static void CreateSwapchain() {}
 
 VkPipeline Vulkan_CreateGraphicsPipeline(const VkPipelineVertexInputStateCreateInfo& vertex_input_create_info,
                                          VkPipelineLayout pipeline_layout,

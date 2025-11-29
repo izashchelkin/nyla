@@ -6,18 +6,9 @@
 #include <vector>
 
 #include "nyla/commons/memory/charview.h"
-#include "nyla/vulkan/vulkan.h"
+#include "nyla/rhi/rhi.h"
 
 namespace nyla {
-
-constexpr uint32_t kPushConstantMaxSize = 128;
-
-enum class RpVertAttr {
-  Float4,
-  Half2,
-  SNorm8x4,
-  UNorm8x4,
-};
 
 struct RpBuf {
   bool enabled;
@@ -25,7 +16,7 @@ struct RpBuf {
   uint32_t size;
   uint32_t range;
   uint32_t written;
-  std::vector<RpVertAttr> attrs;
+  std::vector<RhiVertexAttributeType> attrs;
   std::vector<VkBuffer> buffer;
   std::vector<VkDeviceMemory> mem;
   std::vector<char*> mem_mapped;
@@ -39,12 +30,11 @@ inline VkShaderStageFlags RpBufStageFlags(const RpBuf& buf) {
 }
 
 struct Rp {
-  std::string_view name;
+  std::string name;
 
-  VkPipeline pipeline;
-  VkPipelineLayout layout;
+  RhiGraphicsPipeline pipeline;
+
   std::vector<VkDescriptorSet> desc_sets;
-  std::vector<VkPipelineShaderStageCreateInfo> shader_stages;
 
   bool disable_culling;
   RpBuf static_uniform;
@@ -67,8 +57,5 @@ void RpPushConst(Rp& rp, CharView data);
 void RpStaticUniformCopy(Rp& rp, CharView data);
 RpMesh RpVertCopy(Rp& rp, uint32_t vert_count, CharView vert_data);
 void RpDraw(Rp& rp, RpMesh mesh, CharView dynamic_uniform_data);
-
-VkFormat RpVertAttrVkFormat(RpVertAttr attr);
-uint32_t RpVertAttrSize(RpVertAttr attr);
 
 }  // namespace nyla
