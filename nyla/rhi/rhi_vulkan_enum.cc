@@ -83,4 +83,14 @@ VkFormat ConvertVulkanFormat(RhiFormat format) {
   CHECK(false);
 }
 
+VkVertexInputRate ConvertVulkanInputRate(RhiInputRate input_rate) {
+  switch (input_rate) {
+    case RhiInputRate::PerInstance:
+      return VK_VERTEX_INPUT_RATE_INSTANCE;
+    case RhiInputRate::PerVertex:
+      return VK_VERTEX_INPUT_RATE_VERTEX;
+  }
+  CHECK(false);
+}
+
 }  // namespace nyla

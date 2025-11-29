@@ -54,13 +54,13 @@ static struct {
   uint32_t num_frames_in_flight;
 } vk;
 
-static HandlePool<VkShaderModule, 16> shader_pool;
+static HandlePool<VkShaderModule, 16> shader_hpool;
 
 struct VulkanPipeline {
   VkPipelineLayout layout;
   VkPipeline pipeline;
 };
-static HandlePool<VulkanPipeline, 16> pipeline_pool;
+static HandlePool<VulkanPipeline, 16> gfx_pipeline_hpool;
 
 #if !defined(NDEBUG)
 
@@ -344,68 +344,62 @@ RhiShader RhiCreateShader(RhiShaderDesc desc) {
   VkShaderModule shader_module;
   VK_CHECK(vkCreateShaderModule(vk.dev, &create_info, nullptr, &shader_module));
 
-  return static_cast<RhiShader>(HandleAcquire(shader_pool, shader_module));
+  return static_cast<RhiShader>(HandleAcquire(shader_hpool, shader_module));
 }
 
 void RhiDestroyShader(RhiShader shader) {
-  VkShaderModule shader_module = HandleGet(shader_pool, shader);
+  VkShaderModule shader_module = HandleGetData(shader_hpool, shader);
   vkDestroyShaderModule(vk.dev, shader_module, nullptr);
 
-  HandleRelease(shader_pool, shader);
+  HandleRelease(shader_hpool, shader);
 }
 
-// static VkPipeline Vulkan_CreateGraphicsPipeline(const VkPipelineVertexInputStateCreateInfo& vertex_input_create_info,
-//                                                 VkPipelineLayout pipeline_layout,
-//                                                 std::span<const VkPipelineShaderStageCreateInfo> stages,
-//                                                 VkPipelineRasterizationStateCreateInfo rasterizer_create_info) {
+void RhiDestroyGraphicsPipeline(RhiGraphicsPipeline pipeline) {
+  auto& data = HandleGetData(gfx_pipeline_hpool, pipeline);
+
+  if (data.layout) {
+    vkDeviceWaitIdle(vk.dev);
+    vkDestroyPipelineLayout(vk.dev, data.layout, nullptr);
+  }
+  if (data.pipeline) {
+    vkDeviceWaitIdle(vk.dev);
+    vkDestroyPipeline(vk.dev, data.pipeline, nullptr);
+  }
+
+  HandleRelease(gfx_pipeline_hpool, pipeline);
+}
 
 RhiGraphicsPipeline RhiCreateGraphicsPipeline(RhiGraphicsPipelineDesc desc) {
-  VkPipelineLayout layout;
-  {
-    VkDescriptorSetLayout descriptor_set_layouts[std::size(desc.bind_layouts)];
-    CHECK_LE(desc.bind_layout_count, std::size(desc.bind_layouts));
-
-    for (uint32_t ilayout = 0; ilayout < desc.bind_layout_count; ++ilayout) {
-      const auto& bind_layout = desc.bind_layouts[ilayout];
-      CHECK_LE(bind_layout.binding_count, std::size(bind_layout.bindings));
-      VkDescriptorSetLayoutBinding descriptor_set_layout_bindings[std::size(bind_layout.bindings)];
-
-      for (uint32_t ibinding = 0; ibinding < bind_layout.binding_count; ++ibinding) {
-        const auto& binding = bind_layout.bindings[ibinding];
-        descriptor_set_layout_bindings[ibinding] = {
-            .binding = binding.binding,
-            .descriptorType = ConvertVulkanBindingType(binding.type),
-            .descriptorCount = binding.array_size,
-            .stageFlags = ConvertVulkanStageFlags(binding.stage_flags),
-        };
-      }
-
-      const VkDescriptorSetLayoutCreateInfo descriptor_set_layout_create_info{
-          .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-          .bindingCount = bind_layout.binding_count,
-          .pBindings = descriptor_set_layout_bindings,
-      };
-
-      VK_CHECK(vkCreateDescriptorSetLayout(vk.dev, &descriptor_set_layout_create_info, nullptr,
-                                           descriptor_set_layouts + ilayout));
-    }
-
-    const VkPushConstantRange push_constant_range{
-        .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT,
-        .offset = 0,
-        .size = kRhiPushConstantMaxSize,
+  VkVertexInputBindingDescription vertex_bindings[std::size(desc.vertex_bindings)];
+  CHECK_LE(desc.vertex_bindings_count, std::size(desc.vertex_bindings));
+  for (uint32_t i = 0; i < desc.vertex_bindings_count; ++i) {
+    const auto& binding = desc.vertex_bindings[i];
+    vertex_bindings[i] = VkVertexInputBindingDescription{
+        .binding = binding.binding,
+        .stride = binding.stride,
+        .inputRate = ConvertVulkanInputRate(binding.input_rate),
     };
-
-    const VkPipelineLayoutCreateInfo pipeline_layout_create_info{
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-        .setLayoutCount = desc.bind_layout_count,
-        .pSetLayouts = descriptor_set_layouts,
-        .pushConstantRangeCount = 1,
-        .pPushConstantRanges = &push_constant_range,
-    };
-
-    vkCreatePipelineLayout(vk.dev, &pipeline_layout_create_info, nullptr, &layout);
   }
+
+  VkVertexInputAttributeDescription vertex_attributes[std::size(desc.vertex_attributes)];
+  CHECK_LE(desc.vertex_attribute_count, std::size(desc.vertex_attributes));
+  for (uint32_t i = 0; i < desc.vertex_attribute_count; ++i) {
+    const auto& attribute = desc.vertex_attributes[i];
+    vertex_attributes[i] = VkVertexInputAttributeDescription{
+        .location = attribute.location,
+        .binding = attribute.binding,
+        .format = ConvertVulkanFormat(attribute.format),
+        .offset = attribute.offset,
+    };
+  }
+
+  const VkPipelineVertexInputStateCreateInfo vertex_input_state_create_info{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+      .vertexBindingDescriptionCount = desc.bind_layout_count,
+      .pVertexBindingDescriptions = vertex_bindings,
+      .vertexAttributeDescriptionCount = desc.vertex_attribute_count,
+      .pVertexAttributeDescriptions = vertex_attributes,
+  };
 
   const VkPipelineRasterizationStateCreateInfo rasterizer_create_info{
       .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
@@ -482,7 +476,7 @@ RhiGraphicsPipeline RhiCreateGraphicsPipeline(RhiGraphicsPipelineDesc desc) {
     stages[stage_count++] = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
         .stage = VK_SHADER_STAGE_VERTEX_BIT,
-        .module = HandleGet(shader_pool, desc.vert_shader),
+        .module = HandleGetData(shader_hpool, desc.vert_shader),
         .pName = "main",
     };
   }
@@ -490,30 +484,62 @@ RhiGraphicsPipeline RhiCreateGraphicsPipeline(RhiGraphicsPipelineDesc desc) {
     stages[stage_count++] = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
         .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-        .module = HandleGet(shader_pool, desc.frag_shader),
+        .module = HandleGetData(shader_hpool, desc.frag_shader),
         .pName = "main",
     };
   }
 
-  /*
-    const void*                                 pNext;
-    VkPipelineVertexInputStateCreateFlags       flags;
-    uint32_t                                    vertexBindingDescriptionCount;
-    const VkVertexInputBindingDescription*      pVertexBindingDescriptions;
-    uint32_t                                    vertexAttributeDescriptionCount;
-    const VkVertexInputAttributeDescription*    pVertexAttributeDescriptions;
-   */
+  VkDescriptorSetLayout descriptor_set_layouts[std::size(desc.bind_layouts)];
+  CHECK_LE(desc.bind_layout_count, std::size(desc.bind_layouts));
 
-  VkPipelineVertexInputStateCreateInfo vertex_input_create_info{
-      .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+  for (uint32_t ilayout = 0; ilayout < desc.bind_layout_count; ++ilayout) {
+    const auto& bind_layout = desc.bind_layouts[ilayout];
+    CHECK_LE(bind_layout.binding_count, std::size(bind_layout.bindings));
+    VkDescriptorSetLayoutBinding descriptor_set_layout_bindings[std::size(bind_layout.bindings)];
+
+    for (uint32_t ibinding = 0; ibinding < bind_layout.binding_count; ++ibinding) {
+      const auto& binding = bind_layout.bindings[ibinding];
+      descriptor_set_layout_bindings[ibinding] = {
+          .binding = binding.binding,
+          .descriptorType = ConvertVulkanBindingType(binding.type),
+          .descriptorCount = binding.array_size,
+          .stageFlags = ConvertVulkanStageFlags(binding.stage_flags),
+      };
+    }
+
+    const VkDescriptorSetLayoutCreateInfo descriptor_set_layout_create_info{
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+        .bindingCount = bind_layout.binding_count,
+        .pBindings = descriptor_set_layout_bindings,
+    };
+
+    VK_CHECK(vkCreateDescriptorSetLayout(vk.dev, &descriptor_set_layout_create_info, nullptr,
+                                         descriptor_set_layouts + ilayout));
+  }
+
+  const VkPushConstantRange push_constant_range{
+      .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT,
+      .offset = 0,
+      .size = kRhiPushConstantMaxSize,
   };
+
+  const VkPipelineLayoutCreateInfo pipeline_layout_create_info{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+      .setLayoutCount = desc.bind_layout_count,
+      .pSetLayouts = descriptor_set_layouts,
+      .pushConstantRangeCount = 1,
+      .pPushConstantRanges = &push_constant_range,
+  };
+
+  VkPipelineLayout layout;
+  vkCreatePipelineLayout(vk.dev, &pipeline_layout_create_info, nullptr, &layout);
 
   const VkGraphicsPipelineCreateInfo pipeline_create_info{
       .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
       .pNext = &pipeline_rendering_create_info,
       .stageCount = stage_count,
       .pStages = stages,
-      .pVertexInputState = &vertex_input_create_info,
+      .pVertexInputState = &vertex_input_state_create_info,
       .pInputAssemblyState = &input_assembly_create_info,
       .pViewportState = &viewport_state_create_info,
       .pRasterizationState = &rasterizer_create_info,
@@ -527,9 +553,10 @@ RhiGraphicsPipeline RhiCreateGraphicsPipeline(RhiGraphicsPipelineDesc desc) {
       .basePipelineIndex = -1,
   };
 
-  VkPipeline graphics_pipeline;
-  VK_CHECK(vkCreateGraphicsPipelines(vk.dev, VK_NULL_HANDLE, 1, &pipeline_create_info, nullptr, &graphics_pipeline));
-  return graphics_pipeline;
+  VkPipeline pipeline;
+  VK_CHECK(vkCreateGraphicsPipelines(vk.dev, VK_NULL_HANDLE, 1, &pipeline_create_info, nullptr, &pipeline));
+
+  return static_cast<RhiGraphicsPipeline>(HandleAcquire(gfx_pipeline_hpool, VulkanPipeline{layout, pipeline}));
 }
 
 VkShaderModule Vulkan_CreateShaderModule(const std::vector<char>& code) {

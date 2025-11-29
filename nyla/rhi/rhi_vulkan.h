@@ -5,11 +5,12 @@
 
 namespace nyla {
 
-VkDescriptorType ConvertVulkanBindingType(RhiBindingType binding_type);
-VkShaderStageFlags ConvertVulkanStageFlags(uint32_t stage_flags);
-VkCullModeFlags ConvertVulkanCullMode(RhiCullMode cull_mode);
-VkFrontFace ConvertVulkanFrontFace(RhiFrontFace front_face);
-VkCompareOp ConvertVulkanCompareOp(RhiCompareOp compare_op);
-VkFormat ConvertVulkanFormat(RhiCompareOp compare_op);
+VkDescriptorType ConvertVulkanBindingType(RhiBindingType);
+VkShaderStageFlags ConvertVulkanStageFlags(uint32_t);
+VkCullModeFlags ConvertVulkanCullMode(RhiCullMode);
+VkFrontFace ConvertVulkanFrontFace(RhiFrontFace);
+VkCompareOp ConvertVulkanCompareOp(RhiCompareOp);
+VkFormat ConvertVulkanFormat(RhiFormat);
+VkVertexInputRate ConvertVulkanInputRate(RhiInputRate);
 
 }  // namespace nyla

@@ -45,7 +45,7 @@ inline Handle HandleAcquire(HandlePool<Data, Size>& pool, Data data) {
 }
 
 template <typename Data, size_t Size>
-inline Data HandleGet(const HandlePool<Data, Size>& pool, Handle handle) {
+inline Data& HandleGetData(HandlePool<Data, Size>& pool, Handle handle) {
   CHECK(handle.gen);
   CHECK_LT(handle.index, Size);
 
