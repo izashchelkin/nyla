@@ -32,6 +32,9 @@ struct Rp {
   RhiBindGroupLayout bind_group_layout;
   RhiBindGroup bind_group[rhi_max_num_frames_in_flight];
 
+  RhiShader vertex_shader;
+  RhiShader fragment_shader;
+
   bool disable_culling;
   RpBuf static_uniform;
   RpBuf dynamic_uniform;

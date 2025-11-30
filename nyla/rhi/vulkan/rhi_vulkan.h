@@ -74,15 +74,15 @@ struct VulkanPipelineData {
   uint32_t bind_group_layout_count;
 };
 
-#define NYLA_RHI_HANDLE_POOLS(X)                                                                   \
-  X rhi_internal::RhiHandlePool<RhiBindGroupLayout, VkDescriptorSetLayout, 16> bind_group_layouts; \
-  X rhi_internal::RhiHandlePool<RhiBindGroup, VkDescriptorSet, 16> bind_groups;                    \
-  X rhi_internal::RhiHandlePool<RhiBuffer, VulkanBufferData, 16> buffers;                          \
-  X rhi_internal::RhiHandlePool<RhiCmdList, VulkanCmdListData, 16> cmd_lists;                      \
-  X rhi_internal::RhiHandlePool<RhiShader, VkShaderModule, 16> shaders;                            \
-  X rhi_internal::RhiHandlePool<RhiGraphicsPipeline, VulkanPipelineData, 16> graphics_pipelines;
-
-NYLA_RHI_HANDLE_POOLS(extern)
+struct RhiHandles {
+  rhi_internal::RhiHandlePool<RhiBindGroupLayout, VkDescriptorSetLayout, 16> bind_group_layouts;
+  rhi_internal::RhiHandlePool<RhiBindGroup, VkDescriptorSet, 16> bind_groups;
+  rhi_internal::RhiHandlePool<RhiBuffer, VulkanBufferData, 16> buffers;
+  rhi_internal::RhiHandlePool<RhiCmdList, VulkanCmdListData, 16> cmd_lists;
+  rhi_internal::RhiHandlePool<RhiShader, VkShaderModule, 16> shaders;
+  rhi_internal::RhiHandlePool<RhiGraphicsPipeline, VulkanPipelineData, 16> graphics_pipelines;
+};
+extern RhiHandles rhi_handles;
 
 VkBool32 DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
                                 VkDebugUtilsMessageTypeFlagsEXT message_type,
@@ -94,6 +94,7 @@ VkSemaphore CreateTimeline(uint64_t initial_value);
 void WaitTimeline(VkSemaphore timeline, uint64_t wait_value);
 
 VkFormat ConvertVulkanFormat(RhiFormat format);
+VkShaderStageFlags ConvertVulkanStageFlags(RhiShaderStage stage_flags);
 
 }  // namespace rhi_vulkan_internal
 

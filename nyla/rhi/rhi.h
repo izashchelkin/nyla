@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "nyla/commons/bitenum.h"
+#include "nyla/commons/memory/charview.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi_handle_pool.h"
 
@@ -166,13 +167,20 @@ RhiGraphicsPipeline RhiCreateGraphicsPipeline(const RhiGraphicsPipelineDesc&);
 void RhiDestroyGraphicsPipeline(RhiGraphicsPipeline);
 
 void RhiInit(const RhiDesc&);
+uint32_t RhiGetMinUniformBufferOffsetAlignment();
+uint32_t RhiGetNumFramesInFlight();
 RhiCmdList RhiFrameBegin();
 void RhiFrameEnd();
 uint32_t RhiFrameGetIndex();
 RhiCmdList RhiFrameGetCmdList();  // TODO: get rid of this
 
 void RhiCmdBindGraphicsPipeline(RhiCmdList, RhiGraphicsPipeline);
-void RhiCmdBindGraphicsBindGroup(RhiCmdList cmd, uint32_t set_index, RhiBindGroup bind_group,
+void RhiCmdBindVertexBuffers(RhiCmdList cmd, uint32_t first_binding, std::span<const RhiBuffer> buffers,
+                             std::span<const uint32_t> offsets);
+void RhiCmdBindGraphicsBindGroup(RhiCmdList, uint32_t set_index, RhiBindGroup bind_group,
                                  std::span<const uint32_t> dynamic_offsets);
+void RhiCmdPushGraphicsConstants(RhiCmdList cmd, uint32_t offset, RhiShaderStage stage, CharView data);
+void RhiCmdDraw(RhiCmdList cmd, uint32_t vertex_count, uint32_t instance_count, uint32_t first_vertex,
+                uint32_t first_instance);
 
 }  // namespace nyla

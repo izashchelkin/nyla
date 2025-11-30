@@ -24,10 +24,13 @@ constexpr inline bool enableValidations = true;
 
 namespace nyla {
 
+using namespace rhi_internal;
+using namespace rhi_vulkan_internal;
+
 namespace rhi_vulkan_internal {
 
 VulkanData vk;
-NYLA_RHI_HANDLE_POOLS();
+RhiHandles rhi_handles;
 
 VkFormat ConvertVulkanFormat(RhiFormat format) {
   switch (format) {
@@ -44,11 +47,20 @@ VkFormat ConvertVulkanFormat(RhiFormat format) {
   return static_cast<VkFormat>(0);
 }
 
+VkShaderStageFlags ConvertVulkanStageFlags(RhiShaderStage stage_flags) {
+  VkShaderStageFlags ret = 0;
+  if (Any(stage_flags & RhiShaderStage::Vertex)) {
+    ret |= VK_SHADER_STAGE_VERTEX_BIT;
+  }
+  if (Any(stage_flags & RhiShaderStage::Fragment)) {
+    ret |= VK_SHADER_STAGE_FRAGMENT_BIT;
+  }
+  return ret;
+}
+
 }  // namespace rhi_vulkan_internal
 
 void RhiInit(RhiDesc rhi_desc) {
-  using namespace rhi_vulkan_internal;
-
   constexpr uint32_t kInvalidIndex = std::numeric_limits<uint32_t>::max();
 
   CHECK_LE(rhi_desc.num_frames_in_flight, rhi_max_num_frames_in_flight);
@@ -318,6 +330,10 @@ void RhiInit(RhiDesc rhi_desc) {
       .pPoolSizes = descriptor_pool_sizes,
   };
   vkCreateDescriptorPool(vk.dev, &descriptor_pool_create_info, nullptr, &vk.descriptor_pool);
+}
+
+uint32_t RhiGetMinUniformBufferOffsetAlignment() {
+  return vk.phys_dev_props.limits.minUniformBufferOffsetAlignment;
 }
 
 }  // namespace nyla

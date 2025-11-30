@@ -189,4 +189,8 @@ RhiCmdList RhiFrameGetCmdList() {  // TODO: get rid of this
   return vk.graphics_queue_cmd[vk.frame_index];
 }
 
+uint32_t RhiGetNumFramesInFlight() {
+  return vk.num_frames_in_flight;
+}
+
 }  // namespace nyla

@@ -61,11 +61,11 @@ RhiShader RhiCreateShader(RhiShaderDesc desc) {
   VkShaderModule shader_module;
   VK_CHECK(vkCreateShaderModule(vk.dev, &create_info, nullptr, &shader_module));
 
-  return RhiHandleAcquire(shaders, shader_module);
+  return RhiHandleAcquire(rhi_handles.shaders, shader_module);
 }
 
 void RhiDestroyShader(RhiShader shader) {
-  VkShaderModule shader_module = RhiHandleRelease(shaders, shader);
+  VkShaderModule shader_module = RhiHandleRelease(rhi_handles.shaders, shader);
   vkDestroyShaderModule(vk.dev, shader_module, nullptr);
 }
 
@@ -178,7 +178,7 @@ RhiGraphicsPipeline RhiCreateGraphicsPipeline(RhiGraphicsPipelineDesc desc) {
     stages[stage_count++] = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
         .stage = VK_SHADER_STAGE_VERTEX_BIT,
-        .module = RhiHandleGetData(shaders, desc.vert_shader),
+        .module = RhiHandleGetData(rhi_handles.shaders, desc.vert_shader),
         .pName = "main",
     };
   }
@@ -186,7 +186,7 @@ RhiGraphicsPipeline RhiCreateGraphicsPipeline(RhiGraphicsPipelineDesc desc) {
     stages[stage_count++] = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
         .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-        .module = RhiHandleGetData(shaders, desc.frag_shader),
+        .module = RhiHandleGetData(rhi_handles.shaders, desc.frag_shader),
         .pName = "main",
     };
   }
@@ -204,7 +204,7 @@ RhiGraphicsPipeline RhiCreateGraphicsPipeline(RhiGraphicsPipelineDesc desc) {
 
   VkDescriptorSetLayout descriptor_set_layouts[rhi_max_bind_group_layouts];
   for (uint32_t i = 0; i < desc.bind_group_layouts_count; ++i) {
-    descriptor_set_layouts[i] = RhiHandleGetData(bind_group_layouts, desc.bind_group_layouts[i]);
+    descriptor_set_layouts[i] = RhiHandleGetData(rhi_handles.bind_group_layouts, desc.bind_group_layouts[i]);
   }
 
   const VkPipelineLayoutCreateInfo pipeline_layout_create_info{
@@ -240,11 +240,11 @@ RhiGraphicsPipeline RhiCreateGraphicsPipeline(RhiGraphicsPipelineDesc desc) {
   VkPipeline pipeline;
   VK_CHECK(vkCreateGraphicsPipelines(vk.dev, VK_NULL_HANDLE, 1, &pipeline_create_info, nullptr, &pipeline));
 
-  return RhiHandleAcquire(graphics_pipelines, pipeline_data);
+  return RhiHandleAcquire(rhi_handles.graphics_pipelines, pipeline_data);
 }
 
 void RhiDestroyGraphicsPipeline(RhiGraphicsPipeline pipeline) {
-  auto pipeline_data = RhiHandleRelease(graphics_pipelines, pipeline);
+  auto pipeline_data = RhiHandleRelease(rhi_handles.graphics_pipelines, pipeline);
   vkDeviceWaitIdle(vk.dev);
 
   if (pipeline_data.layout) {
@@ -256,10 +256,41 @@ void RhiDestroyGraphicsPipeline(RhiGraphicsPipeline pipeline) {
 }
 
 void RhiCmdBindGraphicsPipeline(RhiCmdList cmd, RhiGraphicsPipeline pipeline) {
-  VulkanCmdListData cmd_data = RhiHandleGetData(cmd_lists, cmd);
-  const VulkanPipelineData& pipeline_data = RhiHandleGetData(graphics_pipelines, pipeline);
+  VulkanCmdListData cmd_data = RhiHandleGetData(rhi_handles.cmd_lists, cmd);
+  const VulkanPipelineData& pipeline_data = RhiHandleGetData(rhi_handles.graphics_pipelines, pipeline);
 
   vkCmdBindPipeline(cmd_data.cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_data.pipeline);
+}
+
+void RhiCmdPushGraphicsConstants(RhiCmdList cmd, uint32_t offset, RhiShaderStage stage, CharView data) {
+  const VulkanCmdListData& cmd_data = RhiHandleGetData(rhi_handles.cmd_lists, cmd);
+  const VulkanPipelineData& pipeline_data =
+      RhiHandleGetData(rhi_handles.graphics_pipelines, cmd_data.bound_graphics_pipeline);
+
+  vkCmdPushConstants(cmd_data.cmdbuf, pipeline_data.layout, ConvertVulkanStageFlags(stage), offset, data.size(),
+                     data.data());
+}
+
+void RhiCmdBindVertexBuffers(RhiCmdList cmd, uint32_t first_binding, std::span<const RhiBuffer> buffers,
+                             std::span<const uint32_t> offsets) {
+  CHECK_EQ(buffers.size(), offsets.size());
+  CHECK_LE(buffers.size(), 4);
+
+  VkBuffer vk_bufs[4]{};
+  VkDeviceSize vk_offsets[4];
+  for (uint32_t i = 0; i < buffers.size(); ++i) {
+    vk_bufs[i] = RhiHandleGetData(rhi_handles.buffers, buffers[i]).buffer;
+    vk_offsets[i] = offsets[i];
+  }
+
+  VulkanCmdListData cmd_data = RhiHandleGetData(rhi_handles.cmd_lists, cmd);
+  vkCmdBindVertexBuffers(cmd_data.cmdbuf, first_binding, buffers.size(), vk_bufs, vk_offsets);
+}
+
+void RhiCmdDraw(RhiCmdList cmd, uint32_t vertex_count, uint32_t instance_count, uint32_t first_vertex,
+                uint32_t first_instance) {
+  VulkanCmdListData cmd_data = RhiHandleGetData(rhi_handles.cmd_lists, cmd);
+  vkCmdDraw(cmd_data.cmdbuf, vertex_count, instance_count, first_vertex, first_instance);
 }
 
 }  // namespace nyla

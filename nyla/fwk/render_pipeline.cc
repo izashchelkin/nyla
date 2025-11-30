@@ -13,7 +13,6 @@
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_handle_pool.h"
-#include "nyla/vulkan/vulkan.h"
 
 namespace nyla {
 
@@ -79,7 +78,7 @@ void RpInit(Rp& rp) {
 
     RhiBindGroupDesc bind_group_desc[rhi_max_num_frames_in_flight]{};
 
-    for (uint32_t j = 0; j < vk.frames_inflight; ++j) {
+    for (uint32_t j = 0; j < RhiGetNumFramesInFlight(); ++j) {
       bind_group_desc[j].entries_count = bind_group_layout_desc.binding_count;
     }
 
@@ -93,7 +92,7 @@ void RpInit(Rp& rp) {
           .stage_flags = RpBufStageFlags(buf),
       };
 
-      for (uint32_t iframe = 0; iframe < vk.frames_inflight; ++iframe) {
+      for (uint32_t iframe = 0; iframe < RhiGetNumFramesInFlight(); ++iframe) {
         buf.buffer[iframe] = RhiCreateBuffer(RhiBufferDesc{
             .size = buf.size,
             .buffer_usage = buffer_usage,
@@ -126,7 +125,7 @@ void RpInit(Rp& rp) {
 
     rp.bind_group_layout = RhiCreateBindGroupLayout(bind_group_layout_desc);
 
-    for (uint32_t iframe = 0; iframe < vk.frames_inflight; ++iframe) {
+    for (uint32_t iframe = 0; iframe < RhiGetNumFramesInFlight(); ++iframe) {
       bind_group_desc[iframe].layout = rp.bind_group_layout;
       rp.bind_group[iframe] = RhiCreateBindGroup(bind_group_desc[iframe]);
     }
@@ -208,17 +207,18 @@ void RpPushConst(Rp& rp, CharView data) {
   CHECK(!data.empty());
   CHECK_LE(data.size(), rhi_max_push_constant_size);
 
-  const VkCommandBuffer cmd = vk.command_buffers[vk.current_frame_data.iframe];
-  vkCmdPushConstants(cmd, rp.layout, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT, 0, data.size(),
-                     data.data());
+  RhiCmdList cmd = RhiFrameGetCmdList();
+  RhiCmdPushGraphicsConstants(cmd, 0, RhiShaderStage::Vertex | RhiShaderStage::Fragment, data);
 }
 
 void RpDraw(Rp& rp, RpMesh mesh, CharView dynamic_uniform_data) {
-  const VkCommandBuffer cmd = vk.command_buffers[vk.current_frame_data.iframe];
+  RhiCmdList cmd = RhiFrameGetCmdList();
+  uint32_t frame_index = RhiFrameGetIndex();
 
   if (rp.vert_buf.enabled) {
-    VkBuffer buf = rp.vert_buf.buffer[vk.current_frame_data.iframe];
-    vkCmdBindVertexBuffers(cmd, 0, 1, &buf, &mesh.offset);
+    RhiBuffer buffers[]{rp.vert_buf.buffer[frame_index]};
+    uint32_t offsets[]{mesh.offset};
+    RhiCmdBindVertexBuffers(cmd, 0, buffers, offsets);
   }
 
   if (rp.dynamic_uniform.enabled || rp.static_uniform.enabled) {
@@ -226,40 +226,38 @@ void RpDraw(Rp& rp, RpMesh mesh, CharView dynamic_uniform_data) {
     uint32_t offset = 0;
 
     if (rp.dynamic_uniform.enabled) {
-      rp.dynamic_uniform.written =
-          AlignUp(rp.dynamic_uniform.written, vk.phys_device_props.limits.minUniformBufferOffsetAlignment);
+      rp.dynamic_uniform.written = AlignUp(rp.dynamic_uniform.written, RhiGetMinUniformBufferOffsetAlignment());
 
       offset_count = 1;
       offset = rp.dynamic_uniform.written;
       RpBufCopy(rp.dynamic_uniform, dynamic_uniform_data);
     }
 
-    const VkDescriptorSet desc_set = rp.desc_sets[vk.current_frame_data.iframe];
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, rp.layout, 0, 1, &desc_set, offset_count, &offset);
+    RhiCmdBindGraphicsBindGroup(cmd, 0, rp.bind_group[frame_index], {&offset, offset_count});
   }
 
-  vkCmdDraw(cmd, mesh.vert_count, 1, 0, 0);
+  RhiCmdDraw(cmd, mesh.vert_count, 1, 0, 0);
 }
 
 void RpAttachVertShader(Rp& rp, const std::string& path) {
-  rp.shader_stages.emplace_back(VkPipelineShaderStageCreateInfo{
-      .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-      .stage = VK_SHADER_STAGE_VERTEX_BIT,
-      .module = Vulkan_CreateShaderModule(ReadFile(path)),
-      .pName = "main",
-  });
+  if (RhiHandleIsSet(rp.vertex_shader)) {
+    RhiDestroyShader(rp.vertex_shader);
+  }
 
+  rp.vertex_shader = RhiCreateShader(RhiShaderDesc{
+      .code = ReadFile(path),
+  });
   PlatformFsWatch(path);
 }
 
 void RpAttachFragShader(Rp& rp, const std::string& path) {
-  rp.shader_stages.emplace_back(VkPipelineShaderStageCreateInfo{
-      .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-      .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-      .module = Vulkan_CreateShaderModule(ReadFile(path)),
-      .pName = "main",
-  });
+  if (RhiHandleIsSet(rp.fragment_shader)) {
+    RhiDestroyShader(rp.fragment_shader);
+  }
 
+  rp.fragment_shader = RhiCreateShader(RhiShaderDesc{
+      .code = ReadFile(path),
+  });
   PlatformFsWatch(path);
 }
 
