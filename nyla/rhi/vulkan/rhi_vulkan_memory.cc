@@ -7,14 +7,16 @@
 
 namespace nyla {
 
-namespace {
+using namespace rhi_internal;
+using namespace rhi_vulkan_internal;
 
-struct VulkanBufferData {
-  VkBuffer buffer;
-  VkDeviceMemory memory;
-  char* mapped;
-};
-rhi_internal::RhiHandlePool<VulkanBufferData, 16> buffers;
+namespace rhi_vulkan_internal {
+
+RhiHandlePool<VulkanBufferData, 16> buffers;
+
+}
+
+namespace {
 
 VkBufferUsageFlags ConvertVulkanBufferUsage(RhiBufferUsage usage) {
   VkBufferUsageFlags ret = 0;
@@ -108,7 +110,7 @@ RhiBuffer RhiCreateBuffer(RhiBufferDesc desc) {
   VK_CHECK(vkAllocateMemory(vk.dev, &memory_alloc_info, nullptr, &buffer_data.memory));
   VK_CHECK(vkBindBufferMemory(vk.dev, buffer_data.buffer, buffer_data.memory, 0));
 
-  return static_cast<RhiBuffer>(RhiHandleAcquire(buffers, buffer_data));
+  return RhiHandleAcquire(buffers, buffer_data);
 }
 
 void RhiDestroyBuffer(RhiBuffer buffer) {

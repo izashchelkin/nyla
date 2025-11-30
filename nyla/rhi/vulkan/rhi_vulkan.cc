@@ -26,17 +26,17 @@ namespace nyla {
 
 namespace rhi_vulkan_internal {
 
+VulkanData vk;
+NYLA_RHI_HANDLE_POOLS();
+
 VkFormat ConvertVulkanFormat(RhiFormat format) {
   switch (format) {
     case RhiFormat::Float4:
       return VK_FORMAT_R32G32B32A32_SFLOAT;
-
     case RhiFormat::Half2:
       return VK_FORMAT_R16G16_SFLOAT;
-
     case RhiFormat::SNorm8x4:
       return VK_FORMAT_R8G8B8A8_SNORM;
-
     case RhiFormat::UNorm8x4:
       return VK_FORMAT_R8G8B8A8_UNORM;
   }
@@ -275,7 +275,7 @@ void RhiInit(RhiDesc rhi_desc) {
     vkGetDeviceQueue(vk.dev, vk.transfer_queue.queue_family_index, 0, &vk.transfer_queue.queue);
   }
 
-  auto init_queue = [](DeviceQueue& queue, VkCommandBuffer* cmd, uint32_t cmd_count) {
+  auto init_queue = [](DeviceQueue& queue, RhiQueueType queue_type, std::span<RhiCmdList> cmd) {
     const VkCommandPoolCreateInfo command_pool_create_info{
         .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
         .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
@@ -286,16 +286,12 @@ void RhiInit(RhiDesc rhi_desc) {
     queue.timeline = CreateTimeline(0);
     queue.timeline_next = 1;
 
-    const VkCommandBufferAllocateInfo alloc_info{
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-        .commandPool = queue.cmd_pool,
-        .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-        .commandBufferCount = cmd_count,
-    };
-    VK_CHECK(vkAllocateCommandBuffers(vk.dev, &alloc_info, cmd));
+    for (uint32_t i = 0; i < cmd.size(); ++i) {
+      cmd[i] = RhiCreateCmdList(queue_type);
+    }
   };
-  init_queue(vk.graphics_queue, vk.graphics_queue_cmd, vk.num_frames_in_flight);
-  init_queue(vk.transfer_queue, &vk.transfer_queue_cmd, 1);
+  init_queue(vk.graphics_queue, RhiQueueType::Graphics, std::span{vk.graphics_queue_cmd, vk.num_frames_in_flight});
+  init_queue(vk.transfer_queue, RhiQueueType::Transfer, std::span{&vk.transfer_queue_cmd, 1});
 
   for (size_t i = 0; i < vk.num_frames_in_flight; ++i) {
     const VkSemaphoreCreateInfo semaphore_create_info{
@@ -303,6 +299,25 @@ void RhiInit(RhiDesc rhi_desc) {
     };
     VK_CHECK(vkCreateSemaphore(vk.dev, &semaphore_create_info, nullptr, vk.swapchain_acquire_semaphores + i));
   }
+
+  const VkDescriptorPoolSize descriptor_pool_sizes[]{
+      {
+          .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+          .descriptorCount = 256,
+      },
+      {
+          .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+          .descriptorCount = 256,
+      },
+  };
+  const VkDescriptorPoolCreateInfo descriptor_pool_create_info{
+      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+      .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
+      .maxSets = 256,
+      .poolSizeCount = static_cast<uint32_t>(std::size(descriptor_pool_sizes)),
+      .pPoolSizes = descriptor_pool_sizes,
+  };
+  vkCreateDescriptorPool(vk.dev, &descriptor_pool_create_info, nullptr, &vk.descriptor_pool);
 }
 
 }  // namespace nyla

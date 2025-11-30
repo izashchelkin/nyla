@@ -6,17 +6,10 @@
 
 namespace nyla {
 
+using namespace rhi_internal;
+using namespace rhi_vulkan_internal;
+
 namespace {
-
-struct VulkanPipelineData {
-  VkPipelineLayout layout;
-  VkPipeline pipeline;
-  RhiBindGroupLayout bind_group_layouts[rhi_max_bind_group_layouts];
-  uint32_t bind_group_layout_count;
-};
-
-rhi_internal::RhiHandlePool<VkShaderModule, 16> shaders;
-rhi_internal::RhiHandlePool<VulkanPipelineData, 16> gfx_pipelines;
 
 VkCullModeFlags ConvertVulkanCullMode(RhiCullMode cull_mode) {
   switch (cull_mode) {
@@ -58,9 +51,14 @@ VkVertexInputRate ConvertVulkanInputRate(RhiInputRate input_rate) {
 
 }  // namespace
 
-RhiShader RhiCreateShader(RhiShaderDesc desc) {
-  using namespace rhi_vulkan_internal;
+namespace rhi_vulkan_internal {
 
+rhi_internal::RhiHandlePool<VkShaderModule, 16> shaders;
+rhi_internal::RhiHandlePool<VulkanPipelineData, 16> graphics_pipelines;
+
+}  // namespace rhi_vulkan_internal
+
+RhiShader RhiCreateShader(RhiShaderDesc desc) {
   const VkShaderModuleCreateInfo create_info{
       .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
       .codeSize = desc.code.size(),
@@ -70,19 +68,15 @@ RhiShader RhiCreateShader(RhiShaderDesc desc) {
   VkShaderModule shader_module;
   VK_CHECK(vkCreateShaderModule(vk.dev, &create_info, nullptr, &shader_module));
 
-  return static_cast<RhiShader>(RhiHandleAcquire(shaders, shader_module));
+  return RhiHandleAcquire(shaders, shader_module);
 }
 
 void RhiDestroyShader(RhiShader shader) {
-  using namespace rhi_vulkan_internal;
-
   VkShaderModule shader_module = RhiHandleRelease(shaders, shader);
   vkDestroyShaderModule(vk.dev, shader_module, nullptr);
 }
 
 RhiGraphicsPipeline RhiCreateGraphicsPipeline(RhiGraphicsPipelineDesc desc) {
-  using namespace rhi_vulkan_internal;
-
   VulkanPipelineData pipeline_data = {};
 
   VkVertexInputBindingDescription vertex_bindings[std::size(desc.vertex_bindings)];
@@ -253,15 +247,11 @@ RhiGraphicsPipeline RhiCreateGraphicsPipeline(RhiGraphicsPipelineDesc desc) {
   VkPipeline pipeline;
   VK_CHECK(vkCreateGraphicsPipelines(vk.dev, VK_NULL_HANDLE, 1, &pipeline_create_info, nullptr, &pipeline));
 
-  const RhiGraphicsPipeline ret_handle =
-      static_cast<RhiGraphicsPipeline>(RhiHandleAcquire(gfx_pipelines, pipeline_data));
-  return ret_handle;
+  return RhiHandleAcquire(graphics_pipelines, pipeline_data);
 }
 
 void RhiDestroyGraphicsPipeline(RhiGraphicsPipeline pipeline) {
-  using namespace rhi_vulkan_internal;
-
-  auto pipeline_data = RhiHandleRelease(gfx_pipelines, pipeline);
+  auto pipeline_data = RhiHandleRelease(graphics_pipelines, pipeline);
   vkDeviceWaitIdle(vk.dev);
 
   if (pipeline_data.layout) {
@@ -270,6 +260,13 @@ void RhiDestroyGraphicsPipeline(RhiGraphicsPipeline pipeline) {
   if (pipeline_data.pipeline) {
     vkDestroyPipeline(vk.dev, pipeline_data.pipeline, nullptr);
   }
+}
+
+void RhiCmdBindGraphicsPipeline(RhiCmdList cmd, RhiGraphicsPipeline pipeline) {
+  VulkanCmdListData cmd_data = RhiHandleGetData(cmd_lists, cmd);
+  const VulkanPipelineData& pipeline_data = RhiHandleGetData(graphics_pipelines, pipeline);
+
+  vkCmdBindPipeline(cmd_data.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_data.pipeline);
 }
 
 }  // namespace nyla

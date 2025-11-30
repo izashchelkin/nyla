@@ -95,12 +95,14 @@ struct RhiBufferBinding {
 struct RhiBindGroupEntry {
   uint32_t binding;
   RhiBindingType type;
+  uint32_t array_index;
   union {
     RhiBufferBinding buffer;
   };
 };
 
 struct RhiBindGroupDesc {
+  RhiBindGroupLayout layout;
   RhiBindGroupEntry entries[4];
   uint32_t entries_count;
 };
@@ -142,23 +144,33 @@ struct RhiDesc {
 
 //
 
-RhiShader RhiCreateShader(RhiShaderDesc);
+RhiCmdList RhiCreateCmdList(RhiQueueType queue_type);
+void RhiDestroyCmdList(RhiCmdList cmd);
+
+RhiShader RhiCreateShader(const RhiShaderDesc&);
 void RhiDestroyShader(RhiShader);
 
-RhiBuffer RhiCreateBuffer(RhiBufferDesc);
+RhiBuffer RhiCreateBuffer(const RhiBufferDesc&);
 void RhiDestroyBuffer(RhiBuffer);
 
 void* RhiMapBuffer(RhiBuffer, bool idempotent = true);
 void RhiUnmapBuffer(RhiBuffer, bool idempotent = true);
 
-RhiBindGroupLayout RhiCreateBindGroupLayout(RhiBindGroupLayoutDesc);
+RhiBindGroupLayout RhiCreateBindGroupLayout(const RhiBindGroupLayoutDesc&);
 void RhiDestroyBindGroupLayout(RhiBindGroupLayout);
 
-RhiGraphicsPipeline RhiCreateGraphicsPipeline(RhiGraphicsPipelineDesc);
+RhiBindGroup RhiCreateBindGroup(const RhiBindGroupDesc&);
+void RhiDestroyBindGroup(RhiBindGroup);
+
+RhiGraphicsPipeline RhiCreateGraphicsPipeline(const RhiGraphicsPipelineDesc&);
 void RhiDestroyGraphicsPipeline(RhiGraphicsPipeline);
 
-void RhiInit(RhiDesc);
+void RhiInit(const RhiDesc&);
 RhiCmdList RhiFrameBegin();
 void RhiFrameEnd();
+
+void RhiCmdBindGraphicsPipeline(RhiCmdList, RhiGraphicsPipeline);
+void RhiCmdBindGraphicsBindGroup(RhiCmdList cmd, uint32_t set_index, RhiBindGroup bind_group,
+                                 std::span<const uint32_t> dynamic_offsets);
 
 }  // namespace nyla

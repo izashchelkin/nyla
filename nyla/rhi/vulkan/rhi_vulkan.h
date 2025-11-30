@@ -1,3 +1,5 @@
+#pragma once
+
 #include "absl/log/check.h"
 #include "nyla/rhi/rhi.h"
 #include "vulkan/vk_enum_string_helper.h"
@@ -19,12 +21,13 @@ struct DeviceQueue {
   uint64_t timeline_next;
 };
 
-static struct {
+struct VulkanData {
   VkInstance instance;
   VkDevice dev;
   VkPhysicalDevice phys_dev;
   VkPhysicalDeviceProperties phys_dev_props;
   VkPhysicalDeviceMemoryProperties phys_dev_mem_props;
+  VkDescriptorPool descriptor_pool;
 
   PlatformWindow window;
   VkSurfaceKHR surface;
@@ -37,19 +40,49 @@ static struct {
   VkSemaphore swapchain_acquire_semaphores[8];
 
   DeviceQueue graphics_queue;
-  VkCommandBuffer graphics_queue_cmd[rhi_max_num_frames_in_flight];
+  RhiCmdList graphics_queue_cmd[rhi_max_num_frames_in_flight];
   uint64_t graphics_queue_cmd_done[rhi_max_num_frames_in_flight];
 
   DeviceQueue transfer_queue;
-  VkCommandBuffer transfer_queue_cmd;
+  RhiCmdList transfer_queue_cmd;
   uint64_t transfer_queue_cmd_done;
 
   uint32_t num_frames_in_flight;
   uint32_t frame_index;
   uint32_t swapchain_image_index;
-} vk;
+};
 
-extern rhi_internal::RhiHandlePool<VkDescriptorSetLayout, 64> bind_group_layouts;
+extern VulkanData vk;
+
+struct VulkanBufferData {
+  VkBuffer buffer;
+  VkDeviceMemory memory;
+  char* mapped;
+};
+
+struct VulkanCmdListData {
+  VkCommandBuffer command_buffer;
+  RhiQueueType queue_type;
+  RhiGraphicsPipeline bound_graphics_pipeline;
+};
+
+struct VulkanPipelineData {
+  VkPipelineLayout layout;
+  VkPipeline pipeline;
+  VkPipelineBindPoint bind_point;
+  RhiBindGroupLayout bind_group_layouts[rhi_max_bind_group_layouts];
+  uint32_t bind_group_layout_count;
+};
+
+#define NYLA_RHI_HANDLE_POOLS(X)                                                                   \
+  X rhi_internal::RhiHandlePool<RhiBindGroupLayout, VkDescriptorSetLayout, 16> bind_group_layouts; \
+  X rhi_internal::RhiHandlePool<RhiBindGroup, VkDescriptorSet, 16> bind_groups;                    \
+  X rhi_internal::RhiHandlePool<RhiBuffer, VulkanBufferData, 16> buffers;                          \
+  X rhi_internal::RhiHandlePool<RhiCmdList, VulkanCmdListData, 16> cmd_lists;                      \
+  X rhi_internal::RhiHandlePool<RhiShader, VkShaderModule, 16> shaders;                            \
+  X rhi_internal::RhiHandlePool<RhiGraphicsPipeline, VulkanPipelineData, 16> graphics_pipelines;
+
+NYLA_RHI_HANDLE_POOLS(extern)
 
 VkBool32 DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
                                 VkDebugUtilsMessageTypeFlagsEXT message_type,

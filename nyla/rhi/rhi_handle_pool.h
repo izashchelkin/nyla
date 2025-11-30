@@ -18,7 +18,7 @@ inline bool RhiHandleIsSet(RhiHandle handle) {
 
 namespace rhi_internal {
 
-template <typename Data, size_t Size>
+template <typename Handle, typename Data, size_t Size>
 struct RhiHandlePool {
   struct {
     Data data;
@@ -27,8 +27,8 @@ struct RhiHandlePool {
   } slots[Size];
 };
 
-template <typename Data, size_t Size>
-inline RhiHandle RhiHandleAcquire(RhiHandlePool<Data, Size>& pool, Data data, bool allow_intern = false) {
+template <typename Handle, typename Data, size_t Size>
+inline Handle RhiHandleAcquire(RhiHandlePool<Handle, Data, Size>& pool, Data data, bool allow_intern = false) {
   RhiHandle ret_handle;
 
   for (uint32_t i = 0; i < Size; ++i) {
@@ -43,18 +43,18 @@ inline RhiHandle RhiHandleAcquire(RhiHandlePool<Data, Size>& pool, Data data, bo
       slot.used = true;
       slot.data = data;
 
-      ret_handle = RhiHandle{
+      ret_handle = static_cast<Handle>(RhiHandle{
           .gen = slot.gen,
           .index = i,
-      };
+      });
     }
   }
 
   CHECK(false);
 }
 
-template <typename Data, size_t Size>
-inline Data& RhiHandleGetData(RhiHandlePool<Data, Size>& pool, RhiHandle handle) {
+template <typename Handle, typename Data, size_t Size>
+inline Data& RhiHandleGetData(RhiHandlePool<Handle, Data, Size>& pool, Handle handle) {
   CHECK(handle.gen);
   CHECK_LT(handle.index, Size);
 
@@ -66,8 +66,8 @@ inline Data& RhiHandleGetData(RhiHandlePool<Data, Size>& pool, RhiHandle handle)
   CHECK(false);
 }
 
-template <typename Data, size_t Size>
-inline Data RhiHandleRelease(RhiHandlePool<Data, Size>& pool, RhiHandle handle) {
+template <typename Handle, typename Data, size_t Size>
+inline Data RhiHandleRelease(RhiHandlePool<Handle, Data, Size>& pool, Handle handle) {
   CHECK(handle.gen);
   CHECK_LT(handle.index, Size);
 

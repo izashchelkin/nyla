@@ -5,15 +5,10 @@
 
 namespace nyla {
 
-namespace {
-
-rhi_internal::RhiHandlePool<VkCommandBuffer, 16> cmdlists;
-
-}
+using namespace rhi_internal;
+using namespace rhi_vulkan_internal;
 
 RhiCmdList RhiFrameBegin() {
-  using namespace rhi_vulkan_internal;
-
   WaitTimeline(vk.graphics_queue.timeline, vk.graphics_queue_cmd_done[vk.frame_index]);
 
   VkResult acquire_result =
@@ -35,7 +30,7 @@ RhiCmdList RhiFrameBegin() {
   }
 
   const VkCommandBuffer cmd = vk.graphics_queue_cmd[vk.frame_index];
-  RhiCmdList ret_handle = static_cast<RhiCmdList>(RhiHandleAcquire(cmdlists, cmd, true));
+  RhiCmdList ret_handle = RhiHandleAcquire(cmd_lists, cmd, true);
 
   VK_CHECK(vkResetCommandBuffer(cmd, 0));
 
@@ -102,8 +97,6 @@ RhiCmdList RhiFrameBegin() {
 }
 
 void RhiFrameEnd() {
-  using namespace rhi_vulkan_internal;
-
   const VkCommandBuffer cmd = vk.graphics_queue_cmd[vk.frame_index];
   vkCmdEndRendering(cmd);
 
