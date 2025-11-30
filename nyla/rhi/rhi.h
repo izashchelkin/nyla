@@ -6,19 +6,22 @@
 
 #include "nyla/commons/bitenum.h"
 #include "nyla/platform/platform.h"
-#include "nyla/rhi/handle_pool.h"
+#include "nyla/rhi/rhi_handle_pool.h"
 
 namespace nyla {
 
 constexpr inline uint32_t rhi_max_push_constant_size = 256;
 constexpr inline uint32_t rhi_max_num_frames_in_flight = 3;
+constexpr inline uint32_t rhi_max_bind_group_layouts = 4;
 
 //
 
-struct RhiShader : Handle {};
-struct RhiGraphicsPipeline : Handle {};
-struct RhiCmdList : Handle {};
-struct RhiBuffer : Handle {};
+struct RhiShader : RhiHandle {};
+struct RhiGraphicsPipeline : RhiHandle {};
+struct RhiCmdList : RhiHandle {};
+struct RhiBuffer : RhiHandle {};
+struct RhiBindGroup : RhiHandle {};
+struct RhiBindGroupLayout : RhiHandle {};
 
 //
 
@@ -83,7 +86,26 @@ struct RhiBindingDesc {
   RhiShaderStage stage_flags;
 };
 
-struct RhiBindGroupLayout {
+struct RhiBufferBinding {
+  RhiBuffer buffer;
+  uint32_t offset;
+  uint32_t size;
+};
+
+struct RhiBindGroupEntry {
+  uint32_t binding;
+  RhiBindingType type;
+  union {
+    RhiBufferBinding buffer;
+  };
+};
+
+struct RhiBindGroupDesc {
+  RhiBindGroupEntry entries[4];
+  uint32_t entries_count;
+};
+
+struct RhiBindGroupLayoutDesc {
   RhiBindingDesc bindings[16];
   uint32_t binding_count;
 };
@@ -100,8 +122,8 @@ struct RhiGraphicsPipelineDesc {
   RhiShader vert_shader;
   RhiShader frag_shader;
 
-  RhiBindGroupLayout bind_layouts[16];
-  uint32_t bind_layout_count;
+  RhiBindGroupLayout bind_group_layouts[rhi_max_bind_group_layouts];
+  uint32_t bind_group_layouts_count;
 
   RhiVertexBindingDesc vertex_bindings[4];
   uint32_t vertex_bindings_count;
@@ -118,12 +140,20 @@ struct RhiDesc {
   uint32_t num_frames_in_flight;
 };
 
+//
+
 RhiShader RhiCreateShader(RhiShaderDesc);
 void RhiDestroyShader(RhiShader);
+
 RhiBuffer RhiCreateBuffer(RhiBufferDesc);
 void RhiDestroyBuffer(RhiBuffer);
+
 void* RhiMapBuffer(RhiBuffer, bool idempotent = true);
 void RhiUnmapBuffer(RhiBuffer, bool idempotent = true);
+
+RhiBindGroupLayout RhiCreateBindGroupLayout(RhiBindGroupLayoutDesc);
+void RhiDestroyBindGroupLayout(RhiBindGroupLayout);
+
 RhiGraphicsPipeline RhiCreateGraphicsPipeline(RhiGraphicsPipelineDesc);
 void RhiDestroyGraphicsPipeline(RhiGraphicsPipeline);
 

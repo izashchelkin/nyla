@@ -296,6 +296,13 @@ void RhiInit(RhiDesc rhi_desc) {
   };
   init_queue(vk.graphics_queue, vk.graphics_queue_cmd, vk.num_frames_in_flight);
   init_queue(vk.transfer_queue, &vk.transfer_queue_cmd, 1);
+
+  for (size_t i = 0; i < vk.num_frames_in_flight; ++i) {
+    const VkSemaphoreCreateInfo semaphore_create_info{
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+    };
+    VK_CHECK(vkCreateSemaphore(vk.dev, &semaphore_create_info, nullptr, vk.swapchain_acquire_semaphores + i));
+  }
 }
 
 }  // namespace nyla

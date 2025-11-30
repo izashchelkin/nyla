@@ -1,7 +1,7 @@
 #include <cstdint>
 
-#include "nyla/rhi/handle_pool.h"
 #include "nyla/rhi/rhi.h"
+#include "nyla/rhi/rhi_handle_pool.h"
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
 #include "vulkan/vulkan_core.h"
 
@@ -14,7 +14,7 @@ struct VulkanBufferData {
   VkDeviceMemory memory;
   char* mapped;
 };
-HandlePool<VulkanBufferData, 16> buffers;
+rhi_internal::RhiHandlePool<VulkanBufferData, 16> buffers;
 
 VkBufferUsageFlags ConvertVulkanBufferUsage(RhiBufferUsage usage) {
   VkBufferUsageFlags ret = 0;
@@ -108,13 +108,13 @@ RhiBuffer RhiCreateBuffer(RhiBufferDesc desc) {
   VK_CHECK(vkAllocateMemory(vk.dev, &memory_alloc_info, nullptr, &buffer_data.memory));
   VK_CHECK(vkBindBufferMemory(vk.dev, buffer_data.buffer, buffer_data.memory, 0));
 
-  return static_cast<RhiBuffer>(HandleAcquire(buffers, buffer_data));
+  return static_cast<RhiBuffer>(RhiHandleAcquire(buffers, buffer_data));
 }
 
 void RhiDestroyBuffer(RhiBuffer buffer) {
   using namespace rhi_vulkan_internal;
 
-  VulkanBufferData buffer_data = HandleRelease(buffers, buffer);
+  VulkanBufferData buffer_data = RhiHandleRelease(buffers, buffer);
 
   if (buffer_data.mapped) {
     vkUnmapMemory(vk.dev, buffer_data.memory);
@@ -126,7 +126,7 @@ void RhiDestroyBuffer(RhiBuffer buffer) {
 void* RhiMapBuffer(RhiBuffer buffer, bool idempotent) {
   using namespace rhi_vulkan_internal;
 
-  VulkanBufferData& buffer_data = HandleGetData(buffers, buffer);
+  VulkanBufferData& buffer_data = RhiHandleGetData(buffers, buffer);
   if (!buffer_data.mapped) {
     vkMapMemory(vk.dev, buffer_data.memory, 0, VK_WHOLE_SIZE, 0, (void**)&buffer_data.mapped);
   } else {
@@ -139,7 +139,7 @@ void* RhiMapBuffer(RhiBuffer buffer, bool idempotent) {
 void RhiUnmapBuffer(RhiBuffer buffer, bool idempotent) {
   using namespace rhi_vulkan_internal;
 
-  VulkanBufferData& buffer_data = HandleGetData(buffers, buffer);
+  VulkanBufferData& buffer_data = RhiHandleGetData(buffers, buffer);
   if (buffer_data.mapped) {
     vkUnmapMemory(vk.dev, buffer_data.memory);
     buffer_data.mapped = nullptr;

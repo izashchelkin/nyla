@@ -49,6 +49,8 @@ static struct {
   uint32_t swapchain_image_index;
 } vk;
 
+extern rhi_internal::RhiHandlePool<VkDescriptorSetLayout, 64> bind_group_layouts;
+
 VkBool32 DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
                                 VkDebugUtilsMessageTypeFlagsEXT message_type,
                                 const VkDebugUtilsMessengerCallbackDataEXT* callback_data, void* user_data);

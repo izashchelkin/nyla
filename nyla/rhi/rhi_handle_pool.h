@@ -7,17 +7,19 @@
 
 namespace nyla {
 
-struct Handle {
+struct RhiHandle {
   uint32_t gen;
   uint32_t index;
 };
 
-inline bool HandleIsSet(Handle handle) {
+inline bool RhiHandleIsSet(RhiHandle handle) {
   return handle.gen;
 }
 
+namespace rhi_internal {
+
 template <typename Data, size_t Size>
-struct HandlePool {
+struct RhiHandlePool {
   struct {
     Data data;
     uint32_t gen;
@@ -26,8 +28,8 @@ struct HandlePool {
 };
 
 template <typename Data, size_t Size>
-inline Handle HandleAcquire(HandlePool<Data, Size>& pool, Data data, bool allow_intern = false) {
-  Handle ret_handle;
+inline RhiHandle RhiHandleAcquire(RhiHandlePool<Data, Size>& pool, Data data, bool allow_intern = false) {
+  RhiHandle ret_handle;
 
   for (uint32_t i = 0; i < Size; ++i) {
     auto& slot = pool.slots[i];
@@ -36,12 +38,12 @@ inline Handle HandleAcquire(HandlePool<Data, Size>& pool, Data data, bool allow_
       continue;
     }
 
-    if (HandleIsSet(ret_handle)) {
+    if (RhiHandleIsSet(ret_handle)) {
       ++slot.gen;
       slot.used = true;
       slot.data = data;
 
-      ret_handle = Handle{
+      ret_handle = RhiHandle{
           .gen = slot.gen,
           .index = i,
       };
@@ -52,7 +54,7 @@ inline Handle HandleAcquire(HandlePool<Data, Size>& pool, Data data, bool allow_
 }
 
 template <typename Data, size_t Size>
-inline Data& HandleGetData(HandlePool<Data, Size>& pool, Handle handle) {
+inline Data& RhiHandleGetData(RhiHandlePool<Data, Size>& pool, RhiHandle handle) {
   CHECK(handle.gen);
   CHECK_LT(handle.index, Size);
 
@@ -65,7 +67,7 @@ inline Data& HandleGetData(HandlePool<Data, Size>& pool, Handle handle) {
 }
 
 template <typename Data, size_t Size>
-inline Data HandleRelease(HandlePool<Data, Size>& pool, Handle handle) {
+inline Data RhiHandleRelease(RhiHandlePool<Data, Size>& pool, RhiHandle handle) {
   CHECK(handle.gen);
   CHECK_LT(handle.index, Size);
 
@@ -77,5 +79,7 @@ inline Data HandleRelease(HandlePool<Data, Size>& pool, Handle handle) {
 
   CHECK(false);
 }
+
+}  // namespace rhi_internal
 
 }  // namespace nyla

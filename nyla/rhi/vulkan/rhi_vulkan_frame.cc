@@ -7,7 +7,7 @@ namespace nyla {
 
 namespace {
 
-HandlePool<VkCommandBuffer, 16> cmdlists;
+rhi_internal::RhiHandlePool<VkCommandBuffer, 16> cmdlists;
 
 }
 
@@ -35,7 +35,7 @@ RhiCmdList RhiFrameBegin() {
   }
 
   const VkCommandBuffer cmd = vk.graphics_queue_cmd[vk.frame_index];
-  RhiCmdList ret_handle = static_cast<RhiCmdList>(HandleAcquire(cmdlists, cmd, true));
+  RhiCmdList ret_handle = static_cast<RhiCmdList>(RhiHandleAcquire(cmdlists, cmd, true));
 
   VK_CHECK(vkResetCommandBuffer(cmd, 0));
 
