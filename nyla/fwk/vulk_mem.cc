@@ -1,9 +1,8 @@
-#include "nyla/fwk/vk_mem.h"
-
 #include <cstdint>
 
 #include "nyla/commons/memory/align.h"
 #include "nyla/commons/memory/charview.h"
+#include "nyla/fwk/vk_mem.h"
 #include "nyla/vulkan/vulkan.h"
 
 namespace nyla {

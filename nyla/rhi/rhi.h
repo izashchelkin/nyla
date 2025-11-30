@@ -22,8 +22,6 @@ struct RhiBuffer : Handle {};
 
 //
 
-enum class RhiShaderType { Vertex, Fragment };
-
 enum class RhiQueueType { Graphics, Transfer };
 
 enum class RhiBindingType { UniformBuffer };

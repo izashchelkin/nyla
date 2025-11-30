@@ -1,5 +1,6 @@
+#include "nyla/rhi/vulkan/rhi_vulkan_enum.h"
+
 #include "nyla/rhi/rhi.h"
-#include "nyla/rhi/rhi_vulkan.h"
 
 namespace nyla {
 
@@ -9,15 +10,16 @@ VkDescriptorType ConvertVulkanBindingType(RhiBindingType binding_type) {
       return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
   }
   CHECK(false);
+  return static_cast<VkDescriptorType>(0);
 }
 
 VkShaderStageFlags ConvertVulkanStageFlags(RhiShaderStage stage_flags) {
   VkShaderStageFlags ret = 0;
 
-  if (stage_flags & RhiShaderType::Vertex) {
+  if (Any(stage_flags & RhiShaderStage::Vertex)) {
     ret |= VK_SHADER_STAGE_VERTEX_BIT;
   }
-  if (stage_flags & RhiShaderType::Fragment) {
+  if (Any(stage_flags & RhiShaderStage::Fragment)) {
     ret |= VK_SHADER_STAGE_FRAGMENT_BIT;
   }
 
@@ -36,6 +38,7 @@ VkCullModeFlags ConvertVulkanCullMode(RhiCullMode cull_mode) {
       return VK_CULL_MODE_FRONT_BIT;
   }
   CHECK(false);
+  return static_cast<VkCullModeFlags>(0);
 }
 
 VkFrontFace ConvertVulkanFrontFace(RhiFrontFace front_face) {
@@ -47,6 +50,7 @@ VkFrontFace ConvertVulkanFrontFace(RhiFrontFace front_face) {
       return VK_FRONT_FACE_CLOCKWISE;
   }
   CHECK(false);
+  return static_cast<VkFrontFace>(0);
 }
 
 VkFormat ConvertVulkanFormat(RhiFormat format) {
@@ -64,6 +68,7 @@ VkFormat ConvertVulkanFormat(RhiFormat format) {
       return VK_FORMAT_R8G8B8A8_UNORM;
   }
   CHECK(false);
+  return static_cast<VkFormat>(0);
 }
 
 VkVertexInputRate ConvertVulkanInputRate(RhiInputRate input_rate) {
@@ -74,6 +79,7 @@ VkVertexInputRate ConvertVulkanInputRate(RhiInputRate input_rate) {
       return VK_VERTEX_INPUT_RATE_VERTEX;
   }
   CHECK(false);
+  return static_cast<VkVertexInputRate>(0);
 }
 
 }  // namespace nyla
