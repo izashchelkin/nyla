@@ -123,24 +123,28 @@ void RhiDestroyBuffer(RhiBuffer buffer) {
   vkFreeMemory(vk.dev, buffer_data.memory, nullptr);
 }
 
-void* RhiMapBuffer(RhiBuffer buffer) {
+void* RhiMapBuffer(RhiBuffer buffer, bool idempotent) {
   using namespace rhi_vulkan_internal;
 
   VulkanBufferData& buffer_data = HandleGetData(buffers, buffer);
   if (!buffer_data.mapped) {
     vkMapMemory(vk.dev, buffer_data.memory, 0, VK_WHOLE_SIZE, 0, (void**)&buffer_data.mapped);
+  } else {
+    CHECK(idempotent);
   }
 
   return buffer_data.mapped;
 }
 
-void RhiUnmapBuffer(RhiBuffer buffer) {
+void RhiUnmapBuffer(RhiBuffer buffer, bool idempotent) {
   using namespace rhi_vulkan_internal;
 
   VulkanBufferData& buffer_data = HandleGetData(buffers, buffer);
   if (buffer_data.mapped) {
     vkUnmapMemory(vk.dev, buffer_data.memory);
     buffer_data.mapped = nullptr;
+  } else {
+    CHECK(idempotent);
   }
 }
 

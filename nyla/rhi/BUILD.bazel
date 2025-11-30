@@ -5,10 +5,10 @@ package(default_visibility = ["//visibility:public"])
 cc_library(
     name = "rhi",
     srcs = glob([
-        "*.cc",
+        "**/*.cc",
     ]),
     hdrs = glob([
-        "*.h",
+        "**/*.h",
     ]),
     linkopts = [
         "-lvulkan",
@@ -23,10 +23,10 @@ cc_library(
 cc_library(
     name = "rhi_ndbg",
     srcs = glob([
-        "*.cc",
+        "**/*.cc",
     ]),
     hdrs = glob([
-        "*.h",
+        "**/*.h",
     ]),
     local_defines = ["NDEBUG"],
     linkopts = [

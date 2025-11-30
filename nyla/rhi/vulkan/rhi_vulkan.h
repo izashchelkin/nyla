@@ -58,12 +58,7 @@ void CreateSwapchain();
 VkSemaphore CreateTimeline(uint64_t initial_value);
 void WaitTimeline(VkSemaphore timeline, uint64_t wait_value);
 
-VkDescriptorType ConvertVulkanBindingType(RhiBindingType);
-VkShaderStageFlags ConvertVulkanStageFlags(RhiShaderStage stage_flags);
-VkCullModeFlags ConvertVulkanCullMode(RhiCullMode);
-VkFrontFace ConvertVulkanFrontFace(RhiFrontFace);
-VkFormat ConvertVulkanFormat(RhiFormat);
-VkVertexInputRate ConvertVulkanInputRate(RhiInputRate);
+VkFormat ConvertVulkanFormat(RhiFormat format);
 
 }  // namespace rhi_vulkan_internal
 

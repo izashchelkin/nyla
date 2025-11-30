@@ -24,6 +24,28 @@ constexpr inline bool enableValidations = true;
 
 namespace nyla {
 
+namespace rhi_vulkan_internal {
+
+VkFormat ConvertVulkanFormat(RhiFormat format) {
+  switch (format) {
+    case RhiFormat::Float4:
+      return VK_FORMAT_R32G32B32A32_SFLOAT;
+
+    case RhiFormat::Half2:
+      return VK_FORMAT_R16G16_SFLOAT;
+
+    case RhiFormat::SNorm8x4:
+      return VK_FORMAT_R8G8B8A8_SNORM;
+
+    case RhiFormat::UNorm8x4:
+      return VK_FORMAT_R8G8B8A8_UNORM;
+  }
+  CHECK(false);
+  return static_cast<VkFormat>(0);
+}
+
+}  // namespace rhi_vulkan_internal
+
 void RhiInit(RhiDesc rhi_desc) {
   using namespace rhi_vulkan_internal;
 

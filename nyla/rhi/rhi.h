@@ -24,7 +24,7 @@ struct RhiBuffer : Handle {};
 
 enum class RhiQueueType { Graphics, Transfer };
 
-enum class RhiBindingType { UniformBuffer };
+enum class RhiBindingType { UniformBuffer, UniformBufferDynamic };
 
 enum class RhiVertexAttributeType { Float4, Half2, SNorm8x4, UNorm8x4 };
 
@@ -122,8 +122,8 @@ RhiShader RhiCreateShader(RhiShaderDesc);
 void RhiDestroyShader(RhiShader);
 RhiBuffer RhiCreateBuffer(RhiBufferDesc);
 void RhiDestroyBuffer(RhiBuffer);
-void* RhiMapBuffer(RhiBuffer);
-void RhiUnmapBuffer(RhiBuffer);
+void* RhiMapBuffer(RhiBuffer, bool idempotent = true);
+void RhiUnmapBuffer(RhiBuffer, bool idempotent = true);
 RhiGraphicsPipeline RhiCreateGraphicsPipeline(RhiGraphicsPipelineDesc);
 void RhiDestroyGraphicsPipeline(RhiGraphicsPipeline);
 
