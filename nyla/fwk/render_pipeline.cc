@@ -11,17 +11,24 @@
 #include "nyla/commons/memory/temp.h"
 #include "nyla/commons/os/readfile.h"
 #include "nyla/platform/platform.h"
+#include "nyla/rhi/rhi.h"
 #include "nyla/vulkan/vulkan.h"
 
 namespace nyla {
 
-static void CreateMappedBuffer(VkBufferUsageFlags usage, size_t buffer_size, VkBuffer& buffer, VkDeviceMemory& memory,
-                               void*& mapped) {
-  Vulkan_CreateBuffer(buffer_size, usage, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                      buffer, memory);
+namespace {
 
-  vkMapMemory(vk.device, memory, 0, buffer_size, 0, &mapped);
+void CreateMappedBuffer(RhiBufferUsage buffer_usage, uint32_t buffer_size, void*& mapped) {
+  RhiBuffer buffer = RhiCreateBuffer(RhiBufferDesc{
+      .size = buffer_size,
+      .buffer_usage = buffer_usage,
+      .memory_usage = RhiMemoryUsage::CpuToGpu,
+  });
+
+  mapped = RhiMapBuffer(buffer);
 }
+
+}  // namespace
 
 static void UpdateDescriptorSet(VkDescriptorSet descriptor_set, uint32_t dst_binding, bool dynamic, uint32_t range,
                                 VkBuffer& buffer) {

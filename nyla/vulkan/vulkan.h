@@ -1,22 +1,36 @@
 #pragma once
 
-#define VK_USE_PLATFORM_XCB_KHR
-
 #include <cstdint>
 
 #include "absl/log/check.h"
 #include "vulkan/vk_enum_string_helper.h"
-#include "vulkan/vulkan.h"
+#include "vulkan/vulkan_core.h"
 
 namespace nyla {
 
-constexpr uint8_t kVulkan_NumFramesInFlight = 2;
+constexpr inline uint32_t kInvalidQueueFamilyIndex = std::numeric_limits<uint32_t>::max();
 
-struct Vulkan_State {
-  VkInstance instance;
-  VkDevice device;
-  uint32_t queue_family_index;
+struct VkQueueState {
+  uint32_t family_index;
   VkQueue queue;
+
+  VkSemaphore timeline;
+  uint64_t timeline_next;
+
+  VkCommandPool cmd_pool;
+  VkCommandBuffer cmd[3];
+  uint64_t cmd_done[3];
+};
+
+struct VkState {
+  uint32_t frames_inflight;
+
+  VkInstance instance;
+  VkDevice dev;
+
+  VkQueueState graphics_queue;
+  VkQueueState transfer_queue;
+
   VkPhysicalDevice phys_device;
   VkPhysicalDeviceProperties phys_device_props;
   VkSurfaceKHR surface;
@@ -25,7 +39,6 @@ struct Vulkan_State {
   VkExtent2D surface_extent;
   VkPresentModeKHR present_mode;
   VkSwapchainKHR swapchain;
-  VkCommandPool command_pool;
   std::vector<VkImage> swapchain_images;
   uint32_t swapchain_image_count() {
     return swapchain_images.size();
@@ -33,17 +46,14 @@ struct Vulkan_State {
   std::vector<VkImageView> swapchain_image_views;
 
   std::vector<VkSemaphore> acquire_semaphores;
-  std::vector<VkFence> frame_fences;
-  std::vector<VkSemaphore> submit_semaphores;
-  std::vector<VkCommandBuffer> command_buffers;
 
   struct {
     uint32_t swapchain_image_index;
     float dt;
     uint8_t iframe;
-  } current_frame_data;
+  } cur;
 };
-extern Vulkan_State vk;
+extern VkState vk;
 
 #define VK_GET_INSTANCE_PROC_ADDR(name) reinterpret_cast<PFN_##name>(vkGetInstanceProcAddr(vk.instance, #name))
 
@@ -56,15 +66,6 @@ VkExtent2D Vulkan_PlatformGetWindowExtent();
 
 //
 
-void Vulkan_CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
-                         VkBuffer& buffer, VkDeviceMemory& buffer_memory);
-
-void Vulkan_CreateBuffer(VkCommandPool command_pool, VkQueue transfer_queue, VkDeviceSize data_size,
-                         const void* src_data, VkBufferUsageFlags usage, VkBuffer& buffer,
-                         VkDeviceMemory& buffer_memory);
-
-//
-
 void VulkanNameHandle(void* object_handle, const std::string& name);
 
 VkPipeline Vulkan_CreateGraphicsPipeline(const VkPipelineVertexInputStateCreateInfo& vertex_input_create_info,
@@ -74,31 +75,10 @@ VkPipeline Vulkan_CreateGraphicsPipeline(const VkPipelineVertexInputStateCreateI
 
 VkShaderModule Vulkan_CreateShaderModule(const std::vector<char>& code);
 
-//
-
-inline VkSemaphore CreateSemaphore() {
-  const VkSemaphoreCreateInfo create_info{
-      .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
-  };
-
-  VkSemaphore semaphore;
-  VK_CHECK(vkCreateSemaphore(vk.device, &create_info, nullptr, &semaphore));
-  return semaphore;
-}
-
-inline VkFence CreateFence(bool signaled = false) {
-  VkFenceCreateFlags flags{};
-  if (signaled) flags += VK_FENCE_CREATE_SIGNALED_BIT;
-
-  const VkFenceCreateInfo create_info{
-      .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
-      .flags = flags,
-  };
-
-  VkFence fence;
-  VK_CHECK(vkCreateFence(vk.device, &create_info, nullptr, &fence));
-  return fence;
-}
+VkSemaphore VkCreateTimelineSemaphore(uint64_t initial_value);
+void VulkWaitTimeline(VkSemaphore timeline, uint64_t wait_value);
+VkSemaphore VkCreateSemaphore();
+VkFence VkCreateFence(bool signaled = false);
 
 //
 

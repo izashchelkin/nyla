@@ -8,8 +8,6 @@
 #include "nyla/apps/breakout/unitshapes.h"
 #include "nyla/apps/breakout/world_renderer.h"
 #include "nyla/commons/color.h"
-#include "nyla/commons/containers/set.h"
-#include "nyla/commons/debug/debugger.h"
 #include "nyla/commons/math/vec/vec2f.h"
 #include "nyla/commons/math/vec/vec3f.h"
 #include "nyla/commons/memory/charview.h"
@@ -40,6 +38,21 @@ struct Level {
 };
 
 }  // namespace
+
+enum class GameStage {
+  kStartMenu,
+  kGame,
+};
+static GameStage stage = GameStage::kGame;
+
+template <typename T>
+static T& FrameLocal(std::vector<T>& vec, auto create) {
+  vec.reserve(kVulkan_NumFramesInFlight);
+  if (vk.current_frame_data.iframe >= vec.size()) {
+    vec.emplace_back(create());
+  }
+  return vec.at(vk.current_frame_data.iframe);
+}
 
 constexpr Vec2f kWorldBoundaryX{-35.f, 35.f};
 constexpr Vec2f kWorldBoundaryY{-30.f, 30.f};
@@ -82,7 +95,7 @@ static bool IsInside(float pos, float size, Vec2f boundary) {
   return false;
 }
 
-void BreakoutProcess() {
+void BreakoutFrame() {
   const int dx = Pressed(kRight) - Pressed(kLeft);
 
   static float dt_accumulator = 0.f;
@@ -139,24 +152,7 @@ void BreakoutProcess() {
   }
 
   WorldSetUp();
-}
 
-enum class GameStage {
-  kStartMenu,
-  kGame,
-};
-static GameStage stage = GameStage::kGame;
-
-template <typename T>
-static T& FrameLocal(std::vector<T>& vec, auto create) {
-  vec.reserve(kVulkan_NumFramesInFlight);
-  if (vk.current_frame_data.iframe >= vec.size()) {
-    vec.emplace_back(create());
-  }
-  return vec.at(vk.current_frame_data.iframe);
-}
-
-void BreakoutRender() {
   RpBegin(world_pipeline);
   {
     static std ::vector<RpMesh> unit_rect_meshes;
