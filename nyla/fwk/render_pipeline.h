@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <string>
-#include <string_view>
 #include <vector>
 
 #include "nyla/commons/memory/charview.h"
@@ -12,28 +11,26 @@ namespace nyla {
 
 struct RpBuf {
   bool enabled;
-  uint32_t stage_flags;
+  RhiShaderStage stage_flags;
   uint32_t size;
   uint32_t range;
   uint32_t written;
   std::vector<RhiVertexAttributeType> attrs;
-  RhiBuffer buffer[RhiDesc::kMaxFramesInFlight];
-  std::vector<char*> mem_mapped;
+  RhiBuffer buffer[rhi_max_num_frames_in_flight];
 };
 
-inline VkShaderStageFlags RpBufStageFlags(const RpBuf& buf) {
-  if (buf.stage_flags)
+inline RhiShaderStage RpBufStageFlags(const RpBuf& buf) {
+  if (Any(buf.stage_flags))
     return buf.stage_flags;
   else
-    return VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+    return RhiShaderStage::Vertex | RhiShaderStage::Fragment;
 }
 
 struct Rp {
-  std::string name;
-
+  std::string debug_name;
   RhiGraphicsPipeline pipeline;
-
-  std::vector<VkDescriptorSet> desc_sets;
+  RhiBindGroupLayout bind_group_layout;
+  RhiBindGroup bind_group[rhi_max_num_frames_in_flight];
 
   bool disable_culling;
   RpBuf static_uniform;
@@ -44,7 +41,7 @@ struct Rp {
 };
 
 struct RpMesh {
-  VkDeviceSize offset;
+  uint32_t offset;
   uint32_t vert_count;
 };
 

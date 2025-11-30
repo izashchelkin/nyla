@@ -12,6 +12,7 @@
 #include "nyla/commons/os/readfile.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
+#include "nyla/rhi/rhi_handle_pool.h"
 #include "nyla/vulkan/vulkan.h"
 
 namespace nyla {
@@ -24,8 +25,45 @@ void CreateMappedBuffer(RhiBufferUsage buffer_usage, uint32_t buffer_size, void*
       .buffer_usage = buffer_usage,
       .memory_usage = RhiMemoryUsage::CpuToGpu,
   });
-
   mapped = RhiMapBuffer(buffer);
+}
+
+uint32_t GetVertAttrSize(RhiVertexAttributeType attr) {
+  switch (attr) {
+    case RhiVertexAttributeType::Float4:
+      return 16;
+    case RhiVertexAttributeType::Half2:
+      return 4;
+    case RhiVertexAttributeType::SNorm8x4:
+      return 4;
+    case RhiVertexAttributeType::UNorm8x4:
+      return 4;
+  }
+  CHECK(false);
+  return 0;
+}
+
+RhiFormat GetVertAttrFormat(RhiVertexAttributeType attr) {
+  switch (attr) {
+    case RhiVertexAttributeType::Float4:
+      return RhiFormat::Float4;
+    case RhiVertexAttributeType::Half2:
+      return RhiFormat::Half2;
+    case RhiVertexAttributeType::SNorm8x4:
+      return RhiFormat::SNorm8x4;
+    case RhiVertexAttributeType::UNorm8x4:
+      return RhiFormat::UNorm8x4;
+  }
+  CHECK(false);
+  return static_cast<RhiFormat>(0);
+}
+
+uint32_t GetVertBindingStride(Rp& rp) {
+  uint32_t ret = 0;
+  for (auto attr : rp.vert_buf.attrs) {
+    ret += GetVertAttrSize(attr);
+  }
+  return ret;
 }
 
 }  // namespace
@@ -53,52 +91,123 @@ static void UpdateDescriptorSet(VkDescriptorSet descriptor_set, uint32_t dst_bin
   vkUpdateDescriptorSets(vk.device, 1, &write_descriptor_set, 0, nullptr);
 }
 
-static uint32_t CalcVertexBufferStride(Rp& rp) {
-  uint32_t ret = 0;
-  for (auto attr : rp.vert_buf.attrs) {
-    ret += RpVertAttrSize(attr);
-  }
-  return ret;
-}
-
-static void RpBufInit(Rp& rp, VkImageUsageFlags usage, RpBuf& b, const char* name, auto visitor) {
-  if (!b.enabled) return;
-
-  b.buffer.reserve(kVulkan_NumFramesInFlight);
-  b.mem.reserve(kVulkan_NumFramesInFlight);
-  b.mem_mapped.reserve(kVulkan_NumFramesInFlight);
-
-  for (size_t i = 0; i < kVulkan_NumFramesInFlight; ++i) {
-    if (b.buffer.size() <= i) {
-      b.buffer.resize(i + 1);
-      b.mem.resize(i + 1);
-      b.mem_mapped.resize(i + 1);
-
-      CreateMappedBuffer(usage, b.size, b.buffer[i], b.mem[i], reinterpret_cast<void*&>(b.mem_mapped[i]));
-      VulkanNameHandle(b.buffer[i], absl::StrFormat("Rp %s %s %d", rp.name, name, i));
-    }
-
-    visitor(rp, i, b);
-  }
-}
+// static void RpBufInit(Rp& rp, VkImageUsageFlags usage, RpBuf& b, const char* name, auto visitor) {
+//   if (!b.enabled) return;
+//
+//   b.buffer.reserve(kVulkan_NumFramesInFlight);
+//   b.mem.reserve(kVulkan_NumFramesInFlight);
+//   b.mem_mapped.reserve(kVulkan_NumFramesInFlight);
+//
+//   for (size_t i = 0; i < kVulkan_NumFramesInFlight; ++i) {
+//     if (b.buffer.size() <= i) {
+//       b.buffer.resize(i + 1);
+//       b.mem.resize(i + 1);
+//       b.mem_mapped.resize(i + 1);
+//
+//       CreateMappedBuffer(usage, b.size, b.buffer[i], b.mem[i], reinterpret_cast<void*&>(b.mem_mapped[i]));
+//       VulkanNameHandle(b.buffer[i], absl::StrFormat("Rp %s %s %d", rp.name, name, i));
+//     }
+//
+//     visitor(rp, i, b);
+//   }
+// }
 
 void RpInit(Rp& rp) {
-  CHECK(!rp.name.empty());
+  CHECK(!rp.debug_name.empty());
 
-  if (rp.layout) {
-    vkDeviceWaitIdle(vk.device);
-    vkDestroyPipelineLayout(vk.device, rp.layout, nullptr);
+  if (RhiHandleIsSet(rp.pipeline)) {
+    RhiDestroyGraphicsPipeline(rp.pipeline);
+  } else {
+    RhiBindGroupLayoutDesc bind_group_layout_desc{};
+    bind_group_layout_desc.binding_count = rp.static_uniform.enabled + rp.dynamic_uniform.enabled;
+
+    RhiBindGroupDesc bind_group_desc[rhi_max_num_frames_in_flight]{};
+
+    for (uint32_t j = 0; j < vk.frames_inflight; ++j) {
+      bind_group_desc[j].entries_count = bind_group_layout_desc.binding_count;
+    }
+
+    auto process_buffer_binding = [&bind_group_layout_desc, &bind_group_desc](RpBuf buf, RhiBindingType binding_type,
+                                                                              uint32_t binding, uint32_t i) {
+      bind_group_layout_desc.bindings[i] = {
+          .binding = binding,
+          .type = binding_type,
+          .array_size = 1,
+          .stage_flags = RpBufStageFlags(buf),
+      };
+
+      for (uint32_t iframe = 0; iframe < vk.frames_inflight; ++iframe) {
+        bind_group_desc[iframe].entries[i] = RhiBindGroupEntry{
+            .binding = binding,
+            .type = binding_type,
+            .array_index = 0,
+            .buffer =
+                {
+                    .buffer = buf.buffer[iframe],
+                    .offset = 0,
+                    .size = buf.size,
+                },
+        };
+      }
+    };
+
+    uint32_t i = 0;
+    if (rp.static_uniform.enabled) {
+      process_buffer_binding(rp.static_uniform, RhiBindingType::UniformBuffer, 0, i++);
+    }
+    if (rp.dynamic_uniform.enabled) {
+      process_buffer_binding(rp.dynamic_uniform, RhiBindingType::UniformBufferDynamic, 1, i++);
+    }
+
+    rp.bind_group_layout = RhiCreateBindGroupLayout(bind_group_layout_desc);
+
+    for (uint32_t iframe = 0; iframe < vk.frames_inflight; ++iframe) {
+      bind_group_desc[iframe].layout = rp.bind_group_layout;
+      rp.bind_group[iframe] = RhiCreateBindGroup(bind_group_desc[iframe]);
+    }
   }
-  if (rp.pipeline) {
-    vkDeviceWaitIdle(vk.device);
-    vkDestroyPipeline(vk.device, rp.pipeline, nullptr);
+
+  RhiGraphicsPipelineDesc desc{
+      .debug_name = absl::StrFormat("Rp %v", rp.debug_name),
+      .cull_mode = rp.disable_culling ? RhiCullMode::None : RhiCullMode::Back,
+      .front_face = RhiFrontFace::CCW,
+  };
+
+  desc.bind_group_layouts_count = 1;
+  desc.bind_group_layouts[0] = rp.bind_group_layout;
+
+  desc.vertex_bindings_count = rp.vert_buf.attrs.size();
+  desc.vertex_attribute_count = rp.vert_buf.attrs.size();
+
+  {
+    uint32_t offset = 0;
+    for (uint32_t i = 0; i < rp.vert_buf.attrs.size(); ++i) {
+      auto attr = rp.vert_buf.attrs[i];
+
+      desc.vertex_bindings[i] = RhiVertexBindingDesc{
+          .binding = 0,
+          .stride = GetVertBindingStride(rp),
+          .input_rate = RhiInputRate::PerVertex,
+      };
+
+      RhiFormat format = GetVertAttrFormat(attr);
+      desc.vertex_attributes[i] = RhiVertexAttributeDesc{
+          .location = i,
+          .binding = 0,
+          .format = format,
+          .offset = offset,
+      };
+
+      offset += GetVertAttrSize(attr);
+    }
   }
+
+  rp.Init(rp);
+  RhiCreateGraphicsPipeline(desc);
 
   //
 
   rp.shader_stages.clear();
-
-  rp.Init(rp);
 
   std::vector<VkDescriptorPoolSize> desc_pool_sizes;
   std::vector<VkDescriptorSetLayoutBinding> desc_layout_bindings;
@@ -203,7 +312,7 @@ void RpInit(Rp& rp) {
   if (rp.vert_buf.enabled) {
     auto& binding_description = Tmake<VkVertexInputBindingDescription>({
         .binding = 0,
-        .stride = CalcVertexBufferStride(rp),
+        .stride = GetVertBindingStride(rp),
         .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
     });
 
@@ -215,10 +324,10 @@ void RpInit(Rp& rp) {
       vertex_attr_descriptions[i] = {
           .location = i,
           .binding = 0,
-          .format = RpVertAttrVkFormat(attr),
+          .format = GetVertAttrFormat(attr),
           .offset = offset,
       };
-      offset += RpVertAttrSize(attr);
+      offset += GetVertAttrSize(attr);
     }
 
     vertex_input_create_info.vertexBindingDescriptionCount = 1;
@@ -240,7 +349,7 @@ void RpInit(Rp& rp) {
   rp.pipeline =
       Vulkan_CreateGraphicsPipeline(vertex_input_create_info, rp.layout, rp.shader_stages, rasterizer_create_info);
   VulkanNameHandle(rp.pipeline, absl::StrFormat("Rp %v", rp.name));
-}
+}  // namespace nyla
 
 void RpBegin(Rp& rp) {
   rp.static_uniform.written = 0;
@@ -268,7 +377,7 @@ void RpStaticUniformCopy(Rp& rp, CharView data) {
 
 RpMesh RpVertCopy(Rp& rp, uint32_t vert_count, CharView vert_data) {
   const uint32_t offset = rp.vert_buf.written;
-  const uint32_t size = vert_count * CalcVertexBufferStride(rp);
+  const uint32_t size = vert_count * GetVertBindingStride(rp);
   CHECK_EQ(vert_data.size(), size);
 
   RpBufCopy(rp.vert_buf, vert_data);
@@ -311,38 +420,6 @@ void RpDraw(Rp& rp, RpMesh mesh, CharView dynamic_uniform_data) {
   }
 
   vkCmdDraw(cmd, mesh.vert_count, 1, 0, 0);
-}
-
-VkFormat RpVertAttrVkFormat(RpVertAttr attr) {
-  switch (attr) {
-    case RpVertAttr::Float4:
-      return VK_FORMAT_R32G32B32A32_SFLOAT;
-    case RpVertAttr::Half2:
-      return VK_FORMAT_R16G16_SFLOAT;
-    case RpVertAttr::SNorm8x4:
-      return VK_FORMAT_R8G8B8A8_SNORM;
-    case RpVertAttr::UNorm8x4:
-      return VK_FORMAT_R8G8B8A8_UNORM;
-  }
-
-  CHECK(false);
-  return VK_FORMAT_UNDEFINED;
-}
-
-uint32_t RpVertAttrSize(RpVertAttr attr) {
-  switch (attr) {
-    case RpVertAttr::Float4:
-      return 16;
-    case RpVertAttr::Half2:
-      return 4;
-    case RpVertAttr::SNorm8x4:
-      return 4;
-    case RpVertAttr::UNorm8x4:
-      return 4;
-  }
-
-  CHECK(false);
-  return 0;
 }
 
 void RpAttachVertShader(Rp& rp, const std::string& path) {

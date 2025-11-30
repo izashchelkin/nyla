@@ -51,13 +51,6 @@ VkVertexInputRate ConvertVulkanInputRate(RhiInputRate input_rate) {
 
 }  // namespace
 
-namespace rhi_vulkan_internal {
-
-rhi_internal::RhiHandlePool<VkShaderModule, 16> shaders;
-rhi_internal::RhiHandlePool<VulkanPipelineData, 16> graphics_pipelines;
-
-}  // namespace rhi_vulkan_internal
-
 RhiShader RhiCreateShader(RhiShaderDesc desc) {
   const VkShaderModuleCreateInfo create_info{
       .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
