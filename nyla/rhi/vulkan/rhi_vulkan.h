@@ -61,7 +61,7 @@ struct VulkanBufferData {
 };
 
 struct VulkanCmdListData {
-  VkCommandBuffer command_buffer;
+  VkCommandBuffer cmdbuf;
   RhiQueueType queue_type;
   RhiGraphicsPipeline bound_graphics_pipeline;
 };

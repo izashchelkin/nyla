@@ -168,6 +168,8 @@ void RhiDestroyGraphicsPipeline(RhiGraphicsPipeline);
 void RhiInit(const RhiDesc&);
 RhiCmdList RhiFrameBegin();
 void RhiFrameEnd();
+uint32_t RhiFrameGetIndex();
+RhiCmdList RhiFrameGetCmdList();  // TODO: get rid of this
 
 void RhiCmdBindGraphicsPipeline(RhiCmdList, RhiGraphicsPipeline);
 void RhiCmdBindGraphicsBindGroup(RhiCmdList cmd, uint32_t set_index, RhiBindGroup bind_group,

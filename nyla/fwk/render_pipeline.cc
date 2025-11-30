@@ -68,50 +68,6 @@ uint32_t GetVertBindingStride(Rp& rp) {
 
 }  // namespace
 
-static void UpdateDescriptorSet(VkDescriptorSet descriptor_set, uint32_t dst_binding, bool dynamic, uint32_t range,
-                                VkBuffer& buffer) {
-  const VkDescriptorBufferInfo descriptor_buffer_info{
-      .buffer = buffer,
-      .offset = 0,
-      .range = range,
-  };
-
-  const VkWriteDescriptorSet write_descriptor_set{
-      .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-      .dstSet = descriptor_set,
-      .dstBinding = dst_binding,
-      .dstArrayElement = 0,
-      .descriptorCount = 1,
-      .descriptorType = dynamic ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC : VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-      .pImageInfo = nullptr,
-      .pBufferInfo = &descriptor_buffer_info,
-      .pTexelBufferView = nullptr,
-  };
-
-  vkUpdateDescriptorSets(vk.device, 1, &write_descriptor_set, 0, nullptr);
-}
-
-// static void RpBufInit(Rp& rp, VkImageUsageFlags usage, RpBuf& b, const char* name, auto visitor) {
-//   if (!b.enabled) return;
-//
-//   b.buffer.reserve(kVulkan_NumFramesInFlight);
-//   b.mem.reserve(kVulkan_NumFramesInFlight);
-//   b.mem_mapped.reserve(kVulkan_NumFramesInFlight);
-//
-//   for (size_t i = 0; i < kVulkan_NumFramesInFlight; ++i) {
-//     if (b.buffer.size() <= i) {
-//       b.buffer.resize(i + 1);
-//       b.mem.resize(i + 1);
-//       b.mem_mapped.resize(i + 1);
-//
-//       CreateMappedBuffer(usage, b.size, b.buffer[i], b.mem[i], reinterpret_cast<void*&>(b.mem_mapped[i]));
-//       VulkanNameHandle(b.buffer[i], absl::StrFormat("Rp %s %s %d", rp.name, name, i));
-//     }
-//
-//     visitor(rp, i, b);
-//   }
-// }
-
 void RpInit(Rp& rp) {
   CHECK(!rp.debug_name.empty());
 
@@ -127,8 +83,9 @@ void RpInit(Rp& rp) {
       bind_group_desc[j].entries_count = bind_group_layout_desc.binding_count;
     }
 
-    auto process_buffer_binding = [&bind_group_layout_desc, &bind_group_desc](RpBuf buf, RhiBindingType binding_type,
-                                                                              uint32_t binding, uint32_t i) {
+    auto init_buffer = [&bind_group_layout_desc, &bind_group_desc](
+                           RpBuf& buf, RhiBufferUsage buffer_usage, RhiMemoryUsage memory_usage,
+                           RhiBindingType binding_type, uint32_t binding, uint32_t i) {
       bind_group_layout_desc.bindings[i] = {
           .binding = binding,
           .type = binding_type,
@@ -137,6 +94,12 @@ void RpInit(Rp& rp) {
       };
 
       for (uint32_t iframe = 0; iframe < vk.frames_inflight; ++iframe) {
+        buf.buffer[iframe] = RhiCreateBuffer(RhiBufferDesc{
+            .size = buf.size,
+            .buffer_usage = buffer_usage,
+            .memory_usage = memory_usage,
+        });
+
         bind_group_desc[iframe].entries[i] = RhiBindGroupEntry{
             .binding = binding,
             .type = binding_type,
@@ -153,10 +116,12 @@ void RpInit(Rp& rp) {
 
     uint32_t i = 0;
     if (rp.static_uniform.enabled) {
-      process_buffer_binding(rp.static_uniform, RhiBindingType::UniformBuffer, 0, i++);
+      init_buffer(rp.static_uniform, RhiBufferUsage::Uniform, RhiMemoryUsage::CpuToGpu, RhiBindingType::UniformBuffer,
+                  0, i++);
     }
     if (rp.dynamic_uniform.enabled) {
-      process_buffer_binding(rp.dynamic_uniform, RhiBindingType::UniformBufferDynamic, 1, i++);
+      init_buffer(rp.dynamic_uniform, RhiBufferUsage::Uniform, RhiMemoryUsage::CpuToGpu,
+                  RhiBindingType::UniformBufferDynamic, 1, i++);
     }
 
     rp.bind_group_layout = RhiCreateBindGroupLayout(bind_group_layout_desc);
@@ -204,160 +169,14 @@ void RpInit(Rp& rp) {
 
   rp.Init(rp);
   RhiCreateGraphicsPipeline(desc);
-
-  //
-
-  rp.shader_stages.clear();
-
-  std::vector<VkDescriptorPoolSize> desc_pool_sizes;
-  std::vector<VkDescriptorSetLayoutBinding> desc_layout_bindings;
-
-  const uint32_t num_uniforms = rp.static_uniform.enabled + rp.dynamic_uniform.enabled;
-  desc_pool_sizes.reserve(num_uniforms);
-
-  if (rp.static_uniform.enabled) {
-    desc_layout_bindings.emplace_back(VkDescriptorSetLayoutBinding{
-        .binding = 0,
-        .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-        .descriptorCount = 1,
-        .stageFlags = RpBufStageFlags(rp.static_uniform),
-    });
-
-    uint32_t descriptor_count = kVulkan_NumFramesInFlight;
-    desc_pool_sizes.emplace_back(VkDescriptorPoolSize{
-        .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-        .descriptorCount = descriptor_count,
-    });
-  }
-
-  if (rp.dynamic_uniform.enabled) {
-    desc_layout_bindings.emplace_back(VkDescriptorSetLayoutBinding{
-        .binding = 1,
-        .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
-        .descriptorCount = 1,
-        .stageFlags = RpBufStageFlags(rp.dynamic_uniform),
-    });
-
-    uint32_t descriptor_count = kVulkan_NumFramesInFlight;
-    desc_pool_sizes.emplace_back(VkDescriptorPoolSize{
-        .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
-        .descriptorCount = descriptor_count,
-    });
-  }
-
-  const VkDescriptorPoolCreateInfo descriptor_pool_create_info{
-      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-      .maxSets = static_cast<uint32_t>(kVulkan_NumFramesInFlight),
-      .poolSizeCount = static_cast<uint32_t>(desc_pool_sizes.size()),
-      .pPoolSizes = desc_pool_sizes.data(),
-  };
-
-  VkDescriptorPool descriptor_pool;
-  VK_CHECK(vkCreateDescriptorPool(vk.device, &descriptor_pool_create_info, nullptr, &descriptor_pool));
-
-  const VkDescriptorSetLayoutCreateInfo descriptor_set_layout_create_info{
-      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-      .bindingCount = static_cast<uint32_t>(desc_layout_bindings.size()),
-      .pBindings = desc_layout_bindings.data(),
-  };
-
-  VkDescriptorSetLayout descriptor_set_layout;
-  VK_CHECK(vkCreateDescriptorSetLayout(vk.device, &descriptor_set_layout_create_info, nullptr, &descriptor_set_layout));
-
-  const VkPushConstantRange push_constant_range{
-      .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT,
-      .offset = 0,
-      .size = kPushConstantMaxSize,
-  };
-
-  const VkPipelineLayoutCreateInfo pipeline_layout_create_info{
-      .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-      .setLayoutCount = static_cast<uint32_t>(num_uniforms ? 1 : 0),
-      .pSetLayouts = &descriptor_set_layout,
-      .pushConstantRangeCount = 1,
-      .pPushConstantRanges = &push_constant_range,
-  };
-
-  vkCreatePipelineLayout(vk.device, &pipeline_layout_create_info, nullptr, &rp.layout);
-
-  const std::vector<VkDescriptorSetLayout> descriptor_sets_layouts(kVulkan_NumFramesInFlight, descriptor_set_layout);
-
-  const VkDescriptorSetAllocateInfo descriptor_set_alloc_info{
-      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-      .descriptorPool = descriptor_pool,
-      .descriptorSetCount = static_cast<uint32_t>(descriptor_sets_layouts.size()),
-      .pSetLayouts = descriptor_sets_layouts.data(),
-  };
-
-  rp.desc_sets.resize(kVulkan_NumFramesInFlight);
-  VK_CHECK(vkAllocateDescriptorSets(vk.device, &descriptor_set_alloc_info, rp.desc_sets.data()));
-
-  RpBufInit(rp, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, rp.static_uniform, "Static Uniform",
-            [](Rp& rp, size_t i, RpBuf& b) {
-              UpdateDescriptorSet(rp.desc_sets[i], 0, false, b.range, b.buffer[i]);  //
-            });
-  RpBufInit(rp, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, rp.dynamic_uniform, "Dynamic Uniform",
-            [](Rp& rp, size_t i, RpBuf& b) {
-              UpdateDescriptorSet(rp.desc_sets[i], 1, true, b.range, b.buffer[i]);  //
-            });
-  RpBufInit(rp, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, rp.vert_buf, "Vertex Buffer",  //
-            [](Rp& rp, size_t i, RpBuf& b) {
-              //
-            });
-
-  VkPipelineVertexInputStateCreateInfo vertex_input_create_info{
-      .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-  };
-
-  if (rp.vert_buf.enabled) {
-    auto& binding_description = Tmake<VkVertexInputBindingDescription>({
-        .binding = 0,
-        .stride = GetVertBindingStride(rp),
-        .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
-    });
-
-    auto vertex_attr_descriptions = Tmakearr<VkVertexInputAttributeDescription>(rp.vert_buf.attrs.size());
-
-    uint32_t offset = 0;
-    for (uint32_t i = 0; i < rp.vert_buf.attrs.size(); ++i) {
-      auto attr = rp.vert_buf.attrs[i];
-      vertex_attr_descriptions[i] = {
-          .location = i,
-          .binding = 0,
-          .format = GetVertAttrFormat(attr),
-          .offset = offset,
-      };
-      offset += GetVertAttrSize(attr);
-    }
-
-    vertex_input_create_info.vertexBindingDescriptionCount = 1;
-    vertex_input_create_info.pVertexBindingDescriptions = &binding_description;
-    vertex_input_create_info.vertexAttributeDescriptionCount = vertex_attr_descriptions.size();
-    vertex_input_create_info.pVertexAttributeDescriptions = vertex_attr_descriptions.data();
-  }
-
-  const VkPipelineRasterizationStateCreateInfo rasterizer_create_info{
-      .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-      .depthClampEnable = VK_FALSE,
-      .rasterizerDiscardEnable = VK_FALSE,
-      .polygonMode = VK_POLYGON_MODE_FILL,
-      .cullMode = rp.disable_culling ? VK_CULL_MODE_NONE : VK_CULL_MODE_BACK_BIT,
-      .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
-      .lineWidth = 1.0f,
-  };
-
-  rp.pipeline =
-      Vulkan_CreateGraphicsPipeline(vertex_input_create_info, rp.layout, rp.shader_stages, rasterizer_create_info);
-  VulkanNameHandle(rp.pipeline, absl::StrFormat("Rp %v", rp.name));
 }  // namespace nyla
 
-void RpBegin(Rp& rp) {
+void RpBegin(Rp& rp, RhiCmdList cmd) {
   rp.static_uniform.written = 0;
   rp.dynamic_uniform.written = 0;
   rp.vert_buf.written = 0;
 
-  const VkCommandBuffer command_buffer = vk.command_buffers[vk.current_frame_data.iframe];
-  vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, rp.pipeline);
+  RhiCmdBindGraphicsPipeline(cmd, rp.pipeline);
 }
 
 static void RpBufCopy(RpBuf& buf, CharView data) {
@@ -365,7 +184,7 @@ static void RpBufCopy(RpBuf& buf, CharView data) {
   CHECK(!data.empty());
   CHECK_LE(buf.written + data.size(), buf.size);
 
-  void* dst = buf.mem_mapped[vk.current_frame_data.iframe] + buf.written;
+  void* dst = (char*)RhiMapBuffer(buf.buffer[RhiFrameGetIndex()], true) + buf.written;
   memcpy(dst, data.data(), data.size());
   buf.written += data.size();
 }
@@ -387,7 +206,7 @@ RpMesh RpVertCopy(Rp& rp, uint32_t vert_count, CharView vert_data) {
 
 void RpPushConst(Rp& rp, CharView data) {
   CHECK(!data.empty());
-  CHECK_LE(data.size(), kPushConstantMaxSize);
+  CHECK_LE(data.size(), rhi_max_push_constant_size);
 
   const VkCommandBuffer cmd = vk.command_buffers[vk.current_frame_data.iframe];
   vkCmdPushConstants(cmd, rp.layout, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT, 0, data.size(),

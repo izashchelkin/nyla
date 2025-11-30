@@ -1,6 +1,5 @@
-#include <fcntl.h>
-
 #include "nyla/rhi/rhi.h"
+#include "nyla/rhi/rhi_handle_pool.h"
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
 
 namespace nyla {
@@ -29,15 +28,15 @@ RhiCmdList RhiFrameBegin() {
     }
   }
 
-  const VkCommandBuffer cmd = vk.graphics_queue_cmd[vk.frame_index];
-  RhiCmdList ret_handle = RhiHandleAcquire(cmd_lists, cmd, true);
+  RhiCmdList cmdlist = vk.graphics_queue_cmd[vk.frame_index];
+  VkCommandBuffer cmdbuf = RhiHandleGetData(cmd_lists, cmdlist).cmdbuf;
 
-  VK_CHECK(vkResetCommandBuffer(cmd, 0));
+  VK_CHECK(vkResetCommandBuffer(cmdbuf, 0));
 
   const VkCommandBufferBeginInfo command_buffer_begin_info{
       .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
   };
-  VK_CHECK(vkBeginCommandBuffer(cmd, &command_buffer_begin_info));
+  VK_CHECK(vkBeginCommandBuffer(cmdbuf, &command_buffer_begin_info));
 
   const VkImageMemoryBarrier image_memory_barrier{
       .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -55,7 +54,7 @@ RhiCmdList RhiFrameBegin() {
           },
   };
 
-  vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0,
+  vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0,
                        nullptr, 0, nullptr, 1, &image_memory_barrier);
 
   const VkRenderingAttachmentInfo color_attachment_info{
@@ -75,7 +74,7 @@ RhiCmdList RhiFrameBegin() {
       .pColorAttachments = &color_attachment_info,
   };
 
-  vkCmdBeginRendering(cmd, &rendering_info);
+  vkCmdBeginRendering(cmdbuf, &rendering_info);
 
   const VkViewport viewport{
       .x = 0.f,
@@ -85,20 +84,21 @@ RhiCmdList RhiFrameBegin() {
       .minDepth = 0.0f,
       .maxDepth = 1.0f,
   };
-  vkCmdSetViewport(cmd, 0, 1, &viewport);
+  vkCmdSetViewport(cmdbuf, 0, 1, &viewport);
 
   const VkRect2D scissor{
       .offset = {0, 0},
       .extent = vk.surface_extent,
   };
-  vkCmdSetScissor(cmd, 0, 1, &scissor);
+  vkCmdSetScissor(cmdbuf, 0, 1, &scissor);
 
-  return ret_handle;
+  return cmdlist;
 }
 
 void RhiFrameEnd() {
-  const VkCommandBuffer cmd = vk.graphics_queue_cmd[vk.frame_index];
-  vkCmdEndRendering(cmd);
+  RhiCmdList cmdlist = vk.graphics_queue_cmd[vk.frame_index];
+  VkCommandBuffer cmdbuf = RhiHandleGetData(cmd_lists, cmdlist).cmdbuf;
+  vkCmdEndRendering(cmdbuf);
 
   const VkImageMemoryBarrier image_memory_barrier{
       .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -116,10 +116,10 @@ void RhiFrameEnd() {
           },
   };
 
-  vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0,
-                       nullptr, 0, nullptr, 1, &image_memory_barrier);
+  vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0,
+                       0, nullptr, 0, nullptr, 1, &image_memory_barrier);
 
-  CHECK_EQ(vkEndCommandBuffer(cmd), VK_SUCCESS);
+  CHECK_EQ(vkEndCommandBuffer(cmdbuf), VK_SUCCESS);
 
   const VkPipelineStageFlags wait_stages[] = {
       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
@@ -142,7 +142,7 @@ void RhiFrameEnd() {
       .pWaitSemaphores = &acquire_semaphore,
       .pWaitDstStageMask = wait_stages,
       .commandBufferCount = 1,
-      .pCommandBuffers = &cmd,
+      .pCommandBuffers = &cmdbuf,
       .signalSemaphoreCount = 1,
       .pSignalSemaphores = &vk.graphics_queue.timeline,
   };
@@ -179,6 +179,14 @@ void RhiFrameEnd() {
   }
 
   vk.frame_index = (vk.frame_index + 1) % vk.num_frames_in_flight;
+}
+
+uint32_t RhiFrameGetIndex() {
+  return vk.frame_index;
+}
+
+RhiCmdList RhiFrameGetCmdList() {  // TODO: get rid of this
+  return vk.graphics_queue_cmd[vk.frame_index];
 }
 
 }  // namespace nyla

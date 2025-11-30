@@ -34,7 +34,7 @@ RhiCmdList RhiCreateCmdList(RhiQueueType queue_type) {
   VK_CHECK(vkAllocateCommandBuffers(vk.dev, &alloc_info, &command_buffer));
 
   const VulkanCmdListData cmd_data{
-      .command_buffer = command_buffer,
+      .cmdbuf = command_buffer,
       .queue_type = queue_type,
   };
   return RhiHandleAcquire(cmd_lists, cmd_data);
@@ -43,7 +43,7 @@ RhiCmdList RhiCreateCmdList(RhiQueueType queue_type) {
 void RhiDestroyCmdList(RhiCmdList cmd) {
   VulkanCmdListData cmd_data = RhiHandleRelease(cmd_lists, cmd);
   VkCommandPool cmd_pool = GetCmdPool(cmd_data.queue_type);
-  vkFreeCommandBuffers(vk.dev, cmd_pool, 1, &cmd_data.command_buffer);
+  vkFreeCommandBuffers(vk.dev, cmd_pool, 1, &cmd_data.cmdbuf);
 }
 
 }  // namespace nyla

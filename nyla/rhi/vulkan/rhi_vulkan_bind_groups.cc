@@ -133,7 +133,7 @@ void RhiCmdBindGraphicsBindGroup(
   const VulkanPipelineData& pipeline_data = RhiHandleGetData(graphics_pipelines, cmd_data.bound_graphics_pipeline);
   const VkDescriptorSet& descriptor_set = RhiHandleGetData(bind_groups, bind_group);
 
-  vkCmdBindDescriptorSets(cmd_data.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_data.layout, set_index, 1,
+  vkCmdBindDescriptorSets(cmd_data.cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_data.layout, set_index, 1,
                           &descriptor_set, dynamic_offsets.size(), dynamic_offsets.data());
 }
 

@@ -259,7 +259,7 @@ void RhiCmdBindGraphicsPipeline(RhiCmdList cmd, RhiGraphicsPipeline pipeline) {
   VulkanCmdListData cmd_data = RhiHandleGetData(cmd_lists, cmd);
   const VulkanPipelineData& pipeline_data = RhiHandleGetData(graphics_pipelines, pipeline);
 
-  vkCmdBindPipeline(cmd_data.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_data.pipeline);
+  vkCmdBindPipeline(cmd_data.cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_data.pipeline);
 }
 
 }  // namespace nyla
