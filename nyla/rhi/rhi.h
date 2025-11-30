@@ -4,69 +4,14 @@
 #include <string>
 #include <vector>
 
+#include "nyla/commons/bitenum.h"
+#include "nyla/platform/platform.h"
 #include "nyla/rhi/handle_pool.h"
 
 namespace nyla {
 
-constexpr uint32_t kRhiPushConstantMaxSize = 256;
-
-enum class RhiShaderType : uint32_t {
-  Vertex,
-  Fragment,
-};
-
-enum class RhiQueueType : uint32_t {
-  Graphics,
-  Transfer,
-};
-
-enum class RhiBindingType : uint32_t {
-  UniformBuffer,
-};
-
-enum class RhiVertexAttributeType : uint32_t {
-  Float4,
-  Half2,
-  SNorm8x4,
-  UNorm8x4,
-};
-
-enum class RhiCullMode : uint32_t {
-  None,
-  Back,
-  Front,
-};
-
-enum class RhiFrontFace : uint32_t {
-  CCW,
-  CW,
-};
-
-enum class RhiInputRate : uint32_t {
-  PerVertex,
-  PerInstance,
-};
-
-enum class RhiFormat : uint32_t {
-  Float4,
-  Half2,
-  SNorm8x4,
-  UNorm8x4,
-};
-
-enum class RhiShaderStage : uint32_t {
-  None = 0,
-  Vertex = 1 << 0,
-  Fragment = 1 << 1,
-};
-
-inline RhiShaderStage operator|(RhiShaderStage a, RhiShaderStage b) {
-  return static_cast<RhiShaderStage>(static_cast<uint32_t>(a) | static_cast<uint32_t>(b));
-}
-
-inline uint32_t operator&(RhiShaderStage a, RhiShaderStage b) {
-  return static_cast<uint32_t>(a) & static_cast<uint32_t>(b);
-}
+constexpr inline uint32_t rhi_max_push_constant_size = 256;
+constexpr inline uint32_t rhi_max_num_frames_in_flight = 3;
 
 //
 
@@ -74,6 +19,45 @@ struct RhiShader : Handle {};
 struct RhiGraphicsPipeline : Handle {};
 struct RhiCmdList : Handle {};
 struct RhiBuffer : Handle {};
+
+//
+
+enum class RhiShaderType { Vertex, Fragment };
+
+enum class RhiQueueType { Graphics, Transfer };
+
+enum class RhiBindingType { UniformBuffer };
+
+enum class RhiVertexAttributeType { Float4, Half2, SNorm8x4, UNorm8x4 };
+
+enum class RhiCullMode { None, Back, Front };
+
+enum class RhiFrontFace { CCW, CW };
+
+enum class RhiInputRate { PerVertex, PerInstance };
+
+enum class RhiFormat { Float4, Half2, SNorm8x4, UNorm8x4 };
+
+enum class RhiShaderStage : uint32_t {
+  Vertex = 1 << 0,
+  Fragment = 1 << 1,
+};
+
+template <>
+struct EnableBitMaskOps<RhiShaderStage> : std::true_type {};
+
+enum class RhiBufferUsage : uint32_t {
+  Vertex = 1 << 0,
+  Index = 1 << 1,
+  Uniform = 1 << 2,
+  TransferSrc = 1 << 3,
+  TransferDst = 1 << 4,
+};
+
+template <>
+struct EnableBitMaskOps<RhiBufferUsage> : std::true_type {};
+
+enum class RhiMemoryUsage { GpuOnly, CpuToGpu, GpuToCpu };
 
 //
 
@@ -106,6 +90,12 @@ struct RhiBindGroupLayout {
   uint32_t binding_count;
 };
 
+struct RhiBufferDesc {
+  uint32_t size;
+  RhiBufferUsage buffer_usage;
+  RhiMemoryUsage memory_usage;
+};
+
 struct RhiGraphicsPipelineDesc {
   std::string debug_name;
 
@@ -123,18 +113,23 @@ struct RhiGraphicsPipelineDesc {
 
   RhiCullMode cull_mode;
   RhiFrontFace front_face;
-  RhiCompareOp compare_op;
 };
 
 struct RhiDesc {
-  constexpr static uint32_t kMaxFramesInFlight = 3;
-
+  PlatformWindow window;
   uint32_t num_frames_in_flight;
 };
 
-void RhiInit(RhiDesc);
 RhiShader RhiCreateShader(RhiShaderDesc);
+void RhiDestroyShader(RhiShader);
+RhiBuffer RhiCreateBuffer(RhiBufferDesc);
+void RhiDestroyBuffer(RhiBuffer);
+void* RhiMapBuffer(RhiBuffer);
+void RhiUnmapBuffer(RhiBuffer);
 RhiGraphicsPipeline RhiCreateGraphicsPipeline(RhiGraphicsPipelineDesc);
+void RhiDestroyGraphicsPipeline(RhiGraphicsPipeline);
+
+void RhiInit(RhiDesc);
 RhiCmdList RhiFrameBegin();
 void RhiFrameEnd();
 

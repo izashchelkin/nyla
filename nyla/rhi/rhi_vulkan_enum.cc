@@ -49,23 +49,6 @@ VkFrontFace ConvertVulkanFrontFace(RhiFrontFace front_face) {
   CHECK(false);
 }
 
-VkCompareOp ConvertVulkanCompareOp(RhiCompareOp compare_op) {
-  switch (compare_op) {
-    case RhiCompareOp::Always:
-      return VK_COMPARE_OP_ALWAYS;
-
-    case RhiCompareOp::Greater:
-      return VK_COMPARE_OP_GREATER;
-
-    case RhiCompareOp::Less:
-      return VK_COMPARE_OP_LESS;
-
-    case RhiCompareOp::LessEqual:
-      return VK_COMPARE_OP_LESS_OR_EQUAL;
-  }
-  CHECK(false);
-}
-
 VkFormat ConvertVulkanFormat(RhiFormat format) {
   switch (format) {
     case RhiFormat::Float4:

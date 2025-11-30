@@ -235,6 +235,8 @@ void RhiInit(RhiDesc rhi_desc) {
   }
   vk.num_frames_in_flight = rhi_desc.num_frames_in_flight;
 
+  vk.window = rhi_desc.window;
+
   const VkApplicationInfo app_info{
       .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
       .pApplicationName = "nyla",

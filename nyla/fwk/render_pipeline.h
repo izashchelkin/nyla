@@ -17,8 +17,7 @@ struct RpBuf {
   uint32_t range;
   uint32_t written;
   std::vector<RhiVertexAttributeType> attrs;
-  std::vector<VkBuffer> buffer;
-  std::vector<VkDeviceMemory> mem;
+  RhiBuffer buffer[RhiDesc::kMaxFramesInFlight];
   std::vector<char*> mem_mapped;
 };
 

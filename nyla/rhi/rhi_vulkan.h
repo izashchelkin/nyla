@@ -9,7 +9,6 @@ VkDescriptorType ConvertVulkanBindingType(RhiBindingType);
 VkShaderStageFlags ConvertVulkanStageFlags(RhiShaderStage stage_flags);
 VkCullModeFlags ConvertVulkanCullMode(RhiCullMode);
 VkFrontFace ConvertVulkanFrontFace(RhiFrontFace);
-VkCompareOp ConvertVulkanCompareOp(RhiCompareOp);
 VkFormat ConvertVulkanFormat(RhiFormat);
 VkVertexInputRate ConvertVulkanInputRate(RhiInputRate);
 
