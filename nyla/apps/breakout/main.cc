@@ -6,7 +6,6 @@
 #include "nyla/apps/breakout/world_renderer.h"
 #include "nyla/commons/logging/init.h"
 #include "nyla/commons/memory/temp.h"
-#include "nyla/commons/os/clock.h"
 #include "nyla/commons/signal/signal.h"
 #include "nyla/fwk/dbg_text_renderer.h"
 #include "nyla/fwk/gui.h"
@@ -18,15 +17,13 @@
 
 namespace nyla {
 
-static uint32_t window;
-
 static int Main() {
   LoggingInit();
   TArenaInit();
   SigIntCoreDump();
 
   PlatformInit();
-  window = PlatformCreateWindow();
+  PlatformWindow window = PlatformCreateWindow();
 
   PlatformMapInputBegin();
   PlatformMapInput(kLeft, KeyPhysical::S);

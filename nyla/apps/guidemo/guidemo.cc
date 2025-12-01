@@ -11,15 +11,13 @@
 
 namespace nyla {
 
-static uint32_t window;
-
 static int Main() {
   LoggingInit();
   TArenaInit();
   SigIntCoreDump();
 
   PlatformInit();
-  window = PlatformCreateWindow();
+  PlatformWindow window = PlatformCreateWindow();
 
   RhiInit(RhiDesc{
       .window = window,

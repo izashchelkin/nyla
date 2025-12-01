@@ -369,7 +369,7 @@ void RhiInit(const RhiDesc& rhi_desc) {
   const VkXcbSurfaceCreateInfoKHR surface_create_info{
       .sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR,
       .connection = xcb_connect(nullptr, nullptr),
-      .window = vk.window,
+      .window = vk.window.handle,
   };
   VK_CHECK(vkCreateXcbSurfaceKHR(vk.instance, &surface_create_info, nullptr, &vk.surface));
 

@@ -16,15 +16,13 @@ namespace nyla {
 
 uint16_t ientity;
 
-static uint32_t window;
-
 static int Main() {
   LoggingInit();
   TArenaInit();
   SigIntCoreDump();
 
   PlatformInit();
-  window = PlatformCreateWindow();
+  PlatformWindow window = PlatformCreateWindow();
 
   PlatformMapInputBegin();
   PlatformMapInput(kUp, KeyPhysical::E);

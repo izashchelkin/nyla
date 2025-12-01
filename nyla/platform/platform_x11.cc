@@ -40,7 +40,7 @@ void PlatformMapInputEnd() {
   key_resolver = {};
 }
 
-uint32_t PlatformCreateWindow() {
+PlatformWindow PlatformCreateWindow() {
   xcb_window_t window = xcb_generate_id(x11.conn);
 
   CHECK(!xcb_request_check(
@@ -54,12 +54,12 @@ uint32_t PlatformCreateWindow() {
   xcb_map_window(x11.conn, window);
   xcb_flush(x11.conn);
 
-  return window;
+  return {window};
 }
 
 PlatformWindowSize PlatformGetWindowSize(PlatformWindow window) {
   const xcb_get_geometry_reply_t* window_geometry =
-      xcb_get_geometry_reply(x11.conn, xcb_get_geometry(x11.conn, window), nullptr);
+      xcb_get_geometry_reply(x11.conn, xcb_get_geometry(x11.conn, window.handle), nullptr);
   return {window_geometry->width, window_geometry->height};
 }
 
