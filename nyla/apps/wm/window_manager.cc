@@ -888,8 +888,10 @@ void UpdateBackground() {
     auto it = wm_clients.find(stack.active_window);
     if (it == wm_clients.end())
       active_client_name = absl::StrFormat("invalid %v", stack.active_window);
-    else
+    else {
       active_client_name = it->second.name;
+      std::erase_if(active_client_name, [](char ch) { return ch < 0x20 || ch > 0x7F; });
+    }
   } else {
     active_client_name = absl::StrFormat("nylawm %v", wm_active_stack_idx);
   }
