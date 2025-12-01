@@ -6,6 +6,7 @@
 #include "nyla/apps/breakout/world_renderer.h"
 #include "nyla/commons/logging/init.h"
 #include "nyla/commons/memory/temp.h"
+#include "nyla/commons/os/clock.h"
 #include "nyla/commons/signal/signal.h"
 #include "nyla/fwk/dbg_text_renderer.h"
 #include "nyla/fwk/gui.h"
@@ -51,8 +52,29 @@ static int Main() {
       RpInit(dbg_text_pipeline);
     }
 
+    static uint64_t last = GetMonotonicTimeNanos();
+    const uint64_t now = GetMonotonicTimeNanos();
+    const uint64_t dtnanos = now - last;
+    last = now;
+
+    const float dt = dtnanos / 1e9;
+
+    static float dtnanosaccum = .0f;
+    dtnanosaccum += dtnanos;
+
+    static uint32_t fps_frames = 0;
+    ++fps_frames;
+
+    uint32_t fps = 0;
+    if (dtnanosaccum >= .5f * 1e9) {
+      fps = (1e9 / dtnanosaccum) * fps_frames;
+
+      fps_frames = 0;
+      dtnanosaccum = .0f;
+    }
+
     RhiFrameBegin();
-    BreakoutFrame();
+    BreakoutFrame(dt, fps);
     RhiFrameEnd();
   }
 

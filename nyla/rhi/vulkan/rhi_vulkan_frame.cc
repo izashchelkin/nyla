@@ -8,7 +8,7 @@ using namespace rhi_internal;
 using namespace rhi_vulkan_internal;
 
 RhiCmdList RhiFrameBegin() {
-  WaitTimeline(vk.graphics_queue.timeline, vk.graphics_queue_cmd_done[vk.frame_index]);
+  // WaitTimeline(vk.graphics_queue.timeline, vk.graphics_queue_cmd_done[vk.frame_index]);
 
   VkResult acquire_result =
       vkAcquireNextImageKHR(vk.dev, vk.swapchain, std::numeric_limits<uint64_t>::max(),
@@ -29,7 +29,7 @@ RhiCmdList RhiFrameBegin() {
   }
 
   RhiCmdList cmdlist = vk.graphics_queue_cmd[vk.frame_index];
-  VkCommandBuffer cmdbuf = RhiHandleGetData(cmd_lists, cmdlist).cmdbuf;
+  VkCommandBuffer cmdbuf = RhiHandleGetData(rhi_handles.cmd_lists, cmdlist).cmdbuf;
 
   VK_CHECK(vkResetCommandBuffer(cmdbuf, 0));
 
@@ -97,7 +97,7 @@ RhiCmdList RhiFrameBegin() {
 
 void RhiFrameEnd() {
   RhiCmdList cmdlist = vk.graphics_queue_cmd[vk.frame_index];
-  VkCommandBuffer cmdbuf = RhiHandleGetData(cmd_lists, cmdlist).cmdbuf;
+  VkCommandBuffer cmdbuf = RhiHandleGetData(rhi_handles.cmd_lists, cmdlist).cmdbuf;
   vkCmdEndRendering(cmdbuf);
 
   const VkImageMemoryBarrier image_memory_barrier{
@@ -119,7 +119,25 @@ void RhiFrameEnd() {
   vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0,
                        0, nullptr, 0, nullptr, 1, &image_memory_barrier);
 
-  CHECK_EQ(vkEndCommandBuffer(cmdbuf), VK_SUCCESS);
+  VK_CHECK(vkEndCommandBuffer(cmdbuf));
+
+  if constexpr (false) {
+    const VkCommandBufferAllocateInfo alloc_info{
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+        .commandPool = vk.graphics_queue.cmd_pool,
+        .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+        .commandBufferCount = 1,
+    };
+    vkAllocateCommandBuffers(vk.dev, &alloc_info, &cmdbuf);
+
+    vkResetCommandBuffer(cmdbuf, 0);
+
+    VkCommandBufferBeginInfo begin_info{
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+    };
+    VK_CHECK(vkBeginCommandBuffer(cmdbuf, &begin_info));
+    VK_CHECK(vkEndCommandBuffer(cmdbuf));
+  }
 
   const VkPipelineStageFlags wait_stages[] = {
       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
@@ -135,29 +153,35 @@ void RhiFrameEnd() {
   };
 
   const VkSemaphore acquire_semaphore = vk.swapchain_acquire_semaphores[vk.frame_index];
+  const VkSemaphore render_finished_semaphore = vk.render_finished_semaphores[vk.frame_index];
+
+  VkFenceCreateInfo fence_create_info{
+      .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+  };
+  VkFence fence;
+  vkCreateFence(vk.dev, &fence_create_info, nullptr, &fence);
+
+  const VkSemaphore signal_semaphores[] = {
+      render_finished_semaphore,
+      // vk.graphics_queue.timeline,
+  };
   const VkSubmitInfo submit_info{
       .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-      .pNext = &timeline_submit_info,
+      // .pNext = &timeline_submit_info,
       .waitSemaphoreCount = 1,
       .pWaitSemaphores = &acquire_semaphore,
       .pWaitDstStageMask = wait_stages,
       .commandBufferCount = 1,
       .pCommandBuffers = &cmdbuf,
-      .signalSemaphoreCount = 1,
-      .pSignalSemaphores = &vk.graphics_queue.timeline,
+      .signalSemaphoreCount = std::size(signal_semaphores),
+      .pSignalSemaphores = signal_semaphores,
   };
-  VK_CHECK(vkQueueSubmit(vk.graphics_queue.queue, 1, &submit_info, VK_NULL_HANDLE));
+  VK_CHECK(vkQueueSubmit(vk.graphics_queue.queue, 1, &submit_info, fence));
 
-  const VkTimelineSemaphoreSubmitInfo timeline_present_info{
-      .sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
-      .waitSemaphoreValueCount = 1,
-      .pWaitSemaphoreValues = &cmd_done,
-  };
   const VkPresentInfoKHR present_info{
       .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-      .pNext = &timeline_present_info,
       .waitSemaphoreCount = 1,
-      .pWaitSemaphores = &vk.graphics_queue.timeline,
+      .pWaitSemaphores = &render_finished_semaphore,
       .swapchainCount = 1,
       .pSwapchains = &vk.swapchain,
       .pImageIndices = &vk.swapchain_image_index,
@@ -179,6 +203,8 @@ void RhiFrameEnd() {
   }
 
   vk.frame_index = (vk.frame_index + 1) % vk.num_frames_in_flight;
+
+  VK_CHECK(vkWaitForFences(vk.dev, 1, &fence, 1, 1e9));
 }
 
 uint32_t RhiFrameGetIndex() {

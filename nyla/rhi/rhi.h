@@ -168,6 +168,8 @@ void RhiDestroyGraphicsPipeline(RhiGraphicsPipeline);
 
 void RhiInit(const RhiDesc&);
 uint32_t RhiGetMinUniformBufferOffsetAlignment();
+uint32_t RhiGetSurfaceWidth();
+uint32_t RhiGetSurfaceHeight();
 uint32_t RhiGetNumFramesInFlight();
 RhiCmdList RhiFrameBegin();
 void RhiFrameEnd();

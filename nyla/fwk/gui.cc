@@ -5,6 +5,7 @@
 #include "nyla/commons/math/vec/vec4f.h"
 #include "nyla/commons/memory/charview.h"
 #include "nyla/fwk/render_pipeline.h"
+#include "nyla/rhi/rhi.h"
 
 namespace nyla {
 
@@ -18,7 +19,7 @@ struct StaticUbo {
 };  // namespace
 
 void UI_FrameBegin() {
-  StaticUbo ubo{static_cast<float>(vk.surface_extent.width), static_cast<float>(vk.surface_extent.height)};
+  StaticUbo ubo{static_cast<float>(RhiGetSurfaceWidth()), static_cast<float>(RhiGetSurfaceHeight())};
   RpStaticUniformCopy(gui_pipeline, CharViewPtr(&ubo));
 }
 
@@ -27,10 +28,10 @@ static void UI_BoxBegin(float x, float y, float width, float height) {
   const float w = 0.f;
 
   if (x < 0.f) {
-    x += vk.surface_extent.width - width;
+    x += RhiGetSurfaceWidth() - width;
   }
   if (y < 0.f) {
-    y += vk.surface_extent.height - height;
+    y += RhiGetSurfaceHeight() - height;
   }
 
   const Vec4f rect[] = {
@@ -56,7 +57,7 @@ void UI_Text(std::string_view text) {
 }
 
 Rp gui_pipeline{
-    .name = "GUI",
+    .debug_name = "GUI",
     .disable_culling = true,
     .static_uniform =
         {
@@ -70,7 +71,7 @@ Rp gui_pipeline{
             .size = 1 << 20,
             .attrs =
                 {
-                    RpVertAttr::Float4,
+                    RhiVertexAttributeType::Float4,
                 },
         },
     .Init =

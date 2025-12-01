@@ -37,11 +37,11 @@ RhiCmdList RhiCreateCmdList(RhiQueueType queue_type) {
       .cmdbuf = command_buffer,
       .queue_type = queue_type,
   };
-  return RhiHandleAcquire(cmd_lists, cmd_data);
+  return RhiHandleAcquire(rhi_handles.cmd_lists, cmd_data);
 }
 
 void RhiDestroyCmdList(RhiCmdList cmd) {
-  VulkanCmdListData cmd_data = RhiHandleRelease(cmd_lists, cmd);
+  VulkanCmdListData cmd_data = RhiHandleRelease(rhi_handles.cmd_lists, cmd);
   VkCommandPool cmd_pool = GetCmdPool(cmd_data.queue_type);
   vkFreeCommandBuffers(vk.dev, cmd_pool, 1, &cmd_data.cmdbuf);
 }

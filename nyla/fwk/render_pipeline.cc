@@ -18,15 +18,6 @@ namespace nyla {
 
 namespace {
 
-void CreateMappedBuffer(RhiBufferUsage buffer_usage, uint32_t buffer_size, void*& mapped) {
-  RhiBuffer buffer = RhiCreateBuffer(RhiBufferDesc{
-      .size = buffer_size,
-      .buffer_usage = buffer_usage,
-      .memory_usage = RhiMemoryUsage::CpuToGpu,
-  });
-  mapped = RhiMapBuffer(buffer);
-}
-
 uint32_t GetVertAttrSize(RhiVertexAttributeType attr) {
   switch (attr) {
     case RhiVertexAttributeType::Float4:
@@ -80,6 +71,16 @@ void RpInit(Rp& rp) {
 
     for (uint32_t j = 0; j < RhiGetNumFramesInFlight(); ++j) {
       bind_group_desc[j].entries_count = bind_group_layout_desc.binding_count;
+    }
+
+    if (rp.vert_buf.enabled) {
+      for (uint32_t iframe = 0; iframe < RhiGetNumFramesInFlight(); ++iframe) {
+        rp.vert_buf.buffer[iframe] = RhiCreateBuffer(RhiBufferDesc{
+            .size = rp.vert_buf.size,
+            .buffer_usage = RhiBufferUsage::Vertex,
+            .memory_usage = RhiMemoryUsage::CpuToGpu,
+        });
+      }
     }
 
     auto init_buffer = [&bind_group_layout_desc, &bind_group_desc](
@@ -167,15 +168,15 @@ void RpInit(Rp& rp) {
   }
 
   rp.Init(rp);
-  RhiCreateGraphicsPipeline(desc);
-}  // namespace nyla
+  rp.pipeline = RhiCreateGraphicsPipeline(desc);
+}
 
-void RpBegin(Rp& rp, RhiCmdList cmd) {
+void RpBegin(Rp& rp) {
   rp.static_uniform.written = 0;
   rp.dynamic_uniform.written = 0;
   rp.vert_buf.written = 0;
 
-  RhiCmdBindGraphicsPipeline(cmd, rp.pipeline);
+  RhiCmdBindGraphicsPipeline(RhiFrameGetCmdList(), rp.pipeline);
 }
 
 static void RpBufCopy(RpBuf& buf, CharView data) {
@@ -208,20 +209,20 @@ void RpPushConst(Rp& rp, CharView data) {
   CHECK_LE(data.size(), rhi_max_push_constant_size);
 
   RhiCmdList cmd = RhiFrameGetCmdList();
-  RhiCmdPushGraphicsConstants(cmd, 0, RhiShaderStage::Vertex | RhiShaderStage::Fragment, data);
+  if (false) RhiCmdPushGraphicsConstants(cmd, 0, RhiShaderStage::Vertex | RhiShaderStage::Fragment, data);
 }
 
 void RpDraw(Rp& rp, RpMesh mesh, CharView dynamic_uniform_data) {
   RhiCmdList cmd = RhiFrameGetCmdList();
   uint32_t frame_index = RhiFrameGetIndex();
 
-  if (rp.vert_buf.enabled) {
+  if (false && rp.vert_buf.enabled) {
     RhiBuffer buffers[]{rp.vert_buf.buffer[frame_index]};
     uint32_t offsets[]{mesh.offset};
     RhiCmdBindVertexBuffers(cmd, 0, buffers, offsets);
   }
 
-  if (rp.dynamic_uniform.enabled || rp.static_uniform.enabled) {
+  if (false && rp.dynamic_uniform.enabled || rp.static_uniform.enabled) {
     uint32_t offset_count = 0;
     uint32_t offset = 0;
 

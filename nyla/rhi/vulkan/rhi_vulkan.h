@@ -37,7 +37,8 @@ struct VulkanData {
   VkImage swapchain_images[8];
   uint32_t swapchain_image_count;
   VkImageView swapchain_image_views[8];
-  VkSemaphore swapchain_acquire_semaphores[8];
+  VkSemaphore swapchain_acquire_semaphores[rhi_max_num_frames_in_flight];
+  VkSemaphore render_finished_semaphores[rhi_max_num_frames_in_flight];
 
   DeviceQueue graphics_queue;
   RhiCmdList graphics_queue_cmd[rhi_max_num_frames_in_flight];

@@ -1,3 +1,6 @@
+#include <cstdint>
+
+#include "nyla/commons/debug/debugger.h"
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
 
 namespace nyla {
@@ -30,7 +33,22 @@ void WaitTimeline(VkSemaphore timeline, uint64_t wait_value) {
       .pSemaphores = &timeline,
       .pValues = &wait_value,
   };
-  vkWaitSemaphores(vk.dev, &wait_info, std::numeric_limits<uint64_t>::max());
+
+  if (vkWaitSemaphores(vk.dev, &wait_info, 1e9) != VK_SUCCESS) {
+    uint64_t current_value = -1;
+    vkGetSemaphoreCounterValue(vk.dev, timeline, &current_value);
+    DebugBreak;
+
+    VkSemaphoreSignalInfo info{
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO,
+        .semaphore = timeline,
+        .value = wait_value,
+    };
+    VK_CHECK(vkSignalSemaphore(vk.dev, &info));
+
+    vkGetSemaphoreCounterValue(vk.dev, vk.graphics_queue.timeline, &current_value);
+    DebugBreak;
+  }
 }
 
 }  // namespace rhi_vulkan_internal

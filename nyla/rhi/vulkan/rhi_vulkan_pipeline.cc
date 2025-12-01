@@ -51,7 +51,7 @@ VkVertexInputRate ConvertVulkanInputRate(RhiInputRate input_rate) {
 
 }  // namespace
 
-RhiShader RhiCreateShader(RhiShaderDesc desc) {
+RhiShader RhiCreateShader(const RhiShaderDesc& desc) {
   const VkShaderModuleCreateInfo create_info{
       .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
       .codeSize = desc.code.size(),
@@ -69,8 +69,10 @@ void RhiDestroyShader(RhiShader shader) {
   vkDestroyShaderModule(vk.dev, shader_module, nullptr);
 }
 
-RhiGraphicsPipeline RhiCreateGraphicsPipeline(RhiGraphicsPipelineDesc desc) {
-  VulkanPipelineData pipeline_data = {};
+RhiGraphicsPipeline RhiCreateGraphicsPipeline(const RhiGraphicsPipelineDesc& desc) {
+  VulkanPipelineData pipeline_data = {
+      .bind_point = VK_PIPELINE_BIND_POINT_GRAPHICS,
+  };
 
   VkVertexInputBindingDescription vertex_bindings[std::size(desc.vertex_bindings)];
   CHECK_LE(desc.vertex_bindings_count, std::size(desc.vertex_bindings));
@@ -97,7 +99,7 @@ RhiGraphicsPipeline RhiCreateGraphicsPipeline(RhiGraphicsPipelineDesc desc) {
 
   const VkPipelineVertexInputStateCreateInfo vertex_input_state_create_info{
       .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-      .vertexBindingDescriptionCount = desc.bind_group_layouts_count,
+      .vertexBindingDescriptionCount = desc.vertex_bindings_count,
       .pVertexBindingDescriptions = vertex_bindings,
       .vertexAttributeDescriptionCount = desc.vertex_attribute_count,
       .pVertexAttributeDescriptions = vertex_attributes,
@@ -215,8 +217,7 @@ RhiGraphicsPipeline RhiCreateGraphicsPipeline(RhiGraphicsPipelineDesc desc) {
       .pPushConstantRanges = &push_constant_range,
   };
 
-  VkPipelineLayout layout;
-  vkCreatePipelineLayout(vk.dev, &pipeline_layout_create_info, nullptr, &layout);
+  vkCreatePipelineLayout(vk.dev, &pipeline_layout_create_info, nullptr, &pipeline_data.layout);
 
   const VkGraphicsPipelineCreateInfo pipeline_create_info{
       .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
@@ -231,14 +232,14 @@ RhiGraphicsPipeline RhiCreateGraphicsPipeline(RhiGraphicsPipelineDesc desc) {
       .pDepthStencilState = nullptr,
       .pColorBlendState = &color_blending_create_info,
       .pDynamicState = &dynamic_state_create_info,
-      .layout = layout,
+      .layout = pipeline_data.layout,
       .subpass = 0,
       .basePipelineHandle = VK_NULL_HANDLE,
       .basePipelineIndex = -1,
   };
 
-  VkPipeline pipeline;
-  VK_CHECK(vkCreateGraphicsPipelines(vk.dev, VK_NULL_HANDLE, 1, &pipeline_create_info, nullptr, &pipeline));
+  VK_CHECK(
+      vkCreateGraphicsPipelines(vk.dev, VK_NULL_HANDLE, 1, &pipeline_create_info, nullptr, &pipeline_data.pipeline));
 
   return RhiHandleAcquire(rhi_handles.graphics_pipelines, pipeline_data);
 }
@@ -256,10 +257,11 @@ void RhiDestroyGraphicsPipeline(RhiGraphicsPipeline pipeline) {
 }
 
 void RhiCmdBindGraphicsPipeline(RhiCmdList cmd, RhiGraphicsPipeline pipeline) {
-  VulkanCmdListData cmd_data = RhiHandleGetData(rhi_handles.cmd_lists, cmd);
+  VulkanCmdListData& cmd_data = RhiHandleGetData(rhi_handles.cmd_lists, cmd);
   const VulkanPipelineData& pipeline_data = RhiHandleGetData(rhi_handles.graphics_pipelines, pipeline);
 
   vkCmdBindPipeline(cmd_data.cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_data.pipeline);
+  cmd_data.bound_graphics_pipeline = pipeline;
 }
 
 void RhiCmdPushGraphicsConstants(RhiCmdList cmd, uint32_t offset, RhiShaderStage stage, CharView data) {

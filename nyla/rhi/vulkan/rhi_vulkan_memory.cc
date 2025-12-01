@@ -10,12 +10,6 @@ namespace nyla {
 using namespace rhi_internal;
 using namespace rhi_vulkan_internal;
 
-namespace rhi_vulkan_internal {
-
-RhiHandlePool<VulkanBufferData, 16> buffers;
-
-}
-
 namespace {
 
 VkBufferUsageFlags ConvertVulkanBufferUsage(RhiBufferUsage usage) {
@@ -84,7 +78,7 @@ uint32_t FindMemoryTypeIndex(VkMemoryRequirements mem_requirements, VkMemoryProp
 
 }  // namespace
 
-RhiBuffer RhiCreateBuffer(RhiBufferDesc desc) {
+RhiBuffer RhiCreateBuffer(const RhiBufferDesc& desc) {
   using namespace rhi_vulkan_internal;
 
   VulkanBufferData buffer_data{};
@@ -110,13 +104,13 @@ RhiBuffer RhiCreateBuffer(RhiBufferDesc desc) {
   VK_CHECK(vkAllocateMemory(vk.dev, &memory_alloc_info, nullptr, &buffer_data.memory));
   VK_CHECK(vkBindBufferMemory(vk.dev, buffer_data.buffer, buffer_data.memory, 0));
 
-  return RhiHandleAcquire(buffers, buffer_data);
+  return RhiHandleAcquire(rhi_handles.buffers, buffer_data);
 }
 
 void RhiDestroyBuffer(RhiBuffer buffer) {
   using namespace rhi_vulkan_internal;
 
-  VulkanBufferData buffer_data = RhiHandleRelease(buffers, buffer);
+  VulkanBufferData buffer_data = RhiHandleRelease(rhi_handles.buffers, buffer);
 
   if (buffer_data.mapped) {
     vkUnmapMemory(vk.dev, buffer_data.memory);
@@ -128,7 +122,7 @@ void RhiDestroyBuffer(RhiBuffer buffer) {
 void* RhiMapBuffer(RhiBuffer buffer, bool idempotent) {
   using namespace rhi_vulkan_internal;
 
-  VulkanBufferData& buffer_data = RhiHandleGetData(buffers, buffer);
+  VulkanBufferData& buffer_data = RhiHandleGetData(rhi_handles.buffers, buffer);
   if (!buffer_data.mapped) {
     vkMapMemory(vk.dev, buffer_data.memory, 0, VK_WHOLE_SIZE, 0, (void**)&buffer_data.mapped);
   } else {
@@ -141,7 +135,7 @@ void* RhiMapBuffer(RhiBuffer buffer, bool idempotent) {
 void RhiUnmapBuffer(RhiBuffer buffer, bool idempotent) {
   using namespace rhi_vulkan_internal;
 
-  VulkanBufferData& buffer_data = RhiHandleGetData(buffers, buffer);
+  VulkanBufferData& buffer_data = RhiHandleGetData(rhi_handles.buffers, buffer);
   if (buffer_data.mapped) {
     vkUnmapMemory(vk.dev, buffer_data.memory);
     buffer_data.mapped = nullptr;

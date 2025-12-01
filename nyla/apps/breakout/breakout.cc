@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <cstring>
 #include <vector>
 
@@ -14,7 +15,7 @@
 #include "nyla/fwk/dbg_text_renderer.h"
 #include "nyla/fwk/render_pipeline.h"
 #include "nyla/platform/abstract_input.h"
-#include "nyla/vulkan/vulkan.h"
+#include "nyla/rhi/rhi.h"
 
 namespace nyla {
 
@@ -47,11 +48,12 @@ static GameStage stage = GameStage::kGame;
 
 template <typename T>
 static T& FrameLocal(std::vector<T>& vec, auto create) {
-  vec.reserve(kVulkan_NumFramesInFlight);
-  if (vk.current_frame_data.iframe >= vec.size()) {
+  vec.reserve(RhiGetNumFramesInFlight());
+  uint32_t frame_index = RhiFrameGetIndex();
+  if (frame_index >= vec.size()) {
     vec.emplace_back(create());
   }
-  return vec.at(vk.current_frame_data.iframe);
+  return vec.at(frame_index);
 }
 
 constexpr Vec2f kWorldBoundaryX{-35.f, 35.f};
@@ -95,11 +97,11 @@ static bool IsInside(float pos, float size, Vec2f boundary) {
   return false;
 }
 
-void BreakoutFrame() {
+void BreakoutFrame(float dt, uint32_t fps) {
   const int dx = Pressed(kRight) - Pressed(kLeft);
 
   static float dt_accumulator = 0.f;
-  dt_accumulator += vk.current_frame_data.dt;
+  dt_accumulator += dt;
 
   constexpr float step = 1.f / 120.f;
   for (; dt_accumulator >= step; dt_accumulator -= step) {
@@ -151,9 +153,9 @@ void BreakoutFrame() {
     }
   }
 
+  RpBegin(world_pipeline);
   WorldSetUp();
 
-  RpBegin(world_pipeline);
   {
     static std ::vector<RpMesh> unit_rect_meshes;
     RpMesh unit_rect_mesh = FrameLocal(unit_rect_meshes, [] {
@@ -186,7 +188,7 @@ void BreakoutFrame() {
 
   RpBegin(dbg_text_pipeline);
   {
-    DbgText(500, 10, absl::StrFormat("fps=%d ball=(%.1f, %.1f)", GetFps(), ball_pos[0], ball_pos[1]));
+    DbgText(500, 10, absl::StrFormat("fps=%d ball=(%.1f, %.1f)", fps, ball_pos[0], ball_pos[1]));
   }
 }
 

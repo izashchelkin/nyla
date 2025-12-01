@@ -5,14 +5,14 @@
 #include <vector>
 
 #include "absl/log/check.h"
+#include "absl/log/log.h"
+#include "nyla/commons/debug/debugger.h"
 #include "nyla/commons/memory/temp.h"
 #include "nyla/rhi/rhi.h"
 #include "vulkan/vulkan_core.h"
 
 // clang-format off
-typedef struct xcb_connection_t xcb_connection_t;
-typedef uint32_t xcb_window_t;
-typedef uint32_t xcb_visualid_t;
+#include "xcb/xcb.h"
 #include "vulkan/vulkan_xcb.h"
 // clang-format on
 
@@ -58,16 +58,35 @@ VkShaderStageFlags ConvertVulkanStageFlags(RhiShaderStage stage_flags) {
   return ret;
 }
 
+VkBool32 DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
+                                VkDebugUtilsMessageTypeFlagsEXT message_type,
+                                const VkDebugUtilsMessengerCallbackDataEXT* callback_data, void* user_data) {
+  switch (message_severity) {
+    case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT: {
+      LOG(ERROR) << callback_data->pMessage;
+      DebugBreak;
+    }
+    case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT: {
+      LOG(WARNING) << callback_data->pMessage;
+    }
+    default: {
+      LOG(INFO) << callback_data->pMessage;
+    }
+  }
+  return VK_FALSE;
+}
+
 }  // namespace rhi_vulkan_internal
 
-void RhiInit(RhiDesc rhi_desc) {
+void RhiInit(const RhiDesc& rhi_desc) {
   constexpr uint32_t kInvalidIndex = std::numeric_limits<uint32_t>::max();
 
   CHECK_LE(rhi_desc.num_frames_in_flight, rhi_max_num_frames_in_flight);
-  if (!rhi_desc.num_frames_in_flight) {
-    rhi_desc.num_frames_in_flight = 2;
+  if (rhi_desc.num_frames_in_flight) {
+    vk.num_frames_in_flight = rhi_desc.num_frames_in_flight;
+  } else {
+    vk.num_frames_in_flight = 2;
   }
-  vk.num_frames_in_flight = rhi_desc.num_frames_in_flight;
 
   vk.window = rhi_desc.window;
 
@@ -93,7 +112,7 @@ void RhiInit(RhiDesc rhi_desc) {
     instance_extensions.emplace_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     instance_extensions.emplace_back(VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME);
 
-    std::span enabled_validations = Tmake((VkValidationFeatureEnableEXT[4]){
+    std::span<VkValidationFeatureEnableEXT> enabled_validations = Tmake(std::array<VkValidationFeatureEnableEXT, 4>{
         VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT,
         VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_RESERVE_BINDING_SLOT_EXT,
         VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT,
@@ -131,10 +150,10 @@ void RhiInit(RhiDesc rhi_desc) {
   };
   VK_CHECK(vkCreateInstance(&instance_create_info, nullptr, &vk.instance));
 
-  VkDebugUtilsMessengerEXT* debug_messenger = nullptr;
+  VkDebugUtilsMessengerEXT debug_messenger{};
   if constexpr (enableValidations) {
     VK_CHECK(VK_GET_INSTANCE_PROC_ADDR(vkCreateDebugUtilsMessengerEXT)(vk.instance, debug_messenger_create_info,
-                                                                       nullptr, debug_messenger));
+                                                                       nullptr, &debug_messenger));
   }
 
   uint32_t num_phys_devices = 0;
@@ -309,18 +328,14 @@ void RhiInit(RhiDesc rhi_desc) {
     const VkSemaphoreCreateInfo semaphore_create_info{
         .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
     };
+
     VK_CHECK(vkCreateSemaphore(vk.dev, &semaphore_create_info, nullptr, vk.swapchain_acquire_semaphores + i));
+    VK_CHECK(vkCreateSemaphore(vk.dev, &semaphore_create_info, nullptr, vk.render_finished_semaphores + i));
   }
 
   const VkDescriptorPoolSize descriptor_pool_sizes[]{
-      {
-          .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-          .descriptorCount = 256,
-      },
-      {
-          .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
-          .descriptorCount = 256,
-      },
+      {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 256},
+      {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 256},
   };
   const VkDescriptorPoolCreateInfo descriptor_pool_create_info{
       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
@@ -330,10 +345,27 @@ void RhiInit(RhiDesc rhi_desc) {
       .pPoolSizes = descriptor_pool_sizes,
   };
   vkCreateDescriptorPool(vk.dev, &descriptor_pool_create_info, nullptr, &vk.descriptor_pool);
+
+  const VkXcbSurfaceCreateInfoKHR surface_create_info{
+      .sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR,
+      .connection = xcb_connect(nullptr, nullptr),
+      .window = vk.window,
+  };
+  VK_CHECK(vkCreateXcbSurfaceKHR(vk.instance, &surface_create_info, nullptr, &vk.surface));
+
+  CreateSwapchain();
 }
 
 uint32_t RhiGetMinUniformBufferOffsetAlignment() {
   return vk.phys_dev_props.limits.minUniformBufferOffsetAlignment;
+}
+
+uint32_t RhiGetSurfaceWidth() {
+  return vk.surface_extent.width;
+}
+
+uint32_t RhiGetSurfaceHeight() {
+  return vk.surface_extent.height;
 }
 
 }  // namespace nyla

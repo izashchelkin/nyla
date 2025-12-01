@@ -29,16 +29,16 @@ struct RhiHandlePool {
 
 template <typename Handle, typename Data, size_t Size>
 inline Handle RhiHandleAcquire(RhiHandlePool<Handle, Data, Size>& pool, Data data, bool allow_intern = false) {
-  RhiHandle ret_handle;
+  Handle ret_handle{};
 
   for (uint32_t i = 0; i < Size; ++i) {
     auto& slot = pool.slots[i];
     if (slot.used) {
-      CHECK(slot.data != data || allow_intern);
+      CHECK(memcmp(&slot.data, &data, sizeof(slot.data)) || allow_intern);
       continue;
     }
 
-    if (RhiHandleIsSet(ret_handle)) {
+    if (!RhiHandleIsSet(ret_handle)) {
       ++slot.gen;
       slot.used = true;
       slot.data = data;
@@ -50,7 +50,8 @@ inline Handle RhiHandleAcquire(RhiHandlePool<Handle, Data, Size>& pool, Data dat
     }
   }
 
-  CHECK(false);
+  CHECK(RhiHandleIsSet(ret_handle));
+  return ret_handle;
 }
 
 template <typename Handle, typename Data, size_t Size>

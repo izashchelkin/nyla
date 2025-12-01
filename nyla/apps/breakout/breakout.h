@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include "nyla/platform/abstract_input.h"
 
 namespace nyla {
@@ -11,6 +12,6 @@ NYLA_INPUT_MAPPING(X)
 #undef X
 
 void BreakoutInit();
-void BreakoutFrame();
+void BreakoutFrame(float dt, uint32_t fps);
 
 }  // namespace nyla
