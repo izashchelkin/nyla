@@ -2,49 +2,38 @@
 
 #include <cstdint>
 #include <string>
-#include <string_view>
 #include <vector>
 
 #include "nyla/commons/memory/charview.h"
-#include "nyla/vulkan/vulkan.h"
+#include "nyla/rhi/rhi.h"
 
 namespace nyla {
 
-constexpr uint32_t kPushConstantMaxSize = 128;
-
-enum class RpVertAttr {
-  Float4,
-  Half2,
-  SNorm8x4,
-  UNorm8x4,
-};
-
 struct RpBuf {
   bool enabled;
-  uint32_t stage_flags;
+  RhiShaderStage stage_flags;
   uint32_t size;
   uint32_t range;
   uint32_t written;
-  std::vector<RpVertAttr> attrs;
-  std::vector<VkBuffer> buffer;
-  std::vector<VkDeviceMemory> mem;
-  std::vector<char*> mem_mapped;
+  std::vector<RhiVertexAttributeType> attrs;
+  RhiBuffer buffer[rhi_max_num_frames_in_flight];
 };
 
-inline VkShaderStageFlags RpBufStageFlags(const RpBuf& buf) {
-  if (buf.stage_flags)
+inline RhiShaderStage RpBufStageFlags(const RpBuf& buf) {
+  if (Any(buf.stage_flags))
     return buf.stage_flags;
   else
-    return VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+    return RhiShaderStage::Vertex | RhiShaderStage::Fragment;
 }
 
 struct Rp {
-  std::string_view name;
+  std::string debug_name;
+  RhiGraphicsPipeline pipeline;
+  RhiBindGroupLayout bind_group_layout;
+  RhiBindGroup bind_group[rhi_max_num_frames_in_flight];
 
-  VkPipeline pipeline;
-  VkPipelineLayout layout;
-  std::vector<VkDescriptorSet> desc_sets;
-  std::vector<VkPipelineShaderStageCreateInfo> shader_stages;
+  RhiShader vertex_shader;
+  RhiShader fragment_shader;
 
   bool disable_culling;
   RpBuf static_uniform;
@@ -55,7 +44,7 @@ struct Rp {
 };
 
 struct RpMesh {
-  VkDeviceSize offset;
+  uint32_t offset;
   uint32_t vert_count;
 };
 
@@ -67,8 +56,5 @@ void RpPushConst(Rp& rp, CharView data);
 void RpStaticUniformCopy(Rp& rp, CharView data);
 RpMesh RpVertCopy(Rp& rp, uint32_t vert_count, CharView vert_data);
 void RpDraw(Rp& rp, RpMesh mesh, CharView dynamic_uniform_data);
-
-VkFormat RpVertAttrVkFormat(RpVertAttr attr);
-uint32_t RpVertAttrSize(RpVertAttr attr);
 
 }  // namespace nyla

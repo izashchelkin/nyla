@@ -3,36 +3,38 @@ load("@rules_cc//cc:cc_library.bzl", "cc_library")
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
-    name = "vulkan",
+    name = "rhi",
     srcs = glob([
-        "*.cc",
+        "**/*.cc",
     ]),
     hdrs = glob([
-        "*.h",
+        "**/*.h",
     ]),
     linkopts = [
         "-lvulkan",
     ],
     deps = [
         "//nyla/commons",
+        "//nyla/platform",
         "//third_party/vulkansdk",
     ],
 )
 
 cc_library(
-    name = "vulkan_nvkdbg",
+    name = "rhi_ndbg",
     srcs = glob([
-        "*.cc",
+        "**/*.cc",
     ]),
     hdrs = glob([
-        "*.h",
+        "**/*.h",
     ]),
-    local_defines = ["NYLA_VULKAN_NDEBUG"],
+    local_defines = ["NDEBUG"],
     linkopts = [
         "-lvulkan",
     ],
     deps = [
         "//nyla/commons",
+        "//nyla/platform",
         "//third_party/vulkansdk",
     ],
 )

@@ -14,7 +14,9 @@ void PlatformMapInputBegin();
 void PlatformMapInput(AbstractInputMapping mapping, KeyPhysical key);
 void PlatformMapInputEnd();
 
-using PlatformWindow = uint32_t;
+struct PlatformWindow {
+  uint32_t handle;
+};
 PlatformWindow PlatformCreateWindow();
 
 struct PlatformWindowSize {

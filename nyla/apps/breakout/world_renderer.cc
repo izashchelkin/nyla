@@ -4,7 +4,7 @@
 #include "nyla/commons/math/vec/vec2f.h"
 #include "nyla/commons/memory/charview.h"
 #include "nyla/fwk/render_pipeline.h"
-#include "nyla/vulkan/vulkan.h"
+#include "nyla/rhi/rhi.h"
 
 namespace nyla {
 
@@ -31,8 +31,8 @@ void WorldSetUp() {
 
   const float base = kMetersOnScreen;
 
-  const float width = static_cast<float>(vk.surface_extent.width);
-  const float height = static_cast<float>(vk.surface_extent.height);
+  const float width = static_cast<float>(RhiGetSurfaceWidth());
+  const float height = static_cast<float>(RhiGetSurfaceHeight());
   const float aspect = width / height;
 
   world_h = base;
@@ -56,11 +56,11 @@ void WorldRender(Vec2f pos, Vec3f color, float width, float height, const RpMesh
 }
 
 Rp world_pipeline{
-    .name = "World",
+    .debug_name = "World",
     .dynamic_uniform =
         {
             .enabled = true,
-            .size = 1 << 20,
+            .size = 60000,
             .range = sizeof(DynamicUbo),
         },
     .vert_buf =
@@ -69,7 +69,7 @@ Rp world_pipeline{
             .size = 1 << 22,
             .attrs =
                 {
-                    RpVertAttr::Float4,
+                    RhiVertexAttributeType::Float4,
                 },
         },
     .Init =

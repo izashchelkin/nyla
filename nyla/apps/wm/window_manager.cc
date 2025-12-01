@@ -581,7 +581,14 @@ void ToggleZoom() {
 
 void ToggleFollow() {
   WindowStack& stack = GetActiveStack();
-  Client& client = wm_clients.at(stack.active_window);
+
+  auto it = wm_clients.find(stack.active_window);
+  if (it == wm_clients.end()) {
+    return;
+  }
+
+  Client& client = it->second;
+
   if (!stack.active_window || client.transient_for) {
     wm_follow = false;
     return;
