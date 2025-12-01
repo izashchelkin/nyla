@@ -1,11 +1,17 @@
 #pragma once
 
+#include <cstdint>
+
 #include "absl/log/check.h"
 #include "nyla/rhi/rhi.h"
 #include "vulkan/vk_enum_string_helper.h"
 #include "vulkan/vulkan_core.h"
 
-#define VK_CHECK(res) CHECK_EQ(res, VK_SUCCESS) << "Vulkan error: " << string_VkResult(res);
+#define VK_CHECK(res)                                                                                            \
+  CHECK_EQ(res, VK_SUCCESS) << "Vulkan error: " << string_VkResult(res) << "; Last checkpoint "                  \
+                            << (res == VK_ERROR_DEVICE_LOST ? __RhiGetLastCheckpointData(RhiQueueType::Graphics) \
+                                                            : 999999);
+
 #define VK_GET_INSTANCE_PROC_ADDR(name) reinterpret_cast<PFN_##name>(vkGetInstanceProcAddr(vk.instance, #name))
 
 namespace nyla {

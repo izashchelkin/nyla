@@ -4,6 +4,7 @@
 
 #include <cstdint>
 
+#include "absl/log/log.h"
 #include "absl/strings/str_format.h"
 #include "nyla/commons/debug/debugger.h"
 #include "nyla/commons/memory/align.h"
@@ -209,20 +210,29 @@ void RpPushConst(Rp& rp, CharView data) {
   CHECK_LE(data.size(), rhi_max_push_constant_size);
 
   RhiCmdList cmd = RhiFrameGetCmdList();
-  if (false) RhiCmdPushGraphicsConstants(cmd, 0, RhiShaderStage::Vertex | RhiShaderStage::Fragment, data);
+  RhiCmdPushGraphicsConstants(cmd, 0, RhiShaderStage::Vertex | RhiShaderStage::Fragment, data);
+
+  __RhiCmdSetCheckpoint(cmd, 2000);
 }
 
 void RpDraw(Rp& rp, RpMesh mesh, CharView dynamic_uniform_data) {
   RhiCmdList cmd = RhiFrameGetCmdList();
   uint32_t frame_index = RhiFrameGetIndex();
 
-  if (false && rp.vert_buf.enabled) {
+  uint64_t checkpoint = __RhiCmdSetCheckpoint(cmd, [] {
+    static uint64_t i = 0;
+    return 5000 + (++i);
+  }());
+
+  LOG(INFO) << "checkpoint: " << checkpoint << " ";
+
+  if (rp.vert_buf.enabled) {
     RhiBuffer buffers[]{rp.vert_buf.buffer[frame_index]};
     uint32_t offsets[]{mesh.offset};
     RhiCmdBindVertexBuffers(cmd, 0, buffers, offsets);
   }
 
-  if (false && rp.dynamic_uniform.enabled || rp.static_uniform.enabled) {
+  if (rp.dynamic_uniform.enabled || rp.static_uniform.enabled) {
     uint32_t offset_count = 0;
     uint32_t offset = 0;
 

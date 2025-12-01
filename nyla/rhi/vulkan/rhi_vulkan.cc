@@ -16,12 +16,6 @@
 #include "vulkan/vulkan_xcb.h"
 // clang-format on
 
-#if defined(NDEBUG)
-constexpr inline bool enableValidations = false;
-#else
-constexpr inline bool enableValidations = true;
-#endif
-
 namespace nyla {
 
 using namespace rhi_internal;
@@ -108,26 +102,30 @@ void RhiInit(const RhiDesc& rhi_desc) {
 
   VkDebugUtilsMessengerCreateInfoEXT* debug_messenger_create_info = nullptr;
 
-  if constexpr (enableValidations) {
+  if constexpr (rhi_validations) {
     instance_extensions.emplace_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-    instance_extensions.emplace_back(VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME);
 
-    std::span<VkValidationFeatureEnableEXT> enabled_validations = Tmake(std::array<VkValidationFeatureEnableEXT, 4>{
-        VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT,
-        VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_RESERVE_BINDING_SLOT_EXT,
-        VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT,
-        VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT,
-    });
+    VkValidationFeaturesEXT* validation_features = nullptr;
+    if constexpr (false) {
+      instance_extensions.emplace_back(VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME);
 
-    auto& validation_features = Tmake(VkValidationFeaturesEXT{
-        .sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT,
-        .enabledValidationFeatureCount = static_cast<uint32_t>(std::size(enabled_validations)),
-        .pEnabledValidationFeatures = enabled_validations.data(),
-    });
+      std::span<VkValidationFeatureEnableEXT> enabled_validations = Tmake(std::array{
+          VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT,
+          VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_RESERVE_BINDING_SLOT_EXT,
+          VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT,
+          VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT,
+      });
+
+      validation_features = &Tmake(VkValidationFeaturesEXT{
+          .sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT,
+          .enabledValidationFeatureCount = static_cast<uint32_t>(std::size(enabled_validations)),
+          .pEnabledValidationFeatures = enabled_validations.data(),
+      });
+    }
 
     debug_messenger_create_info = &Tmake(VkDebugUtilsMessengerCreateInfoEXT{
         .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
-        .pNext = &validation_features,
+        .pNext = validation_features,
         .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
                            VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
                            VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
@@ -151,7 +149,7 @@ void RhiInit(const RhiDesc& rhi_desc) {
   VK_CHECK(vkCreateInstance(&instance_create_info, nullptr, &vk.instance));
 
   VkDebugUtilsMessengerEXT debug_messenger{};
-  if constexpr (enableValidations) {
+  if constexpr (rhi_validations) {
     VK_CHECK(VK_GET_INSTANCE_PROC_ADDR(vkCreateDebugUtilsMessengerEXT)(vk.instance, debug_messenger_create_info,
                                                                        nullptr, &debug_messenger));
   }
@@ -165,19 +163,35 @@ void RhiInit(const RhiDesc& rhi_desc) {
   std::vector<const char*> device_extensions;
   device_extensions.emplace_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 
+  if constexpr (rhi_validations) {
+    device_extensions.emplace_back(VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_EXTENSION_NAME);
+  }
+
   for (VkPhysicalDevice phys_dev : phys_devs) {
     uint32_t extension_count = 0;
     vkEnumerateDeviceExtensionProperties(phys_dev, nullptr, &extension_count, nullptr);
     std::vector<VkExtensionProperties> extensions(extension_count);
     vkEnumerateDeviceExtensionProperties(phys_dev, nullptr, &extension_count, extensions.data());
 
+    if constexpr (rhi_validations) {
+      LOG(INFO) << "===";
+      for (uint32_t i = 0; i < extension_count; ++i) {
+        if (std::string_view{extensions[i].extensionName}.starts_with("VK_NV_")) {
+          LOG(INFO) << extensions[i].extensionName;
+        }
+      }
+      LOG(INFO) << "===";
+    }
+
     uint32_t missing_extensions = device_extensions.size();
-    for (uint32_t i = 0; i < extension_count; ++i) {
-      for (uint32_t j = 0; j < device_extensions.size(); ++j) {
+    for (uint32_t j = 0; j < device_extensions.size(); ++j) {
+      for (uint32_t i = 0; i < extension_count; ++i) {
         if (strcmp(extensions[i].extensionName, device_extensions[j]) == 0) {
           --missing_extensions;
+          break;
+        } else {
+          // LOG(INFO) << extensions[i].extensionName << " " << device_extensions[j];
         }
-        break;
       }
     }
     if (missing_extensions) {
@@ -282,9 +296,13 @@ void RhiInit(const RhiDesc& rhi_desc) {
       .scalarBlockLayout = VK_TRUE,
       .timelineSemaphore = VK_TRUE,
   };
+  VkPhysicalDeviceVulkan11Features v1_1{
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
+      .pNext = &v1_2,
+  };
   VkPhysicalDeviceFeatures2 features{
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-      .pNext = &v1_2,
+      .pNext = &v1_1,
   };
 
   const VkDeviceCreateInfo device_create_info{

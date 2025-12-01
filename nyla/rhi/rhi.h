@@ -15,6 +15,12 @@ constexpr inline uint32_t rhi_max_push_constant_size = 256;
 constexpr inline uint32_t rhi_max_num_frames_in_flight = 3;
 constexpr inline uint32_t rhi_max_bind_group_layouts = 4;
 
+#if defined(NDEBUG)
+constexpr inline bool rhi_validations = false;
+#else
+constexpr inline bool rhi_validations = true;
+#endif
+
 //
 
 struct RhiShader : RhiHandle {};
@@ -184,5 +190,8 @@ void RhiCmdBindGraphicsBindGroup(RhiCmdList, uint32_t set_index, RhiBindGroup bi
 void RhiCmdPushGraphicsConstants(RhiCmdList cmd, uint32_t offset, RhiShaderStage stage, CharView data);
 void RhiCmdDraw(RhiCmdList cmd, uint32_t vertex_count, uint32_t instance_count, uint32_t first_vertex,
                 uint32_t first_instance);
+
+uint64_t __RhiCmdSetCheckpoint(RhiCmdList cmd, uint64_t data);
+uint64_t __RhiGetLastCheckpointData(RhiQueueType queue_type);
 
 }  // namespace nyla

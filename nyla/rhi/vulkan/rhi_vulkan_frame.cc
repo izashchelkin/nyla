@@ -28,8 +28,8 @@ RhiCmdList RhiFrameBegin() {
     }
   }
 
-  RhiCmdList cmdlist = vk.graphics_queue_cmd[vk.frame_index];
-  VkCommandBuffer cmdbuf = RhiHandleGetData(rhi_handles.cmd_lists, cmdlist).cmdbuf;
+  RhiCmdList cmd = vk.graphics_queue_cmd[vk.frame_index];
+  VkCommandBuffer cmdbuf = RhiHandleGetData(rhi_handles.cmd_lists, cmd).cmdbuf;
 
   VK_CHECK(vkResetCommandBuffer(cmdbuf, 0));
 
@@ -37,6 +37,8 @@ RhiCmdList RhiFrameBegin() {
       .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
   };
   VK_CHECK(vkBeginCommandBuffer(cmdbuf, &command_buffer_begin_info));
+
+  __RhiCmdSetCheckpoint(cmd, 1);
 
   const VkImageMemoryBarrier image_memory_barrier{
       .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -57,6 +59,8 @@ RhiCmdList RhiFrameBegin() {
   vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0,
                        nullptr, 0, nullptr, 1, &image_memory_barrier);
 
+  __RhiCmdSetCheckpoint(cmd, 2);
+
   const VkRenderingAttachmentInfo color_attachment_info{
       .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
       .imageView = vk.swapchain_image_views[vk.swapchain_image_index],
@@ -76,6 +80,8 @@ RhiCmdList RhiFrameBegin() {
 
   vkCmdBeginRendering(cmdbuf, &rendering_info);
 
+  __RhiCmdSetCheckpoint(cmd, 3);
+
   const VkViewport viewport{
       .x = 0.f,
       .y = static_cast<float>(vk.surface_extent.height),
@@ -86,19 +92,25 @@ RhiCmdList RhiFrameBegin() {
   };
   vkCmdSetViewport(cmdbuf, 0, 1, &viewport);
 
+  __RhiCmdSetCheckpoint(cmd, 4);
+
   const VkRect2D scissor{
       .offset = {0, 0},
       .extent = vk.surface_extent,
   };
   vkCmdSetScissor(cmdbuf, 0, 1, &scissor);
 
-  return cmdlist;
+  __RhiCmdSetCheckpoint(cmd, 5);
+
+  return cmd;
 }
 
 void RhiFrameEnd() {
-  RhiCmdList cmdlist = vk.graphics_queue_cmd[vk.frame_index];
-  VkCommandBuffer cmdbuf = RhiHandleGetData(rhi_handles.cmd_lists, cmdlist).cmdbuf;
+  RhiCmdList cmd = vk.graphics_queue_cmd[vk.frame_index];
+  VkCommandBuffer cmdbuf = RhiHandleGetData(rhi_handles.cmd_lists, cmd).cmdbuf;
   vkCmdEndRendering(cmdbuf);
+
+  __RhiCmdSetCheckpoint(cmd, 6);
 
   const VkImageMemoryBarrier image_memory_barrier{
       .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -119,25 +131,9 @@ void RhiFrameEnd() {
   vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0,
                        0, nullptr, 0, nullptr, 1, &image_memory_barrier);
 
+  __RhiCmdSetCheckpoint(cmd, 7);
+
   VK_CHECK(vkEndCommandBuffer(cmdbuf));
-
-  if constexpr (false) {
-    const VkCommandBufferAllocateInfo alloc_info{
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-        .commandPool = vk.graphics_queue.cmd_pool,
-        .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-        .commandBufferCount = 1,
-    };
-    vkAllocateCommandBuffers(vk.dev, &alloc_info, &cmdbuf);
-
-    vkResetCommandBuffer(cmdbuf, 0);
-
-    VkCommandBufferBeginInfo begin_info{
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-    };
-    VK_CHECK(vkBeginCommandBuffer(cmdbuf, &begin_info));
-    VK_CHECK(vkEndCommandBuffer(cmdbuf));
-  }
 
   const VkPipelineStageFlags wait_stages[] = {
       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
