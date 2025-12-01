@@ -8,7 +8,7 @@ using namespace rhi_internal;
 using namespace rhi_vulkan_internal;
 
 RhiCmdList RhiFrameBegin() {
-  // WaitTimeline(vk.graphics_queue.timeline, vk.graphics_queue_cmd_done[vk.frame_index]);
+  WaitTimeline(vk.graphics_queue.timeline, vk.graphics_queue_cmd_done[vk.frame_index]);
 
   VkResult acquire_result =
       vkAcquireNextImageKHR(vk.dev, vk.swapchain, std::numeric_limits<uint64_t>::max(),
@@ -137,12 +137,6 @@ void RhiFrameEnd() {
   const VkSemaphore acquire_semaphore = vk.swapchain_acquire_semaphores[vk.frame_index];
   // const VkSemaphore render_finished_semaphore = vk.render_finished_semaphores[vk.frame_index];
 
-  VkFenceCreateInfo fence_create_info{
-      .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
-  };
-  VkFence fence;
-  vkCreateFence(vk.dev, &fence_create_info, nullptr, &fence);
-
   const VkSemaphore signal_semaphores[] = {
       // render_finished_semaphore,
       vk.graphics_queue.timeline,
@@ -158,7 +152,7 @@ void RhiFrameEnd() {
       .signalSemaphoreCount = std::size(signal_semaphores),
       .pSignalSemaphores = signal_semaphores,
   };
-  VK_CHECK(vkQueueSubmit(vk.graphics_queue.queue, 1, &submit_info, fence));
+  VK_CHECK(vkQueueSubmit(vk.graphics_queue.queue, 1, &submit_info, VK_NULL_HANDLE));
 
   const VkTimelineSemaphoreSubmitInfo timeline_wait_info{
       .sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
@@ -191,8 +185,6 @@ void RhiFrameEnd() {
   }
 
   vk.frame_index = (vk.frame_index + 1) % vk.num_frames_in_flight;
-
-  VK_CHECK(vkWaitForFences(vk.dev, 1, &fence, 1, 1e9));
 }
 
 uint32_t RhiFrameGetIndex() {
