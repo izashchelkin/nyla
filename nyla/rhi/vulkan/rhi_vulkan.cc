@@ -70,6 +70,19 @@ VkBool32 DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_s
   return VK_FALSE;
 }
 
+void VulkanNameHandle(VkObjectType type, uint64_t handle, std::string_view name) {
+  auto name_copy = std::string{name};
+  const VkDebugUtilsObjectNameInfoEXT name_info{
+      .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+      .objectType = type,
+      .objectHandle = reinterpret_cast<uint64_t>(handle),
+      .pObjectName = name_copy.c_str(),
+  };
+
+  static PFN_vkSetDebugUtilsObjectNameEXT fn = VK_GET_INSTANCE_PROC_ADDR(vkSetDebugUtilsObjectNameEXT);
+  fn(vk.dev, &name_info);
+}
+
 }  // namespace rhi_vulkan_internal
 
 void RhiInit(const RhiDesc& rhi_desc) {
@@ -163,7 +176,7 @@ void RhiInit(const RhiDesc& rhi_desc) {
   std::vector<const char*> device_extensions;
   device_extensions.emplace_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 
-  if constexpr (rhi_validations) {
+  if constexpr (rhi_checkpoints) {
     device_extensions.emplace_back(VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_EXTENSION_NAME);
   }
 
@@ -172,16 +185,6 @@ void RhiInit(const RhiDesc& rhi_desc) {
     vkEnumerateDeviceExtensionProperties(phys_dev, nullptr, &extension_count, nullptr);
     std::vector<VkExtensionProperties> extensions(extension_count);
     vkEnumerateDeviceExtensionProperties(phys_dev, nullptr, &extension_count, extensions.data());
-
-    if constexpr (rhi_validations) {
-      LOG(INFO) << "===";
-      for (uint32_t i = 0; i < extension_count; ++i) {
-        if (std::string_view{extensions[i].extensionName}.starts_with("VK_NV_")) {
-          LOG(INFO) << extensions[i].extensionName;
-        }
-      }
-      LOG(INFO) << "===";
-    }
 
     uint32_t missing_extensions = device_extensions.size();
     for (uint32_t j = 0; j < device_extensions.size(); ++j) {
@@ -348,7 +351,6 @@ void RhiInit(const RhiDesc& rhi_desc) {
     };
 
     VK_CHECK(vkCreateSemaphore(vk.dev, &semaphore_create_info, nullptr, vk.swapchain_acquire_semaphores + i));
-    VK_CHECK(vkCreateSemaphore(vk.dev, &semaphore_create_info, nullptr, vk.render_finished_semaphores + i));
   }
 
   const VkDescriptorPoolSize descriptor_pool_sizes[]{

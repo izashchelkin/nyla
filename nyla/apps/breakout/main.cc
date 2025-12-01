@@ -52,26 +52,9 @@ static int Main() {
       RpInit(dbg_text_pipeline);
     }
 
-    static uint64_t last = GetMonotonicTimeNanos();
-    const uint64_t now = GetMonotonicTimeNanos();
-    const uint64_t dtnanos = now - last;
-    last = now;
-
-    const float dt = dtnanos / 1e9;
-
-    static float dtnanosaccum = .0f;
-    dtnanosaccum += dtnanos;
-
-    static uint32_t fps_frames = 0;
-    ++fps_frames;
-
-    uint32_t fps = 0;
-    if (dtnanosaccum >= .5f * 1e9) {
-      fps = (1e9 / dtnanosaccum) * fps_frames;
-
-      fps_frames = 0;
-      dtnanosaccum = .0f;
-    }
+    static uint32_t fps;
+    float dt;
+    UpdateDtFps(fps, dt);
 
     RhiFrameBegin();
     BreakoutFrame(dt, fps);

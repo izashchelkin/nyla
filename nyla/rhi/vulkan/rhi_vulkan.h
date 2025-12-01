@@ -44,7 +44,6 @@ struct VulkanData {
   uint32_t swapchain_image_count;
   VkImageView swapchain_image_views[8];
   VkSemaphore swapchain_acquire_semaphores[rhi_max_num_frames_in_flight];
-  VkSemaphore render_finished_semaphores[rhi_max_num_frames_in_flight];
 
   DeviceQueue graphics_queue;
   RhiCmdList graphics_queue_cmd[rhi_max_num_frames_in_flight];
@@ -99,6 +98,8 @@ void CreateSwapchain();
 
 VkSemaphore CreateTimeline(uint64_t initial_value);
 void WaitTimeline(VkSemaphore timeline, uint64_t wait_value);
+
+void VulkanNameHandle(VkObjectType type, uint64_t handle, std::string_view name);
 
 VkFormat ConvertVulkanFormat(RhiFormat format);
 VkShaderStageFlags ConvertVulkanStageFlags(RhiShaderStage stage_flags);

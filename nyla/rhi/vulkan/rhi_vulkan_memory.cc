@@ -51,8 +51,6 @@ VkMemoryPropertyFlags ConvertVulkanMemoryUsage(RhiMemoryUsage usage) {
 }
 
 uint32_t FindMemoryTypeIndex(VkMemoryRequirements mem_requirements, VkMemoryPropertyFlags properties) {
-  using namespace rhi_vulkan_internal;
-
   // TODO: not all GPUs support HOST_COHERENT, HOST_CACHED
 
   static const VkPhysicalDeviceMemoryProperties mem_propertities = [] {
@@ -79,8 +77,6 @@ uint32_t FindMemoryTypeIndex(VkMemoryRequirements mem_requirements, VkMemoryProp
 }  // namespace
 
 RhiBuffer RhiCreateBuffer(const RhiBufferDesc& desc) {
-  using namespace rhi_vulkan_internal;
-
   VulkanBufferData buffer_data{};
 
   const VkBufferCreateInfo buffer_create_info{
@@ -107,9 +103,12 @@ RhiBuffer RhiCreateBuffer(const RhiBufferDesc& desc) {
   return RhiHandleAcquire(rhi_handles.buffers, buffer_data);
 }
 
-void RhiDestroyBuffer(RhiBuffer buffer) {
-  using namespace rhi_vulkan_internal;
+void RhiNameBuffer(RhiBuffer buf, std::string_view name) {
+  VulkanBufferData& buffer_data = RhiHandleGetData(rhi_handles.buffers, buf);
+  VulkanNameHandle(VK_OBJECT_TYPE_BUFFER, (uint64_t)buffer_data.buffer, name);
+}
 
+void RhiDestroyBuffer(RhiBuffer buffer) {
   VulkanBufferData buffer_data = RhiHandleRelease(rhi_handles.buffers, buffer);
 
   if (buffer_data.mapped) {
@@ -120,8 +119,6 @@ void RhiDestroyBuffer(RhiBuffer buffer) {
 }
 
 void* RhiMapBuffer(RhiBuffer buffer, bool idempotent) {
-  using namespace rhi_vulkan_internal;
-
   VulkanBufferData& buffer_data = RhiHandleGetData(rhi_handles.buffers, buffer);
   if (!buffer_data.mapped) {
     vkMapMemory(vk.dev, buffer_data.memory, 0, VK_WHOLE_SIZE, 0, (void**)&buffer_data.mapped);
@@ -133,8 +130,6 @@ void* RhiMapBuffer(RhiBuffer buffer, bool idempotent) {
 }
 
 void RhiUnmapBuffer(RhiBuffer buffer, bool idempotent) {
-  using namespace rhi_vulkan_internal;
-
   VulkanBufferData& buffer_data = RhiHandleGetData(rhi_handles.buffers, buffer);
   if (buffer_data.mapped) {
     vkUnmapMemory(vk.dev, buffer_data.memory);

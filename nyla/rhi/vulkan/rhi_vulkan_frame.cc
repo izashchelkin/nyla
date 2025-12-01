@@ -38,8 +38,6 @@ RhiCmdList RhiFrameBegin() {
   };
   VK_CHECK(vkBeginCommandBuffer(cmdbuf, &command_buffer_begin_info));
 
-  __RhiCmdSetCheckpoint(cmd, 1);
-
   const VkImageMemoryBarrier image_memory_barrier{
       .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
       .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
@@ -58,8 +56,6 @@ RhiCmdList RhiFrameBegin() {
 
   vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0,
                        nullptr, 0, nullptr, 1, &image_memory_barrier);
-
-  __RhiCmdSetCheckpoint(cmd, 2);
 
   const VkRenderingAttachmentInfo color_attachment_info{
       .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
@@ -80,8 +76,6 @@ RhiCmdList RhiFrameBegin() {
 
   vkCmdBeginRendering(cmdbuf, &rendering_info);
 
-  __RhiCmdSetCheckpoint(cmd, 3);
-
   const VkViewport viewport{
       .x = 0.f,
       .y = static_cast<float>(vk.surface_extent.height),
@@ -92,15 +86,11 @@ RhiCmdList RhiFrameBegin() {
   };
   vkCmdSetViewport(cmdbuf, 0, 1, &viewport);
 
-  __RhiCmdSetCheckpoint(cmd, 4);
-
   const VkRect2D scissor{
       .offset = {0, 0},
       .extent = vk.surface_extent,
   };
   vkCmdSetScissor(cmdbuf, 0, 1, &scissor);
-
-  __RhiCmdSetCheckpoint(cmd, 5);
 
   return cmd;
 }
@@ -109,8 +99,6 @@ void RhiFrameEnd() {
   RhiCmdList cmd = vk.graphics_queue_cmd[vk.frame_index];
   VkCommandBuffer cmdbuf = RhiHandleGetData(rhi_handles.cmd_lists, cmd).cmdbuf;
   vkCmdEndRendering(cmdbuf);
-
-  __RhiCmdSetCheckpoint(cmd, 6);
 
   const VkImageMemoryBarrier image_memory_barrier{
       .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -131,8 +119,6 @@ void RhiFrameEnd() {
   vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0,
                        0, nullptr, 0, nullptr, 1, &image_memory_barrier);
 
-  __RhiCmdSetCheckpoint(cmd, 7);
-
   VK_CHECK(vkEndCommandBuffer(cmdbuf));
 
   const VkPipelineStageFlags wait_stages[] = {
@@ -149,7 +135,7 @@ void RhiFrameEnd() {
   };
 
   const VkSemaphore acquire_semaphore = vk.swapchain_acquire_semaphores[vk.frame_index];
-  const VkSemaphore render_finished_semaphore = vk.render_finished_semaphores[vk.frame_index];
+  // const VkSemaphore render_finished_semaphore = vk.render_finished_semaphores[vk.frame_index];
 
   VkFenceCreateInfo fence_create_info{
       .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
@@ -158,12 +144,12 @@ void RhiFrameEnd() {
   vkCreateFence(vk.dev, &fence_create_info, nullptr, &fence);
 
   const VkSemaphore signal_semaphores[] = {
-      render_finished_semaphore,
-      // vk.graphics_queue.timeline,
+      // render_finished_semaphore,
+      vk.graphics_queue.timeline,
   };
   const VkSubmitInfo submit_info{
       .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-      // .pNext = &timeline_submit_info,
+      .pNext = &timeline_submit_info,
       .waitSemaphoreCount = 1,
       .pWaitSemaphores = &acquire_semaphore,
       .pWaitDstStageMask = wait_stages,
@@ -174,10 +160,16 @@ void RhiFrameEnd() {
   };
   VK_CHECK(vkQueueSubmit(vk.graphics_queue.queue, 1, &submit_info, fence));
 
+  const VkTimelineSemaphoreSubmitInfo timeline_wait_info{
+      .sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
+      .waitSemaphoreValueCount = 1,
+      .pWaitSemaphoreValues = &cmd_done,
+  };
   const VkPresentInfoKHR present_info{
       .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+      .pNext = &timeline_wait_info,
       .waitSemaphoreCount = 1,
-      .pWaitSemaphores = &render_finished_semaphore,
+      .pWaitSemaphores = &vk.graphics_queue.timeline,
       .swapchainCount = 1,
       .pSwapchains = &vk.swapchain,
       .pImageIndices = &vk.swapchain_image_index,

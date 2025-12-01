@@ -142,33 +142,35 @@ void RpInit(Rp& rp) {
   desc.bind_group_layouts_count = 1;
   desc.bind_group_layouts[0] = rp.bind_group_layout;
 
-  desc.vertex_bindings_count = rp.vert_buf.attrs.size();
+  desc.vertex_bindings_count = 1;
+  desc.vertex_bindings[0] = RhiVertexBindingDesc{
+      .binding = 0,
+      .stride = GetVertBindingStride(rp),
+      .input_rate = RhiInputRate::PerVertex,
+  };
+
   desc.vertex_attribute_count = rp.vert_buf.attrs.size();
 
-  {
-    uint32_t offset = 0;
-    for (uint32_t i = 0; i < rp.vert_buf.attrs.size(); ++i) {
-      auto attr = rp.vert_buf.attrs[i];
+  uint32_t offset = 0;
+  for (uint32_t i = 0; i < rp.vert_buf.attrs.size(); ++i) {
+    RhiVertexAttributeType attr = rp.vert_buf.attrs[i];
 
-      desc.vertex_bindings[i] = RhiVertexBindingDesc{
-          .binding = 0,
-          .stride = GetVertBindingStride(rp),
-          .input_rate = RhiInputRate::PerVertex,
-      };
+    RhiFormat format = GetVertAttrFormat(attr);
+    desc.vertex_attributes[i] = RhiVertexAttributeDesc{
+        .location = i,
+        .binding = 0,
+        .format = format,
+        .offset = offset,
+    };
 
-      RhiFormat format = GetVertAttrFormat(attr);
-      desc.vertex_attributes[i] = RhiVertexAttributeDesc{
-          .location = i,
-          .binding = 0,
-          .format = format,
-          .offset = offset,
-      };
-
-      offset += GetVertAttrSize(attr);
-    }
+    offset += GetVertAttrSize(attr);
   }
 
   rp.Init(rp);
+
+  desc.vert_shader = rp.vertex_shader;
+  desc.frag_shader = rp.fragment_shader;
+
   rp.pipeline = RhiCreateGraphicsPipeline(desc);
 }
 
@@ -211,24 +213,16 @@ void RpPushConst(Rp& rp, CharView data) {
 
   RhiCmdList cmd = RhiFrameGetCmdList();
   RhiCmdPushGraphicsConstants(cmd, 0, RhiShaderStage::Vertex | RhiShaderStage::Fragment, data);
-
-  __RhiCmdSetCheckpoint(cmd, 2000);
 }
 
 void RpDraw(Rp& rp, RpMesh mesh, CharView dynamic_uniform_data) {
   RhiCmdList cmd = RhiFrameGetCmdList();
   uint32_t frame_index = RhiFrameGetIndex();
 
-  uint64_t checkpoint = __RhiCmdSetCheckpoint(cmd, [] {
-    static uint64_t i = 0;
-    return 5000 + (++i);
-  }());
-
-  LOG(INFO) << "checkpoint: " << checkpoint << " ";
-
   if (rp.vert_buf.enabled) {
     RhiBuffer buffers[]{rp.vert_buf.buffer[frame_index]};
     uint32_t offsets[]{mesh.offset};
+
     RhiCmdBindVertexBuffers(cmd, 0, buffers, offsets);
   }
 

@@ -21,6 +21,8 @@ constexpr inline bool rhi_validations = false;
 constexpr inline bool rhi_validations = true;
 #endif
 
+constexpr inline bool rhi_checkpoints = false;
+
 //
 
 struct RhiShader : RhiHandle {};
@@ -152,12 +154,14 @@ struct RhiDesc {
 //
 
 RhiCmdList RhiCreateCmdList(RhiQueueType queue_type);
+void RhiNameCmdList(RhiCmdList, std::string_view name);
 void RhiDestroyCmdList(RhiCmdList cmd);
 
 RhiShader RhiCreateShader(const RhiShaderDesc&);
 void RhiDestroyShader(RhiShader);
 
 RhiBuffer RhiCreateBuffer(const RhiBufferDesc&);
+void RhiNameBuffer(RhiBuffer, std::string_view name);
 void RhiDestroyBuffer(RhiBuffer);
 
 void* RhiMapBuffer(RhiBuffer, bool idempotent = true);
@@ -170,6 +174,7 @@ RhiBindGroup RhiCreateBindGroup(const RhiBindGroupDesc&);
 void RhiDestroyBindGroup(RhiBindGroup);
 
 RhiGraphicsPipeline RhiCreateGraphicsPipeline(const RhiGraphicsPipelineDesc&);
+void RhiNameGraphicsPipeline(RhiGraphicsPipeline, std::string_view name);
 void RhiDestroyGraphicsPipeline(RhiGraphicsPipeline);
 
 void RhiInit(const RhiDesc&);

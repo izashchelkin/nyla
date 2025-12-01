@@ -4,8 +4,6 @@
 #include <vector>
 
 #include "nyla/apps/shipgame/world_renderer.h"
-#include "nyla/commons/containers/map.h"
-#include "nyla/commons/containers/set.h"
 #include "nyla/commons/math/vec/vec2f.h"
 #include "nyla/commons/math/vec/vec3f.h"
 #include "nyla/platform/abstract_input.h"
@@ -42,7 +40,6 @@ extern GameObject game_solar_system;
 extern GameObject game_ship;
 
 void ShipgameInit();
-void ShipgameProcess();
-void ShipgameRender();
+void ShipgameFrame(float dt, uint32_t fps);
 
 }  // namespace nyla

@@ -44,6 +44,11 @@ RhiCmdList RhiCreateCmdList(RhiQueueType queue_type) {
   return cmd;
 }
 
+void RhiNameCmdList(RhiCmdList cmd, std::string_view name) {
+  VulkanCmdListData cmd_data = RhiHandleGetData(rhi_handles.cmd_lists, cmd);
+  VulkanNameHandle(VK_OBJECT_TYPE_COMMAND_BUFFER, (uint64_t)cmd_data.cmdbuf, name);
+}
+
 void RhiDestroyCmdList(RhiCmdList cmd) {
   VulkanCmdListData cmd_data = RhiHandleRelease(rhi_handles.cmd_lists, cmd);
   VkCommandPool cmd_pool = GetDeviceQueue(cmd_data.queue_type).cmd_pool;
@@ -51,8 +56,8 @@ void RhiDestroyCmdList(RhiCmdList cmd) {
 }
 
 uint64_t __RhiCmdSetCheckpoint(RhiCmdList cmd, uint64_t data) {
-  if constexpr (!rhi_validations) {
-    return 0;
+  if constexpr (!rhi_checkpoints) {
+    return data;
   }
 
   VulkanCmdListData cmd_data = RhiHandleGetData(rhi_handles.cmd_lists, cmd);
@@ -64,7 +69,7 @@ uint64_t __RhiCmdSetCheckpoint(RhiCmdList cmd, uint64_t data) {
 }
 
 uint64_t __RhiGetLastCheckpointData(RhiQueueType queue_type) {
-  if constexpr (!rhi_validations) {
+  if constexpr (!rhi_checkpoints) {
     return -1;
   }
 

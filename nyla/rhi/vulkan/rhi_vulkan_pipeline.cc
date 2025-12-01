@@ -1,3 +1,5 @@
+#include <unistd.h>
+
 #include <cstdint>
 
 #include "nyla/rhi/rhi.h"
@@ -176,22 +178,19 @@ RhiGraphicsPipeline RhiCreateGraphicsPipeline(const RhiGraphicsPipelineDesc& des
   VkPipelineShaderStageCreateInfo stages[2];
   uint32_t stage_count = 0;
 
-  if (RhiHandleIsSet(desc.vert_shader)) {
-    stages[stage_count++] = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-        .stage = VK_SHADER_STAGE_VERTEX_BIT,
-        .module = RhiHandleGetData(rhi_handles.shaders, desc.vert_shader),
-        .pName = "main",
-    };
-  }
-  if (RhiHandleIsSet(desc.frag_shader)) {
-    stages[stage_count++] = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-        .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-        .module = RhiHandleGetData(rhi_handles.shaders, desc.frag_shader),
-        .pName = "main",
-    };
-  }
+  stages[stage_count++] = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+      .stage = VK_SHADER_STAGE_VERTEX_BIT,
+      .module = RhiHandleGetData(rhi_handles.shaders, desc.vert_shader),
+      .pName = "main",
+  };
+
+  stages[stage_count++] = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+      .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+      .module = RhiHandleGetData(rhi_handles.shaders, desc.frag_shader),
+      .pName = "main",
+  };
 
   CHECK_LE(desc.bind_group_layouts_count, std::size(desc.bind_group_layouts));
   pipeline_data.bind_group_layout_count = desc.bind_group_layouts_count;
@@ -244,6 +243,11 @@ RhiGraphicsPipeline RhiCreateGraphicsPipeline(const RhiGraphicsPipelineDesc& des
   return RhiHandleAcquire(rhi_handles.graphics_pipelines, pipeline_data);
 }
 
+void RhiNameGraphicsPipeline(RhiGraphicsPipeline pipeline, std::string_view name) {
+  const VulkanPipelineData& pipeline_data = RhiHandleGetData(rhi_handles.graphics_pipelines, pipeline);
+  VulkanNameHandle(VK_OBJECT_TYPE_PIPELINE, (uint64_t)pipeline_data.pipeline, name);
+}
+
 void RhiDestroyGraphicsPipeline(RhiGraphicsPipeline pipeline) {
   auto pipeline_data = RhiHandleRelease(rhi_handles.graphics_pipelines, pipeline);
   vkDeviceWaitIdle(vk.dev);
@@ -276,7 +280,7 @@ void RhiCmdPushGraphicsConstants(RhiCmdList cmd, uint32_t offset, RhiShaderStage
 void RhiCmdBindVertexBuffers(RhiCmdList cmd, uint32_t first_binding, std::span<const RhiBuffer> buffers,
                              std::span<const uint32_t> offsets) {
   CHECK_EQ(buffers.size(), offsets.size());
-  CHECK_LE(buffers.size(), 4);
+  CHECK_LE(buffers.size(), 4U);
 
   VkBuffer vk_bufs[4]{};
   VkDeviceSize vk_offsets[4];

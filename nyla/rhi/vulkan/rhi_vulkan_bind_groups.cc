@@ -1,5 +1,6 @@
 #include <cstdint>
 
+#include "nyla/commons/memory/temp.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_handle_pool.h"
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
@@ -79,11 +80,11 @@ RhiBindGroup RhiCreateBindGroup(const RhiBindGroupDesc& desc) {
       case RhiBindingType::UniformBufferDynamic: {
         const VulkanBufferData& buffer_data = RhiHandleGetData(rhi_handles.buffers, entry.buffer.buffer);
 
-        const VkDescriptorBufferInfo buffer_info{
+        auto buffer_info = &Tmake(VkDescriptorBufferInfo{
             .buffer = buffer_data.buffer,
             .offset = entry.buffer.offset,
             .range = entry.buffer.size,
-        };
+        });
 
         writes[i] = {
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -92,7 +93,7 @@ RhiBindGroup RhiCreateBindGroup(const RhiBindGroupDesc& desc) {
             .dstArrayElement = entry.array_index,
             .descriptorCount = 1,
             .descriptorType = ConvertVulkanBindingType(entry.type),
-            .pBufferInfo = &buffer_info,
+            .pBufferInfo = buffer_info,
         };
         break;
       }

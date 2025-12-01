@@ -6,14 +6,12 @@
 #include <cstring>
 
 #include "nyla/apps/shipgame/world_renderer.h"
-#include "nyla/commons/containers/set.h"
 #include "nyla/commons/math/lerp.h"
 #include "nyla/commons/math/math.h"
 #include "nyla/commons/math/vec/vec2f.h"
 #include "nyla/commons/os/clock.h"
 #include "nyla/fwk/dbg_text_renderer.h"
 #include "nyla/platform/abstract_input.h"
-#include "nyla/vulkan/vulkan.h"
 
 namespace nyla {
 
@@ -88,20 +86,6 @@ static void RenderGameObject(GameObject& obj) {
   }
 }
 
-void ShipgameRender() {
-  RpBegin(world_pipeline);
-  WorldSetUp(game_camera_pos, game_camera_zoom);
-
-  RenderGameObject(game_solar_system);
-  RenderGameObject(game_ship);
-
-  RpBegin(grid_pipeline);
-  GridRender();
-
-  RpBegin(dbg_text_pipeline);
-  DbgText(500, 10, "fps= " + std::to_string(GetFps()));
-}
-
 void ShipgameInit() {
   {
     game_solar_system = {
@@ -161,12 +145,12 @@ void ShipgameInit() {
   }
 }
 
-void ShipgameProcess() {
+void ShipgameFrame(float dt, uint32_t fps) {
   const int dx = Pressed(kRight) - Pressed(kLeft);
   const int dy = Pressed(kDown) - Pressed(kUp);
 
   static float dt_accumulator = 0.f;
-  dt_accumulator += vk.current_frame_data.dt;
+  dt_accumulator += dt;
 
   constexpr float step = 1.f / 120.f;
   for (; dt_accumulator >= step; dt_accumulator -= step) {
@@ -317,6 +301,18 @@ void ShipgameProcess() {
 
     game_camera_zoom = std::clamp(game_camera_zoom, .1f, 2.5f);
   }
+
+  RpBegin(world_pipeline);
+  WorldSetUp(game_camera_pos, game_camera_zoom);
+
+  RenderGameObject(game_solar_system);
+  RenderGameObject(game_ship);
+
+  RpBegin(grid_pipeline);
+  GridRender();
+
+  RpBegin(dbg_text_pipeline);
+  DbgText(500, 10, "fps= " + std::to_string(fps));
 }
 
 }  // namespace nyla

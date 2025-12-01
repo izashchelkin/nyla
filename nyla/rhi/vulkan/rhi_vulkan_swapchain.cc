@@ -1,3 +1,5 @@
+#include <cstdint>
+
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
 
 namespace nyla {
@@ -109,9 +111,10 @@ void CreateSwapchain() {
   }
 
   if (old_swapchain) {
-    for (const VkImageView image_view : old_image_views) {
-      vkDestroyImageView(vk.dev, image_view, nullptr);
+    for (uint32_t i = 0; i < old_images_views_count; ++i) {
+      vkDestroyImageView(vk.dev, old_image_views[i], nullptr);
     }
+
     vkDestroySwapchainKHR(vk.dev, old_swapchain, nullptr);
   }
 }

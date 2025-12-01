@@ -1,12 +1,10 @@
 #include "nyla/apps/shipgame/world_renderer.h"
 
-#include <utility>
-
 #include "nyla/commons/math/mat4.h"
 #include "nyla/commons/math/vec/vec2f.h"
 #include "nyla/commons/memory/charview.h"
 #include "nyla/fwk/render_pipeline.h"
-#include "nyla/vulkan/vulkan.h"
+#include "nyla/rhi/rhi.h"
 
 namespace nyla {
 
@@ -31,8 +29,8 @@ void WorldSetUp(Vec2f camera_pos, float zoom) {
 
   const float base = kMetersOnScreen * zoom;
 
-  const float width = static_cast<float>(vk.surface_extent.width);
-  const float height = static_cast<float>(vk.surface_extent.height);
+  const float width = static_cast<float>(RhiGetSurfaceWidth());
+  const float height = static_cast<float>(RhiGetSurfaceHeight());
   const float aspect = width / height;
   if (aspect >= 1.0f) {
     world_h = base;
@@ -63,7 +61,7 @@ void WorldRender(Vec2f pos, float angle_radians, float scalar, std::span<Vertex>
 }
 
 Rp world_pipeline{
-    .name = "World",
+    .debug_name = "World",
     .static_uniform =
         {
             .enabled = true,
@@ -73,7 +71,7 @@ Rp world_pipeline{
     .dynamic_uniform =
         {
             .enabled = true,
-            .size = 1 << 15,
+            .size = 60000,
             .range = sizeof(DynamicUbo),
         },
     .vert_buf =
@@ -82,8 +80,8 @@ Rp world_pipeline{
             .size = 1 << 22,
             .attrs =
                 {
-                    RpVertAttr::Float4,
-                    RpVertAttr::Float4,
+                    RhiVertexAttributeType::Float4,
+                    RhiVertexAttributeType::Float4,
                 },
         },
     .Init =
@@ -98,7 +96,7 @@ void GridRender() {
 }
 
 Rp grid_pipeline{
-    .name = "WorldGrid",
+    .debug_name = "WorldGrid",
     .static_uniform =
         {
             .enabled = true,
