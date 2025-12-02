@@ -6,6 +6,7 @@
 
 #include "nyla/commons/memory/charview.h"
 #include "nyla/rhi/rhi.h"
+#include "nyla/rhi/rhi_pipeline.h"
 
 namespace nyla {
 
@@ -15,7 +16,7 @@ struct RpBuf {
   uint32_t size;
   uint32_t range;
   uint32_t written;
-  std::vector<RhiVertexAttributeType> attrs;
+  std::vector<RhiVertexFormat> attrs;
   RhiBuffer buffer[rhi_max_num_frames_in_flight];
 };
 

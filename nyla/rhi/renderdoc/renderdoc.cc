@@ -1,4 +1,4 @@
-#include "nyla/rhi/renderdoc.h"
+#include "nyla/rhi/renderdoc/renderdoc.h"
 
 #if !defined(NDEBUG)
 
@@ -6,7 +6,7 @@
 
 #include "absl/log/log.h"
 #include "nyla/commons/debug/debugger.h"
-#include "nyla/rhi/renderdoc_app.h"
+#include "nyla/rhi/renderdoc/renderdoc_app.h"
 
 namespace nyla {
 

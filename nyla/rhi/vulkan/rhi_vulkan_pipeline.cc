@@ -2,8 +2,7 @@
 
 #include <cstdint>
 
-#include "nyla/rhi/rhi.h"
-#include "nyla/rhi/rhi_handle_pool.h"
+#include "nyla/rhi/rhi_handle.h"
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
 
 namespace nyla {
@@ -94,7 +93,7 @@ RhiGraphicsPipeline RhiCreateGraphicsPipeline(const RhiGraphicsPipelineDesc& des
     vertex_attributes[i] = VkVertexInputAttributeDescription{
         .location = attribute.location,
         .binding = attribute.binding,
-        .format = ConvertVulkanFormat(attribute.format),
+        .format = ConvertVulkanVertexFormat(attribute.format),
         .offset = attribute.offset,
     };
   }

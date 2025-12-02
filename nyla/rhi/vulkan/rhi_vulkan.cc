@@ -9,6 +9,7 @@
 #include "nyla/commons/debug/debugger.h"
 #include "nyla/commons/memory/temp.h"
 #include "nyla/rhi/rhi.h"
+#include "nyla/rhi/rhi_pipeline.h"
 #include "vulkan/vulkan_core.h"
 
 // clang-format off
@@ -26,16 +27,10 @@ namespace rhi_vulkan_internal {
 VulkanData vk;
 RhiHandles rhi_handles;
 
-VkFormat ConvertVulkanFormat(RhiFormat format) {
+VkFormat ConvertVulkanVertexFormat(RhiVertexFormat format) {
   switch (format) {
-    case RhiFormat::Float4:
+    case RhiVertexFormat::R32G32B32A32_Float:
       return VK_FORMAT_R32G32B32A32_SFLOAT;
-    case RhiFormat::Half2:
-      return VK_FORMAT_R16G16_SFLOAT;
-    case RhiFormat::SNorm8x4:
-      return VK_FORMAT_R8G8B8A8_SNORM;
-    case RhiFormat::UNorm8x4:
-      return VK_FORMAT_R8G8B8A8_UNORM;
   }
   CHECK(false);
   return static_cast<VkFormat>(0);

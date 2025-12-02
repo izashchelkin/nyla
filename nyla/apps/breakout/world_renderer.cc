@@ -5,6 +5,7 @@
 #include "nyla/commons/memory/charview.h"
 #include "nyla/fwk/render_pipeline.h"
 #include "nyla/rhi/rhi.h"
+#include "nyla/rhi/rhi_pipeline.h"
 
 namespace nyla {
 
@@ -69,7 +70,7 @@ Rp world_pipeline{
             .size = 1 << 22,
             .attrs =
                 {
-                    RhiVertexAttributeType::Float4,
+                    RhiVertexFormat::R32G32B32A32_Float,
                 },
         },
     .Init =

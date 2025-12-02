@@ -1,7 +1,7 @@
 #include <cstdint>
 
 #include "nyla/rhi/rhi.h"
-#include "nyla/rhi/rhi_handle_pool.h"
+#include "nyla/rhi/rhi_handle.h"
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
 
 namespace nyla {

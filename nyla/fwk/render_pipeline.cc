@@ -4,55 +4,24 @@
 
 #include <cstdint>
 
-#include "absl/log/log.h"
 #include "absl/strings/str_format.h"
-#include "nyla/commons/debug/debugger.h"
 #include "nyla/commons/memory/align.h"
 #include "nyla/commons/memory/charview.h"
-#include "nyla/commons/memory/temp.h"
 #include "nyla/commons/os/readfile.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
-#include "nyla/rhi/rhi_handle_pool.h"
+#include "nyla/rhi/rhi_cmdlist.h"
+#include "nyla/rhi/rhi_handle.h"
+#include "nyla/rhi/rhi_pipeline.h"
 
 namespace nyla {
 
 namespace {
 
-uint32_t GetVertAttrSize(RhiVertexAttributeType attr) {
-  switch (attr) {
-    case RhiVertexAttributeType::Float4:
-      return 16;
-    case RhiVertexAttributeType::Half2:
-      return 4;
-    case RhiVertexAttributeType::SNorm8x4:
-      return 4;
-    case RhiVertexAttributeType::UNorm8x4:
-      return 4;
-  }
-  CHECK(false);
-  return 0;
-}
-
-RhiFormat GetVertAttrFormat(RhiVertexAttributeType attr) {
-  switch (attr) {
-    case RhiVertexAttributeType::Float4:
-      return RhiFormat::Float4;
-    case RhiVertexAttributeType::Half2:
-      return RhiFormat::Half2;
-    case RhiVertexAttributeType::SNorm8x4:
-      return RhiFormat::SNorm8x4;
-    case RhiVertexAttributeType::UNorm8x4:
-      return RhiFormat::UNorm8x4;
-  }
-  CHECK(false);
-  return static_cast<RhiFormat>(0);
-}
-
 uint32_t GetVertBindingStride(Rp& rp) {
   uint32_t ret = 0;
   for (auto attr : rp.vert_buf.attrs) {
-    ret += GetVertAttrSize(attr);
+    ret += RhiGetVertexFormatSize(attr);
   }
   return ret;
 }
@@ -153,17 +122,16 @@ void RpInit(Rp& rp) {
 
   uint32_t offset = 0;
   for (uint32_t i = 0; i < rp.vert_buf.attrs.size(); ++i) {
-    RhiVertexAttributeType attr = rp.vert_buf.attrs[i];
+    RhiVertexFormat attr = rp.vert_buf.attrs[i];
 
-    RhiFormat format = GetVertAttrFormat(attr);
     desc.vertex_attributes[i] = RhiVertexAttributeDesc{
         .location = i,
         .binding = 0,
-        .format = format,
+        .format = attr,
         .offset = offset,
     };
 
-    offset += GetVertAttrSize(attr);
+    offset += RhiGetVertexFormatSize(attr);
   }
 
   rp.Init(rp);

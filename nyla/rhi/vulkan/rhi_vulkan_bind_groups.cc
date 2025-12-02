@@ -1,8 +1,7 @@
 #include <cstdint>
 
 #include "nyla/commons/memory/temp.h"
-#include "nyla/rhi/rhi.h"
-#include "nyla/rhi/rhi_handle_pool.h"
+#include "nyla/rhi/rhi_handle.h"
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
 #include "vulkan/vulkan_core.h"
 

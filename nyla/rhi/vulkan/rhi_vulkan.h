@@ -4,6 +4,8 @@
 
 #include "absl/log/check.h"
 #include "nyla/rhi/rhi.h"
+#include "nyla/rhi/rhi_cmdlist.h"
+#include "nyla/rhi/rhi_pipeline.h"
 #include "vulkan/vk_enum_string_helper.h"
 #include "vulkan/vulkan_core.h"
 
@@ -101,7 +103,7 @@ void WaitTimeline(VkSemaphore timeline, uint64_t wait_value);
 
 void VulkanNameHandle(VkObjectType type, uint64_t handle, std::string_view name);
 
-VkFormat ConvertVulkanFormat(RhiFormat format);
+VkFormat ConvertVulkanVertexFormat(RhiVertexFormat format);
 VkShaderStageFlags ConvertVulkanStageFlags(RhiShaderStage stage_flags);
 
 }  // namespace rhi_vulkan_internal
