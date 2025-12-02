@@ -6,6 +6,7 @@
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_pipeline.h"
+#include "nyla/rhi/rhi_texture.h"
 #include "vulkan/vk_enum_string_helper.h"
 #include "vulkan/vulkan_core.h"
 
@@ -30,6 +31,8 @@ struct DeviceQueue {
 };
 
 struct VulkanData {
+  VkAllocationCallbacks* alloc;
+
   VkInstance instance;
   VkDevice dev;
   VkPhysicalDevice phys_dev;
@@ -82,6 +85,14 @@ struct VulkanPipelineData {
   uint32_t bind_group_layout_count;
 };
 
+struct VulkanTextureData {
+  VkImage image;
+  VkImageView image_view;
+  VkDeviceMemory memory;
+  VkFormat format;
+  VkMemoryPropertyFlags memory_property_flags;
+};
+
 struct RhiHandles {
   rhi_internal::RhiHandlePool<RhiBindGroupLayout, VkDescriptorSetLayout, 16> bind_group_layouts;
   rhi_internal::RhiHandlePool<RhiBindGroup, VkDescriptorSet, 16> bind_groups;
@@ -89,6 +100,7 @@ struct RhiHandles {
   rhi_internal::RhiHandlePool<RhiCmdList, VulkanCmdListData, 16> cmd_lists;
   rhi_internal::RhiHandlePool<RhiShader, VkShaderModule, 16> shaders;
   rhi_internal::RhiHandlePool<RhiGraphicsPipeline, VulkanPipelineData, 16> graphics_pipelines;
+  rhi_internal::RhiHandlePool<RhiTexture, VulkanTextureData, 16> textures;
 };
 extern RhiHandles rhi_handles;
 
@@ -101,10 +113,20 @@ void CreateSwapchain();
 VkSemaphore CreateTimeline(uint64_t initial_value);
 void WaitTimeline(VkSemaphore timeline, uint64_t wait_value);
 
+uint32_t FindMemoryTypeIndex(VkMemoryRequirements mem_requirements, VkMemoryPropertyFlags properties);
+
 void VulkanNameHandle(VkObjectType type, uint64_t handle, std::string_view name);
 
-VkFormat ConvertVulkanVertexFormat(RhiVertexFormat format);
-VkShaderStageFlags ConvertVulkanStageFlags(RhiShaderStage stage_flags);
+VkBufferUsageFlags ConvertRhiBufferUsageIntoVkBufferUsageFlags(RhiBufferUsage usage);
+
+VkMemoryPropertyFlags ConvertRhiMemoryUsageIntoVkMemoryPropertyFlags(RhiMemoryUsage usage);
+
+VkFormat ConvertRhiVertexFormatIntoVkFormat(RhiVertexFormat format);
+
+VkFormat ConvertRhiTextureFormatIntoVkFormat(RhiTextureFormat format);
+RhiTextureFormat ConvertVkFormatIntoRhiTextureFormat(VkFormat format);
+
+VkShaderStageFlags ConvertRhiShaderStageIntoVkShaderStageFlags(RhiShaderStage stage_flags);
 
 }  // namespace rhi_vulkan_internal
 

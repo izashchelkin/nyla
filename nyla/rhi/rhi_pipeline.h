@@ -15,6 +15,8 @@ constexpr inline uint32_t rhi_max_push_constant_size = 256;
 struct RhiGraphicsPipeline : RhiHandle {};
 
 enum class RhiVertexFormat {
+  None,
+
   // R32_Float,
   // R32G32_Float,
   // R32G32B32_Float,

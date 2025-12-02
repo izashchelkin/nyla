@@ -27,8 +27,11 @@ namespace rhi_vulkan_internal {
 VulkanData vk;
 RhiHandles rhi_handles;
 
-VkFormat ConvertVulkanVertexFormat(RhiVertexFormat format) {
+VkFormat ConvertRhiVertexFormatIntoVkFormat(RhiVertexFormat format) {
   switch (format) {
+    case RhiVertexFormat::None:
+      break;
+
     case RhiVertexFormat::R32G32B32A32_Float:
       return VK_FORMAT_R32G32B32A32_SFLOAT;
   }
@@ -36,7 +39,7 @@ VkFormat ConvertVulkanVertexFormat(RhiVertexFormat format) {
   return static_cast<VkFormat>(0);
 }
 
-VkShaderStageFlags ConvertVulkanStageFlags(RhiShaderStage stage_flags) {
+VkShaderStageFlags ConvertRhiShaderStageIntoVkShaderStageFlags(RhiShaderStage stage_flags) {
   VkShaderStageFlags ret = 0;
   if (Any(stage_flags & RhiShaderStage::Vertex)) {
     ret |= VK_SHADER_STAGE_VERTEX_BIT;

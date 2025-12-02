@@ -93,7 +93,7 @@ RhiGraphicsPipeline RhiCreateGraphicsPipeline(const RhiGraphicsPipelineDesc& des
     vertex_attributes[i] = VkVertexInputAttributeDescription{
         .location = attribute.location,
         .binding = attribute.binding,
-        .format = ConvertVulkanVertexFormat(attribute.format),
+        .format = ConvertRhiVertexFormatIntoVkFormat(attribute.format),
         .offset = attribute.offset,
     };
   }
@@ -272,8 +272,8 @@ void RhiCmdPushGraphicsConstants(RhiCmdList cmd, uint32_t offset, RhiShaderStage
   const VulkanPipelineData& pipeline_data =
       RhiHandleGetData(rhi_handles.graphics_pipelines, cmd_data.bound_graphics_pipeline);
 
-  vkCmdPushConstants(cmd_data.cmdbuf, pipeline_data.layout, ConvertVulkanStageFlags(stage), offset, data.size(),
-                     data.data());
+  vkCmdPushConstants(cmd_data.cmdbuf, pipeline_data.layout, ConvertRhiShaderStageIntoVkShaderStageFlags(stage), offset,
+                     data.size(), data.data());
 }
 
 void RhiCmdBindVertexBuffers(RhiCmdList cmd, uint32_t first_binding, std::span<const RhiBuffer> buffers,

@@ -9,9 +9,9 @@ namespace nyla {
 using namespace rhi_internal;
 using namespace rhi_vulkan_internal;
 
-namespace {
+namespace rhi_vulkan_internal {
 
-VkBufferUsageFlags ConvertVulkanBufferUsage(RhiBufferUsage usage) {
+VkBufferUsageFlags ConvertRhiBufferUsageIntoVkBufferUsageFlags(RhiBufferUsage usage) {
   VkBufferUsageFlags ret = 0;
 
   if (Any(usage & RhiBufferUsage::Vertex)) {
@@ -33,7 +33,7 @@ VkBufferUsageFlags ConvertVulkanBufferUsage(RhiBufferUsage usage) {
   return ret;
 }
 
-VkMemoryPropertyFlags ConvertVulkanMemoryUsage(RhiMemoryUsage usage) {
+VkMemoryPropertyFlags ConvertRhiMemoryUsageIntoVkMemoryPropertyFlags(RhiMemoryUsage usage) {
   // TODO: not all GPUs support HOST_COHERENT, HOST_CACHED
 
   switch (usage) {
@@ -73,7 +73,7 @@ uint32_t FindMemoryTypeIndex(VkMemoryRequirements mem_requirements, VkMemoryProp
   CHECK(false);
 }
 
-}  // namespace
+}  // namespace rhi_vulkan_internal
 
 RhiBuffer RhiCreateBuffer(const RhiBufferDesc& desc) {
   VulkanBufferData buffer_data{};
@@ -81,7 +81,7 @@ RhiBuffer RhiCreateBuffer(const RhiBufferDesc& desc) {
   const VkBufferCreateInfo buffer_create_info{
       .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
       .size = desc.size,
-      .usage = ConvertVulkanBufferUsage(desc.buffer_usage),
+      .usage = ConvertRhiBufferUsageIntoVkBufferUsageFlags(desc.buffer_usage),
       .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
   };
   VK_CHECK(vkCreateBuffer(vk.dev, &buffer_create_info, nullptr, &buffer_data.buffer));
@@ -89,7 +89,7 @@ RhiBuffer RhiCreateBuffer(const RhiBufferDesc& desc) {
   VkMemoryRequirements mem_requirements;
   vkGetBufferMemoryRequirements(rhi_vulkan_internal::vk.dev, buffer_data.buffer, &mem_requirements);
 
-  const uint32_t memory_type_index = FindMemoryTypeIndex(mem_requirements, ConvertVulkanMemoryUsage(desc.memory_usage));
+  const uint32_t memory_type_index = FindMemoryTypeIndex(mem_requirements, ConvertRhiMemoryUsageIntoVkMemoryPropertyFlags(desc.memory_usage));
   const VkMemoryAllocateInfo memory_alloc_info{
       .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
       .allocationSize = mem_requirements.size,

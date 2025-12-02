@@ -18,6 +18,7 @@ void CreateSwapchain() {
   vk.surface_format = [] {
     uint32_t surface_format_count;
     VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(vk.phys_dev, vk.surface, &surface_format_count, nullptr));
+
     std::vector<VkSurfaceFormatKHR> surface_formats(surface_format_count);
     vkGetPhysicalDeviceSurfaceFormatsKHR(vk.phys_dev, vk.surface, &surface_format_count, surface_formats.data());
 
@@ -90,13 +91,6 @@ void CreateSwapchain() {
         .image = vk.swapchain_images[i],
         .viewType = VK_IMAGE_VIEW_TYPE_2D,
         .format = vk.surface_format.format,
-        .components =
-            {
-                .r = VK_COMPONENT_SWIZZLE_IDENTITY,
-                .g = VK_COMPONENT_SWIZZLE_IDENTITY,
-                .b = VK_COMPONENT_SWIZZLE_IDENTITY,
-                .a = VK_COMPONENT_SWIZZLE_IDENTITY,
-            },
         .subresourceRange =
             {
                 .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -117,6 +111,10 @@ void CreateSwapchain() {
 
     vkDestroySwapchainKHR(vk.dev, old_swapchain, nullptr);
   }
+}
+
+RhiTextureFormat RhiGetBackbufferFormat() {
+  return ConvertVkFormatIntoRhiTextureFormat(vk.surface_format.format);
 }
 
 }  // namespace rhi_vulkan_internal

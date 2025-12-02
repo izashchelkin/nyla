@@ -35,7 +35,7 @@ RhiBindGroupLayout RhiCreateBindGroupLayout(const RhiBindGroupLayoutDesc& desc) 
         .binding = binding.binding,
         .descriptorType = ConvertVulkanBindingType(binding.type),
         .descriptorCount = binding.array_size,
-        .stageFlags = ConvertVulkanStageFlags(binding.stage_flags),
+        .stageFlags = ConvertRhiShaderStageIntoVkShaderStageFlags(binding.stage_flags),
     };
   }
 
