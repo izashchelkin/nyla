@@ -2,11 +2,14 @@
 
 #include <string_view>
 
+#include "nyla/platform/key_physical.h"
 #include "xcb/xcb.h"
 #include "xcb/xproto.h"
 #include "xkbcommon/xkbcommon.h"
 
 namespace nyla {
+
+namespace platform_x11_internal {
 
 #define Nyla_X11_Atoms(X) \
   X(compound_text)        \
@@ -58,5 +61,9 @@ struct X11_KeyResolver {
 bool X11_InitializeKeyResolver(X11_KeyResolver& resolver);
 void X11_FreeKeyResolver(X11_KeyResolver& resolver);
 xcb_keycode_t X11_ResolveKeyCode(const X11_KeyResolver& resolver, std::string_view keyname);
+
+const char* ConvertKeyPhysicalIntoXkbName(KeyPhysical key);
+
+}  // namespace platform_x11_internal
 
 }  // namespace nyla

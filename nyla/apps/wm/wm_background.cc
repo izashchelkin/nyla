@@ -10,11 +10,13 @@
 #include "nyla/fwk/dbg_text_renderer.h"
 #include "nyla/fwk/gui.h"
 #include "nyla/fwk/staging.h"
+#include "nyla/platform/x11/platform_x11.h"
 #include "nyla/rhi/rhi.h"
-#include "nyla/x11/x11.h"
 #include "xcb/xproto.h"
 
 namespace nyla {
+
+using namespace platform_x11_internal;
 
 xcb_window_t background_window;
 
@@ -47,7 +49,7 @@ std::future<void> InitWMBackground() {
 
   return std::async(std::launch::async, [] {
     RhiInit(RhiDesc{
-        .window = background_window,
+        .window = PlatformWindow{background_window},
     });
   });
 }

@@ -9,10 +9,12 @@
 #include "nyla/commons/containers/map.h"
 #include "nyla/dbus/dbus.h"
 #include "nyla/debugfs/debugfs.h"
-#include "nyla/x11/x11.h"
+#include "nyla/platform/x11/platform_x11.h"
 #include "xcb/screensaver.h"
 
 namespace nyla {
+
+using namespace platform_x11_internal;
 
 static uint32_t next_inhibit_cookie = 1;
 static Map<uint32_t, std::string> inhibit_cookies;

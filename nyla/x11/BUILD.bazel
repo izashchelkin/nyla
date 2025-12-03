@@ -6,14 +6,6 @@ cc_library(
     name = "x11",
     srcs = glob(["*.cc"]),
     hdrs = glob(["*.h"]),
-    linkopts = [
-        "-lxcb",
-        "-lxcb-util",
-        "-lxcb-xkb",
-        "-lxkbcommon",
-        "-lxkbcommon-x11",
-        "-lxcb-xinput",
-    ],
     deps = [
         "//nyla/commons",
         "@abseil-cpp//absl/log",

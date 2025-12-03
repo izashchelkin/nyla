@@ -1,6 +1,8 @@
-#include "nyla/x11/wm_hints.h"
+#include "nyla/platform/x11/platform_x11_wm_hints.h"
 
 namespace nyla {
+
+namespace platform_x11_internal {
 
 void Initialize(WM_Hints& h) {
   if (!(h.flags & WM_Hints::kInputHint)) {
@@ -59,5 +61,7 @@ void Initialize(WM_Normal_Hints& h) {
     h.win_gravity = {};
   }
 }
+
+}  // namespace platform_x11_internal
 
 }  // namespace nyla

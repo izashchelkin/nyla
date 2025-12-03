@@ -7,7 +7,6 @@
 #include <iterator>
 #include <limits>
 #include <span>
-#include <variant>
 #include <vector>
 
 #include "absl/cleanup/cleanup.h"
@@ -20,16 +19,17 @@
 #include "nyla/apps/wm/screen_saver_inhibitor.h"
 #include "nyla/apps/wm/wm_background.h"
 #include "nyla/commons/containers/map.h"
-#include "nyla/commons/memory/optional.h"
 #include "nyla/debugfs/debugfs.h"
-#include "nyla/x11/error.h"
-#include "nyla/x11/wm_hints.h"
-#include "nyla/x11/x11.h"
+#include "nyla/platform/x11/platform_x11.h"
+#include "nyla/platform/x11/platform_x11_error.h"
+#include "nyla/platform/x11/platform_x11_wm_hints.h"
 #include "xcb/xcb.h"
 #include "xcb/xinput.h"
 #include "xcb/xproto.h"
 
 namespace nyla {
+
+using namespace platform_x11_internal;
 
 static std::string DumpClients();
 
@@ -80,7 +80,7 @@ static std::vector<xcb_window_t> wm_pending_clients;
 static Map<xcb_atom_t, void (*)(xcb_window_t, Client&, xcb_get_property_reply_t*)> wm_property_change_handlers;
 
 static std::vector<WindowStack> wm_stacks;
-static size_t wm_active_stack_idx;
+static uint64_t wm_active_stack_idx;
 
 static xcb_timestamp_t last_rawmotion_ts = 0;
 static xcb_window_t last_entered_window = 0;
@@ -88,8 +88,8 @@ static xcb_window_t last_entered_window = 0;
 //
 
 static WindowStack& GetActiveStack() {
-  CHECK_LT(wm_active_stack_idx, wm_stacks.size());
-  return wm_stacks.at(wm_active_stack_idx);
+  CHECK_LT(wm_active_stack_idx & 0xFF, wm_stacks.size());
+  return wm_stacks.at(wm_active_stack_idx & 0xFF);
 }
 
 static void Handle_WM_Hints(xcb_window_t client_window, Client& client, xcb_get_property_reply_t* reply) {
@@ -397,7 +397,7 @@ void UnmanageClient(xcb_window_t window) {
     if (stack.active_window == window) {
       stack.active_window = 0;
 
-      if (istack == wm_active_stack_idx) {
+      if (istack == (wm_active_stack_idx & 0xFF)) {
         xcb_window_t fallback_to = client.transient_for;
         if (!fallback_to && !stack.windows.empty()) {
           fallback_to = stack.windows.front();
@@ -461,7 +461,7 @@ static void ConfigureClientIfNeeded(xcb_connection_t* conn, xcb_window_t client_
 }
 
 static void MoveStack(xcb_timestamp_t time, auto compute_idx) {
-  size_t iold = wm_active_stack_idx;
+  size_t iold = wm_active_stack_idx & 0xFF;
   size_t inew = compute_idx(iold + wm_stacks.size()) % wm_stacks.size();
 
   if (iold == inew) return;
@@ -740,7 +740,7 @@ void ProcessWM() {
     }
 
     for (size_t istack = 0; istack < wm_stacks.size(); ++istack) {
-      if (istack != wm_active_stack_idx) {
+      if (istack != (wm_active_stack_idx & 0xFF)) {
         for (xcb_window_t client_window : wm_stacks[istack].windows)
           hide_all(client_window, wm_clients.at(client_window));
       }
@@ -898,7 +898,7 @@ void UpdateBackground() {
       std::erase_if(active_client_name, [](char ch) { return ch < 0x20 || ch > 0x7F; });
     }
   } else {
-    active_client_name = absl::StrFormat("nylawm %v", wm_active_stack_idx);
+    active_client_name = absl::StrFormat("nylawm %v", wm_active_stack_idx & 0xFF);
   }
 
   double load_avg[3];

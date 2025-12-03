@@ -5,7 +5,6 @@
 #include <chrono>
 #include <cstdint>
 #include <initializer_list>
-#include <variant>
 
 #include "absl/cleanup/cleanup.h"
 #include "absl/log/check.h"
@@ -21,12 +20,13 @@
 #include "nyla/dbus/dbus.h"
 #include "nyla/debugfs/debugfs.h"
 #include "nyla/platform/key_physical.h"
-#include "nyla/platform/platform_x11.h"
-#include "nyla/x11/x11.h"
+#include "nyla/platform/x11/platform_x11.h"
 #include "xcb/xcb.h"
 #include "xcb/xproto.h"
 
 namespace nyla {
+
+using namespace platform_x11_internal;
 
 int Main(int argc, char** argv) {
   LoggingInit();

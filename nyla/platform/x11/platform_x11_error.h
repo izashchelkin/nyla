@@ -4,7 +4,9 @@
 
 #include "absl/strings/str_format.h"
 
-namespace {
+namespace nyla {
+
+namespace platform_x11_internal {
 
 enum class X11ErrorCode : uint8_t {
   kSuccess = 0,           /* everything's okay */
@@ -97,4 +99,6 @@ void AbslStringify(Sink& sink, X11ErrorCode error_code) {
   absl::Format(&sink, "bad error code");
 }
 
-}  // namespace
+}  // namespace platform_x11_internal
+
+}  // namespace nyla
