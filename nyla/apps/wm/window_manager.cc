@@ -758,9 +758,7 @@ void ProcessWM() {
   }
 }
 
-void ProcessWMEvents(
-    const bool& is_running, uint16_t modifier,
-    std::vector<std::pair<xcb_keycode_t, std::variant<void (*)(xcb_timestamp_t timestamp), void (*)()>>> keybinds) {
+void ProcessWMEvents(const bool& is_running, uint16_t modifier, std::vector<Keybind> keybinds) {
   while (is_running) {
     xcb_generic_event_t* event = xcb_poll_for_event(x11.conn);
     if (!event) break;
@@ -779,8 +777,8 @@ void ProcessWMEvents(
       case XCB_KEY_PRESS: {
         auto keypress = reinterpret_cast<xcb_key_press_event_t*>(event);
         if (keypress->state == modifier) {
-          for (const auto& [keycode, fn] : keybinds) {
-            if (keycode == keypress->detail) {
+          for (const auto& [keycode, mod, fn] : keybinds) {
+            if (mod == keypress->state && keycode == keypress->detail) {
               if (std::holds_alternative<void (*)()>(fn)) {
                 std::get<void (*)()>(fn)();
               } else if (std::holds_alternative<void (*)(xcb_timestamp_t time)>(fn)) {

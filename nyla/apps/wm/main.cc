@@ -4,6 +4,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <initializer_list>
 #include <variant>
 
 #include "absl/cleanup/cleanup.h"
@@ -19,6 +20,8 @@
 #include "nyla/commons/signal/signal.h"
 #include "nyla/dbus/dbus.h"
 #include "nyla/debugfs/debugfs.h"
+#include "nyla/platform/key_physical.h"
+#include "nyla/platform/platform_x11.h"
 #include "nyla/x11/x11.h"
 #include "xcb/xcb.h"
 #include "xcb/xproto.h"
@@ -52,41 +55,42 @@ int Main(int argc, char** argv) {
   InitializeWM();
 
   uint16_t modifier = XCB_MOD_MASK_4;
-  std::vector<std::pair<xcb_keycode_t, std::variant<void (*)(xcb_timestamp_t timestamp), void (*)()>>> keybinds;
+  std::vector<Keybind> keybinds;
 
   {
     X11_KeyResolver key_resolver;
     X11_InitializeKeyResolver(key_resolver);
 
-    // W
-    keybinds.emplace_back(X11_ResolveKeyCode(key_resolver, "AD02"), NextLayout);
-    // E
-    keybinds.emplace_back(X11_ResolveKeyCode(key_resolver, "AD03"), MoveStackPrev);
-    // R
-    keybinds.emplace_back(X11_ResolveKeyCode(key_resolver, "AD04"), MoveStackNext);
-    // D
-    keybinds.emplace_back(X11_ResolveKeyCode(key_resolver, "AC03"), MoveLocalPrev);
-    // F
-    keybinds.emplace_back(X11_ResolveKeyCode(key_resolver, "AC04"), MoveLocalNext);
-    // G
-    keybinds.emplace_back(X11_ResolveKeyCode(key_resolver, "AC05"), ToggleZoom);
-    // X
-    keybinds.emplace_back(X11_ResolveKeyCode(key_resolver, "AB02"), CloseActive);
-    // V
-    keybinds.emplace_back(X11_ResolveKeyCode(key_resolver, "AB04"), ToggleFollow);
-    // T
-    keybinds.emplace_back(X11_ResolveKeyCode(key_resolver, "AD05"),
-                          [](xcb_timestamp_t time) { Spawn({{"ghostty", nullptr}}); });
-    // S
-    keybinds.emplace_back(X11_ResolveKeyCode(key_resolver, "AC02"),
-                          [](xcb_timestamp_t time) { Spawn({{"dmenu_run", nullptr}}); });
+    auto SpawnTerminal = [] { Spawn({{"ghostty", nullptr}}); };
+    auto SpawnLauncher = [] { Spawn({{"dmenu_run", nullptr}}); };
+    auto Nothing = [] {};
+
+    for (auto [key, mod, handler] : std::initializer_list<std::tuple<KeyPhysical, int, KeybindHandler>>{
+             {KeyPhysical::W, 0, NextLayout},
+             {KeyPhysical::E, 0, MoveStackPrev},
+             {KeyPhysical::R, 0, MoveStackNext},
+             {KeyPhysical::E, 1, Nothing},
+             {KeyPhysical::R, 1, Nothing},
+             {KeyPhysical::D, 0, MoveLocalPrev},
+             {KeyPhysical::F, 0, MoveLocalNext},
+             {KeyPhysical::D, 1, Nothing},
+             {KeyPhysical::F, 1, Nothing},
+             {KeyPhysical::G, 0, ToggleZoom},
+             {KeyPhysical::X, 0, CloseActive},
+             {KeyPhysical::V, 0, ToggleFollow},
+             {KeyPhysical::T, 0, SpawnTerminal},
+             {KeyPhysical::S, 0, SpawnLauncher},
+         }) {
+      const char* xkb_name = ConvertKeyPhysicalIntoXkbName(key);
+      xcb_keycode_t keycode = X11_ResolveKeyCode(key_resolver, xkb_name);
+
+      mod |= XCB_MOD_MASK_4;
+      keybinds.emplace_back(keycode, mod, handler);
+
+      xcb_grab_key(x11.conn, false, x11.screen->root, mod, keycode, XCB_GRAB_MODE_ASYNC, XCB_GRAB_MODE_ASYNC);
+    }
 
     X11_FreeKeyResolver(key_resolver);
-
-    for (const auto& [keycode, _] : keybinds) {
-      xcb_grab_key(x11.conn, false, x11.screen->root, XCB_MOD_MASK_4, keycode, XCB_GRAB_MODE_ASYNC,
-                   XCB_GRAB_MODE_ASYNC);
-    }
   }
 
   using namespace std::chrono_literals;

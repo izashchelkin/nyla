@@ -1,3 +1,5 @@
+#include "nyla/platform/platform_x11.h"
+
 #include <sys/inotify.h>
 #include <unistd.h>
 
@@ -16,8 +18,6 @@ namespace nyla {
 
 static bool should_exit = false;
 
-static const char* XkbNameFromKey(KeyPhysical key);
-
 void PlatformInit() {
   X11_Initialize();
 }
@@ -30,7 +30,7 @@ void PlatformMapInputBegin() {
 }
 
 void PlatformMapInput(AbstractInputMapping mapping, KeyPhysical key) {
-  const char* xkb_name = XkbNameFromKey(key);
+  const char* xkb_name = ConvertKeyPhysicalIntoXkbName(key);
   const uint32_t keycode = X11_ResolveKeyCode(key_resolver, xkb_name);
   AbstractInputMapId(mapping, {1, keycode});
 }
@@ -162,7 +162,7 @@ bool PlatformShouldExit() {
   return should_exit;
 }
 
-static const char* XkbNameFromKey(KeyPhysical key) {
+const char* ConvertKeyPhysicalIntoXkbName(KeyPhysical key) {
   using K = KeyPhysical;
 
   switch (key) {
