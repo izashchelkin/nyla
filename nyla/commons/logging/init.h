@@ -1,7 +1,8 @@
 #pragma once
 
-namespace nyla {
+namespace nyla
+{
 
 void LoggingInit();
 
-}  // namespace nyla
+} // namespace nyla

@@ -1,7 +1,10 @@
 #include "nyla/apps/asteroids/asteroids.h"
 
-namespace nyla {
+namespace nyla
+{
 
-void AsteroidsInit() {}
+void AsteroidsInit()
+{
+}
 
-}  // namespace nyla
+} // namespace nyla

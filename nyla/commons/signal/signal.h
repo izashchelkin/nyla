@@ -1,8 +1,9 @@
 #pragma once
 
-namespace nyla {
+namespace nyla
+{
 
 void SigIntCoreDump();
 void SigSegvExitZero();
 
-}  // namespace nyla
+} // namespace nyla

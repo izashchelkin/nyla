@@ -2,11 +2,18 @@
 
 #include "nyla/rhi/rhi_handle.h"
 
-namespace nyla {
+namespace nyla
+{
 
-enum class RhiQueueType { Graphics, Transfer };
+enum class RhiQueueType
+{
+    Graphics,
+    Transfer
+};
 
-struct RhiCmdList : RhiHandle {};
+struct RhiCmdList : RhiHandle
+{
+};
 
 RhiCmdList RhiCreateCmdList(RhiQueueType queue_type);
 void RhiNameCmdList(RhiCmdList, std::string_view name);
@@ -18,6 +25,6 @@ uint64_t __RhiGetLastCheckpointData(RhiQueueType queue_type);
 RhiCmdList RhiFrameBegin();
 void RhiFrameEnd();
 
-RhiCmdList RhiFrameGetCmdList();  // TODO: get rid of this
+RhiCmdList RhiFrameGetCmdList(); // TODO: get rid of this
 
-}  // namespace nyla
+} // namespace nyla

@@ -10,11 +10,12 @@
 
 #include "nyla/commons/math/vec/vecbaseinterface.h"
 
-namespace nyla {
+namespace nyla
+{
 
 nyla__Vec VecCross(nyla__VecSpanConst lhs, nyla__VecSpanConst rhs);
 
-}  // namespace nyla
+} // namespace nyla
 
 #undef nyla__kVecDimension
 #undef nyla__VecComponentType

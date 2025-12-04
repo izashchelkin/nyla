@@ -9,150 +9,182 @@
 #include "absl/log/check.h"
 #include "nyla/commons/memory/temp.h"
 
-namespace nyla {
+namespace nyla
+{
 
-Vec::operator VecSpanConst() const& {
-  return VecSpanConst{v, kVecDimension};
+Vec::operator VecSpanConst() const &
+{
+    return VecSpanConst{v, kVecDimension};
 }
-Vec::operator VecSpan() & {
-  return VecSpan{v, kVecDimension};
+Vec::operator VecSpan() &
+{
+    return VecSpan{v, kVecDimension};
 }
-Vec::operator VecSpanConst() const&& {
-  return Tmake(std::move(*this));
+Vec::operator VecSpanConst() const &&
+{
+    return Tmake(std::move(*this));
 };
-Vec::operator VecSpan() && {
-  return Tmake(std::move(*this));
+Vec::operator VecSpan() &&
+{
+    return Tmake(std::move(*this));
 };
 
-const VecComponentType& nyla__Vec::operator[](size_t i) const {
-  CHECK(i < kVecDimension);
-  return v[i];
+const VecComponentType &nyla__Vec::operator[](size_t i) const
+{
+    CHECK(i < kVecDimension);
+    return v[i];
 }
-VecComponentType& nyla__Vec::operator[](size_t i) {
-  CHECK(i < kVecDimension);
-  return v[i];
-}
-
-Vec NYLA__VEC(Neg)(VecSpanConst rhs) {
-  CHECK(rhs.size() >= kVecDimension);
-
-  return Vec{-rhs[0], -rhs[1]};
+VecComponentType &nyla__Vec::operator[](size_t i)
+{
+    CHECK(i < kVecDimension);
+    return v[i];
 }
 
-Vec NYLA__VEC(Sum)(VecSpanConst lhs, VecSpanConst rhs) {
-  CHECK(lhs.size() >= kVecDimension && rhs.size() >= kVecDimension);
+Vec NYLA__VEC(Neg)(VecSpanConst rhs)
+{
+    CHECK(rhs.size() >= kVecDimension);
 
-  Vec ret;
-  for (size_t i = 0; i < kVecDimension; ++i) {
-    ret[i] = lhs[i] + rhs[i];
-  }
-  return ret;
+    return Vec{-rhs[0], -rhs[1]};
 }
 
-void NYLA__VEC(Add)(VecSpan lhs, VecSpanConst rhs) {
-  CHECK(lhs.size() >= kVecDimension && rhs.size() >= kVecDimension);
+Vec NYLA__VEC(Sum)(VecSpanConst lhs, VecSpanConst rhs)
+{
+    CHECK(lhs.size() >= kVecDimension && rhs.size() >= kVecDimension);
 
-  for (size_t i = 0; i < kVecDimension; ++i) {
-    lhs[i] += rhs[i];
-  }
+    Vec ret;
+    for (size_t i = 0; i < kVecDimension; ++i)
+    {
+        ret[i] = lhs[i] + rhs[i];
+    }
+    return ret;
 }
 
-Vec NYLA__VEC(Dif)(VecSpanConst lhs, VecSpanConst rhs) {
-  CHECK(lhs.size() >= kVecDimension && rhs.size() >= kVecDimension);
+void NYLA__VEC(Add)(VecSpan lhs, VecSpanConst rhs)
+{
+    CHECK(lhs.size() >= kVecDimension && rhs.size() >= kVecDimension);
 
-  return Vec{lhs[0] - rhs[0], lhs[1] - rhs[1]};
+    for (size_t i = 0; i < kVecDimension; ++i)
+    {
+        lhs[i] += rhs[i];
+    }
 }
 
-void NYLA__VEC(Sub)(VecSpan lhs, VecSpanConst rhs) {
-  CHECK(lhs.size() >= kVecDimension && rhs.size() >= kVecDimension);
+Vec NYLA__VEC(Dif)(VecSpanConst lhs, VecSpanConst rhs)
+{
+    CHECK(lhs.size() >= kVecDimension && rhs.size() >= kVecDimension);
 
-  for (size_t i = 0; i < kVecDimension; ++i) {
-    lhs[i] -= rhs[i];
-  }
+    return Vec{lhs[0] - rhs[0], lhs[1] - rhs[1]};
 }
 
-Vec NYLA__VEC(Mul)(VecSpanConst lhs, VecComponentType scalar) {
-  CHECK(lhs.size() >= kVecDimension);
+void NYLA__VEC(Sub)(VecSpan lhs, VecSpanConst rhs)
+{
+    CHECK(lhs.size() >= kVecDimension && rhs.size() >= kVecDimension);
 
-  return Vec{lhs[0] * scalar, lhs[1] * scalar};
+    for (size_t i = 0; i < kVecDimension; ++i)
+    {
+        lhs[i] -= rhs[i];
+    }
 }
 
-void NYLA__VEC(Scale)(VecSpan lhs, VecComponentType scalar) {
-  CHECK(lhs.size() >= kVecDimension);
+Vec NYLA__VEC(Mul)(VecSpanConst lhs, VecComponentType scalar)
+{
+    CHECK(lhs.size() >= kVecDimension);
 
-  for (size_t i = 0; i < kVecDimension; ++i) {
-    lhs[i] *= scalar;
-  }
+    return Vec{lhs[0] * scalar, lhs[1] * scalar};
 }
 
-Vec NYLA__VEC(Div)(VecSpanConst lhs, VecComponentType scalar) {
-  CHECK(lhs.size() >= kVecDimension);
+void NYLA__VEC(Scale)(VecSpan lhs, VecComponentType scalar)
+{
+    CHECK(lhs.size() >= kVecDimension);
 
-  return Vec{lhs[0] / scalar, lhs[1] / scalar};
+    for (size_t i = 0; i < kVecDimension; ++i)
+    {
+        lhs[i] *= scalar;
+    }
 }
 
-void NYLA__VEC(ScaleDown)(VecSpan lhs, VecComponentType scalar) {
-  CHECK(lhs.size() >= kVecDimension);
+Vec NYLA__VEC(Div)(VecSpanConst lhs, VecComponentType scalar)
+{
+    CHECK(lhs.size() >= kVecDimension);
 
-  for (size_t i = 0; i < kVecDimension; ++i) {
-    lhs[i] /= scalar;
-  }
+    return Vec{lhs[0] / scalar, lhs[1] / scalar};
 }
 
-bool NYLA__VEC(Eq)(VecSpanConst lhs, VecSpanConst rhs) {
-  CHECK(lhs.size() >= kVecDimension && rhs.size() >= kVecDimension);
+void NYLA__VEC(ScaleDown)(VecSpan lhs, VecComponentType scalar)
+{
+    CHECK(lhs.size() >= kVecDimension);
 
-  for (size_t i = 0; i < kVecDimension; ++i) {
-    if (lhs[i] != rhs[i]) return false;
-  }
-  return true;
+    for (size_t i = 0; i < kVecDimension; ++i)
+    {
+        lhs[i] /= scalar;
+    }
 }
 
-VecComponentType NYLA__VEC(Len)(VecSpanConst rhs) {
-  VecComponentType ret{};
-  for (size_t i = 0; i < kVecDimension; ++i) {
-    ret += rhs[i] * rhs[i];
-  }
-  return std::sqrt(ret);
+bool NYLA__VEC(Eq)(VecSpanConst lhs, VecSpanConst rhs)
+{
+    CHECK(lhs.size() >= kVecDimension && rhs.size() >= kVecDimension);
+
+    for (size_t i = 0; i < kVecDimension; ++i)
+    {
+        if (lhs[i] != rhs[i])
+            return false;
+    }
+    return true;
 }
 
-Vec NYLA__VEC(Resized)(VecSpanConst rhs, VecComponentType len) {
-  return NYLA__VEC(Mul)(rhs, len / NYLA__VEC(Len)(rhs));
+VecComponentType NYLA__VEC(Len)(VecSpanConst rhs)
+{
+    VecComponentType ret{};
+    for (size_t i = 0; i < kVecDimension; ++i)
+    {
+        ret += rhs[i] * rhs[i];
+    }
+    return std::sqrt(ret);
 }
 
-Vec NYLA__VEC(Norm)(VecSpanConst rhs) {
-  return NYLA__VEC(Div)(rhs, NYLA__VEC(Len)(rhs));
+Vec NYLA__VEC(Resized)(VecSpanConst rhs, VecComponentType len)
+{
+    return NYLA__VEC(Mul)(rhs, len / NYLA__VEC(Len)(rhs));
 }
 
-VecComponentType NYLA__VEC(Dot)(VecSpanConst lhs, VecSpanConst rhs) {
-  CHECK(lhs.size() >= kVecDimension && rhs.size() >= kVecDimension);
-
-  VecComponentType ret{};
-  for (size_t i = 0; i < kVecDimension; ++i) {
-    ret += lhs[i] * rhs[i];
-  }
-  return ret;
+Vec NYLA__VEC(Norm)(VecSpanConst rhs)
+{
+    return NYLA__VEC(Div)(rhs, NYLA__VEC(Len)(rhs));
 }
 
-Vec NYLA__VEC(Apply)(VecSpanConst lhs, std::complex<VecComponentType> comp) {
-  CHECK(lhs.size() >= kVecDimension);
+VecComponentType NYLA__VEC(Dot)(VecSpanConst lhs, VecSpanConst rhs)
+{
+    CHECK(lhs.size() >= kVecDimension && rhs.size() >= kVecDimension);
 
-  Vec ret{};
-
-  {
-    auto res = std::complex<VecComponentType>{lhs[0], lhs[1]} * comp;
-    ret[0] = res.real();
-    ret[1] = res.imag();
-  }
-
-  for (size_t i = 2; i < kVecDimension; ++i) {
-    ret[i] = lhs[i];
-  }
-
-  return ret;
+    VecComponentType ret{};
+    for (size_t i = 0; i < kVecDimension; ++i)
+    {
+        ret += lhs[i] * rhs[i];
+    }
+    return ret;
 }
 
-}  // namespace nyla
+Vec NYLA__VEC(Apply)(VecSpanConst lhs, std::complex<VecComponentType> comp)
+{
+    CHECK(lhs.size() >= kVecDimension);
+
+    Vec ret{};
+
+    {
+        auto res = std::complex<VecComponentType>{lhs[0], lhs[1]} * comp;
+        ret[0] = res.real();
+        ret[1] = res.imag();
+    }
+
+    for (size_t i = 2; i < kVecDimension; ++i)
+    {
+        ret[i] = lhs[i];
+    }
+
+    return ret;
+}
+
+} // namespace nyla
 
 #undef NYLA__VEC
 #undef NYLA__XCAT

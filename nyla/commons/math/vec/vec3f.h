@@ -10,7 +10,8 @@
 
 #include "nyla/commons/math/vec/vecbaseinterface.h"
 
-namespace nyla {
+namespace nyla
+{
 
 #define NYLA__CAT(a, b) a##b
 #define NYLA__XCAT(a, b) NYLA__CAT(a, b)
@@ -22,7 +23,7 @@ nyla__Vec NYLA__VEC(Cross)(nyla__VecSpanConst lhs, nyla__VecSpanConst rhs);
 #undef NYLA__XCAT
 #undef NYLA__CAT
 
-}  // namespace nyla
+} // namespace nyla
 
 #undef nyla__kVecDimension
 #undef nyla__VecComponentType

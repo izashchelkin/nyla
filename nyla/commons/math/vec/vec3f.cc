@@ -7,7 +7,8 @@
 
 #define nyla__Vec Vec3f
 
-namespace {
+namespace
+{
 
 static inline constexpr size_t kVecDimension = 3;
 using VecComponentType = float;
@@ -15,22 +16,24 @@ using Vec = nyla::nyla__Vec;
 using VecSpan = std::span<VecComponentType>;
 using VecSpanConst = std::span<const VecComponentType>;
 
-}  // namespace
+} // namespace
 
 #include "nyla/commons/math/vec/vecbaseimpl.h"
 
-namespace nyla {
+namespace nyla
+{
 
-Vec Vec3fCross(const VecSpanConst lhs, const VecSpanConst rhs) {
-  CHECK(lhs.size() >= kVecDimension && rhs.size() >= kVecDimension);
+Vec Vec3fCross(const VecSpanConst lhs, const VecSpanConst rhs)
+{
+    CHECK(lhs.size() >= kVecDimension && rhs.size() >= kVecDimension);
 
-  return {
-      lhs[1] * rhs[2] - lhs[2] * rhs[1],
-      lhs[2] * rhs[0] - lhs[0] * rhs[2],
-      lhs[0] * rhs[1] - lhs[1] * rhs[0],
-  };
+    return {
+        lhs[1] * rhs[2] - lhs[2] * rhs[1],
+        lhs[2] * rhs[0] - lhs[0] * rhs[2],
+        lhs[0] * rhs[1] - lhs[1] * rhs[0],
+    };
 }
 
-}  // namespace nyla
+} // namespace nyla
 
 #undef nyla__Vec

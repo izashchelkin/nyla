@@ -5,18 +5,20 @@
 
 #include <complex>
 
-namespace nyla {
+namespace nyla
+{
 
-struct nyla__Vec {
-  nyla__VecComponentType v[nyla__kVecDimension];
+struct nyla__Vec
+{
+    nyla__VecComponentType v[nyla__kVecDimension];
 
-  operator nyla__VecSpanConst() const&;
-  operator nyla__VecSpan() &;
-  operator nyla__VecSpan() &&;
-  operator nyla__VecSpanConst() const&&;
+    operator nyla__VecSpanConst() const &;
+    operator nyla__VecSpan() &;
+    operator nyla__VecSpan() &&;
+    operator nyla__VecSpanConst() const &&;
 
-  const nyla__VecComponentType& operator[](size_t i) const;
-  nyla__VecComponentType& operator[](size_t i);
+    const nyla__VecComponentType &operator[](size_t i) const;
+    nyla__VecComponentType &operator[](size_t i);
 };
 
 nyla__Vec NYLA__VEC(Neg)(nyla__VecSpanConst rhs);
@@ -49,7 +51,7 @@ nyla__VecComponentType NYLA__VEC(Dot)(nyla__VecSpanConst lhs, nyla__VecSpanConst
 
 nyla__Vec NYLA__VEC(Apply)(nyla__VecSpanConst lhs, std::complex<nyla__VecComponentType> comp);
 
-}  // namespace nyla
+} // namespace nyla
 
 #undef NYLA__VEC
 #undef NYLA__XCAT

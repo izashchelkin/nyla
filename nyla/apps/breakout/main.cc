@@ -15,54 +15,60 @@
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
 
-namespace nyla {
+namespace nyla
+{
 
-static int Main() {
-  LoggingInit();
-  TArenaInit();
-  SigIntCoreDump();
+static int Main()
+{
+    LoggingInit();
+    TArenaInit();
+    SigIntCoreDump();
 
-  PlatformInit();
-  PlatformWindow window = PlatformCreateWindow();
+    PlatformInit();
+    PlatformWindow window = PlatformCreateWindow();
 
-  PlatformMapInputBegin();
-  PlatformMapInput(kLeft, KeyPhysical::S);
-  PlatformMapInput(kRight, KeyPhysical::F);
-  PlatformMapInput(kFire, KeyPhysical::J);
-  PlatformMapInput(kBoost, KeyPhysical::K);
-  PlatformMapInputEnd();
+    PlatformMapInputBegin();
+    PlatformMapInput(kLeft, KeyPhysical::S);
+    PlatformMapInput(kRight, KeyPhysical::F);
+    PlatformMapInput(kFire, KeyPhysical::J);
+    PlatformMapInput(kBoost, KeyPhysical::K);
+    PlatformMapInputEnd();
 
-  RhiInit(RhiDesc{
-      .window = window,
-  });
-  BreakoutInit();
+    RhiInit(RhiDesc{
+        .window = window,
+    });
+    BreakoutInit();
 
-  for (;;) {
-    PlatformProcessEvents();
-    if (PlatformShouldExit()) {
-      break;
+    for (;;)
+    {
+        PlatformProcessEvents();
+        if (PlatformShouldExit())
+        {
+            break;
+        }
+
+        if (RecompileShadersIfNeeded())
+        {
+            RpInit(world_pipeline);
+            RpInit(gui_pipeline);
+            RpInit(dbg_text_pipeline);
+        }
+
+        static uint32_t fps;
+        float dt;
+        UpdateDtFps(fps, dt);
+
+        RhiFrameBegin();
+        BreakoutFrame(dt, fps);
+        RhiFrameEnd();
     }
 
-    if (RecompileShadersIfNeeded()) {
-      RpInit(world_pipeline);
-      RpInit(gui_pipeline);
-      RpInit(dbg_text_pipeline);
-    }
-
-    static uint32_t fps;
-    float dt;
-    UpdateDtFps(fps, dt);
-
-    RhiFrameBegin();
-    BreakoutFrame(dt, fps);
-    RhiFrameEnd();
-  }
-
-  return 0;
+    return 0;
 }
 
-}  // namespace nyla
+} // namespace nyla
 
-int main() {
-  return nyla::Main();
+int main()
+{
+    return nyla::Main();
 }

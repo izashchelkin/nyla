@@ -6,7 +6,8 @@
 
 #include "xcb/xproto.h"
 
-namespace nyla {
+namespace nyla
+{
 
 extern bool wm_background_dirty;
 
@@ -16,7 +17,7 @@ using Keybind = std::tuple<xcb_keycode_t, int, KeybindHandler>;
 //
 
 void InitializeWM();
-void ProcessWMEvents(const bool& is_running, uint16_t modifier, std::vector<Keybind> keybinds);
+void ProcessWMEvents(const bool &is_running, uint16_t modifier, std::vector<Keybind> keybinds);
 
 void ProcessWM();
 void UpdateBackground();
@@ -36,4 +37,4 @@ void MoveStackPrev(xcb_timestamp_t time);
 
 void NextLayout();
 
-}  // namespace nyla
+} // namespace nyla

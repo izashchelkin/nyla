@@ -18,6 +18,8 @@ file(GLOB_RECURSE NYLA_ALL_CXX_FILES
     "${PROJECT_SOURCE_DIR}/nyla/*.hpp"
     "${PROJECT_SOURCE_DIR}/nyla/*.hh"
     "${PROJECT_SOURCE_DIR}/nyla/*.hxx"
+
+    "${PROJECT_SOURCE_DIR}/nyla/*.hlsl"
 )
 
 add_custom_target(format

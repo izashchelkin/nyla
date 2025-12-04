@@ -1,5 +1,4 @@
 ---
 Language: Cpp
-BasedOnStyle: Google
+BasedOnStyle: Microsoft
 ColumnLimit: 120
-AllowShortFunctionsOnASingleLine: Empty

@@ -2,8 +2,9 @@
 
 #include "nyla/apps/shipgame/shipgame.h"
 
-namespace nyla {
+namespace nyla
+{
 
-std::vector<Vertex> TriangulateLine(const Vec2f& A, const Vec2f& B, float thickness);
+std::vector<Vertex> TriangulateLine(const Vec2f &A, const Vec2f &B, float thickness);
 
-}  // namespace nyla
+} // namespace nyla

@@ -5,7 +5,8 @@
 
 #define nyla__Vec Vec4f
 
-namespace {
+namespace
+{
 
 static inline constexpr size_t kVecDimension = 4;
 using VecComponentType = float;
@@ -13,7 +14,7 @@ using Vec = nyla::nyla__Vec;
 using VecSpan = std::span<VecComponentType>;
 using VecSpanConst = std::span<const VecComponentType>;
 
-}  // namespace
+} // namespace
 
 #include "nyla/commons/math/vec/vecbaseimpl.h"
 

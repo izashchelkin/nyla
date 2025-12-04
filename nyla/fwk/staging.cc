@@ -2,61 +2,72 @@
 #include "nyla/commons/os/clock.h"
 #include "nyla/platform/platform.h"
 
-namespace nyla {
+namespace nyla
+{
 
-bool RecompileShadersIfNeeded() {
-  static bool spv_changed = true;
-  static bool src_changed = true;
+bool RecompileShadersIfNeeded()
+{
+    static bool spv_changed = true;
+    static bool src_changed = true;
 
-  for (auto& change : PlatformFsGetChanges()) {
-    if (change.seen) continue;
-    change.seen = true;
+    for (auto &change : PlatformFsGetChanges())
+    {
+        if (change.seen)
+            continue;
+        change.seen = true;
 
-    const auto& path = change.path;
-    if (path.ends_with(".spv")) {
-      spv_changed = true;
-    } else if (path.ends_with(".vert") || path.ends_with(".frag")) {
-      src_changed = true;
+        const auto &path = change.path;
+        if (path.ends_with(".spv"))
+        {
+            spv_changed = true;
+        }
+        else if (path.ends_with(".vert") || path.ends_with(".frag"))
+        {
+            src_changed = true;
+        }
     }
-  }
 
-  if (src_changed) {
-    LOG(INFO) << "shaders recompiling";
-    system("python3 /home/izashchelkin/nyla/scripts/shaders.py");
-    usleep(1e6);
-    PlatformProcessEvents();
+    if (src_changed)
+    {
+        LOG(INFO) << "shaders recompiling";
+        system("python3 /home/izashchelkin/nyla/scripts/shaders.py");
+        usleep(1e6);
+        PlatformProcessEvents();
 
-    src_changed = false;
-  }
+        src_changed = false;
+    }
 
-  if (src_changed || spv_changed) {
-    spv_changed = false;
-    return true;
-  }
+    if (src_changed || spv_changed)
+    {
+        spv_changed = false;
+        return true;
+    }
 
-  return false;
+    return false;
 }
 
-void UpdateDtFps(uint32_t& fps, float& dt) {
-  static uint64_t last = GetMonotonicTimeNanos();
-  const uint64_t now = GetMonotonicTimeNanos();
-  const uint64_t dtnanos = now - last;
-  last = now;
+void UpdateDtFps(uint32_t &fps, float &dt)
+{
+    static uint64_t last = GetMonotonicTimeNanos();
+    const uint64_t now = GetMonotonicTimeNanos();
+    const uint64_t dtnanos = now - last;
+    last = now;
 
-  dt = dtnanos / 1e9;
+    dt = dtnanos / 1e9;
 
-  static float dtnanosaccum = .0f;
-  dtnanosaccum += dtnanos;
+    static float dtnanosaccum = .0f;
+    dtnanosaccum += dtnanos;
 
-  static uint32_t fps_frames = 0;
-  ++fps_frames;
+    static uint32_t fps_frames = 0;
+    ++fps_frames;
 
-  if (dtnanosaccum >= .5f * 1e9) {
-    fps = (1e9 / dtnanosaccum) * fps_frames;
+    if (dtnanosaccum >= .5f * 1e9)
+    {
+        fps = (1e9 / dtnanosaccum) * fps_frames;
 
-    fps_frames = 0;
-    dtnanosaccum = .0f;
-  }
+        fps_frames = 0;
+        dtnanosaccum = .0f;
+    }
 }
 
-}  // namespace nyla
+} // namespace nyla

@@ -5,29 +5,33 @@
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
 
-namespace nyla {
+namespace nyla
+{
 
-static int Main() {
-  LoggingInit();
-  TArenaInit();
-  SigIntCoreDump();
+static int Main()
+{
+    LoggingInit();
+    TArenaInit();
+    SigIntCoreDump();
 
-  PlatformInit();
-  PlatformWindow window = PlatformCreateWindow();
+    PlatformInit();
+    PlatformWindow window = PlatformCreateWindow();
 
-  RhiInit({
-      .window = window,
-  });
-  AsteroidsInit();
+    RhiInit({
+        .window = window,
+    });
+    AsteroidsInit();
 
-  for (;;) {
-  }
+    for (;;)
+    {
+    }
 
-  return 0;
+    return 0;
 }
 
-}  // namespace nyla
+} // namespace nyla
 
-int main() {
-  return nyla::Main();
+int main()
+{
+    return nyla::Main();
 }

@@ -7,53 +7,62 @@
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_pipeline.h"
 
-namespace nyla {
+namespace nyla
+{
 
-namespace {
+namespace
+{
 
-struct PushConstData {
-  Mat4 view;
-  Mat4 proj;
+struct SceneTransforms
+{
+    Mat4 view;
+    Mat4 proj;
 };
 
-struct DynamicUbo {
-  Mat4 model;
-  Vec3f color;
-  float pad;
+struct DynamicUbo
+{
+    Mat4 model;
+    Vec3f color;
+    float pad;
 };
 
-}  // namespace
+} // namespace
 
 constexpr float kMetersOnScreen = 64.f;
 
-void WorldSetUp() {
-  float world_w;
-  float world_h;
+void WorldSetUp()
+{
+    float world_w;
+    float world_h;
 
-  const float base = kMetersOnScreen;
+    const float base = kMetersOnScreen;
 
-  const float width = static_cast<float>(RhiGetSurfaceWidth());
-  const float height = static_cast<float>(RhiGetSurfaceHeight());
-  const float aspect = width / height;
+    const float width = static_cast<float>(RhiGetSurfaceWidth());
+    const float height = static_cast<float>(RhiGetSurfaceHeight());
+    const float aspect = width / height;
 
-  world_h = base;
-  world_w = base * aspect;
+    world_h = base;
+    world_w = base * aspect;
 
-  const PushConstData push_const = {
-      .view = Identity4,
-      .proj = Ortho(-world_w * .5f, world_w * .5f, world_h * .5f, -world_h * .5f, 0.f, 1.f),
-  };
-  RpPushConst(world_pipeline, CharViewPtr(&push_const));
+    Mat4 view = Identity4;
+    Mat4 proj = Ortho(-world_w * .5f, world_w * .5f, world_h * .5f, -world_h * .5f, 0.f, 1.f);
+
+    Mat4 vp = Mult(view, proj);
+    Mat4 inv_vp = Inverse(vp);
+    SceneTransforms scene = {vp, inv_vp};
+
+    RpPushConst(world_pipeline, CharViewPtr(&scene));
 }
 
-void WorldRender(Vec2f pos, Vec3f color, float width, float height, const RpMesh& mesh) {
-  DynamicUbo dynamic_data{};
-  dynamic_data.color = color;
+void WorldRender(Vec2f pos, Vec3f color, float width, float height, const RpMesh &mesh)
+{
+    DynamicUbo dynamic_data{};
+    dynamic_data.color = color;
 
-  dynamic_data.model = Translate(pos);
-  dynamic_data.model = Mult(dynamic_data.model, ScaleXY(width, height));
+    dynamic_data.model = Translate(pos);
+    dynamic_data.model = Mult(dynamic_data.model, ScaleXY(width, height));
 
-  RpDraw(world_pipeline, mesh, CharViewPtr(&dynamic_data));
+    RpDraw(world_pipeline, mesh, CharViewPtr(&dynamic_data));
 }
 
 Rp world_pipeline{
@@ -74,10 +83,10 @@ Rp world_pipeline{
                 },
         },
     .Init =
-        [](Rp& rp) {
-          RpAttachVertShader(rp, "nyla/apps/breakout/shaders/build/world.vert.spv");
-          RpAttachFragShader(rp, "nyla/apps/breakout/shaders/build/world.frag.spv");
+        [](Rp &rp) {
+            RpAttachVertShader(rp, "nyla/apps/breakout/shaders/build/world.vert.spv");
+            RpAttachFragShader(rp, "nyla/apps/breakout/shaders/build/world.frag.spv");
         },
 };
 
-}  // namespace nyla
+} // namespace nyla

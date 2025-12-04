@@ -4,20 +4,24 @@
 
 #include "nyla/commons/containers/map.h"
 
-namespace nyla {
+namespace nyla
+{
 
-struct AbstractInputId {
-  uint32_t tag;
-  uint32_t code;
+struct AbstractInputId
+{
+    uint32_t tag;
+    uint32_t code;
 };
 
-struct AbstractInputMapping {
-  int val;
+struct AbstractInputMapping
+{
+    int val;
 
-  AbstractInputMapping() {
-    static int next = 0;
-    val = next++;
-  }
+    AbstractInputMapping()
+    {
+        static int next = 0;
+        val = next++;
+    }
 };
 
 void AbstractInputProcessFrame();
@@ -29,4 +33,4 @@ void AbstractInputMapId(AbstractInputMapping mapping, AbstractInputId id);
 bool Pressed(AbstractInputMapping mapping);
 uint32_t PressedFor(AbstractInputMapping mapping, uint64_t now);
 
-}  // namespace nyla
+} // namespace nyla

@@ -2,8 +2,9 @@
 
 #include <span>
 
-namespace nyla {
+namespace nyla
+{
 
-bool Spawn(std::span<const char* const> cmd);
+bool Spawn(std::span<const char *const> cmd);
 
 }

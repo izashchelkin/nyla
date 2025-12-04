@@ -4,15 +4,19 @@
 #include "nyla/commons/math/vec/vec3f.h"
 #include "nyla/fwk/render_pipeline.h"
 
-namespace nyla {
+namespace nyla
+{
 
-struct Vertex {
-  Vec2f pos;
-  float pad0[2] = {666.f, 666.f};
-  Vec3f color;
-  float pad1[1] = {777.f};
+struct Vertex
+{
+    Vec2f pos;
+    float pad0[2] = {666.f, 666.f};
+    Vec3f color;
+    float pad1[1] = {777.f};
 
-  Vertex(Vec2f pos, Vec3f color) : pos{pos}, color{color} {}
+    Vertex(Vec2f pos, Vec3f color) : pos{pos}, color{color}
+    {
+    }
 };
 
 extern Rp world_pipeline;
@@ -22,4 +26,4 @@ void WorldSetUp(Vec2f game_camera_pos, float game_camera_zoom);
 void WorldRender(Vec2f pos, float angle_radians, float scalar, std::span<Vertex> vertices);
 void GridRender();
 
-}  // namespace nyla
+} // namespace nyla

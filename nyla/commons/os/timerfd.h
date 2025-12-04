@@ -2,7 +2,8 @@
 
 #include <chrono>
 
-namespace nyla {
+namespace nyla
+{
 
 int MakeTimerFd(std::chrono::duration<double> interval);
 

@@ -1,9 +1,10 @@
 #pragma once
 
 #include <cstdint>
-namespace nyla {
+namespace nyla
+{
 
 bool RecompileShadersIfNeeded();
-void UpdateDtFps(uint32_t& fps, float& dt);
+void UpdateDtFps(uint32_t &fps, float &dt);
 
-}  // namespace nyla
+} // namespace nyla
