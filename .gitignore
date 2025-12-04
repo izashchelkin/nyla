@@ -1,3 +1,5 @@
 /bazel-*
 /.gdb_history
 *.spv
+
+/build

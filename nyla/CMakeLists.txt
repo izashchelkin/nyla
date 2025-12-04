@@ -1,0 +1,8 @@
+add_subdirectory(apps)
+add_subdirectory(commons)
+add_subdirectory(dbus)
+add_subdirectory(debugfs)
+add_subdirectory(fwk)
+add_subdirectory(platform)
+add_subdirectory(rhi)
+add_subdirectory(tools)
