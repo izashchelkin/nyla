@@ -89,7 +89,8 @@ RhiBuffer RhiCreateBuffer(const RhiBufferDesc& desc) {
   VkMemoryRequirements mem_requirements;
   vkGetBufferMemoryRequirements(rhi_vulkan_internal::vk.dev, buffer_data.buffer, &mem_requirements);
 
-  const uint32_t memory_type_index = FindMemoryTypeIndex(mem_requirements, ConvertRhiMemoryUsageIntoVkMemoryPropertyFlags(desc.memory_usage));
+  const uint32_t memory_type_index =
+      FindMemoryTypeIndex(mem_requirements, ConvertRhiMemoryUsageIntoVkMemoryPropertyFlags(desc.memory_usage));
   const VkMemoryAllocateInfo memory_alloc_info{
       .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
       .allocationSize = mem_requirements.size,

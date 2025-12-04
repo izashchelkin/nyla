@@ -30,8 +30,7 @@ int Main() {
   {
     std::array<uint8_t, 1 << 14> tmp{};
     ssize_t r;
-    while ((r = ::read(STDIN_FILENO, tmp.data(), tmp.size())) > 0)
-      buf.insert(buf.end(), tmp.begin(), tmp.begin() + r);
+    while ((r = ::read(STDIN_FILENO, tmp.data(), tmp.size())) > 0) buf.insert(buf.end(), tmp.begin(), tmp.begin() + r);
     if (r < 0) {
       perror("read");
       return 1;
@@ -62,8 +61,7 @@ int Main() {
   const uint32_t row_bytes = (width + 7) / 8;
   const uint64_t expect_glyph = uint64_t(height) * row_bytes;
   if (glyph_size != expect_glyph) {
-    LOG(WARNING) << "glyph_size mismatch header=" << glyph_size
-                 << " computed=" << expect_glyph << " (continuing)";
+    LOG(WARNING) << "glyph_size mismatch header=" << glyph_size << " computed=" << expect_glyph << " (continuing)";
   }
   const uint64_t glyph_table_bytes = uint64_t(length) * glyph_size;
   if (buf.data() + buf.size() < glyphs + glyph_table_bytes) {
@@ -88,14 +86,11 @@ int Main() {
   }
 
   if (row_bytes != 1 || height > 32) {
-    LOG(QFATAL) << "This generator targets up to 8x32 fonts, but got width= "
-                << width << ", height=" << height;
+    LOG(QFATAL) << "This generator targets up to 8x32 fonts, but got width= " << width << ", height=" << height;
     return 2;
   }
 
-  auto glyph_ptr = [&](uint32_t gi) -> const uint8_t* {
-    return glyphs + uint64_t(gi) * glyph_size;
-  };
+  auto glyph_ptr = [&](uint32_t gi) -> const uint8_t* { return glyphs + uint64_t(gi) * glyph_size; };
 
   auto glyph_for_cp = [&](uint32_t cp) -> uint32_t {
     auto it = cp_to_glyph.find(cp);
@@ -124,8 +119,7 @@ int Main() {
         rows[y] = g[y];
       }
     } else {
-      LOG(WARNING) << "Note: codepoint U+" << std::hex << std::uppercase << c
-                   << " not mapped; emitting blank glyph.\n"
+      LOG(WARNING) << "Note: codepoint U+" << std::hex << std::uppercase << c << " not mapped; emitting blank glyph.\n"
                    << std::dec;
     }
 
@@ -145,8 +139,7 @@ int Main() {
 
     auto hex8 = [](uint32_t v) -> std::string {
       std::ostringstream s;
-      s << "0x" << std::hex << std::uppercase << std::setw(8)
-        << std::setfill('0') << v;
+      s << "0x" << std::hex << std::uppercase << std::setw(8) << std::setfill('0') << v;
       return s.str();
     };
     std::string comment;
@@ -161,10 +154,8 @@ int Main() {
     } else if (c == 0x7F) {
       comment = "BACKSPACE";
     }
-    out << "  uvec4(" << hex8(w0) << ", " << hex8(w1) << ", " << hex8(w2)
-        << ", " << hex8(w3) << ")";
-    out << ", // 0x" << std::hex << std::uppercase << c << std::dec
-        << (comment.empty() ? "" : ": " + comment) << "\n";
+    out << "  uvec4(" << hex8(w0) << ", " << hex8(w1) << ", " << hex8(w2) << ", " << hex8(w3) << ")";
+    out << ", // 0x" << std::hex << std::uppercase << c << std::dec << (comment.empty() ? "" : ": " + comment) << "\n";
   }
   out << "};\n";
 
@@ -174,4 +165,6 @@ int Main() {
 
 }  // namespace nyla
 
-int main() { return nyla::Main(); }
+int main() {
+  return nyla::Main();
+}

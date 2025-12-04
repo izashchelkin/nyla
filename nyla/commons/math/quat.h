@@ -12,7 +12,9 @@ struct Quat {
   float k;
 };
 
-inline Quat operator-(const Quat& v) { return {-v.w, -v.i, -v.j, -v.k}; }
+inline Quat operator-(const Quat& v) {
+  return {-v.w, -v.i, -v.j, -v.k};
+}
 
 inline Quat operator+(const Quat& lhs, const Quat& rhs) {
   return {lhs.w + rhs.w, lhs.i + rhs.i, lhs.j + rhs.j, lhs.k + rhs.k};
@@ -22,7 +24,9 @@ inline Quat operator*(const Quat& lhs, float scalar) {
   return {lhs.w * scalar, lhs.i * scalar, lhs.j * scalar, lhs.k * scalar};
 }
 
-inline Quat operator*(const float scalar, Quat& rhs) { return rhs * scalar; }
+inline Quat operator*(const float scalar, Quat& rhs) {
+  return rhs * scalar;
+}
 
 inline Quat operator/(const Quat& lhs, float scalar) {
   return {lhs.w / scalar, lhs.i / scalar, lhs.j / scalar, lhs.k / scalar};

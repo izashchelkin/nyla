@@ -2,7 +2,6 @@
 
 namespace nyla {
 
-void AsteroidsInit() {
-}
+void AsteroidsInit() {}
 
 }  // namespace nyla

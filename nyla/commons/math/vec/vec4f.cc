@@ -1,7 +1,7 @@
+#include "nyla/commons/math/vec/vec4f.h"
+
 #include <cstddef>
 #include <span>
-
-#include "nyla/commons/math/vec/vec4f.h"
 
 #define nyla__Vec Vec4f
 

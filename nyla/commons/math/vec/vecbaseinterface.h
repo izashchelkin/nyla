@@ -41,16 +41,13 @@ bool NYLA__VEC(Eq)(nyla__VecSpanConst lhs, nyla__VecSpanConst rhs);
 
 nyla__VecComponentType NYLA__VEC(Len)(nyla__VecSpanConst rhs);
 
-nyla__Vec NYLA__VEC(Resized)(nyla__VecSpanConst rhs,
-                             nyla__VecComponentType len);
+nyla__Vec NYLA__VEC(Resized)(nyla__VecSpanConst rhs, nyla__VecComponentType len);
 
 nyla__Vec NYLA__VEC(Norm)(nyla__VecSpanConst rhs);
 
-nyla__VecComponentType NYLA__VEC(Dot)(nyla__VecSpanConst lhs,
-                                      nyla__VecSpanConst rhs);
+nyla__VecComponentType NYLA__VEC(Dot)(nyla__VecSpanConst lhs, nyla__VecSpanConst rhs);
 
-nyla__Vec NYLA__VEC(Apply)(nyla__VecSpanConst lhs,
-                           std::complex<nyla__VecComponentType> comp);
+nyla__Vec NYLA__VEC(Apply)(nyla__VecSpanConst lhs, std::complex<nyla__VecComponentType> comp);
 
 }  // namespace nyla
 

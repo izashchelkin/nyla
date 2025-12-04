@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+
 #include "nyla/platform/abstract_input.h"
 
 namespace nyla {

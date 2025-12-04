@@ -23,22 +23,40 @@ class Rect {
   bool operator==(const Rect& rhs) const {
     return this->x_ == rhs.x_ && this->y_ == rhs.y_ && this->width_ == rhs.width_ && this->height_ == rhs.height_;
   }
-  bool operator!=(const Rect& rhs) const { return !(*this == rhs); }
+  bool operator!=(const Rect& rhs) const {
+    return !(*this == rhs);
+  }
 
   template <typename Sink>
   friend void AbslStringify(Sink& sink, const Rect& rect);
 
-  int32_t& x() { return x_; }
-  const int32_t& x() const { return x_; }
+  int32_t& x() {
+    return x_;
+  }
+  const int32_t& x() const {
+    return x_;
+  }
 
-  int32_t& y() { return y_; }
-  const int32_t& y() const { return y_; }
+  int32_t& y() {
+    return y_;
+  }
+  const int32_t& y() const {
+    return y_;
+  }
 
-  uint32_t& width() { return width_; }
-  const uint32_t& width() const { return width_; }
+  uint32_t& width() {
+    return width_;
+  }
+  const uint32_t& width() const {
+    return width_;
+  }
 
-  uint32_t& height() { return height_; }
-  const uint32_t& height() const { return height_; }
+  uint32_t& height() {
+    return height_;
+  }
+  const uint32_t& height() const {
+    return height_;
+  }
 
  private:
   int32_t x_;

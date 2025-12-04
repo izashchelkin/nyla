@@ -8,3 +8,19 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_subdirectory(nyla)
 add_subdirectory(abseil)
+
+file(GLOB_RECURSE NYLA_ALL_CXX_FILES
+    CONFIGURE_DEPENDS
+    "${PROJECT_SOURCE_DIR}/nyla/*.cc"
+    "${PROJECT_SOURCE_DIR}/nyla/*.cpp"
+    "${PROJECT_SOURCE_DIR}/nyla/*.cxx"
+    "${PROJECT_SOURCE_DIR}/nyla/*.h"
+    "${PROJECT_SOURCE_DIR}/nyla/*.hpp"
+    "${PROJECT_SOURCE_DIR}/nyla/*.hh"
+    "${PROJECT_SOURCE_DIR}/nyla/*.hxx"
+)
+
+add_custom_target(format
+    COMMAND clang-format -i ${NYLA_ALL_CXX_FILES}
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+)
