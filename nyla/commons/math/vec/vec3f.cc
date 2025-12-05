@@ -23,7 +23,7 @@ using VecSpanConst = std::span<const VecComponentType>;
 namespace nyla
 {
 
-Vec Vec3fCross(const VecSpanConst lhs, const VecSpanConst rhs)
+auto Vec3fCross(const VecSpanConst lhs, const VecSpanConst rhs) -> Vec
 {
     CHECK(lhs.size() >= kVecDimension && rhs.size() >= kVecDimension);
 

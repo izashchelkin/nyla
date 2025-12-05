@@ -20,7 +20,7 @@ namespace nyla
 namespace
 {
 
-uint32_t GetVertBindingStride(Rp &rp)
+auto GetVertBindingStride(Rp &rp) -> uint32_t
 {
     uint32_t ret = 0;
     for (auto attr : rp.vert_buf.attrs)
@@ -66,7 +66,7 @@ void RpInit(Rp &rp)
 
         auto init_buffer = [&bind_group_layout_desc,
                             &bind_group_desc](RpBuf &buf, RhiBufferUsage buffer_usage, RhiMemoryUsage memory_usage,
-                                              RhiBindingType binding_type, uint32_t binding, uint32_t i) {
+                                              RhiBindingType binding_type, uint32_t binding, uint32_t i) -> void {
             bind_group_layout_desc.bindings[i] = {
                 .binding = binding,
                 .type = binding_type,
@@ -184,7 +184,7 @@ void RpStaticUniformCopy(Rp &rp, CharView data)
     RpBufCopy(rp.static_uniform, data);
 }
 
-RpMesh RpVertCopy(Rp &rp, uint32_t vert_count, CharView vert_data)
+auto RpVertCopy(Rp &rp, uint32_t vert_count, CharView vert_data) -> RpMesh
 {
     const uint32_t offset = rp.vert_buf.written;
     const uint32_t size = vert_count * GetVertBindingStride(rp);

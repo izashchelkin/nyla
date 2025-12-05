@@ -22,7 +22,7 @@ struct RpBuf
     RhiBuffer buffer[rhi_max_num_frames_in_flight];
 };
 
-inline RhiShaderStage RpBufStageFlags(const RpBuf &buf)
+inline auto RpBufStageFlags(const RpBuf &buf) -> RhiShaderStage
 {
     if (Any(buf.stage_flags))
         return buf.stage_flags;
@@ -60,7 +60,7 @@ void RpAttachFragShader(Rp &rp, const std::string &path);
 void RpBegin(Rp &rp);
 void RpPushConst(Rp &rp, CharView data);
 void RpStaticUniformCopy(Rp &rp, CharView data);
-RpMesh RpVertCopy(Rp &rp, uint32_t vert_count, CharView vert_data);
+auto RpVertCopy(Rp &rp, uint32_t vert_count, CharView vert_data) -> RpMesh;
 void RpDraw(Rp &rp, RpMesh mesh, CharView dynamic_uniform_data);
 
 } // namespace nyla

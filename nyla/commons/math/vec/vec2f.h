@@ -13,7 +13,7 @@
 namespace nyla
 {
 
-nyla__Vec VecCross(nyla__VecSpanConst lhs, nyla__VecSpanConst rhs);
+auto VecCross(nyla__VecSpanConst lhs, nyla__VecSpanConst rhs) -> nyla__Vec;
 
 } // namespace nyla
 

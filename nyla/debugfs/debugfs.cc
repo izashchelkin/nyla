@@ -39,7 +39,7 @@ void FuseReplyBufSlice(fuse_req_t req, std::span<const char> buf, off_t offset, 
     }
 }
 
-static std::string_view GetContent(DebugFsFile &file)
+static auto GetContent(DebugFsFile &file) -> std::string_view
 {
     uint64_t now = GetMonotonicTimeMicros();
     if (now - file.content_time > 10)
@@ -51,7 +51,7 @@ static std::string_view GetContent(DebugFsFile &file)
     return file.content;
 }
 
-static fuse_entry_param MakeFileEntryParam(ino_t inode, DebugFsFile &file)
+static auto MakeFileEntryParam(ino_t inode, DebugFsFile &file) -> fuse_entry_param
 {
     constexpr uint32_t mode = S_IFREG | 0444;
 
@@ -87,7 +87,7 @@ static void HandleLookup(fuse_req_t req, fuse_ino_t parent_inode, const char *na
     }
 
     std::string_view lookup_name = name;
-    auto it = std::find_if(debugfs.files.begin(), debugfs.files.end(), [lookup_name](const auto &ent) {
+    auto it = std::find_if(debugfs.files.begin(), debugfs.files.end(), [lookup_name](const auto &ent) -> auto {
         const auto &[_, file] = ent;
         return file.name == lookup_name;
     });
@@ -211,7 +211,7 @@ static void HandleReadDir(fuse_req_t req, fuse_ino_t inode, size_t size, off_t o
 
     size_t total_size = 0;
 
-    auto count = [&](const char *name) { total_size += fuse_add_direntry(req, nullptr, 0, name, nullptr, 0); };
+    auto count = [&](const char *name) -> void { total_size += fuse_add_direntry(req, nullptr, 0, name, nullptr, 0); };
 
     count(".");
     count("..");
@@ -223,7 +223,7 @@ static void HandleReadDir(fuse_req_t req, fuse_ino_t inode, size_t size, off_t o
     std::vector<char> buf(total_size);
     size_t pos = 0;
 
-    auto append = [&](fuse_ino_t inode, const char *name) {
+    auto append = [&](fuse_ino_t inode, const char *name) -> void {
         struct stat stat{.st_ino = inode};
         pos += fuse_add_direntry(req, buf.data() + pos, total_size - pos, name, &stat, buf.size());
     };

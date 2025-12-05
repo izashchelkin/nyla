@@ -55,7 +55,7 @@ void DBus_Process()
         if (!msg)
             break;
 
-        absl::Cleanup unref_msg = [=] { dbus_message_unref(msg); };
+        absl::Cleanup unref_msg = [=] -> void { dbus_message_unref(msg); };
 
         if (dbus_message_is_signal(msg, "org.freedesktop.DBus", "NameOwnerChanged"))
         {

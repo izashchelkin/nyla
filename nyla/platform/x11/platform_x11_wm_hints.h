@@ -32,7 +32,7 @@ struct WM_Hints
     xcb_pixmap_t icon_mask;
     xcb_window_t window_group;
 
-    bool urgent() const
+    auto urgent() const -> bool
     {
         return flags & WM_Hints::kUrgencyHint;
     }

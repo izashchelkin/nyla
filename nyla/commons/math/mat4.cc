@@ -8,7 +8,7 @@
 namespace nyla
 {
 
-Mat4 Mult(const Mat4 &lhs, const Mat4 &rhs)
+auto Mult(const Mat4 &lhs, const Mat4 &rhs) -> Mat4
 {
     Mat4 ret{};
     for (size_t i = 0; i < 4; ++i)
@@ -24,7 +24,7 @@ Mat4 Mult(const Mat4 &lhs, const Mat4 &rhs)
     return ret;
 }
 
-Mat4 Inverse(const Mat4 &m)
+auto Inverse(const Mat4 &m) -> Mat4
 {
     float a[4][8];
 
@@ -99,7 +99,7 @@ Mat4 Inverse(const Mat4 &m)
     return inv;
 }
 
-Mat4 Translate(std::span<const float> v)
+auto Translate(std::span<const float> v) -> Mat4
 {
     CHECK(v.size() >= 2);
 
@@ -108,7 +108,7 @@ Mat4 Translate(std::span<const float> v)
     return ret;
 }
 
-Mat4 ScaleXY(float x, float y)
+auto ScaleXY(float x, float y) -> Mat4
 {
     Mat4 ret = Identity4;
     ret[0][0] = x;
@@ -116,7 +116,7 @@ Mat4 ScaleXY(float x, float y)
     return ret;
 }
 
-Mat4 Rotate2D(float radians)
+auto Rotate2D(float radians) -> Mat4
 {
     Mat4 ret = Identity4;
     ret[0] = {std::cos(radians), std::sin(radians), 0, 0};
@@ -124,7 +124,7 @@ Mat4 Rotate2D(float radians)
     return ret;
 }
 
-Mat4 Ortho(float left, float right, float top, float bottom, float near, float far)
+auto Ortho(float left, float right, float top, float bottom, float near, float far) -> Mat4
 {
     return {
         Mat4Col{2.f / (right - left), 0.f, 0.f, 0.f},

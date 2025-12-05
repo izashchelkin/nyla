@@ -9,7 +9,7 @@ namespace nyla
 namespace rhi_vulkan_internal
 {
 
-VkSemaphore CreateTimeline(uint64_t initial_value)
+auto CreateTimeline(uint64_t initial_value) -> VkSemaphore
 {
     const VkSemaphoreTypeCreateInfo timeline_create_info{
         .sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO,

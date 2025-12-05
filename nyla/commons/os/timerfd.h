@@ -5,6 +5,6 @@
 namespace nyla
 {
 
-int MakeTimerFd(std::chrono::duration<double> interval);
+auto MakeTimerFd(std::chrono::duration<double> interval) -> int;
 
 }

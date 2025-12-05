@@ -39,14 +39,14 @@ struct DBusErrorWrapper
     }
 
     DBusErrorWrapper(const DBusErrorWrapper &) = delete;
-    DBusErrorWrapper &operator=(const DBusErrorWrapper &) = delete;
+    auto operator=(const DBusErrorWrapper &) -> DBusErrorWrapper & = delete;
 
     DBusErrorWrapper(DBusErrorWrapper &&other) noexcept
     {
         dbus_error_init(&inner);
         std::swap(inner, other.inner);
     }
-    DBusErrorWrapper &operator=(DBusErrorWrapper &&other) noexcept
+    auto operator=(DBusErrorWrapper &&other) noexcept -> DBusErrorWrapper &
     {
         if (this != &other)
         {
@@ -66,15 +66,15 @@ struct DBusErrorWrapper
         return &inner;
     }
 
-    bool bad() const
+    auto bad() const -> bool
     {
         return dbus_error_is_set(&inner);
     }
-    const char *name() const
+    auto name() const -> const char *
     {
         return inner.name;
     }
-    const char *message() const
+    auto message() const -> const char *
     {
         return inner.message;
     }

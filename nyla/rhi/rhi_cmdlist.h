@@ -15,16 +15,16 @@ struct RhiCmdList : RhiHandle
 {
 };
 
-RhiCmdList RhiCreateCmdList(RhiQueueType queue_type);
+auto RhiCreateCmdList(RhiQueueType queue_type) -> RhiCmdList;
 void RhiNameCmdList(RhiCmdList, std::string_view name);
 void RhiDestroyCmdList(RhiCmdList cmd);
 
-uint64_t __RhiCmdSetCheckpoint(RhiCmdList cmd, uint64_t data);
-uint64_t __RhiGetLastCheckpointData(RhiQueueType queue_type);
+auto __RhiCmdSetCheckpoint(RhiCmdList cmd, uint64_t data) -> uint64_t;
+auto __RhiGetLastCheckpointData(RhiQueueType queue_type) -> uint64_t;
 
-RhiCmdList RhiFrameBegin();
+auto RhiFrameBegin() -> RhiCmdList;
 void RhiFrameEnd();
 
-RhiCmdList RhiFrameGetCmdList(); // TODO: get rid of this
+auto RhiFrameGetCmdList() -> RhiCmdList; // TODO: get rid of this
 
 } // namespace nyla

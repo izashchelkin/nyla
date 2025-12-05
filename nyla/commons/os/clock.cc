@@ -8,21 +8,21 @@
 namespace nyla
 {
 
-uint64_t GetMonotonicTimeMillis()
+auto GetMonotonicTimeMillis() -> uint64_t
 {
     timespec ts{};
     CHECK_EQ(clock_gettime(CLOCK_MONOTONIC_RAW, &ts), 0);
     return ts.tv_sec * 1e3 + ts.tv_nsec / 1e6;
 }
 
-uint64_t GetMonotonicTimeMicros()
+auto GetMonotonicTimeMicros() -> uint64_t
 {
     timespec ts{};
     CHECK_EQ(clock_gettime(CLOCK_MONOTONIC_RAW, &ts), 0);
     return ts.tv_sec * 1e6 + ts.tv_nsec / 1e3;
 }
 
-uint64_t GetMonotonicTimeNanos()
+auto GetMonotonicTimeNanos() -> uint64_t
 {
     timespec ts{};
     CHECK_EQ(clock_gettime(CLOCK_MONOTONIC_RAW, &ts), 0);

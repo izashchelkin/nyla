@@ -9,7 +9,7 @@
 namespace nyla
 {
 
-float Lerp(float a, float b, float p)
+auto Lerp(float a, float b, float p) -> float
 {
     if (a == b)
         return b;
@@ -31,7 +31,7 @@ void Lerp(std::span<float> a, std::span<const float> b, float p)
         a[i] = Lerp(a[i], b[i], p);
 }
 
-float LerpAngle(float a, float b, float p)
+auto LerpAngle(float a, float b, float p) -> float
 {
     if (a == b)
         return b;

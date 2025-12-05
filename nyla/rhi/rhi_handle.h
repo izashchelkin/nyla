@@ -14,7 +14,7 @@ struct RhiHandle
     uint32_t index;
 };
 
-inline bool RhiHandleIsSet(RhiHandle handle)
+inline auto RhiHandleIsSet(RhiHandle handle) -> bool
 {
     return handle.gen;
 }
@@ -33,7 +33,7 @@ template <typename Handle, typename Data, size_t Size> struct RhiHandlePool
 };
 
 template <typename Handle, typename Data, size_t Size>
-inline Handle RhiHandleAcquire(RhiHandlePool<Handle, Data, Size> &pool, Data data, bool allow_intern = false)
+inline auto RhiHandleAcquire(RhiHandlePool<Handle, Data, Size> &pool, Data data, bool allow_intern = false) -> Handle
 {
     Handle ret_handle{};
 
@@ -64,7 +64,7 @@ inline Handle RhiHandleAcquire(RhiHandlePool<Handle, Data, Size> &pool, Data dat
 }
 
 template <typename Handle, typename Data, size_t Size>
-inline Data &RhiHandleGetData(RhiHandlePool<Handle, Data, Size> &pool, Handle handle)
+inline auto RhiHandleGetData(RhiHandlePool<Handle, Data, Size> &pool, Handle handle) -> Data &
 {
     CHECK(handle.gen);
     CHECK_LT(handle.index, Size);
@@ -79,7 +79,7 @@ inline Data &RhiHandleGetData(RhiHandlePool<Handle, Data, Size> &pool, Handle ha
 }
 
 template <typename Handle, typename Data, size_t Size>
-inline Data RhiHandleRelease(RhiHandlePool<Handle, Data, Size> &pool, Handle handle)
+inline auto RhiHandleRelease(RhiHandlePool<Handle, Data, Size> &pool, Handle handle) -> Data
 {
     CHECK(handle.gen);
     CHECK_LT(handle.index, Size);

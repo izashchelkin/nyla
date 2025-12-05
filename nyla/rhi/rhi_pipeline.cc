@@ -3,7 +3,7 @@
 namespace nyla
 {
 
-uint32_t RhiGetVertexFormatSize(RhiVertexFormat format)
+auto RhiGetVertexFormatSize(RhiVertexFormat format) -> uint32_t
 {
     switch (format)
     {

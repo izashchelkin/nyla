@@ -7,7 +7,7 @@ namespace nyla
 
 using CharView = std::span<const char>;
 
-template <typename T> inline std::span<const char> CharViewSpan(std::span<T> in)
+template <typename T> inline auto CharViewSpan(std::span<T> in) -> std::span<const char>
 {
     return {
         reinterpret_cast<const char *>(in.data()),
@@ -15,7 +15,7 @@ template <typename T> inline std::span<const char> CharViewSpan(std::span<T> in)
     };
 }
 
-template <typename T> inline std::span<const char> CharViewPtr(T *in)
+template <typename T> inline auto CharViewPtr(T *in) -> std::span<const char>
 {
     return {
         reinterpret_cast<const char *>(in),

@@ -12,7 +12,7 @@
 namespace nyla
 {
 
-static int Main()
+static auto Main() -> int
 {
     LoggingInit();
     TArenaInit();
@@ -65,7 +65,7 @@ static int Main()
 
 } // namespace nyla
 
-int main()
+auto main() -> int
 {
     return nyla::Main();
 }

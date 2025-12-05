@@ -113,29 +113,29 @@ struct RhiHandles
 };
 extern RhiHandles rhi_handles;
 
-VkBool32 DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
+auto DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
                                 VkDebugUtilsMessageTypeFlagsEXT message_type,
-                                const VkDebugUtilsMessengerCallbackDataEXT *callback_data, void *user_data);
+                                const VkDebugUtilsMessengerCallbackDataEXT *callback_data, void *user_data) -> VkBool32;
 
 void CreateSwapchain();
 
-VkSemaphore CreateTimeline(uint64_t initial_value);
+auto CreateTimeline(uint64_t initial_value) -> VkSemaphore;
 void WaitTimeline(VkSemaphore timeline, uint64_t wait_value);
 
-uint32_t FindMemoryTypeIndex(VkMemoryRequirements mem_requirements, VkMemoryPropertyFlags properties);
+auto FindMemoryTypeIndex(VkMemoryRequirements mem_requirements, VkMemoryPropertyFlags properties) -> uint32_t;
 
 void VulkanNameHandle(VkObjectType type, uint64_t handle, std::string_view name);
 
-VkBufferUsageFlags ConvertRhiBufferUsageIntoVkBufferUsageFlags(RhiBufferUsage usage);
+auto ConvertRhiBufferUsageIntoVkBufferUsageFlags(RhiBufferUsage usage) -> VkBufferUsageFlags;
 
-VkMemoryPropertyFlags ConvertRhiMemoryUsageIntoVkMemoryPropertyFlags(RhiMemoryUsage usage);
+auto ConvertRhiMemoryUsageIntoVkMemoryPropertyFlags(RhiMemoryUsage usage) -> VkMemoryPropertyFlags;
 
-VkFormat ConvertRhiVertexFormatIntoVkFormat(RhiVertexFormat format);
+auto ConvertRhiVertexFormatIntoVkFormat(RhiVertexFormat format) -> VkFormat;
 
-VkFormat ConvertRhiTextureFormatIntoVkFormat(RhiTextureFormat format);
-RhiTextureFormat ConvertVkFormatIntoRhiTextureFormat(VkFormat format);
+auto ConvertRhiTextureFormatIntoVkFormat(RhiTextureFormat format) -> VkFormat;
+auto ConvertVkFormatIntoRhiTextureFormat(VkFormat format) -> RhiTextureFormat;
 
-VkShaderStageFlags ConvertRhiShaderStageIntoVkShaderStageFlags(RhiShaderStage stage_flags);
+auto ConvertRhiShaderStageIntoVkShaderStageFlags(RhiShaderStage stage_flags) -> VkShaderStageFlags;
 
 } // namespace rhi_vulkan_internal
 

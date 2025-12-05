@@ -104,9 +104,9 @@ struct RhiTextureDesc
     RhiTextureFormat format;
 };
 
-RhiTexture RhiCreateTexture(RhiTextureDesc);
+auto RhiCreateTexture(RhiTextureDesc) -> RhiTexture;
 void RhiDestroyTexture(RhiTexture);
 
-RhiTextureFormat RhiGetBackbufferFormat();
+auto RhiGetBackbufferFormat() -> RhiTextureFormat;
 
 } // namespace nyla

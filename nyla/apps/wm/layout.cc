@@ -73,7 +73,7 @@ static void ComputeGrid(const Rect &bounding_rect, uint32_t n, uint32_t padding,
     }
 }
 
-std::vector<Rect> ComputeLayout(const Rect &bounding_rect, uint32_t n, uint32_t padding, LayoutType layout_type)
+auto ComputeLayout(const Rect &bounding_rect, uint32_t n, uint32_t padding, LayoutType layout_type) -> std::vector<Rect>
 {
     switch (n)
     {
@@ -100,7 +100,7 @@ std::vector<Rect> ComputeLayout(const Rect &bounding_rect, uint32_t n, uint32_t 
     return out;
 }
 
-Rect TryApplyPadding(const Rect &rect, uint32_t padding)
+auto TryApplyPadding(const Rect &rect, uint32_t padding) -> Rect
 {
     if (rect.width() > 2 * padding && rect.height() > 2 * padding)
     {
@@ -112,7 +112,7 @@ Rect TryApplyPadding(const Rect &rect, uint32_t padding)
     }
 }
 
-Rect TryApplyMarginTop(const Rect &rect, uint32_t margin_top)
+auto TryApplyMarginTop(const Rect &rect, uint32_t margin_top) -> Rect
 {
     if (rect.height() > margin_top)
     {
@@ -124,7 +124,7 @@ Rect TryApplyMarginTop(const Rect &rect, uint32_t margin_top)
     }
 }
 
-Rect TryApplyMargin(const Rect &rect, uint32_t margin)
+auto TryApplyMargin(const Rect &rect, uint32_t margin) -> Rect
 {
     if (rect.width() > 2 * margin && rect.height() > 2 * margin)
     {

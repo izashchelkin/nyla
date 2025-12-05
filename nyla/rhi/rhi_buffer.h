@@ -37,11 +37,11 @@ struct RhiBufferDesc
     RhiMemoryUsage memory_usage;
 };
 
-RhiBuffer RhiCreateBuffer(const RhiBufferDesc &);
+auto RhiCreateBuffer(const RhiBufferDesc &) -> RhiBuffer;
 void RhiNameBuffer(RhiBuffer, std::string_view name);
 void RhiDestroyBuffer(RhiBuffer);
 
-void *RhiMapBuffer(RhiBuffer, bool idempotent = true);
+auto RhiMapBuffer(RhiBuffer, bool idempotent = true) -> void *;
 void RhiUnmapBuffer(RhiBuffer, bool idempotent = true);
 
 } // namespace nyla

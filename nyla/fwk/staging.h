@@ -4,7 +4,7 @@
 namespace nyla
 {
 
-bool RecompileShadersIfNeeded();
+auto RecompileShadersIfNeeded() -> bool;
 void UpdateDtFps(uint32_t &fps, float &dt);
 
 } // namespace nyla

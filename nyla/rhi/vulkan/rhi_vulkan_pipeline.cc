@@ -14,7 +14,7 @@ using namespace rhi_vulkan_internal;
 namespace
 {
 
-VkCullModeFlags ConvertVulkanCullMode(RhiCullMode cull_mode)
+auto ConvertVulkanCullMode(RhiCullMode cull_mode) -> VkCullModeFlags
 {
     switch (cull_mode)
     {
@@ -31,7 +31,7 @@ VkCullModeFlags ConvertVulkanCullMode(RhiCullMode cull_mode)
     return static_cast<VkCullModeFlags>(0);
 }
 
-VkFrontFace ConvertVulkanFrontFace(RhiFrontFace front_face)
+auto ConvertVulkanFrontFace(RhiFrontFace front_face) -> VkFrontFace
 {
     switch (front_face)
     {
@@ -45,7 +45,7 @@ VkFrontFace ConvertVulkanFrontFace(RhiFrontFace front_face)
     return static_cast<VkFrontFace>(0);
 }
 
-VkVertexInputRate ConvertVulkanInputRate(RhiInputRate input_rate)
+auto ConvertVulkanInputRate(RhiInputRate input_rate) -> VkVertexInputRate
 {
     switch (input_rate)
     {
@@ -60,7 +60,7 @@ VkVertexInputRate ConvertVulkanInputRate(RhiInputRate input_rate)
 
 } // namespace
 
-RhiShader RhiCreateShader(const RhiShaderDesc &desc)
+auto RhiCreateShader(const RhiShaderDesc &desc) -> RhiShader
 {
     const VkShaderModuleCreateInfo create_info{
         .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
@@ -80,7 +80,7 @@ void RhiDestroyShader(RhiShader shader)
     vkDestroyShaderModule(vk.dev, shader_module, nullptr);
 }
 
-RhiGraphicsPipeline RhiCreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc)
+auto RhiCreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGraphicsPipeline
 {
     VulkanPipelineData pipeline_data = {
         .bind_point = VK_PIPELINE_BIND_POINT_GRAPHICS,

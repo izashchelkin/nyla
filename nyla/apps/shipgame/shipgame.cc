@@ -31,7 +31,7 @@ GameObject game_ship{};
 static Vec2f game_camera_pos = {};
 static float game_camera_zoom = 1.f;
 
-static std::vector<Vertex> GenCircle(size_t n, float radius, Vec3f color)
+static auto GenCircle(size_t n, float radius, Vec3f color) -> std::vector<Vertex>
 {
     CHECK(n > 4);
 

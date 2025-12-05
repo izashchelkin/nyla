@@ -25,7 +25,7 @@ struct RhiShaderDesc
     std::vector<char> code;
 };
 
-RhiShader RhiCreateShader(const RhiShaderDesc &);
+auto RhiCreateShader(const RhiShaderDesc &) -> RhiShader;
 void RhiDestroyShader(RhiShader);
 
 } // namespace nyla

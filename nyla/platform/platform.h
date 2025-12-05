@@ -19,7 +19,7 @@ struct PlatformWindow
 {
     uint32_t handle;
 };
-PlatformWindow PlatformCreateWindow();
+auto PlatformCreateWindow() -> PlatformWindow;
 
 struct PlatformWindowSize
 {
@@ -27,7 +27,7 @@ struct PlatformWindowSize
     uint32_t height;
 };
 
-PlatformWindowSize PlatformGetWindowSize(PlatformWindow window);
+auto PlatformGetWindowSize(PlatformWindow window) -> PlatformWindowSize;
 
 void PlatformFsWatch(const std::string &path);
 
@@ -37,9 +37,9 @@ struct PlatformFsChange
     bool seen;
     std::string path;
 };
-std::span<PlatformFsChange> PlatformFsGetChanges();
+auto PlatformFsGetChanges() -> std::span<PlatformFsChange>;
 
 void PlatformProcessEvents();
-bool PlatformShouldExit();
+auto PlatformShouldExit() -> bool;
 
 } // namespace nyla

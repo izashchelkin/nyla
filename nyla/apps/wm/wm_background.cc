@@ -45,14 +45,14 @@ void DrawBackground(uint32_t num_clients, std::string_view bar_text)
     RhiFrameEnd();
 }
 
-std::future<void> InitWMBackground()
+auto InitWMBackground() -> std::future<void>
 {
     background_window =
         X11_CreateWindow(x11.screen->width_in_pixels, x11.screen->height_in_pixels, true, XCB_EVENT_MASK_EXPOSURE);
     xcb_configure_window(x11.conn, background_window, XCB_CONFIG_WINDOW_STACK_MODE, (uint32_t[]){XCB_STACK_MODE_BELOW});
     X11_Flush();
 
-    return std::async(std::launch::async, [] {
+    return std::async(std::launch::async, [] -> void {
         RhiInit(RhiDesc{
             .window = PlatformWindow{background_window},
         });

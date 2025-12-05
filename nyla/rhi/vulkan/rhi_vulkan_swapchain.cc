@@ -18,14 +18,14 @@ void CreateSwapchain()
     VkSurfaceCapabilitiesKHR surface_capabilities;
     VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vk.phys_dev, vk.surface, &surface_capabilities));
 
-    vk.surface_format = [] {
+    vk.surface_format = [] -> VkSurfaceFormatKHR {
         uint32_t surface_format_count;
         VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(vk.phys_dev, vk.surface, &surface_format_count, nullptr));
 
         std::vector<VkSurfaceFormatKHR> surface_formats(surface_format_count);
         vkGetPhysicalDeviceSurfaceFormatsKHR(vk.phys_dev, vk.surface, &surface_format_count, surface_formats.data());
 
-        auto it = std::find_if(surface_formats.begin(), surface_formats.end(), [](VkSurfaceFormatKHR surface_format) {
+        auto it = std::find_if(surface_formats.begin(), surface_formats.end(), [](VkSurfaceFormatKHR surface_format) -> bool {
             return surface_format.format == VK_FORMAT_B8G8R8A8_SRGB &&
                    surface_format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
         });
@@ -33,7 +33,7 @@ void CreateSwapchain()
         return *it;
     }();
 
-    VkPresentModeKHR present_mode = [] {
+    VkPresentModeKHR present_mode = [] -> VkPresentModeKHR {
         std::vector<VkPresentModeKHR> present_modes;
         uint32_t present_mode_count = 0;
         vkGetPhysicalDeviceSurfacePresentModesKHR(vk.phys_dev, vk.surface, &present_mode_count, nullptr);
@@ -45,7 +45,7 @@ void CreateSwapchain()
         return VK_PRESENT_MODE_FIFO_KHR; // TODO:
     }();
 
-    vk.surface_extent = [surface_capabilities] {
+    vk.surface_extent = [surface_capabilities] -> VkExtent2D {
         if (surface_capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
         {
             return surface_capabilities.currentExtent;
@@ -121,7 +121,7 @@ void CreateSwapchain()
     }
 }
 
-RhiTextureFormat RhiGetBackbufferFormat()
+auto RhiGetBackbufferFormat() -> RhiTextureFormat
 {
     return ConvertVkFormatIntoRhiTextureFormat(vk.surface_format.format);
 }

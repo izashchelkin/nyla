@@ -1,0 +1,12 @@
+Checks: >
+  clang-analyzer-*,
+  bugprone-*,
+  performance-*,
+  modernize-*,
+  -clang-analyzer-security.FloatLoopCounter,
+  -clang-analyzer-optin.core.EnumCastOutOfRange
+
+HeaderFilterRegex: 'nyla/.*'
+FormatStyle: none
+
+ExtraArgs: [ -std=c++23 ]

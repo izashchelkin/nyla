@@ -5,22 +5,22 @@
 namespace nyla
 {
 
-template <typename H> H AbslHashValue(H h, const AbstractInputId &id)
+template <typename H> auto AbslHashValue(H h, const AbstractInputId &id) -> H
 {
     return H::combine(std::move(h), id.tag, id.code);
 }
 
-bool operator==(const AbstractInputId &lhs, const AbstractInputId &rhs)
+auto operator==(const AbstractInputId &lhs, const AbstractInputId &rhs) -> bool
 {
     return lhs.tag == rhs.tag && lhs.code == rhs.code;
 }
 
-template <typename H> H AbslHashValue(H h, const AbstractInputMapping &id)
+template <typename H> auto AbslHashValue(H h, const AbstractInputMapping &id) -> H
 {
     return H::combine(std::move(h), id.val);
 }
 
-bool operator==(const AbstractInputMapping &lhs, const AbstractInputMapping &rhs)
+auto operator==(const AbstractInputMapping &lhs, const AbstractInputMapping &rhs) -> bool
 {
     return lhs.val == rhs.val;
 }
@@ -92,7 +92,7 @@ void AbstractInputMapId(AbstractInputMapping mapping, AbstractInputId id)
     inputmapping.emplace(mapping, id);
 }
 
-bool Pressed(AbstractInputMapping mapping)
+auto Pressed(AbstractInputMapping mapping) -> bool
 {
     auto id = inputmapping.at(mapping);
     auto it = inputstate.find(id);
@@ -105,7 +105,7 @@ bool Pressed(AbstractInputMapping mapping)
     return state.pressed_at > 0;
 }
 
-uint32_t PressedFor(AbstractInputMapping mapping, uint64_t now)
+auto PressedFor(AbstractInputMapping mapping, uint64_t now) -> uint32_t
 {
     auto id = inputmapping.at(mapping);
     auto it = inputstate.find(id);

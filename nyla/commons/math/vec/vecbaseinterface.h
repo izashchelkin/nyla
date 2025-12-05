@@ -17,39 +17,39 @@ struct nyla__Vec
     operator nyla__VecSpan() &&;
     operator nyla__VecSpanConst() const &&;
 
-    const nyla__VecComponentType &operator[](size_t i) const;
-    nyla__VecComponentType &operator[](size_t i);
+    auto operator[](size_t i) const -> const nyla__VecComponentType &;
+    auto operator[](size_t i) -> nyla__VecComponentType &;
 };
 
-nyla__Vec NYLA__VEC(Neg)(nyla__VecSpanConst rhs);
+auto NYLA__VEC(Neg)(nyla__VecSpanConst rhs) -> nyla__Vec;
 
-nyla__Vec NYLA__VEC(Sum)(nyla__VecSpanConst lhs, nyla__VecSpanConst rhs);
+auto NYLA__VEC(Sum)(nyla__VecSpanConst lhs, nyla__VecSpanConst rhs) -> nyla__Vec;
 
 void NYLA__VEC(Add)(nyla__VecSpan lhs, nyla__VecSpanConst rhs);
 
-nyla__Vec NYLA__VEC(Dif)(nyla__VecSpanConst lhs, nyla__VecSpanConst rhs);
+auto NYLA__VEC(Dif)(nyla__VecSpanConst lhs, nyla__VecSpanConst rhs) -> nyla__Vec;
 
 void NYLA__VEC(Sub)(nyla__VecSpan lhs, nyla__VecSpanConst rhs);
 
-nyla__Vec NYLA__VEC(Mul)(nyla__VecSpanConst lhs, nyla__VecComponentType scalar);
+auto NYLA__VEC(Mul)(nyla__VecSpanConst lhs, nyla__VecComponentType scalar) -> nyla__Vec;
 
 void NYLA__VEC(Scale)(nyla__VecSpan lhs, nyla__VecComponentType scalar);
 
-nyla__Vec NYLA__VEC(Div)(nyla__VecSpanConst lhs, nyla__VecComponentType scalar);
+auto NYLA__VEC(Div)(nyla__VecSpanConst lhs, nyla__VecComponentType scalar) -> nyla__Vec;
 
 void NYLA__VEC(ScaleDown)(nyla__VecSpan lhs, nyla__VecComponentType scalar);
 
-bool NYLA__VEC(Eq)(nyla__VecSpanConst lhs, nyla__VecSpanConst rhs);
+auto NYLA__VEC(Eq)(nyla__VecSpanConst lhs, nyla__VecSpanConst rhs) -> bool;
 
-nyla__VecComponentType NYLA__VEC(Len)(nyla__VecSpanConst rhs);
+auto NYLA__VEC(Len)(nyla__VecSpanConst rhs) -> nyla__VecComponentType;
 
-nyla__Vec NYLA__VEC(Resized)(nyla__VecSpanConst rhs, nyla__VecComponentType len);
+auto NYLA__VEC(Resized)(nyla__VecSpanConst rhs, nyla__VecComponentType len) -> nyla__Vec;
 
-nyla__Vec NYLA__VEC(Norm)(nyla__VecSpanConst rhs);
+auto NYLA__VEC(Norm)(nyla__VecSpanConst rhs) -> nyla__Vec;
 
-nyla__VecComponentType NYLA__VEC(Dot)(nyla__VecSpanConst lhs, nyla__VecSpanConst rhs);
+auto NYLA__VEC(Dot)(nyla__VecSpanConst lhs, nyla__VecSpanConst rhs) -> nyla__VecComponentType;
 
-nyla__Vec NYLA__VEC(Apply)(nyla__VecSpanConst lhs, std::complex<nyla__VecComponentType> comp);
+auto NYLA__VEC(Apply)(nyla__VecSpanConst lhs, std::complex<nyla__VecComponentType> comp) -> nyla__Vec;
 
 } // namespace nyla
 

@@ -13,14 +13,14 @@
 namespace nyla
 {
 
-bool Spawn(std::span<const char *const> cmd)
+auto Spawn(std::span<const char *const> cmd) -> bool
 {
     { // TODO: move this somewhere
         static bool installed = false;
         if (!installed)
         {
             struct sigaction sa;
-            sa.sa_handler = [](int signum) {
+            sa.sa_handler = [](int signum) -> void {
                 pid_t pid;
                 int status;
                 while ((pid = waitpid(-1, &status, WNOHANG)) > 0)

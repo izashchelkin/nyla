@@ -28,7 +28,7 @@ void TArenaInit()
     temp_arena.at = temp_arena.base;
 }
 
-void *TAlloc(size_t bytes, size_t align)
+auto TAlloc(size_t bytes, size_t align) -> void *
 {
     CHECK_LT(bytes + align, temp_arena.size);
 

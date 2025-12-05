@@ -9,7 +9,7 @@
 namespace nyla
 {
 
-static std::vector<char> ReadFileInternal(std::ifstream &file)
+static auto ReadFileInternal(std::ifstream &file) -> std::vector<char>
 {
     CHECK(file.is_open());
 
@@ -22,7 +22,7 @@ static std::vector<char> ReadFileInternal(std::ifstream &file)
     return buffer;
 }
 
-std::vector<char> ReadFile(const std::string &filename)
+auto ReadFile(const std::string &filename) -> std::vector<char>
 {
     std::ifstream file(filename, std::ios::ate | std::ios::binary);
     return ReadFileInternal(file);

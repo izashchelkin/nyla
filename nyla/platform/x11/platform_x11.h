@@ -39,11 +39,11 @@ extern X11_State x11;
 
 void X11_Initialize();
 
-xcb_window_t X11_CreateWindow(uint32_t width, uint32_t height, bool override_redirect, xcb_event_mask_t event_mask);
+auto X11_CreateWindow(uint32_t width, uint32_t height, bool override_redirect, xcb_event_mask_t event_mask) -> xcb_window_t;
 
 void X11_Flush();
 
-xcb_atom_t X11_InternAtom(xcb_connection_t *conn, std::string_view name, bool only_if_exists = false);
+auto X11_InternAtom(xcb_connection_t *conn, std::string_view name, bool only_if_exists = false) -> xcb_atom_t;
 
 void X11_SendClientMessage32(xcb_window_t window, xcb_atom_t type, xcb_atom_t arg1, uint32_t arg2, uint32_t arg3,
                              uint32_t arg4);
@@ -63,11 +63,11 @@ struct X11_KeyResolver
     xkb_keymap *keymap;
 };
 
-bool X11_InitializeKeyResolver(X11_KeyResolver &resolver);
+auto X11_InitializeKeyResolver(X11_KeyResolver &resolver) -> bool;
 void X11_FreeKeyResolver(X11_KeyResolver &resolver);
-xcb_keycode_t X11_ResolveKeyCode(const X11_KeyResolver &resolver, std::string_view keyname);
+auto X11_ResolveKeyCode(const X11_KeyResolver &resolver, std::string_view keyname) -> xcb_keycode_t;
 
-const char *ConvertKeyPhysicalIntoXkbName(KeyPhysical key);
+auto ConvertKeyPhysicalIntoXkbName(KeyPhysical key) -> const char *;
 
 } // namespace platform_x11_internal
 

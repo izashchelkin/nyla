@@ -32,7 +32,7 @@ namespace nyla
 
 using namespace platform_x11_internal;
 
-static std::string DumpClients();
+static auto DumpClients() -> std::string;
 
 struct WindowStack
 {
@@ -90,7 +90,7 @@ static xcb_window_t last_entered_window = 0;
 
 //
 
-static WindowStack &GetActiveStack()
+static auto GetActiveStack() -> WindowStack &
 {
     CHECK_LT(wm_active_stack_idx & 0xFF, wm_stacks.size());
     return wm_stacks.at(wm_active_stack_idx & 0xFF);
@@ -98,7 +98,7 @@ static WindowStack &GetActiveStack()
 
 static void Handle_WM_Hints(xcb_window_t client_window, Client &client, xcb_get_property_reply_t *reply)
 {
-    WM_Hints wm_hints = [&reply] {
+    WM_Hints wm_hints = [&reply] -> WM_Hints {
         if (!reply || xcb_get_property_value_length(reply) != sizeof(WM_Hints))
             return WM_Hints{};
 
@@ -115,7 +115,7 @@ static void Handle_WM_Hints(xcb_window_t client_window, Client &client, xcb_get_
 
 static void Handle_WM_Normal_Hints(xcb_window_t client_window, Client &client, xcb_get_property_reply_t *reply)
 {
-    WM_Normal_Hints wm_normal_hints = [&reply] {
+    WM_Normal_Hints wm_normal_hints = [&reply] -> WM_Normal_Hints {
         if (!reply || xcb_get_property_value_length(reply) != sizeof(WM_Normal_Hints))
             return WM_Normal_Hints{};
 
@@ -198,7 +198,7 @@ void InitializeWM()
 
     DebugFsRegister(
         "windows", nullptr,                               //
-        [](auto &file) { file.content = DumpClients(); }, //
+        [](auto &file) -> auto { file.content = DumpClients(); }, //
         nullptr);
 
     ScreenSaverInhibitorInit();
@@ -408,7 +408,7 @@ void ManageClientsStartup()
             xcb_get_window_attributes_reply(x11.conn, xcb_get_window_attributes(x11.conn, client_window), nullptr);
         if (!attr_reply)
             continue;
-        absl::Cleanup attr_reply_freer = [attr_reply] { free(attr_reply); };
+        absl::Cleanup attr_reply_freer = [attr_reply] -> void { free(attr_reply); };
 
         if (attr_reply->override_redirect)
             continue;
@@ -591,12 +591,12 @@ static void MoveStack(xcb_timestamp_t time, auto compute_idx)
 
 void MoveStackNext(xcb_timestamp_t time)
 {
-    MoveStack(time, [](auto idx) { return idx + 1; });
+    MoveStack(time, [](auto idx) -> auto { return idx + 1; });
 }
 
 void MoveStackPrev(xcb_timestamp_t time)
 {
-    MoveStack(time, [](auto idx) { return idx - 1; });
+    MoveStack(time, [](auto idx) -> auto { return idx - 1; });
 }
 
 static void MoveLocal(xcb_timestamp_t time, auto compute_idx)
@@ -644,12 +644,12 @@ static void MoveLocal(xcb_timestamp_t time, auto compute_idx)
 
 void MoveLocalNext(xcb_timestamp_t time)
 {
-    MoveLocal(time, [](auto idx) { return idx + 1; });
+    MoveLocal(time, [](auto idx) -> auto { return idx + 1; });
 }
 
 void MoveLocalPrev(xcb_timestamp_t time)
 {
-    MoveLocal(time, [](auto idx) { return idx - 1; });
+    MoveLocal(time, [](auto idx) -> auto { return idx - 1; });
 }
 
 void NextLayout()
@@ -660,7 +660,7 @@ void NextLayout()
     ClearZoom(stack);
 }
 
-std::string GetActiveClientBarText()
+auto GetActiveClientBarText() -> std::string
 {
     const WindowStack &stack = GetActiveStack();
     xcb_window_t active_window = stack.active_window;
@@ -807,7 +807,7 @@ void ProcessWM()
 
     if (wm_border_dirty)
     {
-        Color color = [&stack] {
+        Color color = [&stack] -> nyla::Color {
             if (wm_follow)
                 return Color::kActiveFollow;
             if (stack.zoom || stack.windows.size() < 2)
@@ -825,21 +825,21 @@ void ProcessWM()
         if (!stack.zoom)
             screen_rect = TryApplyMarginTop(screen_rect, wm_bar_height);
 
-        auto hide = [](xcb_window_t client_window, Client &client) {
+        auto hide = [](xcb_window_t client_window, Client &client) -> void {
             ConfigureClientIfNeeded(x11.conn, client_window, client,
                                     Rect{x11.screen->width_in_pixels, x11.screen->height_in_pixels, client.rect.width(),
                                          client.rect.height()},
                                     client.border_width);
         };
 
-        auto hide_all = [hide](xcb_window_t client_window, Client &client) {
+        auto hide_all = [hide](xcb_window_t client_window, Client &client) -> void {
             hide(client_window, client);
             for (xcb_window_t subwindow : client.subwindows)
                 hide(subwindow, wm_clients.at(subwindow));
         };
 
         auto configure_windows = [](Rect bounding_rect, std::span<const xcb_window_t> windows, LayoutType layout_type,
-                                    auto visitor) {
+                                    auto visitor) -> auto {
             std::vector<Rect> layout = ComputeLayout(bounding_rect, windows.size(), 2, layout_type);
             CHECK_EQ(layout.size(), windows.size());
 
@@ -847,7 +847,7 @@ void ProcessWM()
             {
                 Client &client = wm_clients.at(client_window);
 
-                auto center = [](uint32_t max, uint32_t &w, int32_t &x) {
+                auto center = [](uint32_t max, uint32_t &w, int32_t &x) -> void {
                     if (max)
                     {
                         uint32_t tmp = std::min(max, w);
@@ -864,9 +864,9 @@ void ProcessWM()
             }
         };
 
-        auto configure_subwindows = [configure_windows](const Client &client) {
+        auto configure_subwindows = [configure_windows](const Client &client) -> void {
             configure_windows(TryApplyMargin(client.rect, 20), client.subwindows, LayoutType::kRows,
-                              [](Client &client) {});
+                              [](Client &client) -> void {});
         };
 
         if (stack.zoom)
@@ -922,7 +922,7 @@ void ProcessWMEvents(const bool &is_running, uint16_t modifier, std::vector<Keyb
         xcb_generic_event_t *event = xcb_poll_for_event(x11.conn);
         if (!event)
             break;
-        absl::Cleanup event_freer = [event] { free(event); };
+        absl::Cleanup event_freer = [event] -> void { free(event); };
 
         bool is_synthethic = event->response_type & 0x80;
         uint8_t event_type = event->response_type & 0x7F;
@@ -1076,7 +1076,7 @@ void UpdateBackground()
         else
         {
             active_client_name = it->second.name;
-            std::erase_if(active_client_name, [](char ch) { return ch < 0x20 || ch > 0x7F; });
+            std::erase_if(active_client_name, [](char ch) -> bool { return ch < 0x20 || ch > 0x7F; });
         }
     }
     else
@@ -1093,7 +1093,7 @@ void UpdateBackground()
     DrawBackground(wm_clients.size(), bar_text);
 }
 
-static std::string DumpClients()
+static auto DumpClients() -> std::string
 {
     std::string out;
 
@@ -1103,7 +1103,7 @@ static std::string DumpClients()
 
     for (const auto &[client_window, client] : wm_clients)
     {
-        std::string_view indent = [&client]() {
+        std::string_view indent = [&client]() -> const char * {
             if (client.transient_for)
                 return "  T  ";
             if (!client.subwindows.empty())

@@ -11,7 +11,7 @@ using namespace rhi_vulkan_internal;
 namespace rhi_vulkan_internal
 {
 
-VkFormat ConvertRhiTextureFormatIntoVkFormat(RhiTextureFormat format)
+auto ConvertRhiTextureFormatIntoVkFormat(RhiTextureFormat format) -> VkFormat
 {
     switch (format)
     {
@@ -25,7 +25,7 @@ VkFormat ConvertRhiTextureFormatIntoVkFormat(RhiTextureFormat format)
     return static_cast<VkFormat>(0);
 }
 
-RhiTextureFormat ConvertVkFormatIntoRhiTextureFormat(VkFormat format)
+auto ConvertVkFormatIntoRhiTextureFormat(VkFormat format) -> RhiTextureFormat
 {
     CHECK(false);
     return static_cast<RhiTextureFormat>(0);
@@ -33,7 +33,7 @@ RhiTextureFormat ConvertVkFormatIntoRhiTextureFormat(VkFormat format)
 
 } // namespace rhi_vulkan_internal
 
-RhiTexture RhiCreateTexture(RhiTextureDesc desc)
+auto RhiCreateTexture(RhiTextureDesc desc) -> RhiTexture
 {
     VulkanTextureData texture_data{
         .format = ConvertRhiTextureFormatIntoVkFormat(desc.format),

@@ -8,7 +8,7 @@ namespace nyla
 using namespace rhi_internal;
 using namespace rhi_vulkan_internal;
 
-RhiCmdList RhiFrameBegin()
+auto RhiFrameBegin() -> RhiCmdList
 {
     WaitTimeline(vk.graphics_queue.timeline, vk.graphics_queue_cmd_done[vk.frame_index]);
 
@@ -192,17 +192,17 @@ void RhiFrameEnd()
     vk.frame_index = (vk.frame_index + 1) % vk.num_frames_in_flight;
 }
 
-uint32_t RhiFrameGetIndex()
+auto RhiFrameGetIndex() -> uint32_t
 {
     return vk.frame_index;
 }
 
-RhiCmdList RhiFrameGetCmdList()
+auto RhiFrameGetCmdList() -> RhiCmdList
 { // TODO: get rid of this
     return vk.graphics_queue_cmd[vk.frame_index];
 }
 
-uint32_t RhiGetNumFramesInFlight()
+auto RhiGetNumFramesInFlight() -> uint32_t
 {
     return vk.num_frames_in_flight;
 }

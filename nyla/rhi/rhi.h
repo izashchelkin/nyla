@@ -26,12 +26,12 @@ struct RhiDesc
 };
 
 void RhiInit(const RhiDesc &);
-uint32_t RhiGetNumFramesInFlight();
-uint32_t RhiFrameGetIndex();
+auto RhiGetNumFramesInFlight() -> uint32_t;
+auto RhiFrameGetIndex() -> uint32_t;
 
-uint32_t RhiGetSurfaceWidth();
-uint32_t RhiGetSurfaceHeight();
+auto RhiGetSurfaceWidth() -> uint32_t;
+auto RhiGetSurfaceHeight() -> uint32_t;
 
-uint32_t RhiGetMinUniformBufferOffsetAlignment();
+auto RhiGetMinUniformBufferOffsetAlignment() -> uint32_t;
 
 } // namespace nyla

@@ -30,7 +30,7 @@ void AbstractInputHandleReleased(AbstractInputId id);
 void AbstractInputRelease(AbstractInputMapping mapping);
 
 void AbstractInputMapId(AbstractInputMapping mapping, AbstractInputId id);
-bool Pressed(AbstractInputMapping mapping);
-uint32_t PressedFor(AbstractInputMapping mapping, uint64_t now);
+auto Pressed(AbstractInputMapping mapping) -> bool;
+auto PressedFor(AbstractInputMapping mapping, uint64_t now) -> uint32_t;
 
 } // namespace nyla

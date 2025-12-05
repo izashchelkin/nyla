@@ -97,7 +97,7 @@ Rp world_pipeline{
                 },
         },
     .Init =
-        [](Rp &rp) {
+        [](Rp &rp) -> void {
             RpAttachVertShader(rp, "nyla/apps/shipgame/shaders/build/world.vs.hlsl.spv");
             RpAttachFragShader(rp, "nyla/apps/shipgame/shaders/build/world.ps.hlsl.spv");
         },
@@ -117,7 +117,7 @@ Rp grid_pipeline{
             .range = sizeof(SceneTransforms),
         },
     .Init =
-        [](Rp &rp) {
+        [](Rp &rp) -> void {
             RpAttachVertShader(rp, "nyla/apps/shipgame/shaders/build/grid.vs.hlsl.spv");
             RpAttachFragShader(rp, "nyla/apps/shipgame/shaders/build/grid.ps.hlsl.spv");
         },

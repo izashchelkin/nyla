@@ -8,7 +8,7 @@
 namespace nyla
 {
 
-int MakeTimerFd(std::chrono::duration<double> interval)
+auto MakeTimerFd(std::chrono::duration<double> interval) -> int
 {
     int fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC);
     if (fd == -1)

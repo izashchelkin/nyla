@@ -11,7 +11,7 @@
 namespace nyla
 {
 
-static RENDERDOC_API_1_6_0 *GetRenderDocAPI()
+static auto GetRenderDocAPI() -> RENDERDOC_API_1_6_0 *
 {
     static RENDERDOC_API_1_6_0 *renderdoc_api = nullptr;
 
@@ -36,7 +36,7 @@ static RENDERDOC_API_1_6_0 *GetRenderDocAPI()
     return nullptr;
 }
 
-bool RenderDocCaptureStart()
+auto RenderDocCaptureStart() -> bool
 {
     if (auto api = GetRenderDocAPI())
     {
@@ -47,7 +47,7 @@ bool RenderDocCaptureStart()
     return false;
 }
 
-bool RenderDocCaptureEnd()
+auto RenderDocCaptureEnd() -> bool
 {
     if (auto api = GetRenderDocAPI())
     {
@@ -62,11 +62,11 @@ bool RenderDocCaptureEnd()
 
 #else
 
-bool RenderDocCaptureStart()
+auto RenderDocCaptureStart() -> bool
 {
     return false;
 }
-bool RenderDocCaptureEnd()
+auto RenderDocCaptureEnd() -> bool
 {
     return false;
 }

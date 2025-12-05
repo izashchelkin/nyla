@@ -83,7 +83,7 @@ Rp worldPipeline{
                 },
         },
     .Init =
-        [](Rp &rp) {
+        [](Rp &rp) -> void {
             RpAttachVertShader(rp, "nyla/apps/breakout/shaders/build/world.vs.hlsl.spv");
             RpAttachFragShader(rp, "nyla/apps/breakout/shaders/build/world.ps.hlsl.spv");
         },

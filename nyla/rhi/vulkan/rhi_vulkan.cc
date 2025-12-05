@@ -29,7 +29,7 @@ namespace rhi_vulkan_internal
 VulkanData vk;
 RhiHandles rhi_handles;
 
-VkFormat ConvertRhiVertexFormatIntoVkFormat(RhiVertexFormat format)
+auto ConvertRhiVertexFormatIntoVkFormat(RhiVertexFormat format) -> VkFormat
 {
     switch (format)
     {
@@ -43,7 +43,7 @@ VkFormat ConvertRhiVertexFormatIntoVkFormat(RhiVertexFormat format)
     return static_cast<VkFormat>(0);
 }
 
-VkShaderStageFlags ConvertRhiShaderStageIntoVkShaderStageFlags(RhiShaderStage stage_flags)
+auto ConvertRhiShaderStageIntoVkShaderStageFlags(RhiShaderStage stage_flags) -> VkShaderStageFlags
 {
     VkShaderStageFlags ret = 0;
     if (Any(stage_flags & RhiShaderStage::Vertex))
@@ -57,9 +57,9 @@ VkShaderStageFlags ConvertRhiShaderStageIntoVkShaderStageFlags(RhiShaderStage st
     return ret;
 }
 
-VkBool32 DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
+auto DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
                                 VkDebugUtilsMessageTypeFlagsEXT message_type,
-                                const VkDebugUtilsMessengerCallbackDataEXT *callback_data, void *user_data)
+                                const VkDebugUtilsMessengerCallbackDataEXT *callback_data, void *user_data) -> VkBool32
 {
     switch (message_severity)
     {
@@ -365,7 +365,7 @@ void RhiInit(const RhiDesc &rhi_desc)
         vkGetDeviceQueue(vk.dev, vk.transfer_queue.queue_family_index, 0, &vk.transfer_queue.queue);
     }
 
-    auto init_queue = [](DeviceQueue &queue, RhiQueueType queue_type, std::span<RhiCmdList> cmd) {
+    auto init_queue = [](DeviceQueue &queue, RhiQueueType queue_type, std::span<RhiCmdList> cmd) -> void {
         const VkCommandPoolCreateInfo command_pool_create_info{
             .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
             .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
@@ -416,17 +416,17 @@ void RhiInit(const RhiDesc &rhi_desc)
     CreateSwapchain();
 }
 
-uint32_t RhiGetMinUniformBufferOffsetAlignment()
+auto RhiGetMinUniformBufferOffsetAlignment() -> uint32_t
 {
     return vk.phys_dev_props.limits.minUniformBufferOffsetAlignment;
 }
 
-uint32_t RhiGetSurfaceWidth()
+auto RhiGetSurfaceWidth() -> uint32_t
 {
     return vk.surface_extent.width;
 }
 
-uint32_t RhiGetSurfaceHeight()
+auto RhiGetSurfaceHeight() -> uint32_t
 {
     return vk.surface_extent.height;
 }

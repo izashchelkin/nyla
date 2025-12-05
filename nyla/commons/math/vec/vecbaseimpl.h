@@ -29,25 +29,25 @@ Vec::operator VecSpan() &&
     return Tmake(std::move(*this));
 };
 
-const VecComponentType &nyla__Vec::operator[](size_t i) const
+auto nyla__Vec::operator[](size_t i) const -> const VecComponentType &
 {
     CHECK(i < kVecDimension);
     return v[i];
 }
-VecComponentType &nyla__Vec::operator[](size_t i)
+auto nyla__Vec::operator[](size_t i) -> VecComponentType &
 {
     CHECK(i < kVecDimension);
     return v[i];
 }
 
-Vec NYLA__VEC(Neg)(VecSpanConst rhs)
+auto NYLA__VEC(Neg)(VecSpanConst rhs) -> Vec
 {
     CHECK(rhs.size() >= kVecDimension);
 
     return Vec{-rhs[0], -rhs[1]};
 }
 
-Vec NYLA__VEC(Sum)(VecSpanConst lhs, VecSpanConst rhs)
+auto NYLA__VEC(Sum)(VecSpanConst lhs, VecSpanConst rhs) -> Vec
 {
     CHECK(lhs.size() >= kVecDimension && rhs.size() >= kVecDimension);
 
@@ -69,7 +69,7 @@ void NYLA__VEC(Add)(VecSpan lhs, VecSpanConst rhs)
     }
 }
 
-Vec NYLA__VEC(Dif)(VecSpanConst lhs, VecSpanConst rhs)
+auto NYLA__VEC(Dif)(VecSpanConst lhs, VecSpanConst rhs) -> Vec
 {
     CHECK(lhs.size() >= kVecDimension && rhs.size() >= kVecDimension);
 
@@ -86,7 +86,7 @@ void NYLA__VEC(Sub)(VecSpan lhs, VecSpanConst rhs)
     }
 }
 
-Vec NYLA__VEC(Mul)(VecSpanConst lhs, VecComponentType scalar)
+auto NYLA__VEC(Mul)(VecSpanConst lhs, VecComponentType scalar) -> Vec
 {
     CHECK(lhs.size() >= kVecDimension);
 
@@ -103,7 +103,7 @@ void NYLA__VEC(Scale)(VecSpan lhs, VecComponentType scalar)
     }
 }
 
-Vec NYLA__VEC(Div)(VecSpanConst lhs, VecComponentType scalar)
+auto NYLA__VEC(Div)(VecSpanConst lhs, VecComponentType scalar) -> Vec
 {
     CHECK(lhs.size() >= kVecDimension);
 
@@ -120,7 +120,7 @@ void NYLA__VEC(ScaleDown)(VecSpan lhs, VecComponentType scalar)
     }
 }
 
-bool NYLA__VEC(Eq)(VecSpanConst lhs, VecSpanConst rhs)
+auto NYLA__VEC(Eq)(VecSpanConst lhs, VecSpanConst rhs) -> bool
 {
     CHECK(lhs.size() >= kVecDimension && rhs.size() >= kVecDimension);
 
@@ -132,7 +132,7 @@ bool NYLA__VEC(Eq)(VecSpanConst lhs, VecSpanConst rhs)
     return true;
 }
 
-VecComponentType NYLA__VEC(Len)(VecSpanConst rhs)
+auto NYLA__VEC(Len)(VecSpanConst rhs) -> VecComponentType
 {
     VecComponentType ret{};
     for (size_t i = 0; i < kVecDimension; ++i)
@@ -142,17 +142,17 @@ VecComponentType NYLA__VEC(Len)(VecSpanConst rhs)
     return std::sqrt(ret);
 }
 
-Vec NYLA__VEC(Resized)(VecSpanConst rhs, VecComponentType len)
+auto NYLA__VEC(Resized)(VecSpanConst rhs, VecComponentType len) -> Vec
 {
     return NYLA__VEC(Mul)(rhs, len / NYLA__VEC(Len)(rhs));
 }
 
-Vec NYLA__VEC(Norm)(VecSpanConst rhs)
+auto NYLA__VEC(Norm)(VecSpanConst rhs) -> Vec
 {
     return NYLA__VEC(Div)(rhs, NYLA__VEC(Len)(rhs));
 }
 
-VecComponentType NYLA__VEC(Dot)(VecSpanConst lhs, VecSpanConst rhs)
+auto NYLA__VEC(Dot)(VecSpanConst lhs, VecSpanConst rhs) -> VecComponentType
 {
     CHECK(lhs.size() >= kVecDimension && rhs.size() >= kVecDimension);
 
@@ -164,7 +164,7 @@ VecComponentType NYLA__VEC(Dot)(VecSpanConst lhs, VecSpanConst rhs)
     return ret;
 }
 
-Vec NYLA__VEC(Apply)(VecSpanConst lhs, std::complex<VecComponentType> comp)
+auto NYLA__VEC(Apply)(VecSpanConst lhs, std::complex<VecComponentType> comp) -> Vec
 {
     CHECK(lhs.size() >= kVecDimension);
 

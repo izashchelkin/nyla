@@ -14,7 +14,7 @@ using namespace rhi_vulkan_internal;
 namespace
 {
 
-VkDescriptorType ConvertVulkanBindingType(RhiBindingType binding_type)
+auto ConvertVulkanBindingType(RhiBindingType binding_type) -> VkDescriptorType
 {
     switch (binding_type)
     {
@@ -29,7 +29,7 @@ VkDescriptorType ConvertVulkanBindingType(RhiBindingType binding_type)
 
 } // namespace
 
-RhiBindGroupLayout RhiCreateBindGroupLayout(const RhiBindGroupLayoutDesc &desc)
+auto RhiCreateBindGroupLayout(const RhiBindGroupLayoutDesc &desc) -> RhiBindGroupLayout
 {
     CHECK_LE(desc.binding_count, std::size(desc.bindings));
     VkDescriptorSetLayoutBinding descriptor_set_layout_bindings[std::size(desc.bindings)];
@@ -63,7 +63,7 @@ void RhiDestroyBindGroupLayout(RhiBindGroupLayout layout)
     vkDestroyDescriptorSetLayout(vk.dev, descriptor_set_layout, nullptr);
 }
 
-RhiBindGroup RhiCreateBindGroup(const RhiBindGroupDesc &desc)
+auto RhiCreateBindGroup(const RhiBindGroupDesc &desc) -> RhiBindGroup
 {
     VkDescriptorSetLayout descriptor_set_layout = RhiHandleGetData(rhi_handles.bind_group_layouts, desc.layout);
 

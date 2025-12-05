@@ -130,9 +130,9 @@ struct RhiGraphicsPipelineDesc
     RhiFrontFace front_face;
 };
 
-uint32_t RhiGetVertexFormatSize(RhiVertexFormat);
+auto RhiGetVertexFormatSize(RhiVertexFormat) -> uint32_t;
 
-RhiGraphicsPipeline RhiCreateGraphicsPipeline(const RhiGraphicsPipelineDesc &);
+auto RhiCreateGraphicsPipeline(const RhiGraphicsPipelineDesc &) -> RhiGraphicsPipeline;
 void RhiNameGraphicsPipeline(RhiGraphicsPipeline, std::string_view name);
 void RhiDestroyGraphicsPipeline(RhiGraphicsPipeline);
 

@@ -8,7 +8,7 @@ namespace
 using Vertex = Vertex;
 }
 
-std::vector<Vertex> TriangulateLine(const Vec2f &A, const Vec2f &B, float thickness)
+auto TriangulateLine(const Vec2f &A, const Vec2f &B, float thickness) -> std::vector<Vertex>
 {
     const Vec3f green = {0.f, 1.f, 0.f};
     const Vec3f red = {1.f, 0.f, 0.f};

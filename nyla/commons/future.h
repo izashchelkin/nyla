@@ -5,7 +5,7 @@
 namespace nyla
 {
 
-template <typename T> inline bool IsFutureReady(const std::future<T> &fut)
+template <typename T> inline auto IsFutureReady(const std::future<T> &fut) -> bool
 {
     if (!fut.valid())
         return true;

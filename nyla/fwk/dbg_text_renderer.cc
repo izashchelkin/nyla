@@ -63,7 +63,7 @@ Rp dbg_text_pipeline{
             .range = sizeof(DbgTextLine),
         },
     .Init =
-        [](Rp &rp) {
+        [](Rp &rp) -> void {
             RpAttachVertShader(rp, "/home/izashchelkin/nyla/nyla/fwk/shaders/build/dbgtext.vs.hlsl.spv");
             RpAttachFragShader(rp, "/home/izashchelkin/nyla/nyla/fwk/shaders/build/dbgtext.ps.hlsl.spv");
         },

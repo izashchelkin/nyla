@@ -51,7 +51,7 @@ enum class GameStage
 };
 static GameStage stage = GameStage::kGame;
 
-template <typename T> static T &FrameLocal(std::vector<T> &vec, auto create)
+template <typename T> static auto FrameLocal(std::vector<T> &vec, auto create) -> T &
 {
     vec.reserve(RhiGetNumFramesInFlight());
     uint32_t frame_index = RhiFrameGetIndex();
@@ -99,7 +99,7 @@ void BreakoutInit()
     }
 }
 
-static bool IsInside(float pos, float size, Vec2f boundary)
+static auto IsInside(float pos, float size, Vec2f boundary) -> bool
 {
     if (pos > boundary[0] - size / 2.f && pos < boundary[1] + size / 2.f)
     {
@@ -181,18 +181,18 @@ void BreakoutFrame(float dt, uint32_t fps)
 
     {
         static std ::vector<RpMesh> unit_rect_meshes;
-        RpMesh unit_rect_mesh = FrameLocal(unit_rect_meshes, [] {
+        RpMesh unit_rect_mesh = FrameLocal(unit_rect_meshes, [] -> RpMesh {
             std::vector<Vertex> unit_rect;
             unit_rect.reserve(6);
-            GenUnitRect([&unit_rect](float x, float y) { unit_rect.emplace_back(Vertex{Vec2f{x, y}}); });
+            GenUnitRect([&unit_rect](float x, float y) -> void { unit_rect.emplace_back(Vertex{Vec2f{x, y}}); });
             return RpVertCopy(worldPipeline, unit_rect.size(), CharViewSpan(std::span{unit_rect}));
         });
 
         static std ::vector<RpMesh> unit_circle_meshes;
-        RpMesh unit_circle_mesh = FrameLocal(unit_circle_meshes, [] {
+        RpMesh unit_circle_mesh = FrameLocal(unit_circle_meshes, [] -> RpMesh {
             std::vector<Vertex> unit_circle;
             unit_circle.reserve(32 * 3);
-            GenUnitCircle(32, [&unit_circle](float x, float y) { unit_circle.emplace_back(Vertex{Vec2f{x, y}}); });
+            GenUnitCircle(32, [&unit_circle](float x, float y) -> void { unit_circle.emplace_back(Vertex{Vec2f{x, y}}); });
             return RpVertCopy(worldPipeline, unit_circle.size(), CharViewSpan(std::span{unit_circle}));
         });
 

@@ -5,7 +5,7 @@
 namespace nyla
 {
 
-bool RecompileShadersIfNeeded()
+auto RecompileShadersIfNeeded() -> bool
 {
     static bool b = false;
     if (!b)

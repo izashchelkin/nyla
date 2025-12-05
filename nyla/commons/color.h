@@ -5,6 +5,6 @@
 namespace nyla
 {
 
-Vec3f ConvertHsvToRgb(float h, float s, float v);
+auto ConvertHsvToRgb(float h, float s, float v) -> Vec3f;
 
 } // namespace nyla

@@ -29,7 +29,7 @@ namespace nyla
 
 using namespace platform_x11_internal;
 
-int Main(int argc, char **argv)
+auto Main(int argc, char **argv) -> int
 {
     LoggingInit();
     TArenaInit();
@@ -64,9 +64,9 @@ int Main(int argc, char **argv)
         X11_KeyResolver key_resolver;
         X11_InitializeKeyResolver(key_resolver);
 
-        auto SpawnTerminal = [] { Spawn({{"ghostty", nullptr}}); };
-        auto SpawnLauncher = [] { Spawn({{"dmenu_run", nullptr}}); };
-        auto Nothing = [] {};
+        auto SpawnTerminal = [] -> void { Spawn({{"ghostty", nullptr}}); };
+        auto SpawnLauncher = [] -> void { Spawn({{"dmenu_run", nullptr}}); };
+        auto Nothing = [] -> void {};
 
         for (auto [key, mod, handler] : std::initializer_list<std::tuple<KeyPhysical, int, KeybindHandler>>{
                  {KeyPhysical::W, 0, NextLayout},
@@ -114,7 +114,7 @@ int Main(int argc, char **argv)
 
     if (!tfd)
         LOG(QFATAL) << "MakeTimerFdMillis";
-    absl::Cleanup tfd_closer = [tfd] { close(tfd); };
+    absl::Cleanup tfd_closer = [tfd] -> void { close(tfd); };
     fds.emplace_back(pollfd{
         .fd = tfd,
         .events = POLLIN,
@@ -122,8 +122,8 @@ int Main(int argc, char **argv)
 
     DebugFsRegister(
         "quit", &is_running, //
-        [](auto &file) { file.content = "quit\n"; },
-        [](auto &file) {
+        [](auto &file) -> auto { file.content = "quit\n"; },
+        [](auto &file) -> auto {
             *reinterpret_cast<bool *>(file.data) = false;
             LOG(INFO) << "exit requested";
         });
@@ -196,7 +196,7 @@ int Main(int argc, char **argv)
 
 } // namespace nyla
 
-int main(int argc, char **argv)
+auto main(int argc, char **argv) -> int
 {
     return nyla::Main(argc, argv);
 }

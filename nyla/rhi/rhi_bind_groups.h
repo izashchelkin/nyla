@@ -60,10 +60,10 @@ struct RhiBindGroupLayoutDesc
     uint32_t binding_count;
 };
 
-RhiBindGroupLayout RhiCreateBindGroupLayout(const RhiBindGroupLayoutDesc &);
+auto RhiCreateBindGroupLayout(const RhiBindGroupLayoutDesc &) -> RhiBindGroupLayout;
 void RhiDestroyBindGroupLayout(RhiBindGroupLayout);
 
-RhiBindGroup RhiCreateBindGroup(const RhiBindGroupDesc &);
+auto RhiCreateBindGroup(const RhiBindGroupDesc &) -> RhiBindGroup;
 void RhiDestroyBindGroup(RhiBindGroup);
 
 } // namespace nyla

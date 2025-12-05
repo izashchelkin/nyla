@@ -24,7 +24,7 @@ static void HandleNameOwnerChange(const char *name, const char *old_owner, const
 {
     if (new_owner && *new_owner == '\0' && old_owner && *old_owner != '\0')
     {
-        absl::erase_if(inhibit_cookies, [old_owner](auto &ent) {
+        absl::erase_if(inhibit_cookies, [old_owner](auto &ent) -> auto {
             const auto &[cookie, owner] = ent;
             return owner == old_owner;
         });
@@ -101,7 +101,7 @@ static void HandleMessage(DBusMessage *msg)
     LOG(INFO) << "inhibit count: " << inhibit_cookies.size();
 }
 
-static std::string DumpInhibitors();
+static auto DumpInhibitors() -> std::string;
 
 void ScreenSaverInhibitorInit()
 {
@@ -135,11 +135,11 @@ void ScreenSaverInhibitorInit()
 
     DebugFsRegister(
         "screensaver_inhibitors", nullptr,                   //
-        [](auto &file) { file.content = DumpInhibitors(); }, //
+        [](auto &file) -> auto { file.content = DumpInhibitors(); }, //
         nullptr);
 }
 
-static std::string DumpInhibitors()
+static auto DumpInhibitors() -> std::string
 {
     std::string out;
 

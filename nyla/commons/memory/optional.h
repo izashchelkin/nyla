@@ -5,7 +5,7 @@
 namespace nyla
 {
 
-template <typename T> std::optional<T> Unown(T *p)
+template <typename T> auto Unown(T *p) -> std::optional<T>
 {
     if (!p)
         return {};

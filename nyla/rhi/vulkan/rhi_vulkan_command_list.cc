@@ -13,7 +13,7 @@ using namespace rhi_vulkan_internal;
 namespace
 {
 
-DeviceQueue &GetDeviceQueue(RhiQueueType queue_type)
+auto GetDeviceQueue(RhiQueueType queue_type) -> DeviceQueue &
 {
     switch (queue_type)
     {
@@ -27,7 +27,7 @@ DeviceQueue &GetDeviceQueue(RhiQueueType queue_type)
 
 } // namespace
 
-RhiCmdList RhiCreateCmdList(RhiQueueType queue_type)
+auto RhiCreateCmdList(RhiQueueType queue_type) -> RhiCmdList
 {
     VkCommandPool cmd_pool = GetDeviceQueue(queue_type).cmd_pool;
     const VkCommandBufferAllocateInfo alloc_info{
@@ -62,7 +62,7 @@ void RhiDestroyCmdList(RhiCmdList cmd)
     vkFreeCommandBuffers(vk.dev, cmd_pool, 1, &cmd_data.cmdbuf);
 }
 
-uint64_t __RhiCmdSetCheckpoint(RhiCmdList cmd, uint64_t data)
+auto __RhiCmdSetCheckpoint(RhiCmdList cmd, uint64_t data) -> uint64_t
 {
     if constexpr (!rhi_checkpoints)
     {
@@ -77,7 +77,7 @@ uint64_t __RhiCmdSetCheckpoint(RhiCmdList cmd, uint64_t data)
     return data;
 }
 
-uint64_t __RhiGetLastCheckpointData(RhiQueueType queue_type)
+auto __RhiGetLastCheckpointData(RhiQueueType queue_type) -> uint64_t
 {
     if constexpr (!rhi_checkpoints)
     {

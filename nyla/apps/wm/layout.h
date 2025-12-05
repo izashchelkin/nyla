@@ -29,49 +29,49 @@ class Rect
         this->height_ = rhs.height_;
     }
 
-    bool operator==(const Rect &rhs) const
+    auto operator==(const Rect &rhs) const -> bool
     {
         return this->x_ == rhs.x_ && this->y_ == rhs.y_ && this->width_ == rhs.width_ && this->height_ == rhs.height_;
     }
-    bool operator!=(const Rect &rhs) const
+    auto operator!=(const Rect &rhs) const -> bool
     {
         return !(*this == rhs);
     }
 
     template <typename Sink> friend void AbslStringify(Sink &sink, const Rect &rect);
 
-    int32_t &x()
+    auto x() -> int32_t &
     {
         return x_;
     }
-    const int32_t &x() const
+    auto x() const -> const int32_t &
     {
         return x_;
     }
 
-    int32_t &y()
+    auto y() -> int32_t &
     {
         return y_;
     }
-    const int32_t &y() const
+    auto y() const -> const int32_t &
     {
         return y_;
     }
 
-    uint32_t &width()
+    auto width() -> uint32_t &
     {
         return width_;
     }
-    const uint32_t &width() const
+    auto width() const -> const uint32_t &
     {
         return width_;
     }
 
-    uint32_t &height()
+    auto height() -> uint32_t &
     {
         return height_;
     }
-    const uint32_t &height() const
+    auto height() const -> const uint32_t &
     {
         return height_;
     }
@@ -89,7 +89,7 @@ template <typename Sink> void AbslStringify(Sink &sink, const Rect &rect)
     absl::Format(&sink, "%dx%d at (%d, %d)", rect.width_, rect.height_, rect.x_, rect.y_);
 }
 
-inline bool IsSameWH(const Rect &lhs, const Rect &rhs)
+inline auto IsSameWH(const Rect &lhs, const Rect &rhs) -> bool
 {
     if (lhs.width() != rhs.width())
         return false;
@@ -98,9 +98,9 @@ inline bool IsSameWH(const Rect &lhs, const Rect &rhs)
     return true;
 }
 
-Rect TryApplyPadding(const Rect &rect, uint32_t padding);
-Rect TryApplyMargin(const Rect &rect, uint32_t margin);
-Rect TryApplyMarginTop(const Rect &rect, uint32_t margin_top);
+auto TryApplyPadding(const Rect &rect, uint32_t padding) -> Rect;
+auto TryApplyMargin(const Rect &rect, uint32_t margin) -> Rect;
+auto TryApplyMarginTop(const Rect &rect, uint32_t margin_top) -> Rect;
 
 enum class LayoutType
 {
@@ -112,7 +112,7 @@ enum class LayoutType
 
 void CycleLayoutType(LayoutType &layout);
 
-std::vector<Rect> ComputeLayout(const Rect &bounding_rect, uint32_t n, uint32_t padding,
-                                LayoutType layout_type = LayoutType::kColumns);
+auto ComputeLayout(const Rect &bounding_rect, uint32_t n, uint32_t padding,
+                                LayoutType layout_type = LayoutType::kColumns) -> std::vector<Rect>;
 
 } // namespace nyla

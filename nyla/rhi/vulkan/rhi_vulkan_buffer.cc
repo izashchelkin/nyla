@@ -13,7 +13,7 @@ using namespace rhi_vulkan_internal;
 namespace rhi_vulkan_internal
 {
 
-VkBufferUsageFlags ConvertRhiBufferUsageIntoVkBufferUsageFlags(RhiBufferUsage usage)
+auto ConvertRhiBufferUsageIntoVkBufferUsageFlags(RhiBufferUsage usage) -> VkBufferUsageFlags
 {
     VkBufferUsageFlags ret = 0;
 
@@ -41,7 +41,7 @@ VkBufferUsageFlags ConvertRhiBufferUsageIntoVkBufferUsageFlags(RhiBufferUsage us
     return ret;
 }
 
-VkMemoryPropertyFlags ConvertRhiMemoryUsageIntoVkMemoryPropertyFlags(RhiMemoryUsage usage)
+auto ConvertRhiMemoryUsageIntoVkMemoryPropertyFlags(RhiMemoryUsage usage) -> VkMemoryPropertyFlags
 {
     // TODO: not all GPUs support HOST_COHERENT, HOST_CACHED
 
@@ -59,11 +59,11 @@ VkMemoryPropertyFlags ConvertRhiMemoryUsageIntoVkMemoryPropertyFlags(RhiMemoryUs
     return 0;
 }
 
-uint32_t FindMemoryTypeIndex(VkMemoryRequirements mem_requirements, VkMemoryPropertyFlags properties)
+auto FindMemoryTypeIndex(VkMemoryRequirements mem_requirements, VkMemoryPropertyFlags properties) -> uint32_t
 {
     // TODO: not all GPUs support HOST_COHERENT, HOST_CACHED
 
-    static const VkPhysicalDeviceMemoryProperties mem_propertities = [] {
+    static const VkPhysicalDeviceMemoryProperties mem_propertities = [] -> VkPhysicalDeviceMemoryProperties {
         VkPhysicalDeviceMemoryProperties mem_propertities;
         vkGetPhysicalDeviceMemoryProperties(vk.phys_dev, &mem_propertities);
         return mem_propertities;
@@ -89,7 +89,7 @@ uint32_t FindMemoryTypeIndex(VkMemoryRequirements mem_requirements, VkMemoryProp
 
 } // namespace rhi_vulkan_internal
 
-RhiBuffer RhiCreateBuffer(const RhiBufferDesc &desc)
+auto RhiCreateBuffer(const RhiBufferDesc &desc) -> RhiBuffer
 {
     VulkanBufferData buffer_data{};
 
@@ -136,7 +136,7 @@ void RhiDestroyBuffer(RhiBuffer buffer)
     vkFreeMemory(vk.dev, buffer_data.memory, nullptr);
 }
 
-void *RhiMapBuffer(RhiBuffer buffer, bool idempotent)
+auto RhiMapBuffer(RhiBuffer buffer, bool idempotent) -> void *
 {
     VulkanBufferData &buffer_data = RhiHandleGetData(rhi_handles.buffers, buffer);
     if (!buffer_data.mapped)

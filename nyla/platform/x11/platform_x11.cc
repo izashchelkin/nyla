@@ -77,7 +77,7 @@ void PlatformMapInputEnd()
     key_resolver = {};
 }
 
-PlatformWindow PlatformCreateWindow()
+auto PlatformCreateWindow() -> PlatformWindow
 {
     xcb_window_t window = xcb_generate_id(x11.conn);
 
@@ -95,7 +95,7 @@ PlatformWindow PlatformCreateWindow()
     return {window};
 }
 
-PlatformWindowSize PlatformGetWindowSize(PlatformWindow window)
+auto PlatformGetWindowSize(PlatformWindow window) -> PlatformWindowSize
 {
     const xcb_get_geometry_reply_t *window_geometry =
         xcb_get_geometry_reply(x11.conn, xcb_get_geometry(x11.conn, window.handle), nullptr);
@@ -118,7 +118,7 @@ void PlatformFsWatch(const std::string &filepath)
     fs_watched.emplace_back(filepath);
 }
 
-std::span<PlatformFsChange> PlatformFsGetChanges()
+auto PlatformFsGetChanges() -> std::span<PlatformFsChange>
 {
     return fs_changes;
 }
@@ -164,7 +164,7 @@ void PlatformProcessEvents()
         if (!event)
             break;
 
-        absl::Cleanup event_freer = [=]() { free(event); };
+        absl::Cleanup event_freer = [=]() -> void { free(event); };
         const uint8_t event_type = event->response_type & 0x7F;
 
         uint64_t now = GetMonotonicTimeMicros();
@@ -209,7 +209,7 @@ void PlatformProcessEvents()
     }
 }
 
-bool PlatformShouldExit()
+auto PlatformShouldExit() -> bool
 {
     return should_exit;
 }
@@ -217,7 +217,7 @@ bool PlatformShouldExit()
 namespace platform_x11_internal
 {
 
-const char *ConvertKeyPhysicalIntoXkbName(KeyPhysical key)
+auto ConvertKeyPhysicalIntoXkbName(KeyPhysical key) -> const char *
 {
     using K = KeyPhysical;
 
@@ -459,7 +459,7 @@ void X11_Initialize()
     }
 }
 
-xcb_window_t X11_CreateWindow(uint32_t width, uint32_t height, bool override_redirect, xcb_event_mask_t event_mask)
+auto X11_CreateWindow(uint32_t width, uint32_t height, bool override_redirect, xcb_event_mask_t event_mask) -> xcb_window_t
 {
     const xcb_window_t window = xcb_generate_id(x11.conn);
 
@@ -477,13 +477,13 @@ void X11_Flush()
     xcb_flush(x11.conn);
 }
 
-xcb_atom_t X11_InternAtom(xcb_connection_t *conn, std::string_view name,
+auto X11_InternAtom(xcb_connection_t *conn, std::string_view name,
 
-                          bool only_if_exists)
+                          bool only_if_exists) -> xcb_atom_t
 {
     xcb_intern_atom_reply_t *reply =
         xcb_intern_atom_reply(conn, xcb_intern_atom(conn, only_if_exists, name.size(), name.data()), nullptr);
-    absl::Cleanup reply_freer = [reply] {
+    absl::Cleanup reply_freer = [reply] -> void {
         if (reply)
             free(reply);
     };
@@ -538,7 +538,7 @@ void X11_SendConfigureNotify(xcb_window_t window, xcb_window_t parent, int16_t x
 
 //
 
-bool X11_InitializeKeyResolver(X11_KeyResolver &key_resolver)
+auto X11_InitializeKeyResolver(X11_KeyResolver &key_resolver) -> bool
 {
     key_resolver.ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
     if (!key_resolver.ctx)
@@ -562,7 +562,7 @@ void X11_FreeKeyResolver(X11_KeyResolver &key_resolver)
     xkb_context_unref(key_resolver.ctx);
 }
 
-xcb_keycode_t X11_ResolveKeyCode(const X11_KeyResolver &key_resolver, std::string_view keyname)
+auto X11_ResolveKeyCode(const X11_KeyResolver &key_resolver, std::string_view keyname) -> xcb_keycode_t
 {
     const xkb_keycode_t keycode = xkb_keymap_key_by_name(key_resolver.keymap, keyname.data());
     CHECK(xkb_keycode_is_legal_x11(keycode));
