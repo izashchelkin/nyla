@@ -55,12 +55,12 @@ auto Spawn(std::span<const char *const> cmd) -> bool
         return true;
     }
 
-    int dev_null_fd = open("/dev/null", O_RDWR);
-    if (dev_null_fd != -1)
+    int devNullFd = open("/dev/null", O_RDWR);
+    if (devNullFd != -1)
     {
-        dup2(dev_null_fd, STDIN_FILENO);
-        dup2(dev_null_fd, STDOUT_FILENO);
-        dup2(dev_null_fd, STDERR_FILENO);
+        dup2(devNullFd, STDIN_FILENO);
+        dup2(devNullFd, STDOUT_FILENO);
+        dup2(devNullFd, STDERR_FILENO);
     }
 
     if (close_range(3, ~0U, CLOSE_RANGE_UNSHARE) != 0)

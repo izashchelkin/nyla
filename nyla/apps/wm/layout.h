@@ -11,7 +11,7 @@ namespace nyla
 class Rect
 {
   public:
-    Rect(int32_t x, int32_t y, uint32_t width, uint32_t height) : x_{x}, y_{y}, width_{width}, height_{height}
+    Rect(int32_t x, int32_t y, uint32_t width, uint32_t height) : x{x}, y{y}, width{width}, height{height}
     {
     }
     Rect(uint32_t width, uint32_t height) : Rect{0, 0, width, height}
@@ -23,15 +23,15 @@ class Rect
 
     void operator=(const Rect &rhs)
     {
-        this->x_ = rhs.x_;
-        this->y_ = rhs.y_;
-        this->width_ = rhs.width_;
-        this->height_ = rhs.height_;
+        this->x = rhs.x;
+        this->y = rhs.y;
+        this->width = rhs.width;
+        this->height = rhs.height;
     }
 
     auto operator==(const Rect &rhs) const -> bool
     {
-        return this->x_ == rhs.x_ && this->y_ == rhs.y_ && this->width_ == rhs.width_ && this->height_ == rhs.height_;
+        return this->x == rhs.x && this->y == rhs.y && this->width == rhs.width && this->height == rhs.height;
     }
     auto operator!=(const Rect &rhs) const -> bool
     {
@@ -40,79 +40,79 @@ class Rect
 
     template <typename Sink> friend void AbslStringify(Sink &sink, const Rect &rect);
 
-    auto x() -> int32_t &
+    auto X() -> int32_t &
     {
-        return x_;
+        return x;
     }
-    auto x() const -> const int32_t &
+    auto X() const -> const int32_t &
     {
-        return x_;
-    }
-
-    auto y() -> int32_t &
-    {
-        return y_;
-    }
-    auto y() const -> const int32_t &
-    {
-        return y_;
+        return x;
     }
 
-    auto width() -> uint32_t &
+    auto Y() -> int32_t &
     {
-        return width_;
+        return y;
     }
-    auto width() const -> const uint32_t &
+    auto Y() const -> const int32_t &
     {
-        return width_;
+        return y;
     }
 
-    auto height() -> uint32_t &
+    auto Width() -> uint32_t &
     {
-        return height_;
+        return width;
     }
-    auto height() const -> const uint32_t &
+    auto Width() const -> const uint32_t &
     {
-        return height_;
+        return width;
+    }
+
+    auto Height() -> uint32_t &
+    {
+        return height;
+    }
+    auto Height() const -> const uint32_t &
+    {
+        return height;
     }
 
   private:
-    int32_t x_;
-    int32_t y_;
-    uint32_t width_;
-    uint32_t height_;
+    int32_t x;
+    int32_t y;
+    uint32_t width;
+    uint32_t height;
 };
 static_assert(sizeof(Rect) == 16);
 
 template <typename Sink> void AbslStringify(Sink &sink, const Rect &rect)
 {
-    absl::Format(&sink, "%dx%d at (%d, %d)", rect.width_, rect.height_, rect.x_, rect.y_);
+    absl::Format(&sink, "%dx%d at (%d, %d)", rect.width, rect.height, rect.x, rect.y);
 }
 
 inline auto IsSameWH(const Rect &lhs, const Rect &rhs) -> bool
 {
-    if (lhs.width() != rhs.width())
+    if (lhs.Width() != rhs.Width())
         return false;
-    if (lhs.height() != rhs.height())
+    if (lhs.Height() != rhs.Height())
         return false;
     return true;
 }
 
 auto TryApplyPadding(const Rect &rect, uint32_t padding) -> Rect;
 auto TryApplyMargin(const Rect &rect, uint32_t margin) -> Rect;
-auto TryApplyMarginTop(const Rect &rect, uint32_t margin_top) -> Rect;
+auto TryApplyMarginTop(const Rect &rect, uint32_t marginTop) -> Rect;
 
 enum class LayoutType
 {
-    kColumns,
-    kRows,
-    kGrid,
+    KColumns,
+    KRows,
+    KGrid,
     /* kFibonacciSpiral */
 };
 
 void CycleLayoutType(LayoutType &layout);
 
-auto ComputeLayout(const Rect &bounding_rect, uint32_t n, uint32_t padding,
-                                LayoutType layout_type = LayoutType::kColumns) -> std::vector<Rect>;
+auto ComputeLayout(const Rect &boundingRect, uint32_t n, uint32_t padding,
+                                LayoutType layoutType = LayoutType::KColumns) -> std::vector<Rect>;
 
 } // namespace nyla

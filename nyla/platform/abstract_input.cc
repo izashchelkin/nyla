@@ -30,7 +30,7 @@ namespace
 
 struct InputState
 {
-    uint64_t pressed_at;
+    uint64_t pressedAt;
     bool released;
 };
 
@@ -41,15 +41,15 @@ static Map<AbstractInputMapping, AbstractInputId> inputmapping;
 
 void AbstractInputHandlePressed(AbstractInputId id, uint64_t ts)
 {
-    auto [it, ok] = inputstate.try_emplace(id, InputState{.pressed_at = ts});
+    auto [it, ok] = inputstate.try_emplace(id, InputState{.pressedAt = ts});
     if (ok)
         return;
 
     auto &[_, state] = *it;
-    if (state.pressed_at)
+    if (state.pressedAt)
         return;
 
-    state.pressed_at = ts;
+    state.pressedAt = ts;
 }
 
 void AbstractInputHandleReleased(AbstractInputId id)
@@ -81,7 +81,7 @@ void AbstractInputProcessFrame()
     {
         if (state.released)
         {
-            state.pressed_at = 0;
+            state.pressedAt = 0;
             state.released = false;
         }
     }
@@ -102,7 +102,7 @@ auto Pressed(AbstractInputMapping mapping) -> bool
     }
 
     auto &[_, state] = *it;
-    return state.pressed_at > 0;
+    return state.pressedAt > 0;
 }
 
 auto PressedFor(AbstractInputMapping mapping, uint64_t now) -> uint32_t
@@ -115,12 +115,12 @@ auto PressedFor(AbstractInputMapping mapping, uint64_t now) -> uint32_t
     }
 
     auto &[_, state] = *it;
-    if (!state.pressed_at)
+    if (!state.pressedAt)
     {
         return 0;
     }
 
-    return now - state.pressed_at + 1;
+    return now - state.pressedAt + 1;
 }
 
 } // namespace nyla

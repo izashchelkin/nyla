@@ -32,8 +32,8 @@ constexpr float kMetersOnScreen = 64.f;
 
 void WorldSetUp()
 {
-    float world_w;
-    float world_h;
+    float worldW;
+    float worldH;
 
     const float base = kMetersOnScreen;
 
@@ -41,11 +41,11 @@ void WorldSetUp()
     const float height = static_cast<float>(RhiGetSurfaceHeight());
     const float aspect = width / height;
 
-    world_h = base;
-    world_w = base * aspect;
+    worldH = base;
+    worldW = base * aspect;
 
-    Mat4 view = Identity4;
-    Mat4 proj = Ortho(-world_w * .5f, world_w * .5f, world_h * .5f, -world_h * .5f, 0.f, 1.f);
+    Mat4 view = identity4;
+    Mat4 proj = Ortho(-worldW * .5f, worldW * .5f, worldH * .5f, -worldH * .5f, 0.f, 1.f);
 
     Mat4 vp = Mult(proj, view);
     Mat4 invVp = Inverse(vp);
@@ -66,23 +66,23 @@ void WorldRender(Vec2f pos, Vec3f color, float width, float height, const RpMesh
 }
 
 Rp worldPipeline{
-    .debug_name = "World",
-    .dynamic_uniform =
+    .debugName = "World",
+    .dynamicUniform =
         {
             .enabled = true,
             .size = 60000,
             .range = sizeof(DynamicUbo),
         },
-    .vert_buf =
+    .vertBuf =
         {
             .enabled = true,
             .size = 1 << 22,
             .attrs =
                 {
-                    RhiVertexFormat::R32G32B32A32_Float,
+                    RhiVertexFormat::R32G32B32A32Float,
                 },
         },
-    .Init =
+    .init =
         [](Rp &rp) -> void {
             RpAttachVertShader(rp, "nyla/apps/breakout/shaders/build/world.vs.hlsl.spv");
             RpAttachFragShader(rp, "nyla/apps/breakout/shaders/build/world.ps.hlsl.spv");

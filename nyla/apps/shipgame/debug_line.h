@@ -5,6 +5,6 @@
 namespace nyla
 {
 
-auto TriangulateLine(const Vec2f &A, const Vec2f &B, float thickness) -> std::vector<Vertex>;
+auto TriangulateLine(const Vec2f &a, const Vec2f &b, float thickness) -> std::vector<Vertex>;
 
 } // namespace nyla

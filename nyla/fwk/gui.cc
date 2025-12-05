@@ -16,19 +16,19 @@ namespace
 
 struct StaticUbo
 {
-    float window_width;
-    float window_height;
+    float windowWidth;
+    float windowHeight;
 };
 
 }; // namespace
 
-void UI_FrameBegin()
+void UiFrameBegin()
 {
     StaticUbo ubo{static_cast<float>(RhiGetSurfaceWidth()), static_cast<float>(RhiGetSurfaceHeight())};
-    RpStaticUniformCopy(gui_pipeline, CharViewPtr(&ubo));
+    RpStaticUniformCopy(guiPipeline, CharViewPtr(&ubo));
 }
 
-static void UI_BoxBegin(float x, float y, float width, float height)
+static void UiBoxBegin(float x, float y, float width, float height)
 {
     const float z = 0.f;
     const float w = 0.f;
@@ -52,39 +52,39 @@ static void UI_BoxBegin(float x, float y, float width, float height)
         {x + width, y + height, z, w},
     };
 
-    RpMesh mesh = RpVertCopy(gui_pipeline, std::size(rect), CharViewSpan(std::span{rect, std::size(rect)}));
-    RpDraw(gui_pipeline, mesh, {});
+    RpMesh mesh = RpVertCopy(guiPipeline, std::size(rect), CharViewSpan(std::span{rect, std::size(rect)}));
+    RpDraw(guiPipeline, mesh, {});
 }
 
-void UI_BoxBegin(int32_t x, int32_t y, uint32_t width, uint32_t height)
+void UiBoxBegin(int32_t x, int32_t y, uint32_t width, uint32_t height)
 {
-    UI_BoxBegin((float)x, (float)y, (float)width, (float)height);
+    UiBoxBegin((float)x, (float)y, (float)width, (float)height);
 }
 
-void UI_Text(std::string_view text)
+void UiText(std::string_view text)
 {
     //
 }
 
-Rp gui_pipeline{
-    .debug_name = "GUI",
-    .disable_culling = true,
-    .static_uniform =
+Rp guiPipeline{
+    .debugName = "GUI",
+    .disableCulling = true,
+    .staticUniform =
         {
             .enabled = true,
             .size = sizeof(StaticUbo),
             .range = sizeof(StaticUbo),
         },
-    .vert_buf =
+    .vertBuf =
         {
             .enabled = true,
             .size = 1 << 20,
             .attrs =
                 {
-                    RhiVertexFormat::R32G32B32A32_Float,
+                    RhiVertexFormat::R32G32B32A32Float,
                 },
         },
-    .Init =
+    .init =
         [](Rp &rp) -> void {
             RpAttachVertShader(rp, "/home/izashchelkin/nyla/nyla/fwk/shaders/build/gui.vs.hlsl.spv");
             RpAttachFragShader(rp, "/home/izashchelkin/nyla/nyla/fwk/shaders/build/gui.ps.hlsl.spv");

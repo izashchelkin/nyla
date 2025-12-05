@@ -14,9 +14,9 @@ using namespace rhi_vulkan_internal;
 namespace
 {
 
-auto ConvertVulkanCullMode(RhiCullMode cull_mode) -> VkCullModeFlags
+auto ConvertVulkanCullMode(RhiCullMode cullMode) -> VkCullModeFlags
 {
-    switch (cull_mode)
+    switch (cullMode)
     {
     case RhiCullMode::None:
         return VK_CULL_MODE_NONE;
@@ -31,9 +31,9 @@ auto ConvertVulkanCullMode(RhiCullMode cull_mode) -> VkCullModeFlags
     return static_cast<VkCullModeFlags>(0);
 }
 
-auto ConvertVulkanFrontFace(RhiFrontFace front_face) -> VkFrontFace
+auto ConvertVulkanFrontFace(RhiFrontFace frontFace) -> VkFrontFace
 {
-    switch (front_face)
+    switch (frontFace)
     {
     case RhiFrontFace::CCW:
         return VK_FRONT_FACE_COUNTER_CLOCKWISE;
@@ -45,9 +45,9 @@ auto ConvertVulkanFrontFace(RhiFrontFace front_face) -> VkFrontFace
     return static_cast<VkFrontFace>(0);
 }
 
-auto ConvertVulkanInputRate(RhiInputRate input_rate) -> VkVertexInputRate
+auto ConvertVulkanInputRate(RhiInputRate inputRate) -> VkVertexInputRate
 {
-    switch (input_rate)
+    switch (inputRate)
     {
     case RhiInputRate::PerInstance:
         return VK_VERTEX_INPUT_RATE_INSTANCE;
@@ -62,48 +62,48 @@ auto ConvertVulkanInputRate(RhiInputRate input_rate) -> VkVertexInputRate
 
 auto RhiCreateShader(const RhiShaderDesc &desc) -> RhiShader
 {
-    const VkShaderModuleCreateInfo create_info{
+    const VkShaderModuleCreateInfo createInfo{
         .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
         .codeSize = desc.code.size(),
         .pCode = reinterpret_cast<const uint32_t *>(desc.code.data()),
     };
 
-    VkShaderModule shader_module;
-    VK_CHECK(vkCreateShaderModule(vk.dev, &create_info, nullptr, &shader_module));
+    VkShaderModule shaderModule;
+    VK_CHECK(vkCreateShaderModule(vk.dev, &createInfo, nullptr, &shaderModule));
 
-    return RhiHandleAcquire(rhi_handles.shaders, shader_module);
+    return RhiHandleAcquire(rhiHandles.shaders, shaderModule);
 }
 
 void RhiDestroyShader(RhiShader shader)
 {
-    VkShaderModule shader_module = RhiHandleRelease(rhi_handles.shaders, shader);
-    vkDestroyShaderModule(vk.dev, shader_module, nullptr);
+    VkShaderModule shaderModule = RhiHandleRelease(rhiHandles.shaders, shader);
+    vkDestroyShaderModule(vk.dev, shaderModule, nullptr);
 }
 
 auto RhiCreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGraphicsPipeline
 {
-    VulkanPipelineData pipeline_data = {
-        .bind_point = VK_PIPELINE_BIND_POINT_GRAPHICS,
+    VulkanPipelineData pipelineData = {
+        .bindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
     };
 
-    std::array<VkVertexInputBindingDescription, std::size(desc.vertex_bindings)> vertex_bindings;
-    CHECK_LE(desc.vertex_bindings_count, std::size(desc.vertex_bindings));
-    for (uint32_t i = 0; i < desc.vertex_bindings_count; ++i)
+    std::array<VkVertexInputBindingDescription, std::size(desc.vertexBindings)> vertexBindings;
+    CHECK_LE(desc.vertexBindingsCount, std::size(desc.vertexBindings));
+    for (uint32_t i = 0; i < desc.vertexBindingsCount; ++i)
     {
-        const auto &binding = desc.vertex_bindings[i];
-        vertex_bindings[i] = VkVertexInputBindingDescription{
+        const auto &binding = desc.vertexBindings[i];
+        vertexBindings[i] = VkVertexInputBindingDescription{
             .binding = binding.binding,
             .stride = binding.stride,
-            .inputRate = ConvertVulkanInputRate(binding.input_rate),
+            .inputRate = ConvertVulkanInputRate(binding.inputRate),
         };
     }
 
-    std::array<VkVertexInputAttributeDescription, std::size(desc.vertex_attributes)> vertex_attributes;
-    CHECK_LE(desc.vertex_attribute_count, std::size(desc.vertex_attributes));
-    for (uint32_t i = 0; i < desc.vertex_attribute_count; ++i)
+    std::array<VkVertexInputAttributeDescription, std::size(desc.vertexAttributes)> vertexAttributes;
+    CHECK_LE(desc.vertexAttributeCount, std::size(desc.vertexAttributes));
+    for (uint32_t i = 0; i < desc.vertexAttributeCount; ++i)
     {
-        const auto &attribute = desc.vertex_attributes[i];
-        vertex_attributes[i] = VkVertexInputAttributeDescription{
+        const auto &attribute = desc.vertexAttributes[i];
+        vertexAttributes[i] = VkVertexInputAttributeDescription{
             .location = attribute.location,
             .binding = attribute.binding,
             .format = ConvertRhiVertexFormatIntoVkFormat(attribute.format),
@@ -111,36 +111,36 @@ auto RhiCreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGraphi
         };
     }
 
-    const VkPipelineVertexInputStateCreateInfo vertex_input_state_create_info{
+    const VkPipelineVertexInputStateCreateInfo vertexInputStateCreateInfo{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-        .vertexBindingDescriptionCount = desc.vertex_bindings_count,
-        .pVertexBindingDescriptions = vertex_bindings.data(),
-        .vertexAttributeDescriptionCount = desc.vertex_attribute_count,
-        .pVertexAttributeDescriptions = vertex_attributes.data(),
+        .vertexBindingDescriptionCount = desc.vertexBindingsCount,
+        .pVertexBindingDescriptions = vertexBindings.data(),
+        .vertexAttributeDescriptionCount = desc.vertexAttributeCount,
+        .pVertexAttributeDescriptions = vertexAttributes.data(),
     };
 
-    const VkPipelineRasterizationStateCreateInfo rasterizer_create_info{
+    const VkPipelineRasterizationStateCreateInfo rasterizerCreateInfo{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
         .depthClampEnable = VK_FALSE,
         .rasterizerDiscardEnable = VK_FALSE,
         .polygonMode = VK_POLYGON_MODE_FILL,
-        .cullMode = ConvertVulkanCullMode(desc.cull_mode),
-        .frontFace = ConvertVulkanFrontFace(desc.front_face),
+        .cullMode = ConvertVulkanCullMode(desc.cullMode),
+        .frontFace = ConvertVulkanFrontFace(desc.frontFace),
         .lineWidth = 1.0f,
     };
 
-    const VkPipelineInputAssemblyStateCreateInfo input_assembly_create_info{
+    const VkPipelineInputAssemblyStateCreateInfo inputAssemblyCreateInfo{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
         .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
     };
 
-    const VkPipelineViewportStateCreateInfo viewport_state_create_info{
+    const VkPipelineViewportStateCreateInfo viewportStateCreateInfo{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
         .viewportCount = 1,
         .scissorCount = 1,
     };
 
-    const VkPipelineMultisampleStateCreateInfo multisampling_create_info{
+    const VkPipelineMultisampleStateCreateInfo multisamplingCreateInfo{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
         .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
         .sampleShadingEnable = VK_FALSE,
@@ -149,7 +149,7 @@ auto RhiCreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGraphi
         .alphaToOneEnable = VK_FALSE,
     };
 
-    const VkPipelineColorBlendAttachmentState color_blend_attachment{
+    const VkPipelineColorBlendAttachmentState colorBlendAttachment{
         .blendEnable = VK_TRUE,
         .srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
         .dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
@@ -161,161 +161,161 @@ auto RhiCreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGraphi
             VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
     };
 
-    const VkPipelineColorBlendStateCreateInfo color_blending_create_info{
+    const VkPipelineColorBlendStateCreateInfo colorBlendingCreateInfo{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
         .logicOpEnable = VK_FALSE,
         .logicOp = VK_LOGIC_OP_COPY,
         .attachmentCount = 1,
-        .pAttachments = &color_blend_attachment,
+        .pAttachments = &colorBlendAttachment,
         .blendConstants = {},
     };
 
-    const auto dynamic_states = std::to_array<VkDynamicState>({
+    const auto dynamicStates = std::to_array<VkDynamicState>({
         VK_DYNAMIC_STATE_VIEWPORT,
         VK_DYNAMIC_STATE_SCISSOR,
     });
 
-    const VkPipelineDynamicStateCreateInfo dynamic_state_create_info{
+    const VkPipelineDynamicStateCreateInfo dynamicStateCreateInfo{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-        .dynamicStateCount = dynamic_states.size(),
-        .pDynamicStates = dynamic_states.data(),
+        .dynamicStateCount = dynamicStates.size(),
+        .pDynamicStates = dynamicStates.data(),
     };
 
-    const VkPipelineRenderingCreateInfo pipeline_rendering_create_info{
+    const VkPipelineRenderingCreateInfo pipelineRenderingCreateInfo{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
         .colorAttachmentCount = 1,
-        .pColorAttachmentFormats = &vk.surface_format.format,
+        .pColorAttachmentFormats = &vk.surfaceFormat.format,
     };
 
     std::array<VkPipelineShaderStageCreateInfo, 2> stages{
         VkPipelineShaderStageCreateInfo{
             .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
             .stage = VK_SHADER_STAGE_VERTEX_BIT,
-            .module = RhiHandleGetData(rhi_handles.shaders, desc.vert_shader),
+            .module = RhiHandleGetData(rhiHandles.shaders, desc.vertShader),
             .pName = "main",
         },
         VkPipelineShaderStageCreateInfo{
             .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
             .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-            .module = RhiHandleGetData(rhi_handles.shaders, desc.frag_shader),
+            .module = RhiHandleGetData(rhiHandles.shaders, desc.fragShader),
             .pName = "main",
         },
     };
 
-    CHECK_LE(desc.bind_group_layouts_count, std::size(desc.bind_group_layouts));
-    pipeline_data.bind_group_layout_count = desc.bind_group_layouts_count;
-    pipeline_data.bind_group_layouts = desc.bind_group_layouts;
+    CHECK_LE(desc.bindGroupLayoutsCount, std::size(desc.bindGroupLayouts));
+    pipelineData.bindGroupLayoutCount = desc.bindGroupLayoutsCount;
+    pipelineData.bindGroupLayouts = desc.bindGroupLayouts;
 
-    const VkPushConstantRange push_constant_range{
+    const VkPushConstantRange pushConstantRange{
         .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT,
         .offset = 0,
-        .size = rhi_max_push_constant_size,
+        .size = kRhiMaxPushConstantSize,
     };
 
-    std::array<VkDescriptorSetLayout, rhi_max_bind_group_layouts> descriptor_set_layouts;
-    for (uint32_t i = 0; i < desc.bind_group_layouts_count; ++i)
+    std::array<VkDescriptorSetLayout, kRhiMaxBindGroupLayouts> descriptorSetLayouts;
+    for (uint32_t i = 0; i < desc.bindGroupLayoutsCount; ++i)
     {
-        descriptor_set_layouts[i] = RhiHandleGetData(rhi_handles.bind_group_layouts, desc.bind_group_layouts[i]);
+        descriptorSetLayouts[i] = RhiHandleGetData(rhiHandles.bindGroupLayouts, desc.bindGroupLayouts[i]);
     }
 
-    const VkPipelineLayoutCreateInfo pipeline_layout_create_info{
+    const VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-        .setLayoutCount = desc.bind_group_layouts_count,
-        .pSetLayouts = descriptor_set_layouts.data(),
+        .setLayoutCount = desc.bindGroupLayoutsCount,
+        .pSetLayouts = descriptorSetLayouts.data(),
         .pushConstantRangeCount = 1,
-        .pPushConstantRanges = &push_constant_range,
+        .pPushConstantRanges = &pushConstantRange,
     };
 
-    vkCreatePipelineLayout(vk.dev, &pipeline_layout_create_info, nullptr, &pipeline_data.layout);
+    vkCreatePipelineLayout(vk.dev, &pipelineLayoutCreateInfo, nullptr, &pipelineData.layout);
 
-    const VkGraphicsPipelineCreateInfo pipeline_create_info{
+    const VkGraphicsPipelineCreateInfo pipelineCreateInfo{
         .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-        .pNext = &pipeline_rendering_create_info,
+        .pNext = &pipelineRenderingCreateInfo,
         .stageCount = stages.size(),
         .pStages = stages.data(),
-        .pVertexInputState = &vertex_input_state_create_info,
-        .pInputAssemblyState = &input_assembly_create_info,
-        .pViewportState = &viewport_state_create_info,
-        .pRasterizationState = &rasterizer_create_info,
-        .pMultisampleState = &multisampling_create_info,
+        .pVertexInputState = &vertexInputStateCreateInfo,
+        .pInputAssemblyState = &inputAssemblyCreateInfo,
+        .pViewportState = &viewportStateCreateInfo,
+        .pRasterizationState = &rasterizerCreateInfo,
+        .pMultisampleState = &multisamplingCreateInfo,
         .pDepthStencilState = nullptr,
-        .pColorBlendState = &color_blending_create_info,
-        .pDynamicState = &dynamic_state_create_info,
-        .layout = pipeline_data.layout,
+        .pColorBlendState = &colorBlendingCreateInfo,
+        .pDynamicState = &dynamicStateCreateInfo,
+        .layout = pipelineData.layout,
         .subpass = 0,
         .basePipelineHandle = VK_NULL_HANDLE,
         .basePipelineIndex = -1,
     };
 
     VK_CHECK(
-        vkCreateGraphicsPipelines(vk.dev, VK_NULL_HANDLE, 1, &pipeline_create_info, nullptr, &pipeline_data.pipeline));
+        vkCreateGraphicsPipelines(vk.dev, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &pipelineData.pipeline));
 
-    return RhiHandleAcquire(rhi_handles.graphics_pipelines, pipeline_data);
+    return RhiHandleAcquire(rhiHandles.graphicsPipelines, pipelineData);
 }
 
 void RhiNameGraphicsPipeline(RhiGraphicsPipeline pipeline, std::string_view name)
 {
-    const VulkanPipelineData &pipeline_data = RhiHandleGetData(rhi_handles.graphics_pipelines, pipeline);
-    VulkanNameHandle(VK_OBJECT_TYPE_PIPELINE, (uint64_t)pipeline_data.pipeline, name);
+    const VulkanPipelineData &pipelineData = RhiHandleGetData(rhiHandles.graphicsPipelines, pipeline);
+    VulkanNameHandle(VK_OBJECT_TYPE_PIPELINE, (uint64_t)pipelineData.pipeline, name);
 }
 
 void RhiDestroyGraphicsPipeline(RhiGraphicsPipeline pipeline)
 {
-    auto pipeline_data = RhiHandleRelease(rhi_handles.graphics_pipelines, pipeline);
+    auto pipelineData = RhiHandleRelease(rhiHandles.graphicsPipelines, pipeline);
     vkDeviceWaitIdle(vk.dev);
 
-    if (pipeline_data.layout)
+    if (pipelineData.layout)
     {
-        vkDestroyPipelineLayout(vk.dev, pipeline_data.layout, nullptr);
+        vkDestroyPipelineLayout(vk.dev, pipelineData.layout, nullptr);
     }
-    if (pipeline_data.pipeline)
+    if (pipelineData.pipeline)
     {
-        vkDestroyPipeline(vk.dev, pipeline_data.pipeline, nullptr);
+        vkDestroyPipeline(vk.dev, pipelineData.pipeline, nullptr);
     }
 }
 
 void RhiCmdBindGraphicsPipeline(RhiCmdList cmd, RhiGraphicsPipeline pipeline)
 {
-    VulkanCmdListData &cmd_data = RhiHandleGetData(rhi_handles.cmd_lists, cmd);
-    const VulkanPipelineData &pipeline_data = RhiHandleGetData(rhi_handles.graphics_pipelines, pipeline);
+    VulkanCmdListData &cmdData = RhiHandleGetData(rhiHandles.cmdLists, cmd);
+    const VulkanPipelineData &pipelineData = RhiHandleGetData(rhiHandles.graphicsPipelines, pipeline);
 
-    vkCmdBindPipeline(cmd_data.cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_data.pipeline);
-    cmd_data.bound_graphics_pipeline = pipeline;
+    vkCmdBindPipeline(cmdData.cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineData.pipeline);
+    cmdData.boundGraphicsPipeline = pipeline;
 }
 
 void RhiCmdPushGraphicsConstants(RhiCmdList cmd, uint32_t offset, RhiShaderStage stage, CharView data)
 {
-    const VulkanCmdListData &cmd_data = RhiHandleGetData(rhi_handles.cmd_lists, cmd);
-    const VulkanPipelineData &pipeline_data =
-        RhiHandleGetData(rhi_handles.graphics_pipelines, cmd_data.bound_graphics_pipeline);
+    const VulkanCmdListData &cmdData = RhiHandleGetData(rhiHandles.cmdLists, cmd);
+    const VulkanPipelineData &pipelineData =
+        RhiHandleGetData(rhiHandles.graphicsPipelines, cmdData.boundGraphicsPipeline);
 
-    vkCmdPushConstants(cmd_data.cmdbuf, pipeline_data.layout, ConvertRhiShaderStageIntoVkShaderStageFlags(stage),
+    vkCmdPushConstants(cmdData.cmdbuf, pipelineData.layout, ConvertRhiShaderStageIntoVkShaderStageFlags(stage),
                        offset, data.size(), data.data());
 }
 
-void RhiCmdBindVertexBuffers(RhiCmdList cmd, uint32_t first_binding, std::span<const RhiBuffer> buffers,
+void RhiCmdBindVertexBuffers(RhiCmdList cmd, uint32_t firstBinding, std::span<const RhiBuffer> buffers,
                              std::span<const uint32_t> offsets)
 {
     CHECK_EQ(buffers.size(), offsets.size());
     CHECK_LE(buffers.size(), 4U);
 
-    std::array<VkBuffer, 4> vk_bufs;
-    std::array<VkDeviceSize, 4> vk_offsets;
+    std::array<VkBuffer, 4> vkBufs;
+    std::array<VkDeviceSize, 4> vkOffsets;
     for (uint32_t i = 0; i < buffers.size(); ++i)
     {
-        vk_bufs[i] = RhiHandleGetData(rhi_handles.buffers, buffers[i]).buffer;
-        vk_offsets[i] = offsets[i];
+        vkBufs[i] = RhiHandleGetData(rhiHandles.buffers, buffers[i]).buffer;
+        vkOffsets[i] = offsets[i];
     }
 
-    VulkanCmdListData cmd_data = RhiHandleGetData(rhi_handles.cmd_lists, cmd);
-    vkCmdBindVertexBuffers(cmd_data.cmdbuf, first_binding, buffers.size(), vk_bufs.data(), vk_offsets.data());
+    VulkanCmdListData cmdData = RhiHandleGetData(rhiHandles.cmdLists, cmd);
+    vkCmdBindVertexBuffers(cmdData.cmdbuf, firstBinding, buffers.size(), vkBufs.data(), vkOffsets.data());
 }
 
-void RhiCmdDraw(RhiCmdList cmd, uint32_t vertex_count, uint32_t instance_count, uint32_t first_vertex,
-                uint32_t first_instance)
+void RhiCmdDraw(RhiCmdList cmd, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
+                uint32_t firstInstance)
 {
-    VulkanCmdListData cmd_data = RhiHandleGetData(rhi_handles.cmd_lists, cmd);
-    vkCmdDraw(cmd_data.cmdbuf, vertex_count, instance_count, first_vertex, first_instance);
+    VulkanCmdListData cmdData = RhiHandleGetData(rhiHandles.cmdLists, cmd);
+    vkCmdDraw(cmdData.cmdbuf, vertexCount, instanceCount, firstVertex, firstInstance);
 }
 
 } // namespace nyla

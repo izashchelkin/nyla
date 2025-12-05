@@ -36,9 +36,9 @@ auto Main(int argc, char **argv) -> int
     SigIntCoreDump();
     SigSegvExitZero();
 
-    bool is_running = true;
+    bool isRunning = true;
 
-    X11_Initialize();
+    X11Initialize();
 
     xcb_grab_server(x11.conn);
 
@@ -53,7 +53,7 @@ auto Main(int argc, char **argv) -> int
         LOG(QFATAL) << "another wm is already running";
     }
 
-    DBus_Initialize();
+    DBusInitialize();
     DebugFsInitialize(argv[0] + std::string("-debugfs"));
     InitializeWM();
 
@@ -61,32 +61,32 @@ auto Main(int argc, char **argv) -> int
     std::vector<Keybind> keybinds;
 
     {
-        X11_KeyResolver key_resolver;
-        X11_InitializeKeyResolver(key_resolver);
+        X11KeyResolver keyResolver;
+        X11InitializeKeyResolver(keyResolver);
 
-        auto SpawnTerminal = [] -> void { Spawn({{"ghostty", nullptr}}); };
-        auto SpawnLauncher = [] -> void { Spawn({{"dmenu_run", nullptr}}); };
-        auto Nothing = [] -> void {};
+        auto spawnTerminal = [] -> void { Spawn({{"ghostty", nullptr}}); };
+        auto spawnLauncher = [] -> void { Spawn({{"dmenu_run", nullptr}}); };
+        auto nothing = [] -> void {};
 
         for (auto [key, mod, handler] : std::initializer_list<std::tuple<KeyPhysical, int, KeybindHandler>>{
                  {KeyPhysical::W, 0, NextLayout},
                  {KeyPhysical::E, 0, MoveStackPrev},
                  {KeyPhysical::R, 0, MoveStackNext},
-                 {KeyPhysical::E, 1, Nothing},
-                 {KeyPhysical::R, 1, Nothing},
+                 {KeyPhysical::E, 1, nothing},
+                 {KeyPhysical::R, 1, nothing},
                  {KeyPhysical::D, 0, MoveLocalPrev},
                  {KeyPhysical::F, 0, MoveLocalNext},
-                 {KeyPhysical::D, 1, Nothing},
-                 {KeyPhysical::F, 1, Nothing},
+                 {KeyPhysical::D, 1, nothing},
+                 {KeyPhysical::F, 1, nothing},
                  {KeyPhysical::G, 0, ToggleZoom},
                  {KeyPhysical::X, 0, CloseActive},
                  {KeyPhysical::V, 0, ToggleFollow},
-                 {KeyPhysical::T, 0, SpawnTerminal},
-                 {KeyPhysical::S, 0, SpawnLauncher},
+                 {KeyPhysical::T, 0, spawnTerminal},
+                 {KeyPhysical::S, 0, spawnLauncher},
              })
         {
-            const char *xkb_name = ConvertKeyPhysicalIntoXkbName(key);
-            xcb_keycode_t keycode = X11_ResolveKeyCode(key_resolver, xkb_name);
+            const char *xkbName = ConvertKeyPhysicalIntoXkbName(key);
+            xcb_keycode_t keycode = X11ResolveKeyCode(keyResolver, xkbName);
 
             mod |= XCB_MOD_MASK_4;
             keybinds.emplace_back(keycode, mod, handler);
@@ -94,7 +94,7 @@ auto Main(int argc, char **argv) -> int
             xcb_grab_key(x11.conn, false, x11.screen->root, mod, keycode, XCB_GRAB_MODE_ASYNC, XCB_GRAB_MODE_ASYNC);
         }
 
-        X11_FreeKeyResolver(key_resolver);
+        X11FreeKeyResolver(keyResolver);
     }
 
     using namespace std::chrono_literals;
@@ -114,14 +114,14 @@ auto Main(int argc, char **argv) -> int
 
     if (!tfd)
         LOG(QFATAL) << "MakeTimerFdMillis";
-    absl::Cleanup tfd_closer = [tfd] -> void { close(tfd); };
+    absl::Cleanup tfdCloser = [tfd] -> void { close(tfd); };
     fds.emplace_back(pollfd{
         .fd = tfd,
         .events = POLLIN,
     });
 
     DebugFsRegister(
-        "quit", &is_running, //
+        "quit", &isRunning, //
         [](auto &file) -> auto { file.content = "quit\n"; },
         [](auto &file) -> auto {
             *reinterpret_cast<bool *>(file.data) = false;
@@ -135,7 +135,7 @@ auto Main(int argc, char **argv) -> int
 
     {
         std::future<void> fut = InitWMBackground();
-        while (!IsFutureReady(fut) && is_running && !xcb_connection_has_error(x11.conn))
+        while (!IsFutureReady(fut) && isRunning && !xcb_connection_has_error(x11.conn))
         {
             if (poll(fds.data(), fds.size(), -1) == -1)
             {
@@ -144,7 +144,7 @@ auto Main(int argc, char **argv) -> int
 
             if (fds[0].revents & POLLIN)
             {
-                ProcessWMEvents(is_running, modifier, keybinds);
+                ProcessWMEvents(isRunning, modifier, keybinds);
                 ProcessWM();
                 xcb_flush(x11.conn);
             }
@@ -152,7 +152,7 @@ auto Main(int argc, char **argv) -> int
     }
 
     {
-        while (is_running && !xcb_connection_has_error(x11.conn))
+        while (isRunning && !xcb_connection_has_error(x11.conn))
         {
             if (poll(fds.data(), fds.size(), -1) == -1)
             {
@@ -161,7 +161,7 @@ auto Main(int argc, char **argv) -> int
 
             if (fds[0].revents & POLLIN)
             {
-                ProcessWMEvents(is_running, modifier, keybinds);
+                ProcessWMEvents(isRunning, modifier, keybinds);
                 ProcessWM();
                 xcb_flush(x11.conn);
             }
@@ -176,16 +176,16 @@ auto Main(int argc, char **argv) -> int
                 uint64_t expirations = 0;
                 if (read(tfd, &expirations, sizeof(expirations)) > 0 && expirations > 0)
                 {
-                    wm_background_dirty = true;
+                    wmBackgroundDirty = true;
                 }
             }
 
-            if (wm_background_dirty)
+            if (wmBackgroundDirty)
             {
                 UpdateBackground();
             }
 
-            DBus_Process();
+            DBusProcess();
         }
     }
 

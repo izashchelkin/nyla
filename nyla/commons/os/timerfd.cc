@@ -15,11 +15,11 @@ auto MakeTimerFd(std::chrono::duration<double> interval) -> int
         return 0;
 
     auto nanos = std::chrono::duration_cast<std::chrono::nanoseconds>(interval).count();
-    itimerspec timer_spec = {
+    itimerspec timerSpec = {
         .it_interval = {.tv_nsec = nanos},
         .it_value = {.tv_nsec = nanos},
     };
-    if (timerfd_settime(fd, 0, &timer_spec, nullptr) == -1)
+    if (timerfd_settime(fd, 0, &timerSpec, nullptr) == -1)
     {
         close(fd);
         return 0;

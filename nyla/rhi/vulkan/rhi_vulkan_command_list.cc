@@ -13,84 +13,84 @@ using namespace rhi_vulkan_internal;
 namespace
 {
 
-auto GetDeviceQueue(RhiQueueType queue_type) -> DeviceQueue &
+auto GetDeviceQueue(RhiQueueType queueType) -> DeviceQueue &
 {
-    switch (queue_type)
+    switch (queueType)
     {
     case RhiQueueType::Graphics:
-        return vk.graphics_queue;
+        return vk.graphicsQueue;
     case RhiQueueType::Transfer:
-        return vk.transfer_queue;
+        return vk.transferQueue;
     }
     CHECK(false);
 }
 
 } // namespace
 
-auto RhiCreateCmdList(RhiQueueType queue_type) -> RhiCmdList
+auto RhiCreateCmdList(RhiQueueType queueType) -> RhiCmdList
 {
-    VkCommandPool cmd_pool = GetDeviceQueue(queue_type).cmd_pool;
-    const VkCommandBufferAllocateInfo alloc_info{
+    VkCommandPool cmdPool = GetDeviceQueue(queueType).cmdPool;
+    const VkCommandBufferAllocateInfo allocInfo{
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-        .commandPool = cmd_pool,
+        .commandPool = cmdPool,
         .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
         .commandBufferCount = 1,
     };
 
-    VkCommandBuffer command_buffer;
-    VK_CHECK(vkAllocateCommandBuffers(vk.dev, &alloc_info, &command_buffer));
+    VkCommandBuffer commandBuffer;
+    VK_CHECK(vkAllocateCommandBuffers(vk.dev, &allocInfo, &commandBuffer));
 
-    const VulkanCmdListData cmd_data{
-        .cmdbuf = command_buffer,
-        .queue_type = queue_type,
+    const VulkanCmdListData cmdData{
+        .cmdbuf = commandBuffer,
+        .queueType = queueType,
     };
 
-    RhiCmdList cmd = RhiHandleAcquire(rhi_handles.cmd_lists, cmd_data);
+    RhiCmdList cmd = RhiHandleAcquire(rhiHandles.cmdLists, cmdData);
     return cmd;
 }
 
 void RhiNameCmdList(RhiCmdList cmd, std::string_view name)
 {
-    VulkanCmdListData cmd_data = RhiHandleGetData(rhi_handles.cmd_lists, cmd);
-    VulkanNameHandle(VK_OBJECT_TYPE_COMMAND_BUFFER, (uint64_t)cmd_data.cmdbuf, name);
+    VulkanCmdListData cmdData = RhiHandleGetData(rhiHandles.cmdLists, cmd);
+    VulkanNameHandle(VK_OBJECT_TYPE_COMMAND_BUFFER, (uint64_t)cmdData.cmdbuf, name);
 }
 
 void RhiDestroyCmdList(RhiCmdList cmd)
 {
-    VulkanCmdListData cmd_data = RhiHandleRelease(rhi_handles.cmd_lists, cmd);
-    VkCommandPool cmd_pool = GetDeviceQueue(cmd_data.queue_type).cmd_pool;
-    vkFreeCommandBuffers(vk.dev, cmd_pool, 1, &cmd_data.cmdbuf);
+    VulkanCmdListData cmdData = RhiHandleRelease(rhiHandles.cmdLists, cmd);
+    VkCommandPool cmdPool = GetDeviceQueue(cmdData.queueType).cmdPool;
+    vkFreeCommandBuffers(vk.dev, cmdPool, 1, &cmdData.cmdbuf);
 }
 
-auto __RhiCmdSetCheckpoint(RhiCmdList cmd, uint64_t data) -> uint64_t
+auto RhiCmdSetCheckpoint(RhiCmdList cmd, uint64_t data) -> uint64_t
 {
-    if constexpr (!rhi_checkpoints)
+    if constexpr (!kRhiCheckpoints)
     {
         return data;
     }
 
-    VulkanCmdListData cmd_data = RhiHandleGetData(rhi_handles.cmd_lists, cmd);
+    VulkanCmdListData cmdData = RhiHandleGetData(rhiHandles.cmdLists, cmd);
 
-    static PFN_vkCmdSetCheckpointNV fn = VK_GET_INSTANCE_PROC_ADDR(vkCmdSetCheckpointNV);
-    fn(cmd_data.cmdbuf, (void *)data);
+    static auto fn = VK_GET_INSTANCE_PROC_ADDR(vkCmdSetCheckpointNV);
+    fn(cmdData.cmdbuf, (void *)data);
 
     return data;
 }
 
-auto __RhiGetLastCheckpointData(RhiQueueType queue_type) -> uint64_t
+auto RhiGetLastCheckpointData(RhiQueueType queueType) -> uint64_t
 {
-    if constexpr (!rhi_checkpoints)
+    if constexpr (!kRhiCheckpoints)
     {
         return -1;
     }
 
-    uint32_t data_count = 1;
+    uint32_t dataCount = 1;
     VkCheckpointDataNV data{};
 
-    const VkQueue queue = GetDeviceQueue(queue_type).queue;
+    const VkQueue queue = GetDeviceQueue(queueType).queue;
 
-    static PFN_vkGetQueueCheckpointDataNV fn = VK_GET_INSTANCE_PROC_ADDR(vkGetQueueCheckpointDataNV);
-    fn(queue, &data_count, &data);
+    static auto fn = VK_GET_INSTANCE_PROC_ADDR(vkGetQueueCheckpointDataNV);
+    fn(queue, &dataCount, &data);
 
     return (uint64_t)data.pCheckpointMarker;
 }

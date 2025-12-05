@@ -11,7 +11,7 @@
 namespace nyla
 {
 
-constexpr inline uint32_t rhi_max_push_constant_size = 256;
+constexpr inline uint32_t kRhiMaxPushConstantSize = 256;
 
 struct RhiGraphicsPipeline : RhiHandle
 {
@@ -24,7 +24,7 @@ enum class RhiVertexFormat
     // R32_Float,
     // R32G32_Float,
     // R32G32B32_Float,
-    R32G32B32A32_Float,
+    R32G32B32A32Float,
     //
     // R16_Float,
     // R16G16_Float,
@@ -99,7 +99,7 @@ struct RhiVertexBindingDesc
 {
     uint32_t binding;
     uint32_t stride;
-    RhiInputRate input_rate;
+    RhiInputRate inputRate;
 };
 
 struct RhiVertexAttributeDesc
@@ -112,22 +112,22 @@ struct RhiVertexAttributeDesc
 
 struct RhiGraphicsPipelineDesc
 {
-    std::string debug_name;
+    std::string debugName;
 
-    RhiShader vert_shader;
-    RhiShader frag_shader;
+    RhiShader vertShader;
+    RhiShader fragShader;
 
-    std::array<RhiBindGroupLayout, rhi_max_bind_group_layouts> bind_group_layouts;
-    uint32_t bind_group_layouts_count;
+    std::array<RhiBindGroupLayout, kRhiMaxBindGroupLayouts> bindGroupLayouts;
+    uint32_t bindGroupLayoutsCount;
 
-    std::array<RhiVertexBindingDesc, 4> vertex_bindings;
-    uint32_t vertex_bindings_count;
+    std::array<RhiVertexBindingDesc, 4> vertexBindings;
+    uint32_t vertexBindingsCount;
 
-    std::array<RhiVertexAttributeDesc, 16> vertex_attributes;
-    uint32_t vertex_attribute_count;
+    std::array<RhiVertexAttributeDesc, 16> vertexAttributes;
+    uint32_t vertexAttributeCount;
 
-    RhiCullMode cull_mode;
-    RhiFrontFace front_face;
+    RhiCullMode cullMode;
+    RhiFrontFace frontFace;
 };
 
 auto RhiGetVertexFormatSize(RhiVertexFormat) -> uint32_t;
@@ -137,12 +137,12 @@ void RhiNameGraphicsPipeline(RhiGraphicsPipeline, std::string_view name);
 void RhiDestroyGraphicsPipeline(RhiGraphicsPipeline);
 
 void RhiCmdBindGraphicsPipeline(RhiCmdList, RhiGraphicsPipeline);
-void RhiCmdBindVertexBuffers(RhiCmdList cmd, uint32_t first_binding, std::span<const RhiBuffer> buffers,
+void RhiCmdBindVertexBuffers(RhiCmdList cmd, uint32_t firstBinding, std::span<const RhiBuffer> buffers,
                              std::span<const uint32_t> offsets);
-void RhiCmdBindGraphicsBindGroup(RhiCmdList, uint32_t set_index, RhiBindGroup bind_group,
-                                 std::span<const uint32_t> dynamic_offsets);
+void RhiCmdBindGraphicsBindGroup(RhiCmdList, uint32_t setIndex, RhiBindGroup bindGroup,
+                                 std::span<const uint32_t> dynamicOffsets);
 void RhiCmdPushGraphicsConstants(RhiCmdList cmd, uint32_t offset, RhiShaderStage stage, CharView data);
-void RhiCmdDraw(RhiCmdList cmd, uint32_t vertex_count, uint32_t instance_count, uint32_t first_vertex,
-                uint32_t first_instance);
+void RhiCmdDraw(RhiCmdList cmd, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
+                uint32_t firstInstance);
 
 } // namespace nyla

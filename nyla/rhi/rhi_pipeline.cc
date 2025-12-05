@@ -10,7 +10,7 @@ auto RhiGetVertexFormatSize(RhiVertexFormat format) -> uint32_t
     case nyla::RhiVertexFormat::None:
         break;
 
-    case RhiVertexFormat::R32G32B32A32_Float:
+    case RhiVertexFormat::R32G32B32A32Float:
         return 16;
     }
     CHECK(false);

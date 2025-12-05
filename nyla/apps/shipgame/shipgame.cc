@@ -25,11 +25,11 @@ namespace
 using Vertex = Vertex;
 }
 
-GameObject game_solar_system{};
-GameObject game_ship{};
+GameObject gameSolarSystem{};
+GameObject gameShip{};
 
-static Vec2f game_camera_pos = {};
-static float game_camera_zoom = 1.f;
+static Vec2f gameCameraPos = {};
+static float gameCameraZoom = 1.f;
 
 static auto GenCircle(size_t n, float radius, Vec3f color) -> std::vector<Vertex>
 {
@@ -38,7 +38,7 @@ static auto GenCircle(size_t n, float radius, Vec3f color) -> std::vector<Vertex
     std::vector<Vertex> ret;
     ret.reserve(n * 3);
 
-    const float theta = 2.f * pi / n;
+    const float theta = 2.f * kPi / n;
     std::complex<float> r = 1.f;
 
     for (size_t i = 0; i < n; ++i)
@@ -61,18 +61,18 @@ static void RenderGameObject(GameObject &obj)
 
     switch (obj.type)
     {
-    case GameObject::Type::kSolarSystem: {
+    case GameObject::Type::KSolarSystem: {
         break;
     }
 
-    case GameObject::Type::kPlanet:
-    case GameObject::Type::kMoon: {
+    case GameObject::Type::KPlanet:
+    case GameObject::Type::KMoon: {
         obj.vertices = GenCircle(32, 1.f, obj.color);
 
         break;
     }
 
-    case GameObject::Type::kShip: {
+    case GameObject::Type::KShip: {
         obj.vertices.reserve(3);
 
         obj.vertices.emplace_back(Vertex{{-0.5f, -0.36f}, obj.color});
@@ -85,7 +85,7 @@ static void RenderGameObject(GameObject &obj)
 
     if (!obj.vertices.empty())
     {
-        WorldRender(obj.pos, obj.angle_radians, obj.scale, obj.vertices);
+        WorldRender(obj.pos, obj.angleRadians, obj.scale, obj.vertices);
     }
 
     for (GameObject &child : obj.children)
@@ -97,8 +97,8 @@ static void RenderGameObject(GameObject &obj)
 void ShipgameInit()
 {
     {
-        game_solar_system = {
-            .type = GameObject::Type::kSolarSystem,
+        gameSolarSystem = {
+            .type = GameObject::Type::KSolarSystem,
             .pos = {0.f, 0.f},
             .color = {.1f, .1f, .1f},
             .mass = 100000.f,
@@ -106,46 +106,46 @@ void ShipgameInit()
             .velocity = {0.f, 0.f},
         };
 
-        auto *planets = new std::vector<GameObject>(3, {.type = GameObject::Type::kPlanet});
-        game_solar_system.children = {planets->data(), planets->size()};
+        auto *planets = new std::vector<GameObject>(3, {.type = GameObject::Type::KPlanet});
+        gameSolarSystem.children = {planets->data(), planets->size()};
 
         size_t iplanet = 0;
 
         {
-            GameObject &planet = game_solar_system.children[iplanet++];
+            GameObject &planet = gameSolarSystem.children[iplanet++];
 
             planet.color = {1.f, 0.f, 0.f};
 
             planet.pos = {100.f, 100.f};
             planet.mass = 100.f;
             planet.scale = 20.f;
-            planet.orbit_radius = 4000.f;
+            planet.orbitRadius = 4000.f;
         }
 
         {
-            GameObject &planet = game_solar_system.children[iplanet++];
+            GameObject &planet = gameSolarSystem.children[iplanet++];
             planet.color = {0.f, 1.f, 0.f};
 
             planet.pos = {-100.f, 100.f};
             planet.mass = 50000.f;
             planet.scale = 10.f;
-            planet.orbit_radius = 2000.f;
+            planet.orbitRadius = 2000.f;
         }
 
         {
-            GameObject &planet = game_solar_system.children[iplanet++];
+            GameObject &planet = gameSolarSystem.children[iplanet++];
             planet.color = {0.f, 0.f, 1.f};
 
             planet.pos = {0, -100.f};
             planet.mass = 50000.f;
             planet.scale = 5.f;
-            planet.orbit_radius = 500.f;
+            planet.orbitRadius = 500.f;
         }
     }
 
     {
-        game_ship = {
-            .type = GameObject::Type::kShip,
+        gameShip = {
+            .type = GameObject::Type::KShip,
             .pos = {0.f, 0.f},
             .color = {1.f, 1.f, 0.f},
             .mass = 25,
@@ -159,11 +159,11 @@ void ShipgameFrame(float dt, uint32_t fps)
     const int dx = Pressed(kRight) - Pressed(kLeft);
     const int dy = Pressed(kDown) - Pressed(kUp);
 
-    static float dt_accumulator = 0.f;
-    dt_accumulator += dt;
+    static float dtAccumulator = 0.f;
+    dtAccumulator += dt;
 
-    constexpr float step = 1.f / 120.f;
-    for (; dt_accumulator >= step; dt_accumulator -= step)
+    constexpr float kStep = 1.f / 120.f;
+    for (; dtAccumulator >= kStep; dtAccumulator -= kStep)
     {
         {
             if (dx || dy)
@@ -171,80 +171,80 @@ void ShipgameFrame(float dt, uint32_t fps)
                 float angle = std::atan2(-static_cast<float>(dy), static_cast<float>(dx));
                 if (angle < 0.f)
                 {
-                    angle += 2.f * pi;
+                    angle += 2.f * kPi;
                 }
 
-                game_ship.angle_radians = LerpAngle(game_ship.angle_radians, angle, step * 5.f);
+                gameShip.angleRadians = LerpAngle(gameShip.angleRadians, angle, kStep * 5.f);
             }
 
             if (Pressed(kBrake))
             {
                 AbstractInputRelease(kBoost);
 
-                Lerp(game_ship.velocity, Vec2f{}, step * 5.f);
+                Lerp(gameShip.velocity, Vec2f{}, kStep * 5.f);
             }
             else if (Pressed(kBoost))
             {
                 const Vec2f direction =
-                    Vec2fNorm(Vec2f{std::cos(game_ship.angle_radians), std::sin(game_ship.angle_radians)});
+                    Vec2fNorm(Vec2f{std::cos(gameShip.angleRadians), std::sin(gameShip.angleRadians)});
 
                 uint32_t duration = PressedFor(kBoost, GetMonotonicTimeMicros());
 
-                float max_speed;
+                float maxSpeed;
                 if (duration < 100000)
                 {
-                    max_speed = 100;
+                    maxSpeed = 100;
                 }
                 else
                 {
-                    max_speed = 100 + (duration - 100000) / 10000.f;
+                    maxSpeed = 100 + (duration - 100000) / 10000.f;
                 }
 
-                Lerp(game_ship.velocity, Vec2fMul(direction, max_speed), step);
+                Lerp(gameShip.velocity, Vec2fMul(direction, maxSpeed), kStep);
 
-                if (Vec2fLen(game_ship.velocity) < 20)
+                if (Vec2fLen(gameShip.velocity) < 20)
                 {
-                    game_ship.velocity = Vec2fResized(game_ship.velocity, 20);
+                    gameShip.velocity = Vec2fResized(gameShip.velocity, 20);
                 }
             }
             else
             {
-                Lerp(game_ship.velocity, Vec2f{}, step);
+                Lerp(gameShip.velocity, Vec2f{}, kStep);
             }
 
-            Vec2fAdd(game_ship.pos, Vec2fMul(game_ship.velocity, step));
+            Vec2fAdd(gameShip.pos, Vec2fMul(gameShip.velocity, kStep));
         }
 
         {
-            Lerp(game_camera_pos, game_ship.pos, Vec2fLen(Vec2fDif(game_camera_pos, game_ship.pos)) * step);
+            Lerp(gameCameraPos, gameShip.pos, Vec2fLen(Vec2fDif(gameCameraPos, gameShip.pos)) * kStep);
         }
 
         {
-            for (GameObject &planet : game_solar_system.children)
+            for (GameObject &planet : gameSolarSystem.children)
             {
                 using namespace std::complex_literals;
 
-                const Vec2f v = Vec2fDif(game_solar_system.pos, planet.pos);
+                const Vec2f v = Vec2fDif(gameSolarSystem.pos, planet.pos);
                 const float r = Vec2fLen(v);
 
                 const Vec2f v2 =
-                    Vec2fSum(Vec2fMul(Vec2fNorm(Vec2fApply(Vec2fDif(planet.pos, game_solar_system.pos), 1.f / 1if)),
-                                      std::max(0.f, planet.orbit_radius - r / 5.f)),
-                             game_solar_system.pos);
+                    Vec2fSum(Vec2fMul(Vec2fNorm(Vec2fApply(Vec2fDif(planet.pos, gameSolarSystem.pos), 1.f / 1if)),
+                                      std::max(0.f, planet.orbitRadius - r / 5.f)),
+                             gameSolarSystem.pos);
 
                 const Vec2f vv = Vec2fDif(v2, planet.pos);
 
-                float F = 6.7f * planet.mass * game_solar_system.mass / (r * r);
-                Vec2f Fv = Vec2fResized(vv, F);
+                float f = 6.7f * planet.mass * gameSolarSystem.mass / (r * r);
+                Vec2f fv = Vec2fResized(vv, f);
 
-                Vec2fAdd(planet.velocity, Vec2fMul(Fv, step / planet.mass));
+                Vec2fAdd(planet.velocity, Vec2fMul(fv, kStep / planet.mass));
 
                 if (Vec2fLen(planet.velocity) > 10.f)
                 {
                     planet.velocity = Vec2fResized(planet.velocity, 10.f);
                 }
 
-                Vec2fAdd(planet.pos, Vec2fMul(planet.velocity, step));
+                Vec2fAdd(planet.pos, Vec2fMul(planet.velocity, kStep));
             }
         }
 
@@ -321,23 +321,23 @@ void ShipgameFrame(float dt, uint32_t fps)
 
     {
         if (Pressed(kZoomMore))
-            game_camera_zoom *= 1.1f;
+            gameCameraZoom *= 1.1f;
         if (Pressed(kZoomLess))
-            game_camera_zoom /= 1.1f;
+            gameCameraZoom /= 1.1f;
 
-        game_camera_zoom = std::clamp(game_camera_zoom, .1f, 2.5f);
+        gameCameraZoom = std::clamp(gameCameraZoom, .1f, 2.5f);
     }
 
-    RpBegin(world_pipeline);
-    WorldSetUp(game_camera_pos, game_camera_zoom);
+    RpBegin(worldPipeline);
+    WorldSetUp(gameCameraPos, gameCameraZoom);
 
-    RenderGameObject(game_solar_system);
-    RenderGameObject(game_ship);
+    RenderGameObject(gameSolarSystem);
+    RenderGameObject(gameShip);
 
-    RpBegin(grid_pipeline);
+    RpBegin(gridPipeline);
     GridRender();
 
-    RpBegin(dbg_text_pipeline);
+    RpBegin(dbgTextPipeline);
     DbgText(500, 10, "fps= " + std::to_string(fps));
 }
 

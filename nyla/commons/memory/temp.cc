@@ -19,29 +19,29 @@ struct TempArena
 
 } // namespace
 
-static TempArena temp_arena;
+static TempArena tempArena;
 
 void TArenaInit()
 {
-    temp_arena.size = 1 << 20;
-    temp_arena.base = (char *)malloc(temp_arena.size);
-    temp_arena.at = temp_arena.base;
+    tempArena.size = 1 << 20;
+    tempArena.base = (char *)malloc(tempArena.size);
+    tempArena.at = tempArena.base;
 }
 
 auto TAlloc(size_t bytes, size_t align) -> void *
 {
-    CHECK_LT(bytes + align, temp_arena.size);
+    CHECK_LT(bytes + align, tempArena.size);
 
-    const size_t used = temp_arena.at - temp_arena.base;
+    const size_t used = tempArena.at - tempArena.base;
     const size_t pad = (align - (used % align)) % align;
-    if (used + pad + bytes > temp_arena.size)
+    if (used + pad + bytes > tempArena.size)
     {
-        temp_arena.at = temp_arena.base;
+        tempArena.at = tempArena.base;
         return TAlloc(bytes, align);
     }
 
-    char *ret = temp_arena.at + pad;
-    temp_arena.at += bytes + pad;
+    char *ret = tempArena.at + pad;
+    tempArena.at += bytes + pad;
     return ret;
 }
 

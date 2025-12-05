@@ -6,75 +6,75 @@ namespace nyla
 namespace platform_x11_internal
 {
 
-void Initialize(WM_Hints &h)
+void Initialize(WmHints &h)
 {
-    if (!(h.flags & WM_Hints::kInputHint))
+    if (!(h.flags & WmHints::kInputHint))
     {
         h.input = true;
     }
 
-    if (!(h.flags & WM_Hints::kStateHint))
+    if (!(h.flags & WmHints::kStateHint))
     {
-        h.initial_state = 0;
+        h.initialState = 0;
     }
 
-    if (!(h.flags & WM_Hints::kIconPixmapHint))
+    if (!(h.flags & WmHints::kIconPixmapHint))
     {
-        h.icon_pixmap = 0;
+        h.iconPixmap = 0;
     }
 
-    if (!(h.flags & WM_Hints::kIconWindowHint))
+    if (!(h.flags & WmHints::kIconWindowHint))
     {
-        h.icon_window = 0;
+        h.iconWindow = 0;
     }
 
-    if (!(h.icon_x & WM_Hints::kIconPositionHint))
+    if (!(h.iconX & WmHints::kIconPositionHint))
     {
-        h.icon_x = 0;
-        h.icon_y = 0;
+        h.iconX = 0;
+        h.iconY = 0;
     }
 
-    if (!(h.icon_x & WM_Hints::kIconMaskHint))
+    if (!(h.iconX & WmHints::kIconMaskHint))
     {
-        h.icon_mask = 0;
+        h.iconMask = 0;
     }
 }
 
-void Initialize(WM_Normal_Hints &h)
+void Initialize(WmNormalHints &h)
 {
-    if (!(h.flags & WM_Normal_Hints::kPMinSize))
+    if (!(h.flags & WmNormalHints::kPMinSize))
     {
-        h.min_width = 0;
-        h.min_height = 0;
+        h.minWidth = 0;
+        h.minHeight = 0;
     }
 
-    if (!(h.flags & WM_Normal_Hints::kPMaxSize))
+    if (!(h.flags & WmNormalHints::kPMaxSize))
     {
-        h.max_width = 0;
-        h.max_height = 0;
+        h.maxWidth = 0;
+        h.maxHeight = 0;
     }
 
-    if (!(h.flags & WM_Normal_Hints::kPResizeInc))
+    if (!(h.flags & WmNormalHints::kPResizeInc))
     {
-        h.width_inc = 0;
-        h.height_inc = 0;
+        h.widthInc = 0;
+        h.heightInc = 0;
     }
 
-    if (!(h.flags & WM_Normal_Hints::kPAspect))
+    if (!(h.flags & WmNormalHints::kPAspect))
     {
-        h.min_aspect = {};
-        h.max_aspect = {};
+        h.minAspect = {};
+        h.maxAspect = {};
     }
 
-    if (!(h.flags & WM_Normal_Hints::kPBaseSize))
+    if (!(h.flags & WmNormalHints::kPBaseSize))
     {
-        h.base_width = 0;
-        h.base_height = 0;
+        h.baseWidth = 0;
+        h.baseHeight = 0;
     }
 
-    if (!(h.flags & WM_Normal_Hints::kPWinGravity))
+    if (!(h.flags & WmNormalHints::kPWinGravity))
     {
-        h.win_gravity = {};
+        h.winGravity = {};
     }
 }
 

@@ -43,25 +43,25 @@ auto Inverse(const Mat4 &m) -> Mat4
 
     for (int col = 0; col < 4; ++col)
     {
-        int pivot_row = col;
-        float max_abs = std::fabs(a[pivot_row][col]);
+        int pivotRow = col;
+        float maxAbs = std::fabs(a[pivotRow][col]);
         for (int row = col + 1; row < 4; ++row)
         {
             float v = std::fabs(a[row][col]);
-            if (v > max_abs)
+            if (v > maxAbs)
             {
-                max_abs = v;
-                pivot_row = row;
+                maxAbs = v;
+                pivotRow = row;
             }
         }
 
-        CHECK(max_abs > 1e-8f) << "Mat4 is singular or nearly singular in Inverse()";
+        CHECK(maxAbs > 1e-8f) << "Mat4 is singular or nearly singular in Inverse()";
 
-        if (pivot_row != col)
+        if (pivotRow != col)
         {
             for (int j = 0; j < 8; ++j)
             {
-                std::swap(a[col][j], a[pivot_row][j]);
+                std::swap(a[col][j], a[pivotRow][j]);
             }
         }
 
@@ -103,14 +103,14 @@ auto Translate(std::span<const float> v) -> Mat4
 {
     CHECK(v.size() >= 2);
 
-    Mat4 ret = Identity4;
+    Mat4 ret = identity4;
     ret[3] = {v[0], v[1], v.size() > 2 ? v[2] : 0.f, 1.f};
     return ret;
 }
 
 auto ScaleXY(float x, float y) -> Mat4
 {
-    Mat4 ret = Identity4;
+    Mat4 ret = identity4;
     ret[0][0] = x;
     ret[1][1] = y;
     return ret;
@@ -118,7 +118,7 @@ auto ScaleXY(float x, float y) -> Mat4
 
 auto Rotate2D(float radians) -> Mat4
 {
-    Mat4 ret = Identity4;
+    Mat4 ret = identity4;
     ret[0] = {std::cos(radians), std::sin(radians), 0, 0};
     ret[1] = {-std::sin(radians), std::cos(radians), 0, 0};
     return ret;

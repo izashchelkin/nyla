@@ -43,10 +43,10 @@ auto LerpAngle(float a, float b, float p) -> float
     }
 
     float delta = b - a;
-    while (delta > pi)
-        delta -= 2 * pi;
-    while (delta < -pi)
-        delta += 2 * pi;
+    while (delta > kPi)
+        delta -= 2 * kPi;
+    while (delta < -kPi)
+        delta += 2 * kPi;
 
     if (std::abs(delta) < 10e-3)
         return b;

@@ -21,7 +21,7 @@ namespace nyla
 {
 
 DebugFs debugfs;
-static ino_t next_inode = 2;
+static ino_t nextInode = 2;
 
 void FuseReplyEmptyBuf(fuse_req_t req)
 {
@@ -42,10 +42,10 @@ void FuseReplyBufSlice(fuse_req_t req, std::span<const char> buf, off_t offset, 
 static auto GetContent(DebugFsFile &file) -> std::string_view
 {
     uint64_t now = GetMonotonicTimeMicros();
-    if (now - file.content_time > 10)
+    if (now - file.contentTime > 10)
     {
-        file.set_content_handler(file);
-        file.content_time = GetMonotonicTimeMicros();
+        file.setContentHandler(file);
+        file.contentTime = GetMonotonicTimeMicros();
     }
 
     return file.content;
@@ -53,14 +53,14 @@ static auto GetContent(DebugFsFile &file) -> std::string_view
 
 static auto MakeFileEntryParam(ino_t inode, DebugFsFile &file) -> fuse_entry_param
 {
-    constexpr uint32_t mode = S_IFREG | 0444;
+    constexpr uint32_t kMode = S_IFREG | 0444;
 
     return {
         .ino = inode,
         .attr =
             {
                 .st_nlink = 1,
-                .st_mode = mode,
+                .st_mode = kMode,
                 .st_size = static_cast<off_t>(GetContent(file).size()),
             },
         .attr_timeout = 1.0,
@@ -76,20 +76,20 @@ static void HandleInit(void *userdata, struct fuse_conn_info *conn)
     conn->want &= ~FUSE_CAP_ASYNC_READ;
 }
 
-static void HandleLookup(fuse_req_t req, fuse_ino_t parent_inode, const char *name)
+static void HandleLookup(fuse_req_t req, fuse_ino_t parentInode, const char *name)
 {
     // LOG(INFO) << "lookup " << parent_inode << " " << name;
 
-    if (parent_inode != 1)
+    if (parentInode != 1)
     {
         fuse_reply_err(req, ENOENT);
         return;
     }
 
-    std::string_view lookup_name = name;
-    auto it = std::find_if(debugfs.files.begin(), debugfs.files.end(), [lookup_name](const auto &ent) -> auto {
+    std::string_view lookupName = name;
+    auto it = std::find_if(debugfs.files.begin(), debugfs.files.end(), [lookupName](const auto &ent) -> auto {
         const auto &[_, file] = ent;
-        return file.name == lookup_name;
+        return file.name == lookupName;
     });
     if (it == debugfs.files.end())
     {
@@ -98,23 +98,23 @@ static void HandleLookup(fuse_req_t req, fuse_ino_t parent_inode, const char *na
     }
 
     auto &[inode, file] = *it;
-    fuse_entry_param entry_param = MakeFileEntryParam(inode, file);
-    fuse_reply_entry(req, &entry_param);
+    fuse_entry_param entryParam = MakeFileEntryParam(inode, file);
+    fuse_reply_entry(req, &entryParam);
 }
 
-static void HandleGetAttr(fuse_req_t req, fuse_ino_t inode, fuse_file_info *file_info)
+static void HandleGetAttr(fuse_req_t req, fuse_ino_t inode, fuse_file_info *fileInfo)
 {
     // LOG(INFO) << "get attr " << inode;
 
     if (inode == 1)
     {
-        const fuse_entry_param entry_param{
+        const fuse_entry_param entryParam{
             .ino = 1,
             .attr = {.st_ino = 1, .st_nlink = 2 + debugfs.files.size(), .st_mode = S_IFDIR | 0444},
             .attr_timeout = 1.0,
             .entry_timeout = 1.0,
         };
-        fuse_reply_attr(req, &entry_param.attr, 1.0);
+        fuse_reply_attr(req, &entryParam.attr, 1.0);
     }
     else
     {
@@ -126,8 +126,8 @@ static void HandleGetAttr(fuse_req_t req, fuse_ino_t inode, fuse_file_info *file
         }
 
         auto &[inode, file] = *it;
-        fuse_entry_param entry_param = MakeFileEntryParam(inode, file);
-        fuse_reply_attr(req, &entry_param.attr, 1.0);
+        fuse_entry_param entryParam = MakeFileEntryParam(inode, file);
+        fuse_reply_attr(req, &entryParam.attr, 1.0);
     }
 }
 
@@ -153,7 +153,7 @@ static void HandleRemoveXAttr(fuse_req_t req, fuse_ino_t inode, const char *name
     fuse_reply_err(req, ENOTSUP);
 }
 
-static void HandleOpen(fuse_req_t req, fuse_ino_t inode, fuse_file_info *file_info)
+static void HandleOpen(fuse_req_t req, fuse_ino_t inode, fuse_file_info *fileInfo)
 {
     // LOG(INFO) << "open " << inode;
 
@@ -163,7 +163,7 @@ static void HandleOpen(fuse_req_t req, fuse_ino_t inode, fuse_file_info *file_in
         return;
     }
 
-    if ((file_info->flags & O_ACCMODE) != O_RDONLY)
+    if ((fileInfo->flags & O_ACCMODE) != O_RDONLY)
     {
         fuse_reply_err(req, EACCES);
         return;
@@ -176,10 +176,10 @@ static void HandleOpen(fuse_req_t req, fuse_ino_t inode, fuse_file_info *file_in
         return;
     }
 
-    fuse_reply_open(req, file_info);
+    fuse_reply_open(req, fileInfo);
 }
 
-static void HandleRead(fuse_req_t req, fuse_ino_t inode, size_t size, off_t offset, fuse_file_info *file_info)
+static void HandleRead(fuse_req_t req, fuse_ino_t inode, size_t size, off_t offset, fuse_file_info *fileInfo)
 {
     // LOG(INFO) << "read " << inode << " " << size << " " << offset;
 
@@ -193,13 +193,13 @@ static void HandleRead(fuse_req_t req, fuse_ino_t inode, size_t size, off_t offs
     auto &[_, file] = *it;
     FuseReplyBufSlice(req, GetContent(file), offset, size);
 
-    if (file.read_notify_handler)
+    if (file.readNotifyHandler)
     {
-        file.read_notify_handler(file);
+        file.readNotifyHandler(file);
     }
 }
 
-static void HandleReadDir(fuse_req_t req, fuse_ino_t inode, size_t size, off_t offset, fuse_file_info *file_info)
+static void HandleReadDir(fuse_req_t req, fuse_ino_t inode, size_t size, off_t offset, fuse_file_info *fileInfo)
 {
     // LOG(INFO) << "read dir " << inode << " " << size << " " << offset;
 
@@ -209,9 +209,9 @@ static void HandleReadDir(fuse_req_t req, fuse_ino_t inode, size_t size, off_t o
         return;
     }
 
-    size_t total_size = 0;
+    size_t totalSize = 0;
 
-    auto count = [&](const char *name) -> void { total_size += fuse_add_direntry(req, nullptr, 0, name, nullptr, 0); };
+    auto count = [&](const char *name) -> void { totalSize += fuse_add_direntry(req, nullptr, 0, name, nullptr, 0); };
 
     count(".");
     count("..");
@@ -220,12 +220,12 @@ static void HandleReadDir(fuse_req_t req, fuse_ino_t inode, size_t size, off_t o
         count(file.name);
     }
 
-    std::vector<char> buf(total_size);
+    std::vector<char> buf(totalSize);
     size_t pos = 0;
 
     auto append = [&](fuse_ino_t inode, const char *name) -> void {
         struct stat stat{.st_ino = inode};
-        pos += fuse_add_direntry(req, buf.data() + pos, total_size - pos, name, &stat, buf.size());
+        pos += fuse_add_direntry(req, buf.data() + pos, totalSize - pos, name, &stat, buf.size());
     };
 
     append(1, ".");
@@ -255,36 +255,36 @@ void DebugFsInitialize(const std::string &path)
         .removexattr = HandleRemoveXAttr,
     };
 
-    const char *path_cstr = path.c_str();
+    const char *pathCstr = path.c_str();
 
     {
         struct stat st = {0};
-        if (stat(path_cstr, &st) == -1)
+        if (stat(pathCstr, &st) == -1)
         {
-            mkdir(path_cstr, 0700);
+            mkdir(pathCstr, 0700);
         }
     }
 
     debugfs.session = fuse_session_new(&args, &op, sizeof(op), nullptr);
     CHECK(debugfs.session);
-    CHECK(!fuse_session_mount(debugfs.session, path_cstr));
+    CHECK(!fuse_session_mount(debugfs.session, pathCstr));
 
     debugfs.fd = fuse_session_fd(debugfs.session);
 
     LOG(INFO) << "initialized debugfs";
 }
 
-void DebugFsRegister(const char *name, void *data, void (*set_content_handler)(DebugFsFile &),
-                     void (*read_notify_handler)(DebugFsFile &))
+void DebugFsRegister(const char *name, void *data, void (*setContentHandler)(DebugFsFile &),
+                     void (*readNotifyHandler)(DebugFsFile &))
 {
     LOG(INFO) << "registering debugfs file " << name;
 
-    CHECK(set_content_handler);
-    debugfs.files.emplace(next_inode++, DebugFsFile{
+    CHECK(setContentHandler);
+    debugfs.files.emplace(nextInode++, DebugFsFile{
                                             .name = name,
                                             .data = data,
-                                            .set_content_handler = set_content_handler,
-                                            .read_notify_handler = read_notify_handler,
+                                            .setContentHandler = setContentHandler,
+                                            .readNotifyHandler = readNotifyHandler,
                                         });
 }
 

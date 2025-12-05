@@ -9,7 +9,7 @@
 namespace nyla
 {
 
-extern bool wm_background_dirty;
+extern bool wmBackgroundDirty;
 
 using KeybindHandler = std::variant<void (*)(xcb_timestamp_t timestamp), void (*)()>;
 using Keybind = std::tuple<xcb_keycode_t, int, KeybindHandler>;
@@ -17,7 +17,7 @@ using Keybind = std::tuple<xcb_keycode_t, int, KeybindHandler>;
 //
 
 void InitializeWM();
-void ProcessWMEvents(const bool &is_running, uint16_t modifier, std::vector<Keybind> keybinds);
+void ProcessWMEvents(const bool &isRunning, uint16_t modifier, std::vector<Keybind> keybinds);
 
 void ProcessWM();
 void UpdateBackground();

@@ -16,9 +16,9 @@ struct DebugFsFile
     const char *name;
     void *data;
     std::string content;
-    uint64_t content_time;
-    void (*set_content_handler)(DebugFsFile &);
-    void (*read_notify_handler)(DebugFsFile &);
+    uint64_t contentTime;
+    void (*setContentHandler)(DebugFsFile &);
+    void (*readNotifyHandler)(DebugFsFile &);
 };
 
 struct DebugFs
@@ -31,6 +31,6 @@ extern DebugFs debugfs;
 
 void DebugFsInitialize(const std::string &path);
 void DebugFsProcess();
-void DebugFsRegister(const char *name, void *data, void (*set_content_handler)(DebugFsFile &),
-                     void (*read_notify_handler)(DebugFsFile &));
+void DebugFsRegister(const char *name, void *data, void (*setContentHandler)(DebugFsFile &),
+                     void (*readNotifyHandler)(DebugFsFile &));
 } // namespace nyla

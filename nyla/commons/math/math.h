@@ -5,6 +5,6 @@
 namespace nyla
 {
 
-constexpr inline float pi = std::numbers::pi_v<float>;
+constexpr inline float kPi = std::numbers::pi_v<float>;
 
 } // namespace nyla

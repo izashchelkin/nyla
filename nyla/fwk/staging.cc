@@ -16,8 +16,8 @@ auto RecompileShadersIfNeeded() -> bool
 
     return false;
 
-    static bool spv_changed = true;
-    static bool src_changed = true;
+    static bool spvChanged = true;
+    static bool srcChanged = true;
 
     for (auto &change : PlatformFsGetChanges())
     {
@@ -28,11 +28,11 @@ auto RecompileShadersIfNeeded() -> bool
         const auto &path = change.path;
         if (path.ends_with(".spv"))
         {
-            spv_changed = true;
+            spvChanged = true;
         }
         else if (path.ends_with(".hlsl"))
         {
-            src_changed = true;
+            srcChanged = true;
         }
         else
         {
@@ -40,19 +40,19 @@ auto RecompileShadersIfNeeded() -> bool
         }
     }
 
-    if (src_changed)
+    if (srcChanged)
     {
         LOG(INFO) << "shaders recompiling";
         system("python3 /home/izashchelkin/nyla/scripts/shaders.py");
         usleep(1e6);
         PlatformProcessEvents();
 
-        src_changed = false;
+        srcChanged = false;
     }
 
-    if (src_changed || spv_changed)
+    if (srcChanged || spvChanged)
     {
-        spv_changed = false;
+        spvChanged = false;
         return true;
     }
 
@@ -71,14 +71,14 @@ void UpdateDtFps(uint32_t &fps, float &dt)
     static float dtnanosaccum = .0f;
     dtnanosaccum += dtnanos;
 
-    static uint32_t fps_frames = 0;
-    ++fps_frames;
+    static uint32_t fpsFrames = 0;
+    ++fpsFrames;
 
     if (dtnanosaccum >= .5f * 1e9)
     {
-        fps = (1e9 / dtnanosaccum) * fps_frames;
+        fps = (1e9 / dtnanosaccum) * fpsFrames;
 
-        fps_frames = 0;
+        fpsFrames = 0;
         dtnanosaccum = .0f;
     }
 }

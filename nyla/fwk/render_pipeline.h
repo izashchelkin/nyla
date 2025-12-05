@@ -14,44 +14,44 @@ namespace nyla
 struct RpBuf
 {
     bool enabled;
-    RhiShaderStage stage_flags;
+    RhiShaderStage stageFlags;
     uint32_t size;
     uint32_t range;
     uint32_t written;
     std::vector<RhiVertexFormat> attrs;
-    std::array<RhiBuffer, rhi_max_num_frames_in_flight> buffer;
+    std::array<RhiBuffer, kRhiMaxNumFramesInFlight> buffer;
 };
 
 inline auto RpBufStageFlags(const RpBuf &buf) -> RhiShaderStage
 {
-    if (Any(buf.stage_flags))
-        return buf.stage_flags;
+    if (Any(buf.stageFlags))
+        return buf.stageFlags;
     else
         return RhiShaderStage::Vertex | RhiShaderStage::Fragment;
 }
 
 struct Rp
 {
-    std::string debug_name;
+    std::string debugName;
     RhiGraphicsPipeline pipeline;
-    RhiBindGroupLayout bind_group_layout;
-    std::array<RhiBindGroup, rhi_max_num_frames_in_flight> bind_group;
+    RhiBindGroupLayout bindGroupLayout;
+    std::array<RhiBindGroup, kRhiMaxNumFramesInFlight> bindGroup;
 
-    RhiShader vertex_shader;
-    RhiShader fragment_shader;
+    RhiShader vertexShader;
+    RhiShader fragmentShader;
 
-    bool disable_culling;
-    RpBuf static_uniform;
-    RpBuf dynamic_uniform;
-    RpBuf vert_buf;
+    bool disableCulling;
+    RpBuf staticUniform;
+    RpBuf dynamicUniform;
+    RpBuf vertBuf;
 
-    void (*Init)(Rp &);
+    void (*init)(Rp &);
 };
 
 struct RpMesh
 {
     uint32_t offset;
-    uint32_t vert_count;
+    uint32_t vertCount;
 };
 
 void RpInit(Rp &rp);
@@ -60,7 +60,7 @@ void RpAttachFragShader(Rp &rp, const std::string &path);
 void RpBegin(Rp &rp);
 void RpPushConst(Rp &rp, CharView data);
 void RpStaticUniformCopy(Rp &rp, CharView data);
-auto RpVertCopy(Rp &rp, uint32_t vert_count, CharView vert_data) -> RpMesh;
-void RpDraw(Rp &rp, RpMesh mesh, CharView dynamic_uniform_data);
+auto RpVertCopy(Rp &rp, uint32_t vertCount, CharView vertData) -> RpMesh;
+void RpDraw(Rp &rp, RpMesh mesh, CharView dynamicUniformData);
 
 } // namespace nyla

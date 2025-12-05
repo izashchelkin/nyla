@@ -14,9 +14,9 @@ using namespace rhi_vulkan_internal;
 namespace
 {
 
-auto ConvertVulkanBindingType(RhiBindingType binding_type) -> VkDescriptorType
+auto ConvertVulkanBindingType(RhiBindingType bindingType) -> VkDescriptorType
 {
-    switch (binding_type)
+    switch (bindingType)
     {
     case RhiBindingType::UniformBuffer:
         return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -31,78 +31,78 @@ auto ConvertVulkanBindingType(RhiBindingType binding_type) -> VkDescriptorType
 
 auto RhiCreateBindGroupLayout(const RhiBindGroupLayoutDesc &desc) -> RhiBindGroupLayout
 {
-    CHECK_LE(desc.binding_count, std::size(desc.bindings));
-    VkDescriptorSetLayoutBinding descriptor_set_layout_bindings[std::size(desc.bindings)];
+    CHECK_LE(desc.bindingCount, std::size(desc.bindings));
+    VkDescriptorSetLayoutBinding descriptorSetLayoutBindings[std::size(desc.bindings)];
 
-    for (uint32_t ibinding = 0; ibinding < desc.binding_count; ++ibinding)
+    for (uint32_t ibinding = 0; ibinding < desc.bindingCount; ++ibinding)
     {
         const auto &binding = desc.bindings[ibinding];
-        descriptor_set_layout_bindings[ibinding] = {
+        descriptorSetLayoutBindings[ibinding] = {
             .binding = binding.binding,
             .descriptorType = ConvertVulkanBindingType(binding.type),
-            .descriptorCount = binding.array_size,
-            .stageFlags = ConvertRhiShaderStageIntoVkShaderStageFlags(binding.stage_flags),
+            .descriptorCount = binding.arraySize,
+            .stageFlags = ConvertRhiShaderStageIntoVkShaderStageFlags(binding.stageFlags),
         };
     }
 
-    const VkDescriptorSetLayoutCreateInfo descriptor_set_layout_create_info{
+    const VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-        .bindingCount = desc.binding_count,
-        .pBindings = descriptor_set_layout_bindings,
+        .bindingCount = desc.bindingCount,
+        .pBindings = descriptorSetLayoutBindings,
     };
 
-    VkDescriptorSetLayout descriptor_set_layout;
-    VK_CHECK(vkCreateDescriptorSetLayout(vk.dev, &descriptor_set_layout_create_info, nullptr, &descriptor_set_layout));
+    VkDescriptorSetLayout descriptorSetLayout;
+    VK_CHECK(vkCreateDescriptorSetLayout(vk.dev, &descriptorSetLayoutCreateInfo, nullptr, &descriptorSetLayout));
 
-    return RhiHandleAcquire(rhi_handles.bind_group_layouts, descriptor_set_layout);
+    return RhiHandleAcquire(rhiHandles.bindGroupLayouts, descriptorSetLayout);
 }
 
 void RhiDestroyBindGroupLayout(RhiBindGroupLayout layout)
 {
-    VkDescriptorSetLayout descriptor_set_layout = RhiHandleRelease(rhi_handles.bind_group_layouts, layout);
-    vkDestroyDescriptorSetLayout(vk.dev, descriptor_set_layout, nullptr);
+    VkDescriptorSetLayout descriptorSetLayout = RhiHandleRelease(rhiHandles.bindGroupLayouts, layout);
+    vkDestroyDescriptorSetLayout(vk.dev, descriptorSetLayout, nullptr);
 }
 
 auto RhiCreateBindGroup(const RhiBindGroupDesc &desc) -> RhiBindGroup
 {
-    VkDescriptorSetLayout descriptor_set_layout = RhiHandleGetData(rhi_handles.bind_group_layouts, desc.layout);
+    VkDescriptorSetLayout descriptorSetLayout = RhiHandleGetData(rhiHandles.bindGroupLayouts, desc.layout);
 
-    const VkDescriptorSetAllocateInfo descriptor_set_alloc_info{
+    const VkDescriptorSetAllocateInfo descriptorSetAllocInfo{
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-        .descriptorPool = vk.descriptor_pool,
+        .descriptorPool = vk.descriptorPool,
         .descriptorSetCount = 1,
-        .pSetLayouts = &descriptor_set_layout,
+        .pSetLayouts = &descriptorSetLayout,
     };
 
-    VkDescriptorSet descriptor_set;
-    VK_CHECK(vkAllocateDescriptorSets(vk.dev, &descriptor_set_alloc_info, &descriptor_set));
+    VkDescriptorSet descriptorSet;
+    VK_CHECK(vkAllocateDescriptorSets(vk.dev, &descriptorSetAllocInfo, &descriptorSet));
 
     VkWriteDescriptorSet writes[std::size(desc.entries)];
-    CHECK_LE(desc.entries_count, std::size(desc.entries));
+    CHECK_LE(desc.entriesCount, std::size(desc.entries));
 
-    for (uint32_t i = 0; i < desc.entries_count; ++i)
+    for (uint32_t i = 0; i < desc.entriesCount; ++i)
     {
         const RhiBindGroupEntry &entry = desc.entries[i];
         switch (entry.type)
         {
         case RhiBindingType::UniformBuffer:
         case RhiBindingType::UniformBufferDynamic: {
-            const VulkanBufferData &buffer_data = RhiHandleGetData(rhi_handles.buffers, entry.buffer.buffer);
+            const VulkanBufferData &bufferData = RhiHandleGetData(rhiHandles.buffers, entry.buffer.buffer);
 
-            auto buffer_info = &Tmake(VkDescriptorBufferInfo{
-                .buffer = buffer_data.buffer,
+            auto bufferInfo = &Tmake(VkDescriptorBufferInfo{
+                .buffer = bufferData.buffer,
                 .offset = entry.buffer.offset,
                 .range = entry.buffer.size,
             });
 
             writes[i] = {
                 .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                .dstSet = descriptor_set,
+                .dstSet = descriptorSet,
                 .dstBinding = entry.binding,
-                .dstArrayElement = entry.array_index,
+                .dstArrayElement = entry.arrayIndex,
                 .descriptorCount = 1,
                 .descriptorType = ConvertVulkanBindingType(entry.type),
-                .pBufferInfo = buffer_info,
+                .pBufferInfo = bufferInfo,
             };
             break;
         }
@@ -113,27 +113,27 @@ auto RhiCreateBindGroup(const RhiBindGroupDesc &desc) -> RhiBindGroup
         }
     }
 
-    vkUpdateDescriptorSets(vk.dev, desc.entries_count, writes, 0, nullptr);
+    vkUpdateDescriptorSets(vk.dev, desc.entriesCount, writes, 0, nullptr);
 
-    return RhiHandleAcquire(rhi_handles.bind_groups, descriptor_set);
+    return RhiHandleAcquire(rhiHandles.bindGroups, descriptorSet);
 }
 
-void RhiDestroyBindGroup(RhiBindGroup bind_group)
+void RhiDestroyBindGroup(RhiBindGroup bindGroup)
 {
-    VkDescriptorSet descriptor_set = RhiHandleRelease(rhi_handles.bind_groups, bind_group);
-    vkFreeDescriptorSets(vk.dev, vk.descriptor_pool, 1, &descriptor_set);
+    VkDescriptorSet descriptorSet = RhiHandleRelease(rhiHandles.bindGroups, bindGroup);
+    vkFreeDescriptorSets(vk.dev, vk.descriptorPool, 1, &descriptorSet);
 }
 
-void RhiCmdBindGraphicsBindGroup(RhiCmdList cmd, uint32_t set_index, RhiBindGroup bind_group,
-                                 std::span<const uint32_t> dynamic_offsets)
+void RhiCmdBindGraphicsBindGroup(RhiCmdList cmd, uint32_t setIndex, RhiBindGroup bindGroup,
+                                 std::span<const uint32_t> dynamicOffsets)
 { // TODO: validate dynamic offsets size !!!
-    const VulkanCmdListData &cmd_data = RhiHandleGetData(rhi_handles.cmd_lists, cmd);
-    const VulkanPipelineData &pipeline_data =
-        RhiHandleGetData(rhi_handles.graphics_pipelines, cmd_data.bound_graphics_pipeline);
-    const VkDescriptorSet &descriptor_set = RhiHandleGetData(rhi_handles.bind_groups, bind_group);
+    const VulkanCmdListData &cmdData = RhiHandleGetData(rhiHandles.cmdLists, cmd);
+    const VulkanPipelineData &pipelineData =
+        RhiHandleGetData(rhiHandles.graphicsPipelines, cmdData.boundGraphicsPipeline);
+    const VkDescriptorSet &descriptorSet = RhiHandleGetData(rhiHandles.bindGroups, bindGroup);
 
-    vkCmdBindDescriptorSets(cmd_data.cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_data.layout, set_index, 1,
-                            &descriptor_set, dynamic_offsets.size(), dynamic_offsets.data());
+    vkCmdBindDescriptorSets(cmdData.cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineData.layout, setIndex, 1,
+                            &descriptorSet, dynamicOffsets.size(), dynamicOffsets.data());
 }
 
 } // namespace nyla

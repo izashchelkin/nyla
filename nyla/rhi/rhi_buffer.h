@@ -33,8 +33,8 @@ struct RhiBuffer : RhiHandle
 struct RhiBufferDesc
 {
     uint32_t size;
-    RhiBufferUsage buffer_usage;
-    RhiMemoryUsage memory_usage;
+    RhiBufferUsage bufferUsage;
+    RhiMemoryUsage memoryUsage;
 };
 
 auto RhiCreateBuffer(const RhiBufferDesc &) -> RhiBuffer;

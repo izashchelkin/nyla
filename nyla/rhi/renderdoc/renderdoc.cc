@@ -13,20 +13,20 @@ namespace nyla
 
 static auto GetRenderDocAPI() -> RENDERDOC_API_1_6_0 *
 {
-    static RENDERDOC_API_1_6_0 *renderdoc_api = nullptr;
+    static RENDERDOC_API_1_6_0 *renderdocApi = nullptr;
 
-    if (renderdoc_api)
+    if (renderdocApi)
     {
-        return renderdoc_api;
+        return renderdocApi;
     }
 
     if (void *mod = dlopen("librenderdoc.so", RTLD_NOW | RTLD_NOLOAD))
     {
-        pRENDERDOC_GetAPI RENDERDOC_GetAPI = reinterpret_cast<pRENDERDOC_GetAPI>(dlsym(mod, "RENDERDOC_GetAPI"));
-        if (RENDERDOC_GetAPI && RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_6_0, (void **)&renderdoc_api) == 1)
+        pRENDERDOC_GetAPI renderdocGetApi = reinterpret_cast<pRENDERDOC_GetAPI>(dlsym(mod, "RENDERDOC_GetAPI"));
+        if (renderdocGetApi && renderdocGetApi(eRENDERDOC_API_Version_1_6_0, (void **)&renderdocApi) == 1)
         {
             LOG(INFO) << "got renderdoc api";
-            return renderdoc_api;
+            return renderdocApi;
         }
 
         LOG(ERROR) << "failed to get renderdoc api";

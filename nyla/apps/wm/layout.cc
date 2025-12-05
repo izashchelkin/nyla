@@ -11,14 +11,14 @@ void CycleLayoutType(LayoutType &layout)
 {
     switch (layout)
     {
-    case LayoutType::kColumns:
-        layout = LayoutType::kRows;
+    case LayoutType::KColumns:
+        layout = LayoutType::KRows;
         break;
-    case LayoutType::kRows:
-        layout = LayoutType::kGrid;
+    case LayoutType::KRows:
+        layout = LayoutType::KGrid;
         break;
-    case LayoutType::kGrid:
-        layout = LayoutType::kColumns;
+    case LayoutType::KGrid:
+        layout = LayoutType::KColumns;
         break;
 
     default:
@@ -26,75 +26,75 @@ void CycleLayoutType(LayoutType &layout)
     }
 }
 
-static void ComputeColumns(const Rect &bounding_rect, uint32_t n, uint32_t padding, std::vector<Rect> &out)
+static void ComputeColumns(const Rect &boundingRect, uint32_t n, uint32_t padding, std::vector<Rect> &out)
 {
-    uint32_t width = bounding_rect.width() / n;
+    uint32_t width = boundingRect.Width() / n;
     for (uint32_t i = 0; i < n; ++i)
     {
-        out.emplace_back(TryApplyPadding(Rect(static_cast<int32_t>(bounding_rect.x() + (i * width)), bounding_rect.y(),
-                                              width, bounding_rect.height()),
+        out.emplace_back(TryApplyPadding(Rect(static_cast<int32_t>(boundingRect.X() + (i * width)), boundingRect.Y(),
+                                              width, boundingRect.Height()),
                                          padding));
     }
 }
 
-static void ComputeRows(const Rect &bounding_rect, uint32_t n, uint32_t padding, std::vector<Rect> &out)
+static void ComputeRows(const Rect &boundingRect, uint32_t n, uint32_t padding, std::vector<Rect> &out)
 {
-    uint32_t height = bounding_rect.height() / n;
+    uint32_t height = boundingRect.Height() / n;
     for (uint32_t i = 0; i < n; ++i)
     {
-        out.emplace_back(TryApplyPadding(Rect(bounding_rect.x(), static_cast<int32_t>(bounding_rect.y() + (i * height)),
-                                              bounding_rect.width(), height),
+        out.emplace_back(TryApplyPadding(Rect(boundingRect.X(), static_cast<int32_t>(boundingRect.Y() + (i * height)),
+                                              boundingRect.Width(), height),
                                          padding));
     }
 }
 
-static void ComputeGrid(const Rect &bounding_rect, uint32_t n, uint32_t padding, std::vector<Rect> &out)
+static void ComputeGrid(const Rect &boundingRect, uint32_t n, uint32_t padding, std::vector<Rect> &out)
 {
     if (n < 4)
     {
-        ComputeColumns(bounding_rect, n, padding, out);
+        ComputeColumns(boundingRect, n, padding, out);
     }
     else
     {
         double root = std::sqrt(n);
-        uint32_t num_cols = std::floor(root);
-        uint32_t num_rows = std::ceil(n / (double)num_cols);
+        uint32_t numCols = std::floor(root);
+        uint32_t numRows = std::ceil(n / (double)numCols);
 
-        uint32_t width = bounding_rect.width() / num_cols;
-        uint32_t height = bounding_rect.height() / num_rows;
+        uint32_t width = boundingRect.Width() / numCols;
+        uint32_t height = boundingRect.Height() / numRows;
 
         for (uint32_t i = 0; i < n; ++i)
         {
-            out.emplace_back(TryApplyPadding(Rect(static_cast<int32_t>(bounding_rect.x() + ((i % num_cols) * width)),
-                                                  static_cast<int32_t>(bounding_rect.y() + ((i / num_cols) * height)),
+            out.emplace_back(TryApplyPadding(Rect(static_cast<int32_t>(boundingRect.X() + ((i % numCols) * width)),
+                                                  static_cast<int32_t>(boundingRect.Y() + ((i / numCols) * height)),
                                                   width, height),
                                              padding));
         }
     }
 }
 
-auto ComputeLayout(const Rect &bounding_rect, uint32_t n, uint32_t padding, LayoutType layout_type) -> std::vector<Rect>
+auto ComputeLayout(const Rect &boundingRect, uint32_t n, uint32_t padding, LayoutType layoutType) -> std::vector<Rect>
 {
     switch (n)
     {
     case 0:
         return {};
     case 1:
-        return {TryApplyPadding(bounding_rect, padding)};
+        return {TryApplyPadding(boundingRect, padding)};
     }
 
     std::vector<Rect> out;
     out.reserve(n);
-    switch (layout_type)
+    switch (layoutType)
     {
-    case LayoutType::kColumns:
-        ComputeColumns(bounding_rect, n, padding, out);
+    case LayoutType::KColumns:
+        ComputeColumns(boundingRect, n, padding, out);
         break;
-    case LayoutType::kRows:
-        ComputeRows(bounding_rect, n, padding, out);
+    case LayoutType::KRows:
+        ComputeRows(boundingRect, n, padding, out);
         break;
-    case LayoutType::kGrid:
-        ComputeGrid(bounding_rect, n, padding, out);
+    case LayoutType::KGrid:
+        ComputeGrid(boundingRect, n, padding, out);
         break;
     }
     return out;
@@ -102,9 +102,9 @@ auto ComputeLayout(const Rect &bounding_rect, uint32_t n, uint32_t padding, Layo
 
 auto TryApplyPadding(const Rect &rect, uint32_t padding) -> Rect
 {
-    if (rect.width() > 2 * padding && rect.height() > 2 * padding)
+    if (rect.Width() > 2 * padding && rect.Height() > 2 * padding)
     {
-        return Rect(rect.x(), rect.y(), rect.width() - 2 * padding, rect.height() - 2 * padding);
+        return Rect(rect.X(), rect.Y(), rect.Width() - 2 * padding, rect.Height() - 2 * padding);
     }
     else
     {
@@ -112,11 +112,11 @@ auto TryApplyPadding(const Rect &rect, uint32_t padding) -> Rect
     }
 }
 
-auto TryApplyMarginTop(const Rect &rect, uint32_t margin_top) -> Rect
+auto TryApplyMarginTop(const Rect &rect, uint32_t marginTop) -> Rect
 {
-    if (rect.height() > margin_top)
+    if (rect.Height() > marginTop)
     {
-        return Rect(rect.x(), rect.y() + margin_top, rect.width(), rect.height() - margin_top);
+        return Rect(rect.X(), rect.Y() + marginTop, rect.Width(), rect.Height() - marginTop);
     }
     else
     {
@@ -126,9 +126,9 @@ auto TryApplyMarginTop(const Rect &rect, uint32_t margin_top) -> Rect
 
 auto TryApplyMargin(const Rect &rect, uint32_t margin) -> Rect
 {
-    if (rect.width() > 2 * margin && rect.height() > 2 * margin)
+    if (rect.Width() > 2 * margin && rect.Height() > 2 * margin)
     {
-        return Rect(rect.x() + margin, rect.y() + margin, rect.width() - 2 * margin, rect.height() - 2 * margin);
+        return Rect(rect.X() + margin, rect.Y() + margin, rect.Width() - 2 * margin, rect.Height() - 2 * margin);
     }
     else
     {

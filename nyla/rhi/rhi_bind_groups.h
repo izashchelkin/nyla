@@ -7,7 +7,7 @@
 namespace nyla
 {
 
-constexpr inline uint32_t rhi_max_bind_group_layouts = 4;
+constexpr inline uint32_t kRhiMaxBindGroupLayouts = 4;
 
 struct RhiBindGroup : RhiHandle
 {
@@ -33,7 +33,7 @@ struct RhiBindGroupEntry
 {
     uint32_t binding;
     RhiBindingType type;
-    uint32_t array_index;
+    uint32_t arrayIndex;
     union {
         RhiBufferBinding buffer;
     };
@@ -43,21 +43,21 @@ struct RhiBindGroupDesc
 {
     RhiBindGroupLayout layout;
     RhiBindGroupEntry entries[4];
-    uint32_t entries_count;
+    uint32_t entriesCount;
 };
 
 struct RhiBindingDesc
 {
     uint32_t binding;
     RhiBindingType type;
-    uint32_t array_size;
-    RhiShaderStage stage_flags;
+    uint32_t arraySize;
+    RhiShaderStage stageFlags;
 };
 
 struct RhiBindGroupLayoutDesc
 {
     RhiBindingDesc bindings[16];
-    uint32_t binding_count;
+    uint32_t bindingCount;
 };
 
 auto RhiCreateBindGroupLayout(const RhiBindGroupLayoutDesc &) -> RhiBindGroupLayout;

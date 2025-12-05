@@ -50,8 +50,8 @@ static auto Main() -> int
         if (RecompileShadersIfNeeded())
         {
             RpInit(worldPipeline);
-            RpInit(gui_pipeline);
-            RpInit(dbg_text_pipeline);
+            RpInit(guiPipeline);
+            RpInit(dbgTextPipeline);
         }
 
         static uint32_t fps;

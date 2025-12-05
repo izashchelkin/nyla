@@ -14,19 +14,19 @@ namespace platform_x11_internal
 {
 
 #define Nyla_X11_Atoms(X)                                                                                              \
-    X(compound_text)                                                                                                   \
-    X(wm_delete_window)                                                                                                \
-    X(wm_protocols)                                                                                                    \
-    X(wm_name)                                                                                                         \
-    X(wm_state)                                                                                                        \
-    X(wm_take_focus)
+    X(compoundText)                                                                                                    \
+    X(wmDeleteWindow)                                                                                                  \
+    X(wmProtocols)                                                                                                     \
+    X(wmName)                                                                                                          \
+    X(wmState)                                                                                                         \
+    X(wmTakeFocus)
 
-struct X11_State
+struct X11State
 {
     xcb_connection_t *conn;
     xcb_screen_t *screen;
 
-    const xcb_query_extension_reply_t *ext_xi2;
+    const xcb_query_extension_reply_t *extXi2;
 
     struct
     {
@@ -35,37 +35,38 @@ struct X11_State
 #undef X
     } atoms;
 };
-extern X11_State x11;
+extern X11State x11;
 
-void X11_Initialize();
+void X11Initialize();
 
-auto X11_CreateWindow(uint32_t width, uint32_t height, bool override_redirect, xcb_event_mask_t event_mask) -> xcb_window_t;
+auto X11CreateWindow(uint32_t width, uint32_t height, bool overrideRedirect, xcb_event_mask_t eventMask)
+    -> xcb_window_t;
 
-void X11_Flush();
+void X11Flush();
 
-auto X11_InternAtom(xcb_connection_t *conn, std::string_view name, bool only_if_exists = false) -> xcb_atom_t;
+auto X11InternAtom(xcb_connection_t *conn, std::string_view name, bool onlyIfExists = false) -> xcb_atom_t;
 
-void X11_SendClientMessage32(xcb_window_t window, xcb_atom_t type, xcb_atom_t arg1, uint32_t arg2, uint32_t arg3,
-                             uint32_t arg4);
+void X11SendClientMessage32(xcb_window_t window, xcb_atom_t type, xcb_atom_t arg1, uint32_t arg2, uint32_t arg3,
+                            uint32_t arg4);
 
-void X11_Send_WM_Take_Focus(xcb_window_t window, uint32_t time);
+void X11SendWmTakeFocus(xcb_window_t window, uint32_t time);
 
-void X11_Send_WM_Delete_Window(xcb_window_t window);
+void X11SendWmDeleteWindow(xcb_window_t window);
 
-void X11_SendConfigureNotify(xcb_window_t window, xcb_window_t parent, int16_t x, int16_t y, uint16_t width,
-                             uint16_t height, uint16_t border_width);
+void X11SendConfigureNotify(xcb_window_t window, xcb_window_t parent, int16_t x, int16_t y, uint16_t width,
+                            uint16_t height, uint16_t borderWidth);
 
 //
 
-struct X11_KeyResolver
+struct X11KeyResolver
 {
     xkb_context *ctx;
     xkb_keymap *keymap;
 };
 
-auto X11_InitializeKeyResolver(X11_KeyResolver &resolver) -> bool;
-void X11_FreeKeyResolver(X11_KeyResolver &resolver);
-auto X11_ResolveKeyCode(const X11_KeyResolver &resolver, std::string_view keyname) -> xcb_keycode_t;
+auto X11InitializeKeyResolver(X11KeyResolver &resolver) -> bool;
+void X11FreeKeyResolver(X11KeyResolver &resolver);
+auto X11ResolveKeyCode(const X11KeyResolver &resolver, std::string_view keyname) -> xcb_keycode_t;
 
 auto ConvertKeyPhysicalIntoXkbName(KeyPhysical key) -> const char *;
 

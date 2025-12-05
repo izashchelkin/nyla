@@ -13,7 +13,7 @@ inline void GenUnitCircle(size_t n, auto consumer)
 {
     CHECK(n > 4);
 
-    const float theta = 2.f * pi / n;
+    const float theta = 2.f * kPi / n;
     std::complex<float> r = 1.f;
 
     for (size_t i = 0; i < n; ++i)

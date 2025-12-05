@@ -19,7 +19,7 @@ enum class RhiTextureFormat
     // B8G8R8A8_UNorm,
     //
     // R8G8B8_sRGB,
-    R8G8B8A8_sRGB,
+    R8G8B8A8SRgb,
     // B8G8R8A8_sRGB,
     //
     // R16_UNorm,
@@ -100,7 +100,7 @@ struct RhiTextureDesc
 {
     uint32_t width;
     uint32_t height;
-    RhiMemoryUsage memory_usage;
+    RhiMemoryUsage memoryUsage;
     RhiTextureFormat format;
 };
 

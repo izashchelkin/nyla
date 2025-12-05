@@ -34,34 +34,34 @@ template <typename Handle, typename Data, size_t Size> struct RhiHandlePool
 };
 
 template <typename Handle, typename Data, size_t Size>
-inline auto RhiHandleAcquire(RhiHandlePool<Handle, Data, Size> &pool, Data data, bool allow_intern = false) -> Handle
+inline auto RhiHandleAcquire(RhiHandlePool<Handle, Data, Size> &pool, Data data, bool allowIntern = false) -> Handle
 {
-    Handle ret_handle{};
+    Handle retHandle{};
 
     for (uint32_t i = 0; i < Size; ++i)
     {
         auto &slot = pool.slots[i];
         if (slot.used)
         {
-            CHECK(memcmp(&slot.data, &data, sizeof(slot.data)) || allow_intern);
+            CHECK(memcmp(&slot.data, &data, sizeof(slot.data)) || allowIntern);
             continue;
         }
 
-        if (!RhiHandleIsSet(ret_handle))
+        if (!RhiHandleIsSet(retHandle))
         {
             ++slot.gen;
             slot.used = true;
             slot.data = data;
 
-            ret_handle = static_cast<Handle>(RhiHandle{
+            retHandle = static_cast<Handle>(RhiHandle{
                 .gen = slot.gen,
                 .index = i,
             });
         }
     }
 
-    CHECK(RhiHandleIsSet(ret_handle));
-    return ret_handle;
+    CHECK(RhiHandleIsSet(retHandle));
+    return retHandle;
 }
 
 template <typename Handle, typename Data, size_t Size>

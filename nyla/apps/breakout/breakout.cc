@@ -46,33 +46,33 @@ struct Level
 
 enum class GameStage
 {
-    kStartMenu,
-    kGame,
+    KStartMenu,
+    KGame,
 };
-static GameStage stage = GameStage::kGame;
+static GameStage stage = GameStage::KGame;
 
 template <typename T> static auto FrameLocal(std::vector<T> &vec, auto create) -> T &
 {
     vec.reserve(RhiGetNumFramesInFlight());
-    uint32_t frame_index = RhiFrameGetIndex();
-    if (frame_index >= vec.size())
+    uint32_t frameIndex = RhiFrameGetIndex();
+    if (frameIndex >= vec.size())
     {
         vec.emplace_back(create());
     }
-    return vec.at(frame_index);
+    return vec.at(frameIndex);
 }
 
 constexpr Vec2f kWorldBoundaryX{-35.f, 35.f};
 constexpr Vec2f kWorldBoundaryY{-30.f, 30.f};
 constexpr float kBallRadius = .8f;
 
-static float player_pos_x = 0.f;
-static const float player_pos_y = kWorldBoundaryY[0] + 1.6f;
-static float player_width = 3.f;
-static const float player_height = .8f;
+static float playerPosX = 0.f;
+static const float kPlayerPosY = kWorldBoundaryY[0] + 1.6f;
+static float playerWidth = 3.f;
+static const float kPlayerHeight = .8f;
 
-static Vec2f ball_pos = {};
-static Vec2f ball_vel = {40.f, 40.f};
+static Vec2f ballPos = {};
+static Vec2f ballVel = {40.f, 40.f};
 
 static Level level;
 
@@ -112,31 +112,31 @@ void BreakoutFrame(float dt, uint32_t fps)
 {
     const int dx = Pressed(kRight) - Pressed(kLeft);
 
-    static float dt_accumulator = 0.f;
-    dt_accumulator += dt;
+    static float dtAccumulator = 0.f;
+    dtAccumulator += dt;
 
-    constexpr float step = 1.f / 120.f;
-    for (; dt_accumulator >= step; dt_accumulator -= step)
+    constexpr float kStep = 1.f / 120.f;
+    for (; dtAccumulator >= kStep; dtAccumulator -= kStep)
     {
-        player_pos_x += 100.f * step * dx;
-        player_pos_x =
-            std::clamp(player_pos_x, kWorldBoundaryX[0] + player_width / 2.f, kWorldBoundaryX[1] - player_width / 2.f);
+        playerPosX += 100.f * kStep * dx;
+        playerPosX =
+            std::clamp(playerPosX, kWorldBoundaryX[0] + playerWidth / 2.f, kWorldBoundaryX[1] - playerWidth / 2.f);
 
-        if (!IsInside(ball_pos[0], kBallRadius * 2.f, kWorldBoundaryX))
+        if (!IsInside(ballPos[0], kBallRadius * 2.f, kWorldBoundaryX))
         {
-            ball_vel[0] = -ball_vel[0];
+            ballVel[0] = -ballVel[0];
         }
 
-        if (!IsInside(ball_pos[1], kBallRadius * 2.f, kWorldBoundaryY))
+        if (!IsInside(ballPos[1], kBallRadius * 2.f, kWorldBoundaryY))
         {
-            ball_vel[1] = -ball_vel[1];
+            ballVel[1] = -ballVel[1];
         }
 
         // What's happening?
         // ball_pos[0] = std::clamp(ball_pos[0], kWorldBoundaryX[0] + kBallRadius, kWorldBoundaryX[1] - kBallRadius);
         // ball_pos[1] = std::clamp(ball_pos[1], kWorldBoundaryY[0] + kBallRadius, kWorldBoundaryY[1] - kBallRadius);
 
-        Vec2fAdd(ball_pos, Vec2fMul(ball_vel, step));
+        Vec2fAdd(ballPos, Vec2fMul(ballVel, kStep));
 
         for (auto &brick : level.bricks)
         {
@@ -145,14 +145,14 @@ void BreakoutFrame(float dt, uint32_t fps)
 
             bool hit = false;
 
-            if (IsInside(ball_pos[0], kBallRadius * 2.f,
+            if (IsInside(ballPos[0], kBallRadius * 2.f,
                          Vec2f{brick.x - brick.width / 2.f, brick.x + brick.width / 2.f}))
             {
-                if (IsInside(ball_pos[1], kBallRadius * 2.f,
+                if (IsInside(ballPos[1], kBallRadius * 2.f,
                              Vec2f{brick.y - brick.height / 2.f, brick.y + brick.height / 2.f}))
                 {
-                    ball_vel[1] = -ball_vel[1];
-                    ball_vel[0] = -ball_vel[0];
+                    ballVel[1] = -ballVel[1];
+                    ballVel[0] = -ballVel[0];
                     hit = true;
                     brick.dead = true;
                 }
@@ -163,14 +163,14 @@ void BreakoutFrame(float dt, uint32_t fps)
         }
 
         {
-            if (IsInside(ball_pos[0], kBallRadius * 2.f,
-                         Vec2f{player_pos_x - player_width / 2.f, player_pos_x + player_width / 2.f}))
+            if (IsInside(ballPos[0], kBallRadius * 2.f,
+                         Vec2f{playerPosX - playerWidth / 2.f, playerPosX + playerWidth / 2.f}))
             {
-                if (IsInside(ball_pos[1], kBallRadius * 2.f,
-                             Vec2f{player_pos_y - player_height / 2.f, player_pos_y + player_height / 2.f}))
+                if (IsInside(ballPos[1], kBallRadius * 2.f,
+                             Vec2f{kPlayerPosY - kPlayerHeight / 2.f, kPlayerPosY + kPlayerHeight / 2.f}))
                 {
-                    ball_vel[1] = -ball_vel[1];
-                    ball_vel[0] = -ball_vel[0];
+                    ballVel[1] = -ballVel[1];
+                    ballVel[0] = -ballVel[0];
                 }
             }
         }
@@ -180,42 +180,42 @@ void BreakoutFrame(float dt, uint32_t fps)
     WorldSetUp();
 
     {
-        static std ::vector<RpMesh> unit_rect_meshes;
-        RpMesh unit_rect_mesh = FrameLocal(unit_rect_meshes, [] -> RpMesh {
-            std::vector<Vertex> unit_rect;
-            unit_rect.reserve(6);
-            GenUnitRect([&unit_rect](float x, float y) -> void { unit_rect.emplace_back(Vertex{Vec2f{x, y}}); });
-            return RpVertCopy(worldPipeline, unit_rect.size(), CharViewSpan(std::span{unit_rect}));
+        static std ::vector<RpMesh> unitRectMeshes;
+        RpMesh unitRectMesh = FrameLocal(unitRectMeshes, [] -> RpMesh {
+            std::vector<Vertex> unitRect;
+            unitRect.reserve(6);
+            GenUnitRect([&unitRect](float x, float y) -> void { unitRect.emplace_back(Vertex{Vec2f{x, y}}); });
+            return RpVertCopy(worldPipeline, unitRect.size(), CharViewSpan(std::span{unitRect}));
         });
 
-        static std ::vector<RpMesh> unit_circle_meshes;
-        RpMesh unit_circle_mesh = FrameLocal(unit_circle_meshes, [] -> RpMesh {
-            std::vector<Vertex> unit_circle;
-            unit_circle.reserve(32 * 3);
-            GenUnitCircle(32, [&unit_circle](float x, float y) -> void { unit_circle.emplace_back(Vertex{Vec2f{x, y}}); });
-            return RpVertCopy(worldPipeline, unit_circle.size(), CharViewSpan(std::span{unit_circle}));
+        static std ::vector<RpMesh> unitCircleMeshes;
+        RpMesh unitCircleMesh = FrameLocal(unitCircleMeshes, [] -> RpMesh {
+            std::vector<Vertex> unitCircle;
+            unitCircle.reserve(32 * 3);
+            GenUnitCircle(32, [&unitCircle](float x, float y) -> void { unitCircle.emplace_back(Vertex{Vec2f{x, y}}); });
+            return RpVertCopy(worldPipeline, unitCircle.size(), CharViewSpan(std::span{unitCircle}));
         });
 
-        if (stage == GameStage::kGame)
+        if (stage == GameStage::KGame)
         {
             for (Brick &brick : level.bricks)
             {
                 if (brick.dead)
                     continue;
 
-                WorldRender(Vec2f{brick.x, brick.y}, brick.color, brick.width, brick.height, unit_rect_mesh);
+                WorldRender(Vec2f{brick.x, brick.y}, brick.color, brick.width, brick.height, unitRectMesh);
             }
 
-            WorldRender(Vec2f{player_pos_x, player_pos_y}, Vec3f{.1f, .1f, 1.f}, player_width, player_height,
-                        unit_rect_mesh);
+            WorldRender(Vec2f{playerPosX, kPlayerPosY}, Vec3f{.1f, .1f, 1.f}, playerWidth, kPlayerHeight,
+                        unitRectMesh);
 
-            WorldRender(ball_pos, Vec3f{.5f, 0.f, 1.f}, kBallRadius, kBallRadius, unit_circle_mesh);
+            WorldRender(ballPos, Vec3f{.5f, 0.f, 1.f}, kBallRadius, kBallRadius, unitCircleMesh);
         }
     }
 
-    RpBegin(dbg_text_pipeline);
+    RpBegin(dbgTextPipeline);
     {
-        DbgText(500, 10, absl::StrFormat("fps=%d ball=(%.1f, %.1f)", fps, ball_pos[0], ball_pos[1]));
+        DbgText(500, 10, absl::StrFormat("fps=%d ball=(%.1f, %.1f)", fps, ballPos[0], ballPos[1]));
     }
 }
 

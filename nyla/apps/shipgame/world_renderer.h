@@ -19,11 +19,11 @@ struct Vertex
     }
 };
 
-extern Rp world_pipeline;
-extern Rp grid_pipeline;
+extern Rp worldPipeline;
+extern Rp gridPipeline;
 
-void WorldSetUp(Vec2f game_camera_pos, float game_camera_zoom);
-void WorldRender(Vec2f pos, float angle_radians, float scalar, std::span<Vertex> vertices);
+void WorldSetUp(Vec2f gameCameraPos, float gameCameraZoom);
+void WorldRender(Vec2f pos, float angleRadians, float scalar, std::span<Vertex> vertices);
 void GridRender();
 
 } // namespace nyla

@@ -9,10 +9,10 @@ template <typename E> struct EnableBitMaskOps : std::false_type
 {
 };
 
-template <typename E> constexpr bool EnableBitMaskOps_v = EnableBitMaskOps<E>::value;
+template <typename E> constexpr bool kEnableBitMaskOpsValue = EnableBitMaskOps<E>::value;
 
 template <typename E>
-concept BitmaskEnum = EnableBitMaskOps_v<E> && std::is_enum_v<E>;
+concept BitmaskEnum = kEnableBitMaskOpsValue<E> && std::is_enum_v<E>;
 
 template <BitmaskEnum E> constexpr auto operator|(E lhs, E rhs)
 {

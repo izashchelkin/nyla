@@ -21,26 +21,26 @@ struct GameObject
 {
     enum class Type : uint8_t
     {
-        kSolarSystem,
-        kPlanet,
-        kMoon,
-        kShip,
+        KSolarSystem,
+        KPlanet,
+        KMoon,
+        KShip,
     };
 
     Type type;
     Vec2f pos{};
     Vec3f color{};
-    float angle_radians;
+    float angleRadians;
     float mass;
     float scale;
-    float orbit_radius;
+    float orbitRadius;
     Vec2f velocity{};
 
     std::vector<Vertex> vertices{};
     std::span<GameObject> children{};
 };
-extern GameObject game_solar_system;
-extern GameObject game_ship;
+extern GameObject gameSolarSystem;
+extern GameObject gameShip;
 
 void ShipgameInit();
 void ShipgameFrame(float dt, uint32_t fps);

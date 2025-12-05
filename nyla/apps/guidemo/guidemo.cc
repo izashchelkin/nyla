@@ -35,8 +35,8 @@ static auto Main() -> int
 
         if (RecompileShadersIfNeeded())
         {
-            RpInit(gui_pipeline);
-            RpInit(dbg_text_pipeline);
+            RpInit(guiPipeline);
+            RpInit(dbgTextPipeline);
         }
 
         RhiFrameBegin();
@@ -45,16 +45,16 @@ static auto Main() -> int
         float dt;
         UpdateDtFps(fps, dt);
 
-        RpBegin(gui_pipeline);
-        UI_FrameBegin();
+        RpBegin(guiPipeline);
+        UiFrameBegin();
 
-        UI_BoxBegin(50, 50, 200, 120);
-        UI_BoxBegin(-50, 50, 200, 120);
-        UI_BoxBegin(-50, -50, 200, 120);
-        UI_BoxBegin(50, -50, 200, 120);
-        UI_Text("Hello world");
+        UiBoxBegin(50, 50, 200, 120);
+        UiBoxBegin(-50, 50, 200, 120);
+        UiBoxBegin(-50, -50, 200, 120);
+        UiBoxBegin(50, -50, 200, 120);
+        UiText("Hello world");
 
-        RpBegin(dbg_text_pipeline);
+        RpBegin(dbgTextPipeline);
         DbgText(10, 10, "fps= " + std::to_string(fps));
 
         RhiFrameEnd();

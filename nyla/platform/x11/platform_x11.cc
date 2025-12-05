@@ -47,34 +47,34 @@ using namespace platform_x11_internal;
 namespace
 {
 
-bool should_exit = false;
+bool shouldExit = false;
 
 }
 
 void PlatformInit()
 {
-    X11_Initialize();
+    X11Initialize();
 }
 
-static X11_KeyResolver key_resolver;
+static X11KeyResolver keyResolver;
 
 void PlatformMapInputBegin()
 {
-    key_resolver = {};
-    X11_InitializeKeyResolver(key_resolver);
+    keyResolver = {};
+    X11InitializeKeyResolver(keyResolver);
 }
 
 void PlatformMapInput(AbstractInputMapping mapping, KeyPhysical key)
 {
-    const char *xkb_name = ConvertKeyPhysicalIntoXkbName(key);
-    const uint32_t keycode = X11_ResolveKeyCode(key_resolver, xkb_name);
+    const char *xkbName = ConvertKeyPhysicalIntoXkbName(key);
+    const uint32_t keycode = X11ResolveKeyCode(keyResolver, xkbName);
     AbstractInputMapId(mapping, {1, keycode});
 }
 
 void PlatformMapInputEnd()
 {
-    X11_FreeKeyResolver(key_resolver);
-    key_resolver = {};
+    X11FreeKeyResolver(keyResolver);
+    keyResolver = {};
 }
 
 auto PlatformCreateWindow() -> PlatformWindow
@@ -97,43 +97,43 @@ auto PlatformCreateWindow() -> PlatformWindow
 
 auto PlatformGetWindowSize(PlatformWindow window) -> PlatformWindowSize
 {
-    const xcb_get_geometry_reply_t *window_geometry =
+    const xcb_get_geometry_reply_t *windowGeometry =
         xcb_get_geometry_reply(x11.conn, xcb_get_geometry(x11.conn, window.handle), nullptr);
-    return {window_geometry->width, window_geometry->height};
+    return {windowGeometry->width, windowGeometry->height};
 }
 
-static int fs_notify_fd = 0;
-static std::array<PlatformFsChange, 16> fs_changes;
-static uint32_t fs_changes_at = 0;
-static std::vector<std::string> fs_watched;
+static int fsNotifyFd = 0;
+static std::array<PlatformFsChange, 16> fsChanges;
+static uint32_t fsChangesAt = 0;
+static std::vector<std::string> fsWatched;
 
 void PlatformFsWatch(const std::string &filepath)
 {
-    if (!fs_notify_fd)
+    if (!fsNotifyFd)
     {
-        fs_notify_fd = inotify_init1(IN_NONBLOCK);
-        CHECK_GT(fs_notify_fd, 0);
+        fsNotifyFd = inotify_init1(IN_NONBLOCK);
+        CHECK_GT(fsNotifyFd, 0);
     }
 
-    fs_watched.emplace_back(filepath);
+    fsWatched.emplace_back(filepath);
 }
 
 auto PlatformFsGetChanges() -> std::span<PlatformFsChange>
 {
-    return fs_changes;
+    return fsChanges;
 }
 
 void PlatformProcessEvents()
 {
     AbstractInputProcessFrame();
 
-    if (fs_notify_fd)
+    if (fsNotifyFd)
     {
         char buf[4096] __attribute__((aligned(__alignof__(struct inotify_event))));
         char *bufp = buf;
 
         int numread;
-        while ((numread = read(fs_notify_fd, buf, sizeof(buf))) > 0)
+        while ((numread = read(fsNotifyFd, buf, sizeof(buf))) > 0)
         {
             while (bufp != buf + numread)
             {
@@ -143,11 +143,11 @@ void PlatformProcessEvents()
                 std::string path = {bufp, strlen(bufp)};
                 bufp += event->len;
 
-                fs_changes[fs_changes_at] = {
+                fsChanges[fsChangesAt] = {
                     .isdir = static_cast<bool>(event->mask & IN_ISDIR),
                     .path = path,
                 };
-                fs_changes_at = (fs_changes_at + 1) % fs_changes.size();
+                fsChangesAt = (fsChangesAt + 1) % fsChanges.size();
             }
         }
     }
@@ -156,7 +156,7 @@ void PlatformProcessEvents()
     {
         if (xcb_connection_has_error(x11.conn))
         {
-            should_exit = true;
+            shouldExit = true;
             break;
         }
 
@@ -164,12 +164,12 @@ void PlatformProcessEvents()
         if (!event)
             break;
 
-        absl::Cleanup event_freer = [=]() -> void { free(event); };
-        const uint8_t event_type = event->response_type & 0x7F;
+        absl::Cleanup eventFreer = [=]() -> void { free(event); };
+        const uint8_t eventType = event->response_type & 0x7F;
 
         uint64_t now = GetMonotonicTimeMicros();
 
-        switch (event_type)
+        switch (eventType)
         {
         case XCB_KEY_PRESS: {
             auto keypress = reinterpret_cast<xcb_key_press_event_t *>(event);
@@ -198,10 +198,10 @@ void PlatformProcessEvents()
         case XCB_CLIENT_MESSAGE: {
             auto clientmessage = reinterpret_cast<xcb_client_message_event_t *>(event);
 
-            if (clientmessage->format == 32 && clientmessage->type == x11.atoms.wm_protocols &&
-                clientmessage->data.data32[0] == x11.atoms.wm_delete_window)
+            if (clientmessage->format == 32 && clientmessage->type == x11.atoms.wmProtocols &&
+                clientmessage->data.data32[0] == x11.atoms.wmDeleteWindow)
             {
-                should_exit = true;
+                shouldExit = true;
             }
             break;
         }
@@ -211,7 +211,7 @@ void PlatformProcessEvents()
 
 auto PlatformShouldExit() -> bool
 {
-    return should_exit;
+    return shouldExit;
 }
 
 namespace platform_x11_internal
@@ -385,9 +385,9 @@ auto ConvertKeyPhysicalIntoXkbName(KeyPhysical key) -> const char *
     }
 }
 
-X11_State x11;
+X11State x11;
 
-void X11_Initialize()
+void X11Initialize()
 {
     int iscreen;
     x11.conn = xcb_connect(nullptr, &iscreen);
@@ -399,24 +399,23 @@ void X11_Initialize()
     x11.screen = xcb_aux_get_screen(x11.conn, iscreen);
     CHECK(x11.screen);
 
-#define X(atom) x11.atoms.atom = X11_InternAtom(x11.conn, absl::AsciiStrToUpper(#atom));
+#define X(atom) x11.atoms.atom = X11InternAtom(x11.conn, absl::AsciiStrToUpper(#atom));
     Nyla_X11_Atoms(X)
 #undef X
 
     {
-        uint16_t major_xkb_version_out, minor_xkb_version_out;
-        uint8_t base_event_out, base_error_out;
+        uint16_t majorXkbVersionOut, minorXkbVersionOut;
+        uint8_t baseEventOut, baseErrorOut;
 
         if (!xkb_x11_setup_xkb_extension(x11.conn, XKB_X11_MIN_MAJOR_XKB_VERSION, XKB_X11_MIN_MINOR_XKB_VERSION,
-                                         XKB_X11_SETUP_XKB_EXTENSION_NO_FLAGS, &major_xkb_version_out,
-                                         &minor_xkb_version_out, &base_event_out, &base_error_out))
+                                         XKB_X11_SETUP_XKB_EXTENSION_NO_FLAGS, &majorXkbVersionOut, &minorXkbVersionOut,
+                                         &baseEventOut, &baseErrorOut))
         {
             LOG(QFATAL) << "could not set up xkb extension";
         }
 
-        if (major_xkb_version_out < XKB_X11_MIN_MAJOR_XKB_VERSION ||
-            (major_xkb_version_out == XKB_X11_MIN_MAJOR_XKB_VERSION &&
-             minor_xkb_version_out < XKB_X11_MIN_MINOR_XKB_VERSION))
+        if (majorXkbVersionOut < XKB_X11_MIN_MAJOR_XKB_VERSION ||
+            (majorXkbVersionOut == XKB_X11_MIN_MAJOR_XKB_VERSION && minorXkbVersionOut < XKB_X11_MIN_MINOR_XKB_VERSION))
         {
             LOG(QFATAL) << "could not set up xkb extension";
         }
@@ -435,55 +434,53 @@ void X11_Initialize()
     }
 
     {
-        x11.ext_xi2 = xcb_get_extension_data(x11.conn, &xcb_input_id);
-        if (!x11.ext_xi2 || !x11.ext_xi2->present)
+        x11.extXi2 = xcb_get_extension_data(x11.conn, &xcb_input_id);
+        if (!x11.extXi2 || !x11.extXi2->present)
         {
             LOG(QFATAL) << "could nolt set up XI2 extension";
         }
 
         struct
         {
-            xcb_input_event_mask_t event_mask;
-            uint32_t mask_bits;
+            xcb_input_event_mask_t eventMask;
+            uint32_t maskBits;
         } mask;
 
-        mask.event_mask.deviceid = XCB_INPUT_DEVICE_ALL_MASTER;
-        mask.event_mask.mask_len = 1;
-        mask.mask_bits = XCB_INPUT_XI_EVENT_MASK_RAW_MOTION;
+        mask.eventMask.deviceid = XCB_INPUT_DEVICE_ALL_MASTER;
+        mask.eventMask.mask_len = 1;
+        mask.maskBits = XCB_INPUT_XI_EVENT_MASK_RAW_MOTION;
 
         if (xcb_request_check(x11.conn,
-                              xcb_input_xi_select_events_checked(x11.conn, x11.screen->root, 1, &mask.event_mask)))
+                              xcb_input_xi_select_events_checked(x11.conn, x11.screen->root, 1, &mask.eventMask)))
         {
             LOG(QFATAL) << "could not setup XI2 extension";
         }
     }
 }
 
-auto X11_CreateWindow(uint32_t width, uint32_t height, bool override_redirect, xcb_event_mask_t event_mask) -> xcb_window_t
+auto X11CreateWindow(uint32_t width, uint32_t height, bool overrideRedirect, xcb_event_mask_t eventMask) -> xcb_window_t
 {
     const xcb_window_t window = xcb_generate_id(x11.conn);
 
     xcb_create_window(x11.conn, XCB_COPY_FROM_PARENT, window, x11.screen->root, 0, 0, width, height, 0,
                       XCB_WINDOW_CLASS_INPUT_OUTPUT, x11.screen->root_visual,
-                      XCB_CW_OVERRIDE_REDIRECT | XCB_CW_EVENT_MASK, (uint32_t[]){override_redirect, event_mask});
+                      XCB_CW_OVERRIDE_REDIRECT | XCB_CW_EVENT_MASK, (uint32_t[]){overrideRedirect, eventMask});
 
     xcb_map_window(x11.conn, window);
 
     return window;
 }
 
-void X11_Flush()
+void X11Flush()
 {
     xcb_flush(x11.conn);
 }
 
-auto X11_InternAtom(xcb_connection_t *conn, std::string_view name,
-
-                          bool only_if_exists) -> xcb_atom_t
+auto X11InternAtom(xcb_connection_t *conn, std::string_view name, bool onlyIfExists) -> xcb_atom_t
 {
     xcb_intern_atom_reply_t *reply =
-        xcb_intern_atom_reply(conn, xcb_intern_atom(conn, only_if_exists, name.size(), name.data()), nullptr);
-    absl::Cleanup reply_freer = [reply] -> void {
+        xcb_intern_atom_reply(conn, xcb_intern_atom(conn, onlyIfExists, name.size(), name.data()), nullptr);
+    absl::Cleanup replyFreer = [reply] -> void {
         if (reply)
             free(reply);
     };
@@ -496,8 +493,8 @@ auto X11_InternAtom(xcb_connection_t *conn, std::string_view name,
     return reply->atom;
 }
 
-void X11_SendClientMessage32(xcb_window_t window, xcb_atom_t type, xcb_atom_t arg1, uint32_t arg2, uint32_t arg3,
-                             uint32_t arg4)
+void X11SendClientMessage32(xcb_window_t window, xcb_atom_t type, xcb_atom_t arg1, uint32_t arg2, uint32_t arg3,
+                            uint32_t arg4)
 {
     xcb_client_message_event_t event = {
         .response_type = XCB_CLIENT_MESSAGE,
@@ -510,18 +507,18 @@ void X11_SendClientMessage32(xcb_window_t window, xcb_atom_t type, xcb_atom_t ar
     xcb_send_event(x11.conn, false, window, XCB_EVENT_MASK_NO_EVENT, reinterpret_cast<const char *>(&event));
 }
 
-void X11_Send_WM_Take_Focus(xcb_window_t window, uint32_t time)
+void X11SendWmTakeFocus(xcb_window_t window, uint32_t time)
 {
-    X11_SendClientMessage32(window, x11.atoms.wm_protocols, x11.atoms.wm_take_focus, time, 0, 0);
+    X11SendClientMessage32(window, x11.atoms.wmProtocols, x11.atoms.wmTakeFocus, time, 0, 0);
 }
 
-void X11_Send_WM_Delete_Window(xcb_window_t window)
+void X11SendWmDeleteWindow(xcb_window_t window)
 {
-    X11_SendClientMessage32(window, x11.atoms.wm_protocols, x11.atoms.wm_delete_window, XCB_CURRENT_TIME, 0, 0);
+    X11SendClientMessage32(window, x11.atoms.wmProtocols, x11.atoms.wmDeleteWindow, XCB_CURRENT_TIME, 0, 0);
 }
 
-void X11_SendConfigureNotify(xcb_window_t window, xcb_window_t parent, int16_t x, int16_t y, uint16_t width,
-                             uint16_t height, uint16_t border_width)
+void X11SendConfigureNotify(xcb_window_t window, xcb_window_t parent, int16_t x, int16_t y, uint16_t width,
+                            uint16_t height, uint16_t borderWidth)
 {
     xcb_configure_notify_event_t event = {
         .response_type = XCB_CONFIGURE_NOTIFY,
@@ -530,7 +527,7 @@ void X11_SendConfigureNotify(xcb_window_t window, xcb_window_t parent, int16_t x
         .y = y,
         .width = width,
         .height = height,
-        .border_width = border_width,
+        .border_width = borderWidth,
     };
 
     xcb_send_event(x11.conn, false, window, XCB_EVENT_MASK_STRUCTURE_NOTIFY, reinterpret_cast<const char *>(&event));
@@ -538,33 +535,33 @@ void X11_SendConfigureNotify(xcb_window_t window, xcb_window_t parent, int16_t x
 
 //
 
-auto X11_InitializeKeyResolver(X11_KeyResolver &key_resolver) -> bool
+auto X11InitializeKeyResolver(X11KeyResolver &keyResolver) -> bool
 {
-    key_resolver.ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
-    if (!key_resolver.ctx)
+    keyResolver.ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
+    if (!keyResolver.ctx)
         return false;
 
-    const int32_t device_id = xkb_x11_get_core_keyboard_device_id(x11.conn);
-    if (device_id == -1)
+    const int32_t deviceId = xkb_x11_get_core_keyboard_device_id(x11.conn);
+    if (deviceId == -1)
         return false;
 
-    key_resolver.keymap =
-        xkb_x11_keymap_new_from_device(key_resolver.ctx, x11.conn, device_id, XKB_KEYMAP_COMPILE_NO_FLAGS);
-    if (!key_resolver.keymap)
+    keyResolver.keymap =
+        xkb_x11_keymap_new_from_device(keyResolver.ctx, x11.conn, deviceId, XKB_KEYMAP_COMPILE_NO_FLAGS);
+    if (!keyResolver.keymap)
         return false;
 
     return true;
 }
 
-void X11_FreeKeyResolver(X11_KeyResolver &key_resolver)
+void X11FreeKeyResolver(X11KeyResolver &keyResolver)
 {
-    xkb_keymap_unref(key_resolver.keymap);
-    xkb_context_unref(key_resolver.ctx);
+    xkb_keymap_unref(keyResolver.keymap);
+    xkb_context_unref(keyResolver.ctx);
 }
 
-auto X11_ResolveKeyCode(const X11_KeyResolver &key_resolver, std::string_view keyname) -> xcb_keycode_t
+auto X11ResolveKeyCode(const X11KeyResolver &keyResolver, std::string_view keyname) -> xcb_keycode_t
 {
-    const xkb_keycode_t keycode = xkb_keymap_key_by_name(key_resolver.keymap, keyname.data());
+    const xkb_keycode_t keycode = xkb_keymap_key_by_name(keyResolver.keymap, keyname.data());
     CHECK(xkb_keycode_is_legal_x11(keycode));
     return keycode;
 }

@@ -16,7 +16,7 @@ namespace
 struct SceneTransforms
 {
     Mat4 vp;
-    Mat4 inv_vp;
+    Mat4 invVp;
 };
 
 struct DynamicUbo
@@ -28,10 +28,10 @@ struct DynamicUbo
 
 constexpr float kMetersOnScreen = 64.f;
 
-void WorldSetUp(Vec2f camera_pos, float zoom)
+void WorldSetUp(Vec2f cameraPos, float zoom)
 {
-    float world_w;
-    float world_h;
+    float worldW;
+    float worldH;
 
     const float base = kMetersOnScreen * zoom;
 
@@ -40,63 +40,63 @@ void WorldSetUp(Vec2f camera_pos, float zoom)
     const float aspect = width / height;
     if (aspect >= 1.0f)
     {
-        world_h = base;
-        world_w = base * aspect;
+        worldH = base;
+        worldW = base * aspect;
     }
     else
     {
-        world_w = base;
-        world_h = base / aspect;
+        worldW = base;
+        worldH = base / aspect;
     }
 
-    Mat4 view = Translate(Vec2fNeg(camera_pos));
-    Mat4 proj = Ortho(-world_w * .5f, world_w * .5f, world_h * .5f, -world_h * .5f, 0.f, 1.f);
+    Mat4 view = Translate(Vec2fNeg(cameraPos));
+    Mat4 proj = Ortho(-worldW * .5f, worldW * .5f, worldH * .5f, -worldH * .5f, 0.f, 1.f);
 
     Mat4 vp = Mult(proj, view);
-    Mat4 inv_vp = Inverse(vp);
-    SceneTransforms scene = {vp, inv_vp};
+    Mat4 invVp = Inverse(vp);
+    SceneTransforms scene = {vp, invVp};
 
-    RpStaticUniformCopy(world_pipeline, CharViewPtr(&scene));
-    RpStaticUniformCopy(grid_pipeline, CharViewPtr(&scene));
+    RpStaticUniformCopy(worldPipeline, CharViewPtr(&scene));
+    RpStaticUniformCopy(gridPipeline, CharViewPtr(&scene));
 }
 
-void WorldRender(Vec2f pos, float angle_radians, float scalar, std::span<Vertex> vertices)
+void WorldRender(Vec2f pos, float angleRadians, float scalar, std::span<Vertex> vertices)
 {
     Mat4 model = Translate(pos);
-    model = Mult(model, Rotate2D(angle_radians));
+    model = Mult(model, Rotate2D(angleRadians));
     model = Mult(model, ScaleXY(scalar, scalar));
 
-    CharView vertex_data = CharViewSpan(vertices);
-    CharView dynamic_uniform_data = CharViewPtr(&model);
-    RpMesh mesh = RpVertCopy(world_pipeline, vertices.size(), vertex_data);
-    RpDraw(world_pipeline, mesh, dynamic_uniform_data);
+    CharView vertexData = CharViewSpan(vertices);
+    CharView dynamicUniformData = CharViewPtr(&model);
+    RpMesh mesh = RpVertCopy(worldPipeline, vertices.size(), vertexData);
+    RpDraw(worldPipeline, mesh, dynamicUniformData);
 }
 
-Rp world_pipeline{
-    .debug_name = "World",
-    .static_uniform =
+Rp worldPipeline{
+    .debugName = "World",
+    .staticUniform =
         {
             .enabled = true,
             .size = sizeof(SceneTransforms),
             .range = sizeof(SceneTransforms),
         },
-    .dynamic_uniform =
+    .dynamicUniform =
         {
             .enabled = true,
             .size = 60000,
             .range = sizeof(DynamicUbo),
         },
-    .vert_buf =
+    .vertBuf =
         {
             .enabled = true,
             .size = 1 << 22,
             .attrs =
                 {
-                    RhiVertexFormat::R32G32B32A32_Float,
-                    RhiVertexFormat::R32G32B32A32_Float,
+                    RhiVertexFormat::R32G32B32A32Float,
+                    RhiVertexFormat::R32G32B32A32Float,
                 },
         },
-    .Init =
+    .init =
         [](Rp &rp) -> void {
             RpAttachVertShader(rp, "nyla/apps/shipgame/shaders/build/world.vs.hlsl.spv");
             RpAttachFragShader(rp, "nyla/apps/shipgame/shaders/build/world.ps.hlsl.spv");
@@ -105,18 +105,18 @@ Rp world_pipeline{
 
 void GridRender()
 {
-    RpDraw(grid_pipeline, {.vert_count = 3}, {});
+    RpDraw(gridPipeline, {.vertCount = 3}, {});
 }
 
-Rp grid_pipeline{
-    .debug_name = "WorldGrid",
-    .static_uniform =
+Rp gridPipeline{
+    .debugName = "WorldGrid",
+    .staticUniform =
         {
             .enabled = true,
             .size = sizeof(SceneTransforms),
             .range = sizeof(SceneTransforms),
         },
-    .Init =
+    .init =
         [](Rp &rp) -> void {
             RpAttachVertShader(rp, "nyla/apps/shipgame/shaders/build/grid.vs.hlsl.spv");
             RpAttachFragShader(rp, "nyla/apps/shipgame/shaders/build/grid.ps.hlsl.spv");

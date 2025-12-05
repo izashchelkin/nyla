@@ -15,12 +15,12 @@ struct RhiCmdList : RhiHandle
 {
 };
 
-auto RhiCreateCmdList(RhiQueueType queue_type) -> RhiCmdList;
+auto RhiCreateCmdList(RhiQueueType queueType) -> RhiCmdList;
 void RhiNameCmdList(RhiCmdList, std::string_view name);
 void RhiDestroyCmdList(RhiCmdList cmd);
 
-auto __RhiCmdSetCheckpoint(RhiCmdList cmd, uint64_t data) -> uint64_t;
-auto __RhiGetLastCheckpointData(RhiQueueType queue_type) -> uint64_t;
+auto RhiCmdSetCheckpoint(RhiCmdList cmd, uint64_t data) -> uint64_t;
+auto RhiGetLastCheckpointData(RhiQueueType queueType) -> uint64_t;
 
 auto RhiFrameBegin() -> RhiCmdList;
 void RhiFrameEnd();

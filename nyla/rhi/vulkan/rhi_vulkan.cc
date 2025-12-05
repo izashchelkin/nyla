@@ -27,7 +27,7 @@ namespace rhi_vulkan_internal
 {
 
 VulkanData vk;
-RhiHandles rhi_handles;
+RhiHandles rhiHandles;
 
 auto ConvertRhiVertexFormatIntoVkFormat(RhiVertexFormat format) -> VkFormat
 {
@@ -36,42 +36,42 @@ auto ConvertRhiVertexFormatIntoVkFormat(RhiVertexFormat format) -> VkFormat
     case RhiVertexFormat::None:
         break;
 
-    case RhiVertexFormat::R32G32B32A32_Float:
+    case RhiVertexFormat::R32G32B32A32Float:
         return VK_FORMAT_R32G32B32A32_SFLOAT;
     }
     CHECK(false);
     return static_cast<VkFormat>(0);
 }
 
-auto ConvertRhiShaderStageIntoVkShaderStageFlags(RhiShaderStage stage_flags) -> VkShaderStageFlags
+auto ConvertRhiShaderStageIntoVkShaderStageFlags(RhiShaderStage stageFlags) -> VkShaderStageFlags
 {
     VkShaderStageFlags ret = 0;
-    if (Any(stage_flags & RhiShaderStage::Vertex))
+    if (Any(stageFlags & RhiShaderStage::Vertex))
     {
         ret |= VK_SHADER_STAGE_VERTEX_BIT;
     }
-    if (Any(stage_flags & RhiShaderStage::Fragment))
+    if (Any(stageFlags & RhiShaderStage::Fragment))
     {
         ret |= VK_SHADER_STAGE_FRAGMENT_BIT;
     }
     return ret;
 }
 
-auto DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
-                            VkDebugUtilsMessageTypeFlagsEXT message_type,
-                            const VkDebugUtilsMessengerCallbackDataEXT *callback_data, void *user_data) -> VkBool32
+auto DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+                            VkDebugUtilsMessageTypeFlagsEXT messageType,
+                            const VkDebugUtilsMessengerCallbackDataEXT *callbackData, void *userData) -> VkBool32
 {
-    switch (message_severity)
+    switch (messageSeverity)
     {
     case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT: {
-        LOG(ERROR) << callback_data->pMessage;
+        LOG(ERROR) << callbackData->pMessage;
         DebugBreak;
     }
     case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT: {
-        LOG(WARNING) << callback_data->pMessage;
+        LOG(WARNING) << callbackData->pMessage;
     }
     default: {
-        LOG(INFO) << callback_data->pMessage;
+        LOG(INFO) << callbackData->pMessage;
     }
     }
     return VK_FALSE;
@@ -79,37 +79,37 @@ auto DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_sever
 
 void VulkanNameHandle(VkObjectType type, uint64_t handle, std::string_view name)
 {
-    auto name_copy = std::string{name};
-    const VkDebugUtilsObjectNameInfoEXT name_info{
+    auto nameCopy = std::string{name};
+    const VkDebugUtilsObjectNameInfoEXT nameInfo{
         .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
         .objectType = type,
         .objectHandle = reinterpret_cast<uint64_t>(handle),
-        .pObjectName = name_copy.c_str(),
+        .pObjectName = nameCopy.c_str(),
     };
 
     static auto fn = VK_GET_INSTANCE_PROC_ADDR(vkSetDebugUtilsObjectNameEXT);
-    fn(vk.dev, &name_info);
+    fn(vk.dev, &nameInfo);
 }
 
 } // namespace rhi_vulkan_internal
 
-void RhiInit(const RhiDesc &rhi_desc)
+void RhiInit(const RhiDesc &rhiDesc)
 {
     constexpr uint32_t kInvalidIndex = std::numeric_limits<uint32_t>::max();
 
-    CHECK_LE(rhi_desc.num_frames_in_flight, rhi_max_num_frames_in_flight);
-    if (rhi_desc.num_frames_in_flight)
+    CHECK_LE(rhiDesc.numFramesInFlight, kRhiMaxNumFramesInFlight);
+    if (rhiDesc.numFramesInFlight)
     {
-        vk.num_frames_in_flight = rhi_desc.num_frames_in_flight;
+        vk.numFramesInFlight = rhiDesc.numFramesInFlight;
     }
     else
     {
-        vk.num_frames_in_flight = 2;
+        vk.numFramesInFlight = 2;
     }
 
-    vk.window = rhi_desc.window;
+    vk.window = rhiDesc.window;
 
-    const VkApplicationInfo app_info{
+    const VkApplicationInfo appInfo{
         .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
         .pApplicationName = "nyla",
         .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
@@ -118,41 +118,41 @@ void RhiInit(const RhiDesc &rhi_desc)
         .apiVersion = VK_API_VERSION_1_4,
     };
 
-    const void *instance_pNext = nullptr;
-    std::vector<const char *> instance_extensions;
-    std::vector<const char *> instance_layers;
+    const void *instancePNext = nullptr;
+    std::vector<const char *> instanceExtensions;
+    std::vector<const char *> instanceLayers;
 
-    instance_extensions.emplace_back(VK_KHR_SURFACE_EXTENSION_NAME);
-    instance_extensions.emplace_back(VK_KHR_XCB_SURFACE_EXTENSION_NAME);
+    instanceExtensions.emplace_back(VK_KHR_SURFACE_EXTENSION_NAME);
+    instanceExtensions.emplace_back(VK_KHR_XCB_SURFACE_EXTENSION_NAME);
 
-    VkDebugUtilsMessengerCreateInfoEXT *debug_messenger_create_info = nullptr;
+    VkDebugUtilsMessengerCreateInfoEXT *debugMessengerCreateInfo = nullptr;
 
-    if constexpr (rhi_validations)
+    if constexpr (kRhiValidations)
     {
-        instance_extensions.emplace_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+        instanceExtensions.emplace_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 
-        VkValidationFeaturesEXT *validation_features = nullptr;
+        VkValidationFeaturesEXT *validationFeatures = nullptr;
         if constexpr (false)
         {
-            instance_extensions.emplace_back(VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME);
+            instanceExtensions.emplace_back(VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME);
 
-            std::span<VkValidationFeatureEnableEXT> enabled_validations = Tmake(std::array{
+            std::span<VkValidationFeatureEnableEXT> enabledValidations = Tmake(std::array{
                 VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT,
                 VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_RESERVE_BINDING_SLOT_EXT,
                 VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT,
                 VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT,
             });
 
-            validation_features = &Tmake(VkValidationFeaturesEXT{
+            validationFeatures = &Tmake(VkValidationFeaturesEXT{
                 .sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT,
-                .enabledValidationFeatureCount = static_cast<uint32_t>(std::size(enabled_validations)),
-                .pEnabledValidationFeatures = enabled_validations.data(),
+                .enabledValidationFeatureCount = static_cast<uint32_t>(std::size(enabledValidations)),
+                .pEnabledValidationFeatures = enabledValidations.data(),
             });
         }
 
-        debug_messenger_create_info = &Tmake(VkDebugUtilsMessengerCreateInfoEXT{
+        debugMessengerCreateInfo = &Tmake(VkDebugUtilsMessengerCreateInfoEXT{
             .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
-            .pNext = validation_features,
+            .pNext = validationFeatures,
             .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
                                VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
                                VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
@@ -162,56 +162,56 @@ void RhiInit(const RhiDesc &rhi_desc)
             .pfnUserCallback = DebugMessengerCallback,
         });
 
-        instance_pNext = debug_messenger_create_info;
+        instancePNext = debugMessengerCreateInfo;
     }
 
-    const VkInstanceCreateInfo instance_create_info{
+    const VkInstanceCreateInfo instanceCreateInfo{
         .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-        .pNext = instance_pNext,
-        .pApplicationInfo = &app_info,
-        .enabledLayerCount = static_cast<uint32_t>(instance_layers.size()),
-        .ppEnabledLayerNames = instance_layers.data(),
-        .enabledExtensionCount = static_cast<uint32_t>(instance_extensions.size()),
-        .ppEnabledExtensionNames = instance_extensions.data(),
+        .pNext = instancePNext,
+        .pApplicationInfo = &appInfo,
+        .enabledLayerCount = static_cast<uint32_t>(instanceLayers.size()),
+        .ppEnabledLayerNames = instanceLayers.data(),
+        .enabledExtensionCount = static_cast<uint32_t>(instanceExtensions.size()),
+        .ppEnabledExtensionNames = instanceExtensions.data(),
     };
-    VK_CHECK(vkCreateInstance(&instance_create_info, nullptr, &vk.instance));
+    VK_CHECK(vkCreateInstance(&instanceCreateInfo, nullptr, &vk.instance));
 
-    VkDebugUtilsMessengerEXT debug_messenger{};
-    if constexpr (rhi_validations)
+    VkDebugUtilsMessengerEXT debugMessenger{};
+    if constexpr (kRhiValidations)
     {
-        VK_CHECK(VK_GET_INSTANCE_PROC_ADDR(vkCreateDebugUtilsMessengerEXT)(vk.instance, debug_messenger_create_info,
-                                                                           nullptr, &debug_messenger));
+        VK_CHECK(VK_GET_INSTANCE_PROC_ADDR(vkCreateDebugUtilsMessengerEXT)(vk.instance, debugMessengerCreateInfo,
+                                                                           nullptr, &debugMessenger));
     }
 
-    uint32_t num_phys_devices = 0;
-    VK_CHECK(vkEnumeratePhysicalDevices(vk.instance, &num_phys_devices, nullptr));
+    uint32_t numPhysDevices = 0;
+    VK_CHECK(vkEnumeratePhysicalDevices(vk.instance, &numPhysDevices, nullptr));
 
-    std::vector<VkPhysicalDevice> phys_devs(num_phys_devices);
-    VK_CHECK(vkEnumeratePhysicalDevices(vk.instance, &num_phys_devices, phys_devs.data()));
+    std::vector<VkPhysicalDevice> physDevs(numPhysDevices);
+    VK_CHECK(vkEnumeratePhysicalDevices(vk.instance, &numPhysDevices, physDevs.data()));
 
-    std::vector<const char *> device_extensions;
-    device_extensions.emplace_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+    std::vector<const char *> deviceExtensions;
+    deviceExtensions.emplace_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 
-    if constexpr (rhi_checkpoints)
+    if constexpr (kRhiCheckpoints)
     {
-        device_extensions.emplace_back(VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_EXTENSION_NAME);
+        deviceExtensions.emplace_back(VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_EXTENSION_NAME);
     }
 
-    for (VkPhysicalDevice phys_dev : phys_devs)
+    for (VkPhysicalDevice physDev : physDevs)
     {
-        uint32_t extension_count = 0;
-        vkEnumerateDeviceExtensionProperties(phys_dev, nullptr, &extension_count, nullptr);
-        std::vector<VkExtensionProperties> extensions(extension_count);
-        vkEnumerateDeviceExtensionProperties(phys_dev, nullptr, &extension_count, extensions.data());
+        uint32_t extensionCount = 0;
+        vkEnumerateDeviceExtensionProperties(physDev, nullptr, &extensionCount, nullptr);
+        std::vector<VkExtensionProperties> extensions(extensionCount);
+        vkEnumerateDeviceExtensionProperties(physDev, nullptr, &extensionCount, extensions.data());
 
-        uint32_t missing_extensions = device_extensions.size();
-        for (auto &device_extension : device_extensions)
+        uint32_t missingExtensions = deviceExtensions.size();
+        for (auto &deviceExtension : deviceExtensions)
         {
-            for (uint32_t i = 0; i < extension_count; ++i)
+            for (uint32_t i = 0; i < extensionCount; ++i)
             {
-                if (strcmp(extensions[i].extensionName, device_extension) == 0)
+                if (strcmp(extensions[i].extensionName, deviceExtension) == 0)
                 {
-                    --missing_extensions;
+                    --missingExtensions;
                     break;
                 }
                 else
@@ -220,29 +220,29 @@ void RhiInit(const RhiDesc &rhi_desc)
                 }
             }
         }
-        if (missing_extensions)
+        if (missingExtensions)
         {
             continue;
         }
 
         VkPhysicalDeviceProperties props;
-        vkGetPhysicalDeviceProperties(phys_dev, &props);
+        vkGetPhysicalDeviceProperties(physDev, &props);
 
-        VkPhysicalDeviceMemoryProperties mem_props;
-        vkGetPhysicalDeviceMemoryProperties(phys_dev, &mem_props);
+        VkPhysicalDeviceMemoryProperties memProps;
+        vkGetPhysicalDeviceMemoryProperties(physDev, &memProps);
 
-        uint32_t queue_family_prop_count = 0;
-        vkGetPhysicalDeviceQueueFamilyProperties(phys_dev, &queue_family_prop_count, nullptr);
-        std::vector<VkQueueFamilyProperties> queue_family_properties(queue_family_prop_count);
-        vkGetPhysicalDeviceQueueFamilyProperties(phys_dev, &queue_family_prop_count, queue_family_properties.data());
+        uint32_t queueFamilyPropCount = 0;
+        vkGetPhysicalDeviceQueueFamilyProperties(physDev, &queueFamilyPropCount, nullptr);
+        std::vector<VkQueueFamilyProperties> queueFamilyProperties(queueFamilyPropCount);
+        vkGetPhysicalDeviceQueueFamilyProperties(physDev, &queueFamilyPropCount, queueFamilyProperties.data());
 
         constexpr static uint32_t kInvalidQueueFamilyIndex = std::numeric_limits<uint32_t>::max();
-        uint32_t graphics_queue_index = kInvalidQueueFamilyIndex;
-        uint32_t transfer_queue_index = kInvalidQueueFamilyIndex;
+        uint32_t graphicsQueueIndex = kInvalidQueueFamilyIndex;
+        uint32_t transferQueueIndex = kInvalidQueueFamilyIndex;
 
-        for (size_t i = 0; i < queue_family_prop_count; ++i)
+        for (size_t i = 0; i < queueFamilyPropCount; ++i)
         {
-            VkQueueFamilyProperties &props = queue_family_properties[i];
+            VkQueueFamilyProperties &props = queueFamilyProperties[i];
             if (!props.queueCount)
             {
                 continue;
@@ -250,9 +250,9 @@ void RhiInit(const RhiDesc &rhi_desc)
 
             if (props.queueFlags & VK_QUEUE_GRAPHICS_BIT)
             {
-                if (graphics_queue_index == kInvalidQueueFamilyIndex)
+                if (graphicsQueueIndex == kInvalidQueueFamilyIndex)
                 {
-                    graphics_queue_index = i;
+                    graphicsQueueIndex = i;
                 }
                 continue;
             }
@@ -264,173 +264,173 @@ void RhiInit(const RhiDesc &rhi_desc)
 
             if (props.queueFlags & VK_QUEUE_TRANSFER_BIT)
             {
-                if (transfer_queue_index == kInvalidQueueFamilyIndex)
+                if (transferQueueIndex == kInvalidQueueFamilyIndex)
                 {
-                    transfer_queue_index = i;
+                    transferQueueIndex = i;
                 }
                 continue;
             }
         }
 
-        if (graphics_queue_index == kInvalidQueueFamilyIndex)
+        if (graphicsQueueIndex == kInvalidQueueFamilyIndex)
         {
             continue;
         }
 
         // TODO: pick best device
-        vk.phys_dev = phys_dev;
-        vk.phys_dev_props = props;
-        vk.phys_dev_mem_props = mem_props;
-        vk.graphics_queue.queue_family_index = graphics_queue_index;
-        vk.transfer_queue.queue_family_index = transfer_queue_index;
+        vk.physDev = physDev;
+        vk.physDevProps = props;
+        vk.physDevMemProps = memProps;
+        vk.graphicsQueue.queueFamilyIndex = graphicsQueueIndex;
+        vk.transferQueue.queueFamilyIndex = transferQueueIndex;
 
         break;
     }
 
-    CHECK(vk.phys_dev);
+    CHECK(vk.physDev);
 
-    const float queue_priority = 1.0f;
-    std::vector<VkDeviceQueueCreateInfo> queue_create_infos;
-    if (vk.transfer_queue.queue_family_index == kInvalidIndex)
+    const float queuePriority = 1.0f;
+    std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+    if (vk.transferQueue.queueFamilyIndex == kInvalidIndex)
     {
-        queue_create_infos.emplace_back(VkDeviceQueueCreateInfo{
+        queueCreateInfos.emplace_back(VkDeviceQueueCreateInfo{
             .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-            .queueFamilyIndex = vk.graphics_queue.queue_family_index,
+            .queueFamilyIndex = vk.graphicsQueue.queueFamilyIndex,
             .queueCount = 1,
-            .pQueuePriorities = &queue_priority,
+            .pQueuePriorities = &queuePriority,
         });
     }
     else
     {
-        queue_create_infos.reserve(2);
+        queueCreateInfos.reserve(2);
 
-        queue_create_infos.emplace_back(VkDeviceQueueCreateInfo{
+        queueCreateInfos.emplace_back(VkDeviceQueueCreateInfo{
             .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-            .queueFamilyIndex = vk.graphics_queue.queue_family_index,
+            .queueFamilyIndex = vk.graphicsQueue.queueFamilyIndex,
             .queueCount = 1,
-            .pQueuePriorities = &queue_priority,
+            .pQueuePriorities = &queuePriority,
         });
 
-        queue_create_infos.emplace_back(VkDeviceQueueCreateInfo{
+        queueCreateInfos.emplace_back(VkDeviceQueueCreateInfo{
             .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-            .queueFamilyIndex = vk.transfer_queue.queue_family_index,
+            .queueFamilyIndex = vk.transferQueue.queueFamilyIndex,
             .queueCount = 1,
-            .pQueuePriorities = &queue_priority,
+            .pQueuePriorities = &queuePriority,
         });
     }
 
-    VkPhysicalDeviceVulkan14Features v1_4{
+    VkPhysicalDeviceVulkan14Features v14{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES,
     };
-    VkPhysicalDeviceVulkan13Features v1_3{
+    VkPhysicalDeviceVulkan13Features v13{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
-        .pNext = &v1_4,
+        .pNext = &v14,
         .synchronization2 = VK_TRUE,
         .dynamicRendering = VK_TRUE,
     };
-    VkPhysicalDeviceVulkan12Features v1_2{
+    VkPhysicalDeviceVulkan12Features v12{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
-        .pNext = &v1_3,
+        .pNext = &v13,
         .scalarBlockLayout = VK_TRUE,
         .timelineSemaphore = VK_TRUE,
     };
-    VkPhysicalDeviceVulkan11Features v1_1{
+    VkPhysicalDeviceVulkan11Features v11{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
-        .pNext = &v1_2,
+        .pNext = &v12,
     };
     VkPhysicalDeviceFeatures2 features{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-        .pNext = &v1_1,
+        .pNext = &v11,
     };
 
-    const VkDeviceCreateInfo device_create_info{
+    const VkDeviceCreateInfo deviceCreateInfo{
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
         .pNext = &features,
-        .queueCreateInfoCount = static_cast<uint32_t>(queue_create_infos.size()),
-        .pQueueCreateInfos = queue_create_infos.data(),
-        .enabledExtensionCount = static_cast<uint32_t>(device_extensions.size()),
-        .ppEnabledExtensionNames = device_extensions.data(),
+        .queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size()),
+        .pQueueCreateInfos = queueCreateInfos.data(),
+        .enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size()),
+        .ppEnabledExtensionNames = deviceExtensions.data(),
     };
-    VK_CHECK(vkCreateDevice(vk.phys_dev, &device_create_info, nullptr, &vk.dev));
+    VK_CHECK(vkCreateDevice(vk.physDev, &deviceCreateInfo, nullptr, &vk.dev));
 
-    vkGetDeviceQueue(vk.dev, vk.graphics_queue.queue_family_index, 0, &vk.graphics_queue.queue);
+    vkGetDeviceQueue(vk.dev, vk.graphicsQueue.queueFamilyIndex, 0, &vk.graphicsQueue.queue);
 
-    if (vk.transfer_queue.queue_family_index == kInvalidIndex)
+    if (vk.transferQueue.queueFamilyIndex == kInvalidIndex)
     {
-        vk.transfer_queue.queue_family_index = vk.graphics_queue.queue_family_index;
-        vk.transfer_queue.queue = vk.graphics_queue.queue;
+        vk.transferQueue.queueFamilyIndex = vk.graphicsQueue.queueFamilyIndex;
+        vk.transferQueue.queue = vk.graphicsQueue.queue;
     }
     else
     {
-        vkGetDeviceQueue(vk.dev, vk.transfer_queue.queue_family_index, 0, &vk.transfer_queue.queue);
+        vkGetDeviceQueue(vk.dev, vk.transferQueue.queueFamilyIndex, 0, &vk.transferQueue.queue);
     }
 
-    auto init_queue = [](DeviceQueue &queue, RhiQueueType queue_type, std::span<RhiCmdList> cmd) -> void {
-        const VkCommandPoolCreateInfo command_pool_create_info{
+    auto initQueue = [](DeviceQueue &queue, RhiQueueType queueType, std::span<RhiCmdList> cmd) -> void {
+        const VkCommandPoolCreateInfo commandPoolCreateInfo{
             .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
             .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-            .queueFamilyIndex = queue.queue_family_index,
+            .queueFamilyIndex = queue.queueFamilyIndex,
         };
-        VK_CHECK(vkCreateCommandPool(vk.dev, &command_pool_create_info, nullptr, &queue.cmd_pool));
+        VK_CHECK(vkCreateCommandPool(vk.dev, &commandPoolCreateInfo, nullptr, &queue.cmdPool));
 
         queue.timeline = CreateTimeline(0);
-        queue.timeline_next = 1;
+        queue.timelineNext = 1;
 
         for (auto &i : cmd)
         {
-            i = RhiCreateCmdList(queue_type);
+            i = RhiCreateCmdList(queueType);
         }
     };
-    init_queue(vk.graphics_queue, RhiQueueType::Graphics,
-               std::span{vk.graphics_queue_cmd.data(), vk.num_frames_in_flight});
-    init_queue(vk.transfer_queue, RhiQueueType::Transfer, std::span{&vk.transfer_queue_cmd, 1});
+    initQueue(vk.graphicsQueue, RhiQueueType::Graphics,
+               std::span{vk.graphicsQueueCmd.data(), vk.numFramesInFlight});
+    initQueue(vk.transferQueue, RhiQueueType::Transfer, std::span{&vk.transferQueueCmd, 1});
 
-    for (size_t i = 0; i < vk.num_frames_in_flight; ++i)
+    for (size_t i = 0; i < vk.numFramesInFlight; ++i)
     {
-        const VkSemaphoreCreateInfo semaphore_create_info{
+        const VkSemaphoreCreateInfo semaphoreCreateInfo{
             .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
         };
 
         VK_CHECK(
-            vkCreateSemaphore(vk.dev, &semaphore_create_info, nullptr, vk.swapchain_acquire_semaphores.data() + i));
+            vkCreateSemaphore(vk.dev, &semaphoreCreateInfo, nullptr, vk.swapchainAcquireSemaphores.data() + i));
     }
 
-    const std::array<VkDescriptorPoolSize, 2> descriptor_pool_sizes{
+    const std::array<VkDescriptorPoolSize, 2> descriptorPoolSizes{
         VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 256},
         VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 256},
     };
-    const VkDescriptorPoolCreateInfo descriptor_pool_create_info{
+    const VkDescriptorPoolCreateInfo descriptorPoolCreateInfo{
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
         .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
         .maxSets = 256,
-        .poolSizeCount = static_cast<uint32_t>(descriptor_pool_sizes.size()),
-        .pPoolSizes = descriptor_pool_sizes.data(),
+        .poolSizeCount = static_cast<uint32_t>(descriptorPoolSizes.size()),
+        .pPoolSizes = descriptorPoolSizes.data(),
     };
-    vkCreateDescriptorPool(vk.dev, &descriptor_pool_create_info, nullptr, &vk.descriptor_pool);
+    vkCreateDescriptorPool(vk.dev, &descriptorPoolCreateInfo, nullptr, &vk.descriptorPool);
 
-    const VkXcbSurfaceCreateInfoKHR surface_create_info{
+    const VkXcbSurfaceCreateInfoKHR surfaceCreateInfo{
         .sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR,
         .connection = xcb_connect(nullptr, nullptr),
         .window = vk.window.handle,
     };
-    VK_CHECK(vkCreateXcbSurfaceKHR(vk.instance, &surface_create_info, nullptr, &vk.surface));
+    VK_CHECK(vkCreateXcbSurfaceKHR(vk.instance, &surfaceCreateInfo, nullptr, &vk.surface));
 
     CreateSwapchain();
 }
 
 auto RhiGetMinUniformBufferOffsetAlignment() -> uint32_t
 {
-    return vk.phys_dev_props.limits.minUniformBufferOffsetAlignment;
+    return vk.physDevProps.limits.minUniformBufferOffsetAlignment;
 }
 
 auto RhiGetSurfaceWidth() -> uint32_t
 {
-    return vk.surface_extent.width;
+    return vk.surfaceExtent.width;
 }
 
 auto RhiGetSurfaceHeight() -> uint32_t
 {
-    return vk.surface_extent.height;
+    return vk.surfaceExtent.height;
 }
 
 } // namespace nyla

@@ -8,9 +8,9 @@ namespace nyla
 
 struct DBusObjectPathHandler
 {
-    const char *introspect_xml;
-    void (*message_handler)(DBusMessage *msg);
-    void (*name_owner_changed_handler)(const char *name, const char *old_owner, const char *new_owner);
+    const char *introspectXml;
+    void (*messageHandler)(DBusMessage *msg);
+    void (*nameOwnerChangedHandler)(const char *name, const char *oldOwner, const char *newOwner);
 };
 
 struct DBus
@@ -20,10 +20,10 @@ struct DBus
 };
 extern DBus dbus;
 
-void DBus_Initialize();
-void DBus_TrackNameOwnerChanges();
-void DBus_RegisterHandler(const char *bus, const char *path, DBusObjectPathHandler *handler);
-void DBus_Process();
+void DBusInitialize();
+void DBusTrackNameOwnerChanges();
+void DBusRegisterHandler(const char *bus, const char *path, DBusObjectPathHandler *handler);
+void DBusProcess();
 
 struct DBusErrorWrapper
 {
@@ -66,28 +66,28 @@ struct DBusErrorWrapper
         return &inner;
     }
 
-    auto bad() const -> bool
+    auto Bad() const -> bool
     {
         return dbus_error_is_set(&inner);
     }
-    auto name() const -> const char *
+    auto Name() const -> const char *
     {
         return inner.name;
     }
-    auto message() const -> const char *
+    auto Message() const -> const char *
     {
         return inner.message;
     }
 
-    void clear()
+    void Clear()
     {
         dbus_error_free(&inner);
         dbus_error_init(&inner);
     }
 };
 
-void DBus_ReplyInvalidArguments(DBusMessage *msg, const DBusErrorWrapper &err);
-void DBus_ReplyNone(DBusMessage *msg);
-void DBus_ReplyOne(DBusMessage *msg, int type, void *val);
+void DBusReplyInvalidArguments(DBusMessage *msg, const DBusErrorWrapper &err);
+void DBusReplyNone(DBusMessage *msg);
+void DBusReplyOne(DBusMessage *msg, int type, void *val);
 
 } // namespace nyla

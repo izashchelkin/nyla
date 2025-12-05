@@ -9,7 +9,7 @@ namespace nyla
 using Mat4Col = std::array<float, 4>;
 using Mat4 = std::array<Mat4Col, 4>;
 
-inline Mat4 Identity4 = {
+inline Mat4 identity4 = {
     Mat4Col{1.0f, 0.0f, 0.0f, 0.0f},
     Mat4Col{0.0f, 1.0f, 0.0f, 0.0f},
     Mat4Col{0.0f, 0.0f, 1.0f, 0.0f},

@@ -11,11 +11,11 @@ namespace nyla
 
 DBus dbus;
 
-void DBus_Initialize()
+void DBusInitialize()
 {
     DBusErrorWrapper err;
     dbus.conn = dbus_bus_get(DBUS_BUS_SESSION, err);
-    if (err.bad() || !dbus.conn)
+    if (err.Bad() || !dbus.conn)
     {
         LOG(ERROR) << "could not connect to dbus: " << err.inner.message;
         dbus.conn = nullptr;
@@ -26,7 +26,7 @@ void DBus_Initialize()
     dbus_connection_flush(dbus.conn);
 }
 
-void DBus_TrackNameOwnerChanges()
+void DBusTrackNameOwnerChanges()
 {
     if (!dbus.conn)
         return;
@@ -42,7 +42,7 @@ void DBus_TrackNameOwnerChanges()
     }
 }
 
-void DBus_Process()
+void DBusProcess()
 {
     if (!dbus.conn)
         return;
@@ -55,34 +55,34 @@ void DBus_Process()
         if (!msg)
             break;
 
-        absl::Cleanup unref_msg = [=] -> void { dbus_message_unref(msg); };
+        absl::Cleanup unrefMsg = [=] -> void { dbus_message_unref(msg); };
 
         if (dbus_message_is_signal(msg, "org.freedesktop.DBus", "NameOwnerChanged"))
         {
             const char *name;
-            const char *old_owner;
-            const char *new_owner;
+            const char *oldOwner;
+            const char *newOwner;
 
             DBusErrorWrapper err;
             if (!dbus_message_get_args(msg, err,                     //
                                        DBUS_TYPE_STRING, &name,      //
-                                       DBUS_TYPE_STRING, &old_owner, //
-                                       DBUS_TYPE_STRING, &new_owner, //
+                                       DBUS_TYPE_STRING, &oldOwner, //
+                                       DBUS_TYPE_STRING, &newOwner, //
                                        DBUS_TYPE_INVALID))
             {
-                LOG(ERROR) << err.message();
+                LOG(ERROR) << err.Message();
                 continue;
             }
 
             Set<DBusObjectPathHandler *> tracker;
             for (const auto &[path, handler] : dbus.handlers)
             {
-                if (!handler->name_owner_changed_handler)
+                if (!handler->nameOwnerChangedHandler)
                     continue;
                 if (auto [_, ok] = tracker.emplace(handler); !ok)
                     continue;
 
-                handler->name_owner_changed_handler(name, old_owner, new_owner);
+                handler->nameOwnerChangedHandler(name, oldOwner, newOwner);
             }
 
             continue;
@@ -100,15 +100,15 @@ void DBus_Process()
 
         if (dbus_message_is_method_call(msg, "org.freedesktop.DBus.Introspectable", "Introspect"))
         {
-            DBus_ReplyOne(msg, DBUS_TYPE_STRING, &handler->introspect_xml);
+            DBusReplyOne(msg, DBUS_TYPE_STRING, &handler->introspectXml);
             continue;
         }
 
-        handler->message_handler(msg);
+        handler->messageHandler(msg);
     }
 }
 
-void DBus_RegisterHandler(const char *bus, const char *path, DBusObjectPathHandler *handler)
+void DBusRegisterHandler(const char *bus, const char *path, DBusObjectPathHandler *handler)
 {
     if (!dbus.conn)
         return;
@@ -118,7 +118,7 @@ void DBus_RegisterHandler(const char *bus, const char *path, DBusObjectPathHandl
     DBusErrorWrapper err;
 
     int ret = dbus_bus_request_name(dbus.conn, bus, DBUS_NAME_FLAG_DO_NOT_QUEUE, err);
-    if (err.bad() || (ret != DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER && ret != DBUS_REQUEST_NAME_REPLY_ALREADY_OWNER))
+    if (err.Bad() || (ret != DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER && ret != DBUS_REQUEST_NAME_REPLY_ALREADY_OWNER))
     {
         LOG(ERROR) << "could not become owner of the bus " << bus;
         return;
@@ -128,21 +128,21 @@ void DBus_RegisterHandler(const char *bus, const char *path, DBusObjectPathHandl
     CHECK(ok);
 }
 
-void DBus_ReplyInvalidArguments(DBusMessage *msg, const DBusErrorWrapper &err)
+void DBusReplyInvalidArguments(DBusMessage *msg, const DBusErrorWrapper &err)
 {
-    DBusMessage *error_msg = dbus_message_new_error(msg, DBUS_ERROR_INVALID_ARGS, err.inner.message);
-    dbus_connection_send(dbus.conn, error_msg, nullptr);
-    dbus_message_unref(error_msg);
+    DBusMessage *errorMsg = dbus_message_new_error(msg, DBUS_ERROR_INVALID_ARGS, err.inner.message);
+    dbus_connection_send(dbus.conn, errorMsg, nullptr);
+    dbus_message_unref(errorMsg);
 }
 
-void DBus_ReplyNone(DBusMessage *msg)
+void DBusReplyNone(DBusMessage *msg)
 {
     DBusMessage *reply = dbus_message_new_method_return(msg);
     dbus_connection_send(dbus.conn, reply, nullptr);
     dbus_message_unref(reply);
 }
 
-void DBus_ReplyOne(DBusMessage *msg, int type, void *val)
+void DBusReplyOne(DBusMessage *msg, int type, void *val)
 {
     DBusMessage *reply = dbus_message_new_method_return(msg);
     DBusMessageIter it;

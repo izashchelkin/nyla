@@ -13,7 +13,7 @@
 
 #define VK_CHECK(res)                                                                                                  \
     CHECK_EQ(res, VK_SUCCESS) << "Vulkan error: " << string_VkResult(res) << "; Last checkpoint "                      \
-                              << ((res) == VK_ERROR_DEVICE_LOST ? __RhiGetLastCheckpointData(RhiQueueType::Graphics)   \
+                              << ((res) == VK_ERROR_DEVICE_LOST ? RhiGetLastCheckpointData(RhiQueueType::Graphics)     \
                                                                 : 999999);
 
 #define VK_GET_INSTANCE_PROC_ADDR(name) reinterpret_cast<PFN_##name>(vkGetInstanceProcAddr(vk.instance, #name))
@@ -24,11 +24,11 @@ namespace nyla::rhi_vulkan_internal
 struct DeviceQueue
 {
     VkQueue queue;
-    uint32_t queue_family_index;
-    VkCommandPool cmd_pool;
+    uint32_t queueFamilyIndex;
+    VkCommandPool cmdPool;
 
     VkSemaphore timeline;
-    uint64_t timeline_next;
+    uint64_t timelineNext;
 };
 
 struct VulkanData
@@ -37,32 +37,32 @@ struct VulkanData
 
     VkInstance instance;
     VkDevice dev;
-    VkPhysicalDevice phys_dev;
-    VkPhysicalDeviceProperties phys_dev_props;
-    VkPhysicalDeviceMemoryProperties phys_dev_mem_props;
-    VkDescriptorPool descriptor_pool;
+    VkPhysicalDevice physDev;
+    VkPhysicalDeviceProperties physDevProps;
+    VkPhysicalDeviceMemoryProperties physDevMemProps;
+    VkDescriptorPool descriptorPool;
 
     PlatformWindow window;
     VkSurfaceKHR surface;
-    VkExtent2D surface_extent;
-    VkSurfaceFormatKHR surface_format;
+    VkExtent2D surfaceExtent;
+    VkSurfaceFormatKHR surfaceFormat;
     VkSwapchainKHR swapchain;
-    std::array<VkImage, 8> swapchain_images;
-    uint32_t swapchain_image_count;
-    std::array<VkImageView, 8> swapchain_image_views;
-    std::array<VkSemaphore, rhi_max_num_frames_in_flight> swapchain_acquire_semaphores;
+    std::array<VkImage, 8> swapchainImages;
+    uint32_t swapchainImageCount;
+    std::array<VkImageView, 8> swapchainImageViews;
+    std::array<VkSemaphore, kRhiMaxNumFramesInFlight> swapchainAcquireSemaphores;
 
-    DeviceQueue graphics_queue;
-    std::array<RhiCmdList, rhi_max_num_frames_in_flight> graphics_queue_cmd;
-    std::array<uint64_t, rhi_max_num_frames_in_flight> graphics_queue_cmd_done;
+    DeviceQueue graphicsQueue;
+    std::array<RhiCmdList, kRhiMaxNumFramesInFlight> graphicsQueueCmd;
+    std::array<uint64_t, kRhiMaxNumFramesInFlight> graphicsQueueCmdDone;
 
-    DeviceQueue transfer_queue;
-    RhiCmdList transfer_queue_cmd;
-    uint64_t transfer_queue_cmd_done;
+    DeviceQueue transferQueue;
+    RhiCmdList transferQueueCmd;
+    uint64_t transferQueueCmdDone;
 
-    uint32_t num_frames_in_flight;
-    uint32_t frame_index;
-    uint32_t swapchain_image_index;
+    uint32_t numFramesInFlight;
+    uint32_t frameIndex;
+    uint32_t swapchainImageIndex;
 };
 
 extern VulkanData vk;
@@ -77,50 +77,50 @@ struct VulkanBufferData
 struct VulkanCmdListData
 {
     VkCommandBuffer cmdbuf;
-    RhiQueueType queue_type;
-    RhiGraphicsPipeline bound_graphics_pipeline;
+    RhiQueueType queueType;
+    RhiGraphicsPipeline boundGraphicsPipeline;
 };
 
 struct VulkanPipelineData
 {
     VkPipelineLayout layout;
     VkPipeline pipeline;
-    VkPipelineBindPoint bind_point;
-    std::array<RhiBindGroupLayout, rhi_max_bind_group_layouts> bind_group_layouts;
-    uint32_t bind_group_layout_count;
+    VkPipelineBindPoint bindPoint;
+    std::array<RhiBindGroupLayout, kRhiMaxBindGroupLayouts> bindGroupLayouts;
+    uint32_t bindGroupLayoutCount;
 };
 
 struct VulkanTextureData
 {
     VkImage image;
-    VkImageView image_view;
+    VkImageView imageView;
     VkDeviceMemory memory;
     VkFormat format;
-    VkMemoryPropertyFlags memory_property_flags;
+    VkMemoryPropertyFlags memoryPropertyFlags;
 };
 
 struct RhiHandles
 {
-    rhi_internal::RhiHandlePool<RhiBindGroupLayout, VkDescriptorSetLayout, 16> bind_group_layouts;
-    rhi_internal::RhiHandlePool<RhiBindGroup, VkDescriptorSet, 16> bind_groups;
+    rhi_internal::RhiHandlePool<RhiBindGroupLayout, VkDescriptorSetLayout, 16> bindGroupLayouts;
+    rhi_internal::RhiHandlePool<RhiBindGroup, VkDescriptorSet, 16> bindGroups;
     rhi_internal::RhiHandlePool<RhiBuffer, VulkanBufferData, 16> buffers;
-    rhi_internal::RhiHandlePool<RhiCmdList, VulkanCmdListData, 16> cmd_lists;
+    rhi_internal::RhiHandlePool<RhiCmdList, VulkanCmdListData, 16> cmdLists;
     rhi_internal::RhiHandlePool<RhiShader, VkShaderModule, 16> shaders;
-    rhi_internal::RhiHandlePool<RhiGraphicsPipeline, VulkanPipelineData, 16> graphics_pipelines;
+    rhi_internal::RhiHandlePool<RhiGraphicsPipeline, VulkanPipelineData, 16> graphicsPipelines;
     rhi_internal::RhiHandlePool<RhiTexture, VulkanTextureData, 16> textures;
 };
-extern RhiHandles rhi_handles;
+extern RhiHandles rhiHandles;
 
-auto DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
-                            VkDebugUtilsMessageTypeFlagsEXT message_type,
-                            const VkDebugUtilsMessengerCallbackDataEXT *callback_data, void *user_data) -> VkBool32;
+auto DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+                            VkDebugUtilsMessageTypeFlagsEXT messageType,
+                            const VkDebugUtilsMessengerCallbackDataEXT *callbackData, void *userData) -> VkBool32;
 
 void CreateSwapchain();
 
-auto CreateTimeline(uint64_t initial_value) -> VkSemaphore;
-void WaitTimeline(VkSemaphore timeline, uint64_t wait_value);
+auto CreateTimeline(uint64_t initialValue) -> VkSemaphore;
+void WaitTimeline(VkSemaphore timeline, uint64_t waitValue);
 
-auto FindMemoryTypeIndex(VkMemoryRequirements mem_requirements, VkMemoryPropertyFlags properties) -> uint32_t;
+auto FindMemoryTypeIndex(VkMemoryRequirements memRequirements, VkMemoryPropertyFlags properties) -> uint32_t;
 
 void VulkanNameHandle(VkObjectType type, uint64_t handle, std::string_view name);
 
@@ -133,6 +133,6 @@ auto ConvertRhiVertexFormatIntoVkFormat(RhiVertexFormat format) -> VkFormat;
 auto ConvertRhiTextureFormatIntoVkFormat(RhiTextureFormat format) -> VkFormat;
 auto ConvertVkFormatIntoRhiTextureFormat(VkFormat format) -> RhiTextureFormat;
 
-auto ConvertRhiShaderStageIntoVkShaderStageFlags(RhiShaderStage stage_flags) -> VkShaderStageFlags;
+auto ConvertRhiShaderStageIntoVkShaderStageFlags(RhiShaderStage stageFlags) -> VkShaderStageFlags;
 
 } // namespace nyla::rhi_vulkan_internal

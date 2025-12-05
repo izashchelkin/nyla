@@ -7,22 +7,22 @@
 namespace nyla
 {
 
-constexpr inline uint32_t rhi_max_num_frames_in_flight = 3;
+constexpr inline uint32_t kRhiMaxNumFramesInFlight = 3;
 
 #if defined(NDEBUG)
-constexpr inline bool rhi_validations = false;
+constexpr inline bool kRhiValidations = false;
 #else
-constexpr inline bool rhi_validations = true;
+constexpr inline bool kRhiValidations = true;
 #endif
 
-constexpr inline bool rhi_checkpoints = false;
+constexpr inline bool kRhiCheckpoints = false;
 
 //
 
 struct RhiDesc
 {
     PlatformWindow window;
-    uint32_t num_frames_in_flight;
+    uint32_t numFramesInFlight;
 };
 
 void RhiInit(const RhiDesc &);

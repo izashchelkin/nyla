@@ -20,6 +20,6 @@ struct Vertex
 extern Rp worldPipeline;
 
 void WorldSetUp();
-void WorldRender(Vec2f pos, Vec3f color, float scale_x, float scale_y, const RpMesh &mesh);
+void WorldRender(Vec2f pos, Vec3f color, float scaleX, float scaleY, const RpMesh &mesh);
 
 } // namespace nyla

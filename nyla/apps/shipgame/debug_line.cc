@@ -8,7 +8,7 @@ namespace
 using Vertex = Vertex;
 }
 
-auto TriangulateLine(const Vec2f &A, const Vec2f &B, float thickness) -> std::vector<Vertex>
+auto TriangulateLine(const Vec2f &a, const Vec2f &b, float thickness) -> std::vector<Vertex>
 {
     const Vec3f green = {0.f, 1.f, 0.f};
     const Vec3f red = {1.f, 0.f, 0.f};
@@ -18,19 +18,19 @@ auto TriangulateLine(const Vec2f &A, const Vec2f &B, float thickness) -> std::ve
     const float eps = 1e-6f;
     const float half = 0.5f * thickness;
 
-    Vec2f d = Vec2fDif(B, A);
-    float L = Vec2fLen(d);
+    Vec2f d = Vec2fDif(b, a);
+    float l = Vec2fLen(d);
 
     // Degenerate: draw a tiny square "dot" so something is visible.
-    if (L < eps)
+    if (l < eps)
     {
         const Vec2f nx{half, 0.0f};
         const Vec2f ny{0.0f, half};
 
-        const Vec2f p0 = Vec2fSum(Vec2fSum(A, nx), ny); // top-right
-        const Vec2f p1 = Vec2fSum(Vec2fDif(A, nx), ny); // top-left
-        const Vec2f p2 = Vec2fDif(Vec2fDif(A, nx), ny); // bottom-left
-        const Vec2f p3 = Vec2fSum(Vec2fDif(A, ny), nx); // bottom-right
+        const Vec2f p0 = Vec2fSum(Vec2fSum(a, nx), ny); // top-right
+        const Vec2f p1 = Vec2fSum(Vec2fDif(a, nx), ny); // top-left
+        const Vec2f p2 = Vec2fDif(Vec2fDif(a, nx), ny); // bottom-left
+        const Vec2f p3 = Vec2fSum(Vec2fDif(a, ny), nx); // bottom-right
 
         // CCW triangles
         out.emplace_back(Vertex{p0, red});
@@ -44,13 +44,13 @@ auto TriangulateLine(const Vec2f &A, const Vec2f &B, float thickness) -> std::ve
 
     // Unit direction and left-hand (CCW) perpendicular
     const Vec2f t = Vec2fNorm(d);
-    const Vec2f n_perp = Vec2fMul(Vec2f{-t[1], t[0]}, half); // (-y, x)
+    const Vec2f nPerp = Vec2fMul(Vec2f{-t[1], t[0]}, half); // (-y, x)
 
     // Quad corners around the segment
-    const Vec2f p0 = Vec2fSum(A, n_perp); // "top" at A
-    const Vec2f p1 = Vec2fSum(B, n_perp); // "top" at B
-    const Vec2f p2 = Vec2fDif(B, n_perp); // "bottom" at B
-    const Vec2f p3 = Vec2fDif(A, n_perp); // "bottom" at A
+    const Vec2f p0 = Vec2fSum(a, nPerp); // "top" at A
+    const Vec2f p1 = Vec2fSum(b, nPerp); // "top" at B
+    const Vec2f p2 = Vec2fDif(b, nPerp); // "bottom" at B
+    const Vec2f p3 = Vec2fDif(a, nPerp); // "bottom" at A
 
     // Emit triangles with COUNTER-CLOCKWISE winding for Vulkan (default
     // positive-height viewport)

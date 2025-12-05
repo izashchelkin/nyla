@@ -12,17 +12,17 @@ namespace platform_x11_internal
 
 enum class X11ErrorCode : uint8_t
 {
-    kSuccess = 0,           /* everything's okay */
-    kBadRequest = 1,        /* bad request code */
-    kBadValue = 2,          /* int parameter out of range */
-    kBadWindow = 3,         /* parameter not a Window */
-    kBadPixmap = 4,         /* parameter not a Pixmap */
-    kBadAtom = 5,           /* parameter not an Atom */
-    kBadCursor = 6,         /* parameter not a Cursor */
-    kBadFont = 7,           /* parameter not a Font */
-    kBadMatch = 8,          /* parameter mismatch */
-    kBadDrawable = 9,       /* parameter not a Pixmap or Window */
-    kBadAccess = 10,        /* depending on context:
+    KSuccess = 0,           /* everything's okay */
+    KBadRequest = 1,        /* bad request code */
+    KBadValue = 2,          /* int parameter out of range */
+    KBadWindow = 3,         /* parameter not a Window */
+    KBadPixmap = 4,         /* parameter not a Pixmap */
+    KBadAtom = 5,           /* parameter not an Atom */
+    KBadCursor = 6,         /* parameter not a Cursor */
+    KBadFont = 7,           /* parameter not a Font */
+    KBadMatch = 8,          /* parameter mismatch */
+    KBadDrawable = 9,       /* parameter not a Pixmap or Window */
+    KBadAccess = 10,        /* depending on context:
                                   - key/button already grabbed
                                   - attempt to free an illegal
                                     cmap entry
@@ -31,71 +31,71 @@ enum class X11ErrorCode : uint8_t
                                  - attempt to modify the access control
                                     list from other than the local host.
                                  */
-    kBadAlloc = 11,         /* insufficient resources */
-    kBadColor = 12,         /* no such colormap */
-    kBadGC = 13,            /* parameter not a GC */
-    kBadIDChoice = 14,      /* choice not in range or already used */
-    kBadName = 15,          /* font or color name doesn't exist */
-    kBadLength = 16,        /* Request length incorrect */
-    kBadImplementation = 17 /* server is defective */
+    KBadAlloc = 11,         /* insufficient resources */
+    KBadColor = 12,         /* no such colormap */
+    KBadGc = 13,            /* parameter not a GC */
+    KBadIdChoice = 14,      /* choice not in range or already used */
+    KBadName = 15,          /* font or color name doesn't exist */
+    KBadLength = 16,        /* Request length incorrect */
+    KBadImplementation = 17 /* server is defective */
 };
 
-template <typename Sink> void AbslStringify(Sink &sink, X11ErrorCode error_code)
+template <typename Sink> void AbslStringify(Sink &sink, X11ErrorCode errorCode)
 {
-    switch (error_code)
+    switch (errorCode)
     {
-    case X11ErrorCode::kSuccess:
+    case X11ErrorCode::KSuccess:
         absl::Format(&sink, "Success");
         return;
-    case X11ErrorCode::kBadRequest:
+    case X11ErrorCode::KBadRequest:
         absl::Format(&sink, "BadRequest");
         return;
-    case X11ErrorCode::kBadValue:
+    case X11ErrorCode::KBadValue:
         absl::Format(&sink, "BadValue");
         return;
-    case X11ErrorCode::kBadWindow:
+    case X11ErrorCode::KBadWindow:
         absl::Format(&sink, "BadWindow");
         return;
-    case X11ErrorCode::kBadPixmap:
+    case X11ErrorCode::KBadPixmap:
         absl::Format(&sink, "BadPixmap");
         return;
-    case X11ErrorCode::kBadAtom:
+    case X11ErrorCode::KBadAtom:
         absl::Format(&sink, "BadAtom");
         return;
-    case X11ErrorCode::kBadCursor:
+    case X11ErrorCode::KBadCursor:
         absl::Format(&sink, "BadCursor");
         return;
-    case X11ErrorCode::kBadFont:
+    case X11ErrorCode::KBadFont:
         absl::Format(&sink, "BadFont");
         return;
-    case X11ErrorCode::kBadMatch:
+    case X11ErrorCode::KBadMatch:
         absl::Format(&sink, "BadMatch");
         return;
-    case X11ErrorCode::kBadDrawable:
+    case X11ErrorCode::KBadDrawable:
         absl::Format(&sink, "BadDrawable");
         return;
-    case X11ErrorCode::kBadAccess:
+    case X11ErrorCode::KBadAccess:
         absl::Format(&sink, "BadAccess");
         return;
-    case X11ErrorCode::kBadAlloc:
+    case X11ErrorCode::KBadAlloc:
         absl::Format(&sink, "BadAlloc");
         return;
-    case X11ErrorCode::kBadColor:
+    case X11ErrorCode::KBadColor:
         absl::Format(&sink, "BadColor");
         return;
-    case X11ErrorCode::kBadGC:
+    case X11ErrorCode::KBadGc:
         absl::Format(&sink, "BadGC");
         return;
-    case X11ErrorCode::kBadIDChoice:
+    case X11ErrorCode::KBadIdChoice:
         absl::Format(&sink, "BadIDChoice");
         return;
-    case X11ErrorCode::kBadName:
+    case X11ErrorCode::KBadName:
         absl::Format(&sink, "BadName");
         return;
-    case X11ErrorCode::kBadLength:
+    case X11ErrorCode::KBadLength:
         absl::Format(&sink, "BadLength");
         return;
-    case X11ErrorCode::kBadImplementation:
+    case X11ErrorCode::KBadImplementation:
         absl::Format(&sink, "BadImplementation");
         return;
     }
