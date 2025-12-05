@@ -7,19 +7,18 @@
 #include "xcb/xproto.h"
 #include "xkbcommon/xkbcommon.h"
 
-namespace nyla
+namespace nyla::platform_x11_internal
 {
 
-namespace platform_x11_internal
-{
-
+// NOLINTBEGIN
 #define Nyla_X11_Atoms(X)                                                                                              \
-    X(compoundText)                                                                                                    \
-    X(wmDeleteWindow)                                                                                                  \
-    X(wmProtocols)                                                                                                     \
-    X(wmName)                                                                                                          \
-    X(wmState)                                                                                                         \
-    X(wmTakeFocus)
+    X(compound_text)                                                                                                   \
+    X(wm_delete_window)                                                                                                \
+    X(wm_protocols)                                                                                                    \
+    X(wm_name)                                                                                                         \
+    X(wm_state)                                                                                                        \
+    X(wm_take_focus)
+// NOLINTEND
 
 struct X11State
 {
@@ -70,6 +69,4 @@ auto X11ResolveKeyCode(const X11KeyResolver &resolver, std::string_view keyname)
 
 auto ConvertKeyPhysicalIntoXkbName(KeyPhysical key) -> const char *;
 
-} // namespace platform_x11_internal
-
-} // namespace nyla
+} // namespace nyla::platform_x11_internal

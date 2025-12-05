@@ -160,12 +160,12 @@ static void HandleWmProtocols(xcb_window_t clientWindow, Client &client, xcb_get
 
     for (xcb_atom_t atom : wmProtocols)
     {
-        if (atom == x11.atoms.wmDeleteWindow)
+        if (atom == x11.atoms.wm_delete_window)
         {
             client.wmDeleteWindow = true;
             continue;
         }
-        if (atom == x11.atoms.wmTakeFocus)
+        if (atom == x11.atoms.wm_take_focus)
         {
             client.wmTakeFocus = true;
             continue;
@@ -193,11 +193,11 @@ void InitializeWM()
     wmPropertyChangeHandlers.try_emplace(XCB_ATOM_WM_HINTS, HandleWmHints);
     wmPropertyChangeHandlers.try_emplace(XCB_ATOM_WM_NORMAL_HINTS, HandleWmNormalHints);
     wmPropertyChangeHandlers.try_emplace(XCB_ATOM_WM_NAME, HandleWmName);
-    wmPropertyChangeHandlers.try_emplace(x11.atoms.wmProtocols, HandleWmProtocols);
+    wmPropertyChangeHandlers.try_emplace(x11.atoms.wm_protocols, HandleWmProtocols);
     wmPropertyChangeHandlers.try_emplace(XCB_ATOM_WM_TRANSIENT_FOR, HandleWmTransientFor);
 
     DebugFsRegister(
-        "windows", nullptr,                               //
+        "windows", nullptr,                                       //
         [](auto &file) -> auto { file.content = DumpClients(); }, //
         nullptr);
 
@@ -839,7 +839,7 @@ void ProcessWM()
         };
 
         auto configureWindows = [](Rect boundingRect, std::span<const xcb_window_t> windows, LayoutType layoutType,
-                                    auto visitor) -> auto {
+                                   auto visitor) -> auto {
             std::vector<Rect> layout = ComputeLayout(boundingRect, windows.size(), 2, layoutType);
             CHECK_EQ(layout.size(), windows.size());
 
@@ -866,7 +866,7 @@ void ProcessWM()
 
         auto configureSubwindows = [configureWindows](const Client &client) -> void {
             configureWindows(TryApplyMargin(client.rect, 20), client.subwindows, LayoutType::KRows,
-                              [](Client &client) -> void {});
+                             [](Client &client) -> void {});
         };
 
         if (stack.zoom)
@@ -909,7 +909,7 @@ void ProcessWM()
         if (client.wantsConfigureNotify)
         {
             X11SendConfigureNotify(client_window, x11.screen->root, client.rect.X(), client.rect.Y(),
-                                    client.rect.Width(), client.rect.Height(), 2);
+                                   client.rect.Width(), client.rect.Height(), 2);
             client.wantsConfigureNotify = false;
         }
     }
@@ -1134,10 +1134,10 @@ static auto DumpClients() -> std::string
                               "transient_for=%v\n%sinput=%v\n"
                               "%swm_take_focus=%v\n%swm_delete_window=%v\n%"
                               "ssubwindows=%v\n%smax_dimensions=%vx%v\n\n",
-                              indent, client_window, indent, client.name, indent, client.rect, indent,
-                              transientForName, indent, client.wmHintsInput, indent, client.wmTakeFocus, indent,
-                              client.wmDeleteWindow, indent, absl::StrJoin(client.subwindows, ", "), indent,
-                              client.maxWidth, client.maxHeight);
+                              indent, client_window, indent, client.name, indent, client.rect, indent, transientForName,
+                              indent, client.wmHintsInput, indent, client.wmTakeFocus, indent, client.wmDeleteWindow,
+                              indent, absl::StrJoin(client.subwindows, ", "), indent, client.maxWidth,
+                              client.maxHeight);
     }
     return out;
 }

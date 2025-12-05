@@ -198,8 +198,8 @@ void PlatformProcessEvents()
         case XCB_CLIENT_MESSAGE: {
             auto clientmessage = reinterpret_cast<xcb_client_message_event_t *>(event);
 
-            if (clientmessage->format == 32 && clientmessage->type == x11.atoms.wmProtocols &&
-                clientmessage->data.data32[0] == x11.atoms.wmDeleteWindow)
+            if (clientmessage->format == 32 && clientmessage->type == x11.atoms.wm_protocols &&
+                clientmessage->data.data32[0] == x11.atoms.wm_delete_window)
             {
                 shouldExit = true;
             }
@@ -509,12 +509,12 @@ void X11SendClientMessage32(xcb_window_t window, xcb_atom_t type, xcb_atom_t arg
 
 void X11SendWmTakeFocus(xcb_window_t window, uint32_t time)
 {
-    X11SendClientMessage32(window, x11.atoms.wmProtocols, x11.atoms.wmTakeFocus, time, 0, 0);
+    X11SendClientMessage32(window, x11.atoms.wm_protocols, x11.atoms.wm_take_focus, time, 0, 0);
 }
 
 void X11SendWmDeleteWindow(xcb_window_t window)
 {
-    X11SendClientMessage32(window, x11.atoms.wmProtocols, x11.atoms.wmDeleteWindow, XCB_CURRENT_TIME, 0, 0);
+    X11SendClientMessage32(window, x11.atoms.wm_protocols, x11.atoms.wm_delete_window, XCB_CURRENT_TIME, 0, 0);
 }
 
 void X11SendConfigureNotify(xcb_window_t window, xcb_window_t parent, int16_t x, int16_t y, uint16_t width,
