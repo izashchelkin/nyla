@@ -2,18 +2,14 @@
 
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
 
-namespace nyla
-{
-
-namespace rhi_vulkan_internal
+namespace nyla::rhi_vulkan_internal
 {
 
 void CreateSwapchain()
 {
     VkSwapchainKHR old_swapchain = vk.swapchain;
-    VkImageView old_image_views[std::size(vk.swapchain_image_views)];
+    auto old_image_views = vk.swapchain_image_views;
     uint32_t old_images_views_count = vk.swapchain_image_count;
-    memcpy(old_image_views, vk.swapchain_image_views, std::size(vk.swapchain_image_views) * old_images_views_count);
 
     VkSurfaceCapabilitiesKHR surface_capabilities;
     VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vk.phys_dev, vk.surface, &surface_capabilities));
@@ -25,7 +21,7 @@ void CreateSwapchain()
         std::vector<VkSurfaceFormatKHR> surface_formats(surface_format_count);
         vkGetPhysicalDeviceSurfaceFormatsKHR(vk.phys_dev, vk.surface, &surface_format_count, surface_formats.data());
 
-        auto it = std::find_if(surface_formats.begin(), surface_formats.end(), [](VkSurfaceFormatKHR surface_format) -> bool {
+        auto it = std::ranges::find_if(surface_formats, [](VkSurfaceFormatKHR surface_format) -> bool {
             return surface_format.format == VK_FORMAT_B8G8R8A8_SRGB &&
                    surface_format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
         });
@@ -88,7 +84,7 @@ void CreateSwapchain()
     vkGetSwapchainImagesKHR(vk.dev, vk.swapchain, &swapchain_image_count, nullptr);
 
     CHECK_LE(swapchain_image_count, std::size(vk.swapchain_images));
-    vkGetSwapchainImagesKHR(vk.dev, vk.swapchain, &swapchain_image_count, vk.swapchain_images);
+    vkGetSwapchainImagesKHR(vk.dev, vk.swapchain, &swapchain_image_count, vk.swapchain_images.data());
 
     for (size_t i = 0; i < swapchain_image_count; ++i)
     {
@@ -126,6 +122,4 @@ auto RhiGetBackbufferFormat() -> RhiTextureFormat
     return ConvertVkFormatIntoRhiTextureFormat(vk.surface_format.format);
 }
 
-} // namespace rhi_vulkan_internal
-
-} // namespace nyla
+} // namespace nyla::rhi_vulkan_internal

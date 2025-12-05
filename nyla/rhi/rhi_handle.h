@@ -24,12 +24,13 @@ namespace rhi_internal
 
 template <typename Handle, typename Data, size_t Size> struct RhiHandlePool
 {
-    struct
+    struct Slot
     {
         Data data;
         uint32_t gen;
         bool used;
-    } slots[Size];
+    };
+    std::array<Slot, Size> slots;
 };
 
 template <typename Handle, typename Data, size_t Size>

@@ -4,7 +4,6 @@
 
 #include <cstdint>
 
-#include "absl/strings/str_format.h"
 #include "nyla/commons/memory/align.h"
 #include "nyla/commons/memory/charview.h"
 #include "nyla/commons/os/readfile.h"
@@ -45,7 +44,7 @@ void RpInit(Rp &rp)
         RhiBindGroupLayoutDesc bind_group_layout_desc{};
         bind_group_layout_desc.binding_count = rp.static_uniform.enabled + rp.dynamic_uniform.enabled;
 
-        RhiBindGroupDesc bind_group_desc[rhi_max_num_frames_in_flight]{};
+        std::array<RhiBindGroupDesc, rhi_max_num_frames_in_flight> bind_group_desc;
 
         for (uint32_t j = 0; j < RhiGetNumFramesInFlight(); ++j)
         {
@@ -118,7 +117,7 @@ void RpInit(Rp &rp)
     }
 
     RhiGraphicsPipelineDesc desc{
-        .debug_name = absl::StrFormat("Rp %v", rp.debug_name),
+        .debug_name = std::format("Rp %v", rp.debug_name),
         .cull_mode = rp.disable_culling ? RhiCullMode::None : RhiCullMode::Back,
         .front_face = RhiFrontFace::CCW,
     };
@@ -192,7 +191,10 @@ auto RpVertCopy(Rp &rp, uint32_t vert_count, CharView vert_data) -> RpMesh
 
     RpBufCopy(rp.vert_buf, vert_data);
 
-    return {offset, vert_count};
+    return {
+        .offset = offset,
+        .vert_count = vert_count,
+    };
 }
 
 void RpPushConst(Rp &rp, CharView data)
@@ -211,8 +213,8 @@ void RpDraw(Rp &rp, RpMesh mesh, CharView dynamic_uniform_data)
 
     if (rp.vert_buf.enabled)
     {
-        RhiBuffer buffers[]{rp.vert_buf.buffer[frame_index]};
-        uint32_t offsets[]{mesh.offset};
+        std::array<RhiBuffer, 1> buffers{rp.vert_buf.buffer[frame_index]};
+        std::array<uint32_t, 1> offsets{mesh.offset};
 
         RhiCmdBindVertexBuffers(cmd, 0, buffers, offsets);
     }

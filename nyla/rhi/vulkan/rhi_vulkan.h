@@ -4,6 +4,7 @@
 
 #include "absl/log/check.h"
 #include "nyla/rhi/rhi.h"
+#include "nyla/rhi/rhi_bind_groups.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_pipeline.h"
 #include "nyla/rhi/rhi_texture.h"
@@ -12,15 +13,12 @@
 
 #define VK_CHECK(res)                                                                                                  \
     CHECK_EQ(res, VK_SUCCESS) << "Vulkan error: " << string_VkResult(res) << "; Last checkpoint "                      \
-                              << (res == VK_ERROR_DEVICE_LOST ? __RhiGetLastCheckpointData(RhiQueueType::Graphics)     \
-                                                              : 999999);
+                              << ((res) == VK_ERROR_DEVICE_LOST ? __RhiGetLastCheckpointData(RhiQueueType::Graphics)   \
+                                                                : 999999);
 
 #define VK_GET_INSTANCE_PROC_ADDR(name) reinterpret_cast<PFN_##name>(vkGetInstanceProcAddr(vk.instance, #name))
 
-namespace nyla
-{
-
-namespace rhi_vulkan_internal
+namespace nyla::rhi_vulkan_internal
 {
 
 struct DeviceQueue
@@ -49,14 +47,14 @@ struct VulkanData
     VkExtent2D surface_extent;
     VkSurfaceFormatKHR surface_format;
     VkSwapchainKHR swapchain;
-    VkImage swapchain_images[8];
+    std::array<VkImage, 8> swapchain_images;
     uint32_t swapchain_image_count;
-    VkImageView swapchain_image_views[8];
-    VkSemaphore swapchain_acquire_semaphores[rhi_max_num_frames_in_flight];
+    std::array<VkImageView, 8> swapchain_image_views;
+    std::array<VkSemaphore, rhi_max_num_frames_in_flight> swapchain_acquire_semaphores;
 
     DeviceQueue graphics_queue;
-    RhiCmdList graphics_queue_cmd[rhi_max_num_frames_in_flight];
-    uint64_t graphics_queue_cmd_done[rhi_max_num_frames_in_flight];
+    std::array<RhiCmdList, rhi_max_num_frames_in_flight> graphics_queue_cmd;
+    std::array<uint64_t, rhi_max_num_frames_in_flight> graphics_queue_cmd_done;
 
     DeviceQueue transfer_queue;
     RhiCmdList transfer_queue_cmd;
@@ -88,7 +86,7 @@ struct VulkanPipelineData
     VkPipelineLayout layout;
     VkPipeline pipeline;
     VkPipelineBindPoint bind_point;
-    RhiBindGroupLayout bind_group_layouts[rhi_max_bind_group_layouts];
+    std::array<RhiBindGroupLayout, rhi_max_bind_group_layouts> bind_group_layouts;
     uint32_t bind_group_layout_count;
 };
 
@@ -114,8 +112,8 @@ struct RhiHandles
 extern RhiHandles rhi_handles;
 
 auto DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
-                                VkDebugUtilsMessageTypeFlagsEXT message_type,
-                                const VkDebugUtilsMessengerCallbackDataEXT *callback_data, void *user_data) -> VkBool32;
+                            VkDebugUtilsMessageTypeFlagsEXT message_type,
+                            const VkDebugUtilsMessengerCallbackDataEXT *callback_data, void *user_data) -> VkBool32;
 
 void CreateSwapchain();
 
@@ -137,6 +135,4 @@ auto ConvertVkFormatIntoRhiTextureFormat(VkFormat format) -> RhiTextureFormat;
 
 auto ConvertRhiShaderStageIntoVkShaderStageFlags(RhiShaderStage stage_flags) -> VkShaderStageFlags;
 
-} // namespace rhi_vulkan_internal
-
-} // namespace nyla
+} // namespace nyla::rhi_vulkan_internal

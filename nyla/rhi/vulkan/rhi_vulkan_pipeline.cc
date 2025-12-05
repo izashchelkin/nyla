@@ -86,7 +86,7 @@ auto RhiCreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGraphi
         .bind_point = VK_PIPELINE_BIND_POINT_GRAPHICS,
     };
 
-    VkVertexInputBindingDescription vertex_bindings[std::size(desc.vertex_bindings)];
+    std::array<VkVertexInputBindingDescription, std::size(desc.vertex_bindings)> vertex_bindings;
     CHECK_LE(desc.vertex_bindings_count, std::size(desc.vertex_bindings));
     for (uint32_t i = 0; i < desc.vertex_bindings_count; ++i)
     {
@@ -98,7 +98,7 @@ auto RhiCreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGraphi
         };
     }
 
-    VkVertexInputAttributeDescription vertex_attributes[std::size(desc.vertex_attributes)];
+    std::array<VkVertexInputAttributeDescription, std::size(desc.vertex_attributes)> vertex_attributes;
     CHECK_LE(desc.vertex_attribute_count, std::size(desc.vertex_attributes));
     for (uint32_t i = 0; i < desc.vertex_attribute_count; ++i)
     {
@@ -114,9 +114,9 @@ auto RhiCreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGraphi
     const VkPipelineVertexInputStateCreateInfo vertex_input_state_create_info{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
         .vertexBindingDescriptionCount = desc.vertex_bindings_count,
-        .pVertexBindingDescriptions = vertex_bindings,
+        .pVertexBindingDescriptions = vertex_bindings.data(),
         .vertexAttributeDescriptionCount = desc.vertex_attribute_count,
-        .pVertexAttributeDescriptions = vertex_attributes,
+        .pVertexAttributeDescriptions = vertex_attributes.data(),
     };
 
     const VkPipelineRasterizationStateCreateInfo rasterizer_create_info{
@@ -187,27 +187,24 @@ auto RhiCreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGraphi
         .pColorAttachmentFormats = &vk.surface_format.format,
     };
 
-    VkPipelineShaderStageCreateInfo stages[2];
-    uint32_t stage_count = 0;
-
-    stages[stage_count++] = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-        .stage = VK_SHADER_STAGE_VERTEX_BIT,
-        .module = RhiHandleGetData(rhi_handles.shaders, desc.vert_shader),
-        .pName = "main",
-    };
-
-    stages[stage_count++] = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-        .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-        .module = RhiHandleGetData(rhi_handles.shaders, desc.frag_shader),
-        .pName = "main",
+    std::array<VkPipelineShaderStageCreateInfo, 2> stages{
+        VkPipelineShaderStageCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+            .stage = VK_SHADER_STAGE_VERTEX_BIT,
+            .module = RhiHandleGetData(rhi_handles.shaders, desc.vert_shader),
+            .pName = "main",
+        },
+        VkPipelineShaderStageCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+            .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+            .module = RhiHandleGetData(rhi_handles.shaders, desc.frag_shader),
+            .pName = "main",
+        },
     };
 
     CHECK_LE(desc.bind_group_layouts_count, std::size(desc.bind_group_layouts));
     pipeline_data.bind_group_layout_count = desc.bind_group_layouts_count;
-    memcpy(pipeline_data.bind_group_layouts, desc.bind_group_layouts,
-           desc.bind_group_layouts_count * sizeof(pipeline_data.bind_group_layouts[0]));
+    pipeline_data.bind_group_layouts = desc.bind_group_layouts;
 
     const VkPushConstantRange push_constant_range{
         .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT,
@@ -215,7 +212,7 @@ auto RhiCreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGraphi
         .size = rhi_max_push_constant_size,
     };
 
-    VkDescriptorSetLayout descriptor_set_layouts[rhi_max_bind_group_layouts];
+    std::array<VkDescriptorSetLayout, rhi_max_bind_group_layouts> descriptor_set_layouts;
     for (uint32_t i = 0; i < desc.bind_group_layouts_count; ++i)
     {
         descriptor_set_layouts[i] = RhiHandleGetData(rhi_handles.bind_group_layouts, desc.bind_group_layouts[i]);
@@ -224,7 +221,7 @@ auto RhiCreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGraphi
     const VkPipelineLayoutCreateInfo pipeline_layout_create_info{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         .setLayoutCount = desc.bind_group_layouts_count,
-        .pSetLayouts = descriptor_set_layouts,
+        .pSetLayouts = descriptor_set_layouts.data(),
         .pushConstantRangeCount = 1,
         .pPushConstantRanges = &push_constant_range,
     };
@@ -234,8 +231,8 @@ auto RhiCreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGraphi
     const VkGraphicsPipelineCreateInfo pipeline_create_info{
         .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
         .pNext = &pipeline_rendering_create_info,
-        .stageCount = stage_count,
-        .pStages = stages,
+        .stageCount = stages.size(),
+        .pStages = stages.data(),
         .pVertexInputState = &vertex_input_state_create_info,
         .pInputAssemblyState = &input_assembly_create_info,
         .pViewportState = &viewport_state_create_info,
@@ -302,8 +299,8 @@ void RhiCmdBindVertexBuffers(RhiCmdList cmd, uint32_t first_binding, std::span<c
     CHECK_EQ(buffers.size(), offsets.size());
     CHECK_LE(buffers.size(), 4U);
 
-    VkBuffer vk_bufs[4]{};
-    VkDeviceSize vk_offsets[4];
+    std::array<VkBuffer, 4> vk_bufs;
+    std::array<VkDeviceSize, 4> vk_offsets;
     for (uint32_t i = 0; i < buffers.size(); ++i)
     {
         vk_bufs[i] = RhiHandleGetData(rhi_handles.buffers, buffers[i]).buffer;
@@ -311,7 +308,7 @@ void RhiCmdBindVertexBuffers(RhiCmdList cmd, uint32_t first_binding, std::span<c
     }
 
     VulkanCmdListData cmd_data = RhiHandleGetData(rhi_handles.cmd_lists, cmd);
-    vkCmdBindVertexBuffers(cmd_data.cmdbuf, first_binding, buffers.size(), vk_bufs, vk_offsets);
+    vkCmdBindVertexBuffers(cmd_data.cmdbuf, first_binding, buffers.size(), vk_bufs.data(), vk_offsets.data());
 }
 
 void RhiCmdDraw(RhiCmdList cmd, uint32_t vertex_count, uint32_t instance_count, uint32_t first_vertex,

@@ -19,7 +19,7 @@ struct RpBuf
     uint32_t range;
     uint32_t written;
     std::vector<RhiVertexFormat> attrs;
-    RhiBuffer buffer[rhi_max_num_frames_in_flight];
+    std::array<RhiBuffer, rhi_max_num_frames_in_flight> buffer;
 };
 
 inline auto RpBufStageFlags(const RpBuf &buf) -> RhiShaderStage
@@ -35,7 +35,7 @@ struct Rp
     std::string debug_name;
     RhiGraphicsPipeline pipeline;
     RhiBindGroupLayout bind_group_layout;
-    RhiBindGroup bind_group[rhi_max_num_frames_in_flight];
+    std::array<RhiBindGroup, rhi_max_num_frames_in_flight> bind_group;
 
     RhiShader vertex_shader;
     RhiShader fragment_shader;

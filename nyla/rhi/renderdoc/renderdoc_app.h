@@ -1,3 +1,5 @@
+// NOLINTBEGIN
+
 /******************************************************************************
  * The MIT License (MIT)
  *
@@ -730,3 +732,5 @@ extern "C"
 #ifdef __cplusplus
 } // extern "C"
 #endif
+
+// NOLINTEND

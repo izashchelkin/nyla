@@ -58,8 +58,8 @@ auto ConvertRhiShaderStageIntoVkShaderStageFlags(RhiShaderStage stage_flags) -> 
 }
 
 auto DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
-                                VkDebugUtilsMessageTypeFlagsEXT message_type,
-                                const VkDebugUtilsMessengerCallbackDataEXT *callback_data, void *user_data) -> VkBool32
+                            VkDebugUtilsMessageTypeFlagsEXT message_type,
+                            const VkDebugUtilsMessengerCallbackDataEXT *callback_data, void *user_data) -> VkBool32
 {
     switch (message_severity)
     {
@@ -87,7 +87,7 @@ void VulkanNameHandle(VkObjectType type, uint64_t handle, std::string_view name)
         .pObjectName = name_copy.c_str(),
     };
 
-    static PFN_vkSetDebugUtilsObjectNameEXT fn = VK_GET_INSTANCE_PROC_ADDR(vkSetDebugUtilsObjectNameEXT);
+    static auto fn = VK_GET_INSTANCE_PROC_ADDR(vkSetDebugUtilsObjectNameEXT);
     fn(vk.dev, &name_info);
 }
 
@@ -205,11 +205,11 @@ void RhiInit(const RhiDesc &rhi_desc)
         vkEnumerateDeviceExtensionProperties(phys_dev, nullptr, &extension_count, extensions.data());
 
         uint32_t missing_extensions = device_extensions.size();
-        for (uint32_t j = 0; j < device_extensions.size(); ++j)
+        for (auto &device_extension : device_extensions)
         {
             for (uint32_t i = 0; i < extension_count; ++i)
             {
-                if (strcmp(extensions[i].extensionName, device_extensions[j]) == 0)
+                if (strcmp(extensions[i].extensionName, device_extension) == 0)
                 {
                     --missing_extensions;
                     break;
@@ -376,12 +376,13 @@ void RhiInit(const RhiDesc &rhi_desc)
         queue.timeline = CreateTimeline(0);
         queue.timeline_next = 1;
 
-        for (uint32_t i = 0; i < cmd.size(); ++i)
+        for (auto &i : cmd)
         {
-            cmd[i] = RhiCreateCmdList(queue_type);
+            i = RhiCreateCmdList(queue_type);
         }
     };
-    init_queue(vk.graphics_queue, RhiQueueType::Graphics, std::span{vk.graphics_queue_cmd, vk.num_frames_in_flight});
+    init_queue(vk.graphics_queue, RhiQueueType::Graphics,
+               std::span{vk.graphics_queue_cmd.data(), vk.num_frames_in_flight});
     init_queue(vk.transfer_queue, RhiQueueType::Transfer, std::span{&vk.transfer_queue_cmd, 1});
 
     for (size_t i = 0; i < vk.num_frames_in_flight; ++i)
@@ -390,19 +391,20 @@ void RhiInit(const RhiDesc &rhi_desc)
             .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
         };
 
-        VK_CHECK(vkCreateSemaphore(vk.dev, &semaphore_create_info, nullptr, vk.swapchain_acquire_semaphores + i));
+        VK_CHECK(
+            vkCreateSemaphore(vk.dev, &semaphore_create_info, nullptr, vk.swapchain_acquire_semaphores.data() + i));
     }
 
-    const VkDescriptorPoolSize descriptor_pool_sizes[]{
-        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 256},
-        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 256},
+    const std::array<VkDescriptorPoolSize, 2> descriptor_pool_sizes{
+        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 256},
+        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 256},
     };
     const VkDescriptorPoolCreateInfo descriptor_pool_create_info{
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
         .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
         .maxSets = 256,
-        .poolSizeCount = static_cast<uint32_t>(std::size(descriptor_pool_sizes)),
-        .pPoolSizes = descriptor_pool_sizes,
+        .poolSizeCount = static_cast<uint32_t>(descriptor_pool_sizes.size()),
+        .pPoolSizes = descriptor_pool_sizes.data(),
     };
     vkCreateDescriptorPool(vk.dev, &descriptor_pool_create_info, nullptr, &vk.descriptor_pool);
 

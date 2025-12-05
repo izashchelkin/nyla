@@ -11,52 +11,55 @@ template <typename E> struct EnableBitMaskOps : std::false_type
 
 template <typename E> constexpr bool EnableBitMaskOps_v = EnableBitMaskOps<E>::value;
 
-template <typename E> constexpr auto operator|(E lhs, E rhs) -> std::enable_if_t<EnableBitMaskOps_v<E>, E>
+template <typename E>
+concept BitmaskEnum = EnableBitMaskOps_v<E> && std::is_enum_v<E>;
+
+template <BitmaskEnum E> constexpr auto operator|(E lhs, E rhs)
 {
     using U = std::underlying_type_t<E>;
     return static_cast<E>(static_cast<U>(lhs) | static_cast<U>(rhs));
 }
 
-template <typename E> constexpr auto operator|=(E &lhs, E rhs) -> std::enable_if_t<EnableBitMaskOps_v<E>, E &>
+template <BitmaskEnum E> constexpr auto operator|=(E &lhs, E rhs)
 {
     using U = std::underlying_type_t<E>;
     lhs = static_cast<E>(static_cast<U>(lhs) | static_cast<U>(rhs));
     return lhs;
 }
 
-template <typename E> constexpr auto operator&(E lhs, E rhs) -> std::enable_if_t<EnableBitMaskOps_v<E>, E>
+template <BitmaskEnum E> constexpr auto operator&(E lhs, E rhs)
 {
     using U = std::underlying_type_t<E>;
     return static_cast<E>(static_cast<U>(lhs) & static_cast<U>(rhs));
 }
 
-template <typename E> constexpr auto operator&=(E &lhs, E rhs) -> std::enable_if_t<EnableBitMaskOps_v<E>, E &>
+template <BitmaskEnum E> constexpr auto operator&=(E &lhs, E rhs)
 {
     using U = std::underlying_type_t<E>;
     lhs = static_cast<E>(static_cast<U>(lhs) & static_cast<U>(rhs));
     return lhs;
 }
 
-template <typename E> constexpr auto operator^(E lhs, E rhs) -> std::enable_if_t<EnableBitMaskOps_v<E>, E>
+template <BitmaskEnum E> constexpr auto operator^(E lhs, E rhs)
 {
     using U = std::underlying_type_t<E>;
     return static_cast<E>(static_cast<U>(lhs) ^ static_cast<U>(rhs));
 }
 
-template <typename E> constexpr auto operator^=(E &lhs, E rhs) -> std::enable_if_t<EnableBitMaskOps_v<E>, E &>
+template <BitmaskEnum E> constexpr auto operator^=(E &lhs, E rhs)
 {
     using U = std::underlying_type_t<E>;
     lhs = static_cast<E>(static_cast<U>(lhs) ^ static_cast<U>(rhs));
     return lhs;
 }
 
-template <typename E> constexpr auto operator~(E val) -> std::enable_if_t<EnableBitMaskOps_v<E>, E>
+template <BitmaskEnum E> constexpr auto operator~(E val)
 {
     using U = std::underlying_type_t<E>;
     return static_cast<E>(~static_cast<U>(val));
 }
 
-template <typename E> constexpr auto Any(E val) -> std::enable_if_t<EnableBitMaskOps_v<E>, bool>
+template <BitmaskEnum E> constexpr auto Any(E val)
 {
     using U = std::underlying_type_t<E>;
     return static_cast<U>(val) != 0;

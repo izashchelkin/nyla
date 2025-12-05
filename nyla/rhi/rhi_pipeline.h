@@ -117,13 +117,13 @@ struct RhiGraphicsPipelineDesc
     RhiShader vert_shader;
     RhiShader frag_shader;
 
-    RhiBindGroupLayout bind_group_layouts[rhi_max_bind_group_layouts];
+    std::array<RhiBindGroupLayout, rhi_max_bind_group_layouts> bind_group_layouts;
     uint32_t bind_group_layouts_count;
 
-    RhiVertexBindingDesc vertex_bindings[4];
+    std::array<RhiVertexBindingDesc, 4> vertex_bindings;
     uint32_t vertex_bindings_count;
 
-    RhiVertexAttributeDesc vertex_attributes[16];
+    std::array<RhiVertexAttributeDesc, 16> vertex_attributes;
     uint32_t vertex_attribute_count;
 
     RhiCullMode cull_mode;
