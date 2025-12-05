@@ -1,4 +1,5 @@
 add_subdirectory(breakout)
+add_subdirectory(shipgame)
 add_subdirectory(wm)
 add_subdirectory(guidemo)
 add_subdirectory(asteroids)

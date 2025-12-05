@@ -52,7 +52,7 @@ void WorldSetUp(Vec2f camera_pos, float zoom)
     Mat4 view = Translate(Vec2fNeg(camera_pos));
     Mat4 proj = Ortho(-world_w * .5f, world_w * .5f, world_h * .5f, -world_h * .5f, 0.f, 1.f);
 
-    Mat4 vp = Mult(view, proj);
+    Mat4 vp = Mult(proj, view);
     Mat4 inv_vp = Inverse(vp);
     SceneTransforms scene = {vp, inv_vp};
 
@@ -98,8 +98,8 @@ Rp world_pipeline{
         },
     .Init =
         [](Rp &rp) {
-            RpAttachVertShader(rp, "nyla/apps/shipgame/shaders/build/world.vert.spv");
-            RpAttachFragShader(rp, "nyla/apps/shipgame/shaders/build/world.frag.spv");
+            RpAttachVertShader(rp, "nyla/apps/shipgame/shaders/build/world.vs.hlsl.spv");
+            RpAttachFragShader(rp, "nyla/apps/shipgame/shaders/build/world.ps.hlsl.spv");
         },
 };
 
@@ -118,8 +118,8 @@ Rp grid_pipeline{
         },
     .Init =
         [](Rp &rp) {
-            RpAttachVertShader(rp, "nyla/apps/shipgame/shaders/build/grid.vert.spv");
-            RpAttachFragShader(rp, "nyla/apps/shipgame/shaders/build/grid.frag.spv");
+            RpAttachVertShader(rp, "nyla/apps/shipgame/shaders/build/grid.vs.hlsl.spv");
+            RpAttachFragShader(rp, "nyla/apps/shipgame/shaders/build/grid.ps.hlsl.spv");
         },
 };
 

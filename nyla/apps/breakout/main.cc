@@ -49,7 +49,7 @@ static int Main()
 
         if (RecompileShadersIfNeeded())
         {
-            RpInit(world_pipeline);
+            RpInit(worldPipeline);
             RpInit(gui_pipeline);
             RpInit(dbg_text_pipeline);
         }

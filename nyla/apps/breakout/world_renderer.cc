@@ -15,8 +15,8 @@ namespace
 
 struct SceneTransforms
 {
-    Mat4 view;
-    Mat4 proj;
+    Mat4 vp;
+    Mat4 invVp;
 };
 
 struct DynamicUbo
@@ -47,25 +47,25 @@ void WorldSetUp()
     Mat4 view = Identity4;
     Mat4 proj = Ortho(-world_w * .5f, world_w * .5f, world_h * .5f, -world_h * .5f, 0.f, 1.f);
 
-    Mat4 vp = Mult(view, proj);
-    Mat4 inv_vp = Inverse(vp);
-    SceneTransforms scene = {vp, inv_vp};
+    Mat4 vp = Mult(proj, view);
+    Mat4 invVp = Inverse(vp);
+    SceneTransforms scene = {vp, invVp};
 
-    RpPushConst(world_pipeline, CharViewPtr(&scene));
+    RpPushConst(worldPipeline, CharViewPtr(&scene));
 }
 
 void WorldRender(Vec2f pos, Vec3f color, float width, float height, const RpMesh &mesh)
 {
-    DynamicUbo dynamic_data{};
-    dynamic_data.color = color;
+    DynamicUbo dynamicData{};
+    dynamicData.color = color;
 
-    dynamic_data.model = Translate(pos);
-    dynamic_data.model = Mult(dynamic_data.model, ScaleXY(width, height));
+    dynamicData.model = Translate(pos);
+    dynamicData.model = Mult(dynamicData.model, ScaleXY(width, height));
 
-    RpDraw(world_pipeline, mesh, CharViewPtr(&dynamic_data));
+    RpDraw(worldPipeline, mesh, CharViewPtr(&dynamicData));
 }
 
-Rp world_pipeline{
+Rp worldPipeline{
     .debug_name = "World",
     .dynamic_uniform =
         {
@@ -84,8 +84,8 @@ Rp world_pipeline{
         },
     .Init =
         [](Rp &rp) {
-            RpAttachVertShader(rp, "nyla/apps/breakout/shaders/build/world.vert.spv");
-            RpAttachFragShader(rp, "nyla/apps/breakout/shaders/build/world.frag.spv");
+            RpAttachVertShader(rp, "nyla/apps/breakout/shaders/build/world.vs.hlsl.spv");
+            RpAttachFragShader(rp, "nyla/apps/breakout/shaders/build/world.ps.hlsl.spv");
         },
 };
 

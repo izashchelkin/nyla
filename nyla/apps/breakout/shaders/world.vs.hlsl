@@ -35,7 +35,7 @@ VSOutput main(VSInput input)
     float4 localPos = float4(input.position, 0.0f, 1.0f);
 
     float4 worldPos = mul(entity.model, localPos);
-    o.position = mul(scene.vp, worldPos);
+    o.position = mul(worldPos, scene.vp);
     o.color = entity.color;
 
     return o;

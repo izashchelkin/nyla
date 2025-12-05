@@ -176,7 +176,7 @@ void BreakoutFrame(float dt, uint32_t fps)
         }
     }
 
-    RpBegin(world_pipeline);
+    RpBegin(worldPipeline);
     WorldSetUp();
 
     {
@@ -185,7 +185,7 @@ void BreakoutFrame(float dt, uint32_t fps)
             std::vector<Vertex> unit_rect;
             unit_rect.reserve(6);
             GenUnitRect([&unit_rect](float x, float y) { unit_rect.emplace_back(Vertex{Vec2f{x, y}}); });
-            return RpVertCopy(world_pipeline, unit_rect.size(), CharViewSpan(std::span{unit_rect}));
+            return RpVertCopy(worldPipeline, unit_rect.size(), CharViewSpan(std::span{unit_rect}));
         });
 
         static std ::vector<RpMesh> unit_circle_meshes;
@@ -193,7 +193,7 @@ void BreakoutFrame(float dt, uint32_t fps)
             std::vector<Vertex> unit_circle;
             unit_circle.reserve(32 * 3);
             GenUnitCircle(32, [&unit_circle](float x, float y) { unit_circle.emplace_back(Vertex{Vec2f{x, y}}); });
-            return RpVertCopy(world_pipeline, unit_circle.size(), CharViewSpan(std::span{unit_circle}));
+            return RpVertCopy(worldPipeline, unit_circle.size(), CharViewSpan(std::span{unit_circle}));
         });
 
         if (stage == GameStage::kGame)

@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "absl/log/log.h"
 #include "nyla/commons/memory/charview.h"
 #include "nyla/fwk/render_pipeline.h"
 
@@ -13,11 +14,11 @@ namespace
 
 struct DbgTextLine
 {
-    uint32_t words[68];
-    int origin_x;
-    int origin_y;
+    uint32_t words[68][4];
+    int32_t origin_x;
+    int32_t origin_y;
     uint32_t word_count;
-    int pad;
+    uint32_t pad;
     float fg[4];
     float bg[4];
 };
@@ -46,7 +47,7 @@ void DbgText(int32_t x, int32_t y, std::string_view text)
                 w |= (uint32_t(uint8_t(text[idx])) << (8 * j));
             }
         }
-        ubo.words[i] = w;
+        *(ubo.words[i]) = w;
     }
 
     RpDraw(dbg_text_pipeline, {.vert_count = 3}, CharViewPtr(&ubo));
@@ -63,8 +64,8 @@ Rp dbg_text_pipeline{
         },
     .Init =
         [](Rp &rp) {
-            RpAttachVertShader(rp, "/home/izashchelkin/nyla/nyla/fwk/shaders/build/dbgtext.vert.spv");
-            RpAttachFragShader(rp, "/home/izashchelkin/nyla/nyla/fwk/shaders/build/dbgtext.frag.spv");
+            RpAttachVertShader(rp, "/home/izashchelkin/nyla/nyla/fwk/shaders/build/dbgtext.vs.hlsl.spv");
+            RpAttachFragShader(rp, "/home/izashchelkin/nyla/nyla/fwk/shaders/build/dbgtext.ps.hlsl.spv");
         },
 };
 

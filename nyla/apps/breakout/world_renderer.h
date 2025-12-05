@@ -17,7 +17,7 @@ struct Vertex
     }
 };
 
-extern Rp world_pipeline;
+extern Rp worldPipeline;
 
 void WorldSetUp();
 void WorldRender(Vec2f pos, Vec3f color, float scale_x, float scale_y, const RpMesh &mesh);

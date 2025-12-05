@@ -7,6 +7,15 @@ namespace nyla
 
 bool RecompileShadersIfNeeded()
 {
+    static bool b = false;
+    if (!b)
+    {
+        b = true;
+        return true;
+    }
+
+    return false;
+
     static bool spv_changed = true;
     static bool src_changed = true;
 
@@ -21,9 +30,13 @@ bool RecompileShadersIfNeeded()
         {
             spv_changed = true;
         }
-        else if (path.ends_with(".vert") || path.ends_with(".frag"))
+        else if (path.ends_with(".hlsl"))
         {
             src_changed = true;
+        }
+        else
+        {
+            LOG(INFO) << "ignoring " << path;
         }
     }
 

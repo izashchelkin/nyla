@@ -17,7 +17,6 @@ def detect_stage(src: str) -> str | None:
 
 
 def compile_shader(src: str) -> tuple[str, bool, int]:
-    """Compile a single HLSL file with DXC. Returns (src, success, ms)."""
     parts = src.split("/")
     parts.insert(len(parts) - 1, "build")
     outfile = "/".join(parts) + ".spv"
@@ -34,12 +33,15 @@ def compile_shader(src: str) -> tuple[str, bool, int]:
         "-spirv",
         "-fspv-target-env=vulkan1.3",
         "-fvk-use-dx-layout",
-        "-T",
-        stage,
-        "-E",
-        "main",
-        "-Fo",
-        outfile,
+
+        "-Zi",
+        "-Qembed_debug",
+        "-fspv-debug=vulkan-with-source",
+        "-Od",
+
+        "-T", stage,
+        "-E", "main",
+        "-Fo", outfile,
         src,
     ]
 

@@ -10,7 +10,18 @@ namespace nyla
 
 Mat4 Mult(const Mat4 &lhs, const Mat4 &rhs)
 {
-
+    Mat4 ret{};
+    for (size_t i = 0; i < 4; ++i)
+    {
+        for (size_t j = 0; j < 4; ++j)
+        {
+            for (size_t k = 0; k < 4; ++k)
+            {
+                ret[j][i] += lhs[k][i] * rhs[j][k];
+            }
+        }
+    }
+    return ret;
 }
 
 Mat4 Inverse(const Mat4 &m)

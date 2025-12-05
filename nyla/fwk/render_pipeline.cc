@@ -247,6 +247,7 @@ void RpAttachVertShader(Rp &rp, const std::string &path)
     rp.vertex_shader = RhiCreateShader(RhiShaderDesc{
         .code = ReadFile(path),
     });
+
     PlatformFsWatch(path);
 }
 
