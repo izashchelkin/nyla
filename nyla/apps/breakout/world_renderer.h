@@ -1,7 +1,7 @@
 #pragma once
 
 #include "nyla/commons/math/vec.h"
-#include "nyla/fwk/render_pipeline.h"
+#include "nyla/engine0/render_pipeline.h"
 
 namespace nyla
 {

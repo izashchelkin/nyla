@@ -7,9 +7,9 @@
 #include <cstdint>
 #include <future>
 
-#include "nyla/fwk/dbg_text_renderer.h"
-#include "nyla/fwk/gui.h"
-#include "nyla/fwk/staging.h"
+#include "nyla/engine0/dbg_text_renderer.h"
+#include "nyla/engine0/gui.h"
+#include "nyla/engine0/staging.h"
 #include "nyla/platform/x11/platform_x11.h"
 #include "nyla/rhi/rhi.h"
 #include "xcb/xproto.h"

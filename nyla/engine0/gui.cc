@@ -1,10 +1,10 @@
-#include "nyla/fwk/gui.h"
+#include "nyla/engine0/gui.h"
 
 #include <cstdint>
 
 #include "nyla/commons/math/vec.h"
 #include "nyla/commons/memory/charview.h"
-#include "nyla/fwk/render_pipeline.h"
+#include "nyla/engine0/render_pipeline.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_pipeline.h"
 
@@ -84,8 +84,8 @@ Rp guiPipeline{
                 },
         },
     .init = [](Rp &rp) -> void {
-        RpAttachVertShader(rp, "/home/izashchelkin/nyla/nyla/fwk/shaders/build/gui.vs.hlsl.spv");
-        RpAttachFragShader(rp, "/home/izashchelkin/nyla/nyla/fwk/shaders/build/gui.ps.hlsl.spv");
+        RpAttachVertShader(rp, "/home/izashchelkin/nyla/nyla/engine0/shaders/build/gui.vs.hlsl.spv");
+        RpAttachFragShader(rp, "/home/izashchelkin/nyla/nyla/engine0/shaders/build/gui.ps.hlsl.spv");
     },
 };
 

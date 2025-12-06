@@ -1,10 +1,10 @@
-#include "nyla/fwk/dbg_text_renderer.h"
+#include "nyla/engine0/dbg_text_renderer.h"
 
 #include <cstdint>
 
 #include "absl/log/log.h"
 #include "nyla/commons/memory/charview.h"
-#include "nyla/fwk/render_pipeline.h"
+#include "nyla/engine0/render_pipeline.h"
 
 namespace nyla
 {
@@ -64,8 +64,8 @@ Rp dbgTextPipeline{
         },
     .init =
         [](Rp &rp) -> void {
-            RpAttachVertShader(rp, "/home/izashchelkin/nyla/nyla/fwk/shaders/build/dbgtext.vs.hlsl.spv");
-            RpAttachFragShader(rp, "/home/izashchelkin/nyla/nyla/fwk/shaders/build/dbgtext.ps.hlsl.spv");
+            RpAttachVertShader(rp, "/home/izashchelkin/nyla/nyla/engine0/shaders/build/dbgtext.vs.hlsl.spv");
+            RpAttachFragShader(rp, "/home/izashchelkin/nyla/nyla/engine0/shaders/build/dbgtext.ps.hlsl.spv");
         },
 };
 

@@ -6,44 +6,46 @@ file(GLOB FWK_HEADERS CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/*.h"
 )
 
-add_library(nyla_fwk)
-add_library(nyla::fwk ALIAS nyla_fwk)
+set(TARGET nyla_engine0)
+add_library(${TARGET})
+add_library(nyla::engine0 ALIAS ${TARGET})
 
-target_sources(nyla_fwk
+target_sources(${TARGET}
     PRIVATE
         ${FWK_SOURCES}
     PUBLIC
         ${FWK_HEADERS}
 )
 
-target_include_directories(nyla_fwk
+target_include_directories(${TARGET}
     PUBLIC
         ${PROJECT_SOURCE_DIR}
 )
 
-target_link_libraries(nyla_fwk
+target_link_libraries(${TARGET}
     PUBLIC
         nyla::platform
         nyla::rhi
 )
 
-add_library(nyla_fwk_nvkdbg)
-add_library(nyla::fwk_nvkdbg ALIAS nyla_fwk_nvkdbg)
+set(TARGET_NDEBUG nyla_engine0_ndebug)
+add_library(${TARGET_NDEBUG})
+add_library(nyla::engine0_ndebug ALIAS ${TARGET_NDEBUG})
 
-target_sources(nyla_fwk_nvkdbg
+target_sources(${TARGET_NDEBUG}
     PRIVATE
         ${FWK_SOURCES}
     PUBLIC
         ${FWK_HEADERS}
 )
 
-target_include_directories(nyla_fwk_nvkdbg
+target_include_directories(${TARGET_NDEBUG}
     PUBLIC
         ${PROJECT_SOURCE_DIR}
 )
 
-target_link_libraries(nyla_fwk_nvkdbg
+target_link_libraries(${TARGET_NDEBUG}
     PUBLIC
         nyla::platform
-        nyla::rhi_ndbg
+        nyla::rhi_ndebug
 )

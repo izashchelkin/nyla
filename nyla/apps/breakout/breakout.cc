@@ -11,8 +11,8 @@
 #include "nyla/commons/color.h"
 #include "nyla/commons/math/vec.h"
 #include "nyla/commons/memory/charview.h"
-#include "nyla/fwk/dbg_text_renderer.h"
-#include "nyla/fwk/render_pipeline.h"
+#include "nyla/engine0/dbg_text_renderer.h"
+#include "nyla/engine0/render_pipeline.h"
 #include "nyla/platform/abstract_input.h"
 #include "nyla/rhi/rhi.h"
 

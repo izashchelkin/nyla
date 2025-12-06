@@ -6,9 +6,9 @@
 #include "nyla/commons/memory/temp.h"
 #include "nyla/commons/os/clock.h"
 #include "nyla/commons/signal/signal.h"
-#include "nyla/fwk/dbg_text_renderer.h"
-#include "nyla/fwk/render_pipeline.h"
-#include "nyla/fwk/staging.h"
+#include "nyla/engine0/dbg_text_renderer.h"
+#include "nyla/engine0/render_pipeline.h"
+#include "nyla/engine0/staging.h"
 #include "nyla/platform/key_physical.h"
 #include "nyla/platform/platform.h"
 

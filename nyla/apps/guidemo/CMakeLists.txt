@@ -22,5 +22,5 @@ target_include_directories(${TARGET}
 
 target_link_libraries(${TARGET}
     PRIVATE
-        nyla::fwk
+        nyla::engine0
 )
