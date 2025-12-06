@@ -4,8 +4,7 @@
 #include <vector>
 
 #include "nyla/apps/shipgame/world_renderer.h"
-#include "nyla/commons/math/vec/vec2f.h"
-#include "nyla/commons/math/vec/vec3f.h"
+#include "nyla/commons/math/vec.h"
 #include "nyla/platform/abstract_input.h"
 
 namespace nyla
@@ -28,13 +27,13 @@ struct GameObject
     };
 
     Type type;
-    Vec2f pos{};
-    Vec3f color{};
+    float2 pos{};
+    float3 color{};
     float angleRadians;
     float mass;
     float scale;
     float orbitRadius;
-    Vec2f velocity{};
+    float2 velocity{};
 
     std::vector<Vertex> vertices{};
     std::span<GameObject> children{};

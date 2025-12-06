@@ -1,10 +1,10 @@
 #pragma once
 
-#include "nyla/commons/math/vec/vec3f.h"
+#include "nyla/commons/math/vec.h"
 
 namespace nyla
 {
 
-auto ConvertHsvToRgb(float h, float s, float v) -> Vec3f;
+auto ConvertHsvToRgb(float3 hsv) -> float3;
 
 } // namespace nyla

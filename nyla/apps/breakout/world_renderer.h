@@ -1,7 +1,6 @@
 #pragma once
 
-#include "nyla/commons/math/vec/vec2f.h"
-#include "nyla/commons/math/vec/vec3f.h"
+#include "nyla/commons/math/vec.h"
 #include "nyla/fwk/render_pipeline.h"
 
 namespace nyla
@@ -9,10 +8,10 @@ namespace nyla
 
 struct Vertex
 {
-    Vec2f pos;
-    float pad0[2] = {666.f, 666.f};
+    float2 pos;
+    float2 pad0{666.f, 666.f};
 
-    Vertex(Vec2f pos) : pos{pos}
+    explicit Vertex(float2 pos) : pos{pos}
     {
     }
 };
@@ -20,6 +19,6 @@ struct Vertex
 extern Rp worldPipeline;
 
 void WorldSetUp();
-void WorldRender(Vec2f pos, Vec3f color, float scaleX, float scaleY, const RpMesh &mesh);
+void WorldRender(float2 pos, float3 color, float scaleX, float scaleY, const RpMesh &mesh);
 
 } // namespace nyla

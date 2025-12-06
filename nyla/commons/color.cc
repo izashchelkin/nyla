@@ -1,13 +1,16 @@
 #include "nyla/commons/color.h"
 
-#include "nyla/commons/math/vec/vec3f.h"
+#include "absl/log/check.h"
+#include "nyla/commons/math/vec.h"
 
 namespace nyla
 {
 
-auto ConvertHsvToRgb(float h, float s, float v) -> Vec3f
+auto ConvertHsvToRgb(float3 hsv) -> float3
 {
-    float r, g, b;
+    const float h = hsv[0];
+    const float s = hsv[1];
+    const float v = hsv[2];
 
     float i = std::floor(h * 6.0f);
     float f = h * 6.0f - i;
@@ -15,6 +18,7 @@ auto ConvertHsvToRgb(float h, float s, float v) -> Vec3f
     float q = v * (1.0f - f * s);
     float t = v * (1.0f - (1.0f - f) * s);
 
+    float r, g, b;
     switch (static_cast<int>(i) % 6)
     {
     case 0:
@@ -47,6 +51,8 @@ auto ConvertHsvToRgb(float h, float s, float v) -> Vec3f
         g = p;
         b = q;
         break;
+    default:
+        CHECK(false);
     }
 
     return {r, g, b};

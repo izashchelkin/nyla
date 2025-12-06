@@ -9,8 +9,7 @@
 #include "nyla/apps/breakout/unitshapes.h"
 #include "nyla/apps/breakout/world_renderer.h"
 #include "nyla/commons/color.h"
-#include "nyla/commons/math/vec/vec2f.h"
-#include "nyla/commons/math/vec/vec3f.h"
+#include "nyla/commons/math/vec.h"
 #include "nyla/commons/memory/charview.h"
 #include "nyla/fwk/dbg_text_renderer.h"
 #include "nyla/fwk/render_pipeline.h"
@@ -33,7 +32,7 @@ struct Brick
     float y;
     float width;
     float height;
-    Vec3f color;
+    float3 color;
     bool dead;
 };
 
@@ -62,8 +61,8 @@ template <typename T> static auto FrameLocal(std::vector<T> &vec, auto create) -
     return vec.at(frameIndex);
 }
 
-constexpr Vec2f kWorldBoundaryX{-35.f, 35.f};
-constexpr Vec2f kWorldBoundaryY{-30.f, 30.f};
+constexpr float2 kWorldBoundaryX{-35.f, 35.f};
+constexpr float2 kWorldBoundaryY{-30.f, 30.f};
 constexpr float kBallRadius = .8f;
 
 static float playerPosX = 0.f;
@@ -71,8 +70,8 @@ static const float kPlayerPosY = kWorldBoundaryY[0] + 1.6f;
 static float playerWidth = 3.f;
 static const float kPlayerHeight = .8f;
 
-static Vec2f ballPos = {};
-static Vec2f ballVel = {40.f, 40.f};
+static float2 ballPos = {};
+static float2 ballVel = {40.f, 40.f};
 
 static Level level;
 
@@ -84,7 +83,7 @@ void BreakoutInit()
         float s = .97f;
         float v = .97f;
 
-        Vec3f color = ConvertHsvToRgb(h, s, v);
+        float3 color = ConvertHsvToRgb({h, s, v});
 
         for (size_t j = 0; j < 17; ++j)
         {
@@ -99,7 +98,7 @@ void BreakoutInit()
     }
 }
 
-static auto IsInside(float pos, float size, Vec2f boundary) -> bool
+static auto IsInside(float pos, float size, float2 boundary) -> bool
 {
     if (pos > boundary[0] - size / 2.f && pos < boundary[1] + size / 2.f)
     {
@@ -136,7 +135,7 @@ void BreakoutFrame(float dt, uint32_t fps)
         // ball_pos[0] = std::clamp(ball_pos[0], kWorldBoundaryX[0] + kBallRadius, kWorldBoundaryX[1] - kBallRadius);
         // ball_pos[1] = std::clamp(ball_pos[1], kWorldBoundaryY[0] + kBallRadius, kWorldBoundaryY[1] - kBallRadius);
 
-        Vec2fAdd(ballPos, Vec2fMul(ballVel, kStep));
+        ballPos += ballVel * kStep;
 
         for (auto &brick : level.bricks)
         {
@@ -146,10 +145,10 @@ void BreakoutFrame(float dt, uint32_t fps)
             bool hit = false;
 
             if (IsInside(ballPos[0], kBallRadius * 2.f,
-                         Vec2f{brick.x - brick.width / 2.f, brick.x + brick.width / 2.f}))
+                         float2{brick.x - brick.width / 2.f, brick.x + brick.width / 2.f}))
             {
                 if (IsInside(ballPos[1], kBallRadius * 2.f,
-                             Vec2f{brick.y - brick.height / 2.f, brick.y + brick.height / 2.f}))
+                             float2{brick.y - brick.height / 2.f, brick.y + brick.height / 2.f}))
                 {
                     ballVel[1] = -ballVel[1];
                     ballVel[0] = -ballVel[0];
@@ -164,10 +163,10 @@ void BreakoutFrame(float dt, uint32_t fps)
 
         {
             if (IsInside(ballPos[0], kBallRadius * 2.f,
-                         Vec2f{playerPosX - playerWidth / 2.f, playerPosX + playerWidth / 2.f}))
+                         float2{playerPosX - playerWidth / 2.f, playerPosX + playerWidth / 2.f}))
             {
                 if (IsInside(ballPos[1], kBallRadius * 2.f,
-                             Vec2f{kPlayerPosY - kPlayerHeight / 2.f, kPlayerPosY + kPlayerHeight / 2.f}))
+                             float2{kPlayerPosY - kPlayerHeight / 2.f, kPlayerPosY + kPlayerHeight / 2.f}))
                 {
                     ballVel[1] = -ballVel[1];
                     ballVel[0] = -ballVel[0];
@@ -184,7 +183,7 @@ void BreakoutFrame(float dt, uint32_t fps)
         RpMesh unitRectMesh = FrameLocal(unitRectMeshes, [] -> RpMesh {
             std::vector<Vertex> unitRect;
             unitRect.reserve(6);
-            GenUnitRect([&unitRect](float x, float y) -> void { unitRect.emplace_back(Vertex{Vec2f{x, y}}); });
+            GenUnitRect([&unitRect](float x, float y) -> void { unitRect.emplace_back(Vertex{float2{x, y}}); });
             return RpVertCopy(worldPipeline, unitRect.size(), CharViewSpan(std::span{unitRect}));
         });
 
@@ -192,7 +191,8 @@ void BreakoutFrame(float dt, uint32_t fps)
         RpMesh unitCircleMesh = FrameLocal(unitCircleMeshes, [] -> RpMesh {
             std::vector<Vertex> unitCircle;
             unitCircle.reserve(32 * 3);
-            GenUnitCircle(32, [&unitCircle](float x, float y) -> void { unitCircle.emplace_back(Vertex{Vec2f{x, y}}); });
+            GenUnitCircle(32,
+                          [&unitCircle](float x, float y) -> void { unitCircle.emplace_back(Vertex{float2{x, y}}); });
             return RpVertCopy(worldPipeline, unitCircle.size(), CharViewSpan(std::span{unitCircle}));
         });
 
@@ -203,19 +203,19 @@ void BreakoutFrame(float dt, uint32_t fps)
                 if (brick.dead)
                     continue;
 
-                WorldRender(Vec2f{brick.x, brick.y}, brick.color, brick.width, brick.height, unitRectMesh);
+                WorldRender(float2{brick.x, brick.y}, brick.color, brick.width, brick.height, unitRectMesh);
             }
 
-            WorldRender(Vec2f{playerPosX, kPlayerPosY}, Vec3f{.1f, .1f, 1.f}, playerWidth, kPlayerHeight,
+            WorldRender(float2{playerPosX, kPlayerPosY}, float3{.1f, .1f, 1.f}, playerWidth, kPlayerHeight,
                         unitRectMesh);
 
-            WorldRender(ballPos, Vec3f{.5f, 0.f, 1.f}, kBallRadius, kBallRadius, unitCircleMesh);
+            WorldRender(ballPos, float3{.5f, 0.f, 1.f}, kBallRadius, kBallRadius, unitCircleMesh);
         }
     }
 
     RpBegin(dbgTextPipeline);
     {
-        DbgText(500, 10, absl::StrFormat("fps=%d ball=(%.1f, %.1f)", fps, ballPos[0], ballPos[1]));
+        DbgText(500, 10, std::format("fps={} ball=({:.1f}, {:.1f})", fps, ballPos[0], ballPos[1]));
     }
 }
 

@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include "nyla/commons/math/vec/vec4f.h"
+#include "nyla/commons/math/vec.h"
 #include "nyla/commons/memory/charview.h"
 #include "nyla/fwk/render_pipeline.h"
 #include "nyla/rhi/rhi.h"
@@ -24,7 +24,10 @@ struct StaticUbo
 
 void UiFrameBegin()
 {
-    StaticUbo ubo{static_cast<float>(RhiGetSurfaceWidth()), static_cast<float>(RhiGetSurfaceHeight())};
+    StaticUbo ubo{
+        .windowWidth = static_cast<float>(RhiGetSurfaceWidth()),
+        .windowHeight = static_cast<float>(RhiGetSurfaceHeight()),
+    };
     RpStaticUniformCopy(guiPipeline, CharViewPtr(&ubo));
 }
 
@@ -34,25 +37,21 @@ static void UiBoxBegin(float x, float y, float width, float height)
     const float w = 0.f;
 
     if (x < 0.f)
-    {
-        x += RhiGetSurfaceWidth() - width;
-    }
+        x += static_cast<float>(RhiGetSurfaceWidth()) - width;
     if (y < 0.f)
-    {
-        y += RhiGetSurfaceHeight() - height;
-    }
+        y += static_cast<float>(RhiGetSurfaceHeight()) - height;
 
-    const Vec4f rect[] = {
-        {x, y, z, w},
-        {x + width, y + height, z, w},
-        {x + width, y, z, w},
+    std::array<float4, 6> rect = {
+        float4{x, y, z, w},
+        float4{x + width, y + height, z, w},
+        float4{x + width, y, z, w},
         //
-        {x, y, z, w},
-        {x, y + height, z, w},
-        {x + width, y + height, z, w},
+        float4{x, y, z, w},
+        float4{x, y + height, z, w},
+        float4{x + width, y + height, z, w},
     };
 
-    RpMesh mesh = RpVertCopy(guiPipeline, std::size(rect), CharViewSpan(std::span{rect, std::size(rect)}));
+    RpMesh mesh = RpVertCopy(guiPipeline, std::size(rect), CharViewSpan(std::span{rect}));
     RpDraw(guiPipeline, mesh, {});
 }
 
@@ -84,11 +83,10 @@ Rp guiPipeline{
                     RhiVertexFormat::R32G32B32A32Float,
                 },
         },
-    .init =
-        [](Rp &rp) -> void {
-            RpAttachVertShader(rp, "/home/izashchelkin/nyla/nyla/fwk/shaders/build/gui.vs.hlsl.spv");
-            RpAttachFragShader(rp, "/home/izashchelkin/nyla/nyla/fwk/shaders/build/gui.ps.hlsl.spv");
-        },
+    .init = [](Rp &rp) -> void {
+        RpAttachVertShader(rp, "/home/izashchelkin/nyla/nyla/fwk/shaders/build/gui.vs.hlsl.spv");
+        RpAttachFragShader(rp, "/home/izashchelkin/nyla/nyla/fwk/shaders/build/gui.ps.hlsl.spv");
+    },
 };
 
 } // namespace nyla

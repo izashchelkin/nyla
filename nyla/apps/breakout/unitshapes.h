@@ -2,18 +2,19 @@
 
 #include <complex>
 #include <cstddef>
+#include <cstdint>
+#include <numbers>
 
 #include "absl/log/check.h"
-#include "nyla/commons/math/math.h"
 
 namespace nyla
 {
 
-inline void GenUnitCircle(size_t n, auto consumer)
+inline void GenUnitCircle(uint32_t n, auto consumer)
 {
     CHECK(n > 4);
 
-    const float theta = 2.f * kPi / n;
+    const float theta = 2.f * std::numbers::pi_v<float> / static_cast<float>(n);
     std::complex<float> r = 1.f;
 
     for (size_t i = 0; i < n; ++i)

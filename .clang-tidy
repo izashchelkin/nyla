@@ -6,7 +6,7 @@ Checks: >
   bugprone-*,
 
   performance-*,
-  -performance-enum-size
+  -performance-enum-size,
 
   modernize-*,
   readability-identifier-naming
@@ -30,12 +30,13 @@ CheckOptions:
 
   - key: readability-identifier-naming.VariableCase
     value: camelBack
-  - key: readability-identifier-naming.MemberCase
-    value: camelBack
   - key: readability-identifier-naming.ParameterCase
     value: camelBack
-  - key: readability-identifier-naming.GlobalConstantCase
-    value: CamelCase
+
+  - key: readability-identifier-naming.PrivateMemberCase
+    value: camelBack
+  - key: readability-identifier-naming.PrivateMemberPrefix
+    value: m_
 
   - key: readability-identifier-naming.GlobalConstantCase
     value: CamelCase
@@ -46,6 +47,9 @@ CheckOptions:
     value: CamelCase
   - key: readability-identifier-naming.ConstexprVariablePrefix
     value: k
+ 
+  - key: readability-identifier-naming.MethodIgnoredRegexp
+    value: '^(data|size|begin|end)$'
 
 HeaderFilterRegex: 'nyla/nyla/.*'
 FormatStyle: none

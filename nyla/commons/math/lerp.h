@@ -1,13 +1,18 @@
 #pragma once
 
-#include <span>
+#include "nyla/commons/math/vec.h"
+#include <cstdint>
 
 namespace nyla
 {
 
 auto Lerp(float a, float b, float p) -> float;
 
-void Lerp(std::span<float> a, std::span<const float> b, float p);
+template <typename T, uint32_t N> void Lerp(Vec<T, N> &a, const Vec<T, N> &b, float p)
+{
+    for (uint32_t i = 0; i < N; ++i)
+        a[i] = Lerp(a[i], b[i], p);
+}
 
 auto LerpAngle(float a, float b, float p) -> float;
 

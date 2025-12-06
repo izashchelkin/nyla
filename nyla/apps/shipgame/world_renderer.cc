@@ -1,7 +1,7 @@
 #include "nyla/apps/shipgame/world_renderer.h"
 
-#include "nyla/commons/math/mat4.h"
-#include "nyla/commons/math/vec/vec2f.h"
+#include "nyla/commons/math/mat.h"
+#include "nyla/commons/math/vec.h"
 #include "nyla/commons/memory/charview.h"
 #include "nyla/fwk/render_pipeline.h"
 #include "nyla/rhi/rhi.h"
@@ -15,28 +15,28 @@ namespace
 
 struct SceneTransforms
 {
-    Mat4 vp;
-    Mat4 invVp;
+    float4x4 vp;
+    float4x4 invVp;
 };
 
 struct DynamicUbo
 {
-    Mat4 model;
+    float4 model;
 };
 
 } // namespace
 
 constexpr float kMetersOnScreen = 64.f;
 
-void WorldSetUp(Vec2f cameraPos, float zoom)
+void WorldSetUp(float2 cameraPos, float zoom)
 {
     float worldW;
     float worldH;
 
     const float base = kMetersOnScreen * zoom;
 
-    const float width = static_cast<float>(RhiGetSurfaceWidth());
-    const float height = static_cast<float>(RhiGetSurfaceHeight());
+    const auto width = static_cast<float>(RhiGetSurfaceWidth());
+    const auto height = static_cast<float>(RhiGetSurfaceHeight());
     const float aspect = width / height;
     if (aspect >= 1.0f)
     {
@@ -49,22 +49,25 @@ void WorldSetUp(Vec2f cameraPos, float zoom)
         worldH = base / aspect;
     }
 
-    Mat4 view = Translate(Vec2fNeg(cameraPos));
-    Mat4 proj = Ortho(-worldW * .5f, worldW * .5f, worldH * .5f, -worldH * .5f, 0.f, 1.f);
+    float4x4 view = float4x4::Translate(-cameraPos);
+    float4x4 proj = float4x4::Ortho(-worldW * .5f, worldW * .5f, worldH * .5f, -worldH * .5f, 0.f, 1.f);
 
-    Mat4 vp = Mult(proj, view);
-    Mat4 invVp = Inverse(vp);
-    SceneTransforms scene = {vp, invVp};
+    float4x4 vp = proj.Mult(view);
+    float4x4 invVp = vp.Inversed();
+    SceneTransforms scene = {
+        .vp = vp,
+        .invVp = invVp,
+    };
 
     RpStaticUniformCopy(worldPipeline, CharViewPtr(&scene));
     RpStaticUniformCopy(gridPipeline, CharViewPtr(&scene));
 }
 
-void WorldRender(Vec2f pos, float angleRadians, float scalar, std::span<Vertex> vertices)
+void WorldRender(float2 pos, float angleRadians, float scalar, std::span<Vertex> vertices)
 {
-    Mat4 model = Translate(pos);
-    model = Mult(model, Rotate2D(angleRadians));
-    model = Mult(model, ScaleXY(scalar, scalar));
+    float4x4 model = float4x4::Translate(pos);
+    model = model.Mult(float4x4::Rotate(angleRadians));
+    model = model.Mult(float4x4::Scale(float4{scalar, scalar, 1.f, 1.f}));
 
     CharView vertexData = CharViewSpan(vertices);
     CharView dynamicUniformData = CharViewPtr(&model);
@@ -96,11 +99,10 @@ Rp worldPipeline{
                     RhiVertexFormat::R32G32B32A32Float,
                 },
         },
-    .init =
-        [](Rp &rp) -> void {
-            RpAttachVertShader(rp, "nyla/apps/shipgame/shaders/build/world.vs.hlsl.spv");
-            RpAttachFragShader(rp, "nyla/apps/shipgame/shaders/build/world.ps.hlsl.spv");
-        },
+    .init = [](Rp &rp) -> void {
+        RpAttachVertShader(rp, "nyla/apps/shipgame/shaders/build/world.vs.hlsl.spv");
+        RpAttachFragShader(rp, "nyla/apps/shipgame/shaders/build/world.ps.hlsl.spv");
+    },
 };
 
 void GridRender()
@@ -116,11 +118,10 @@ Rp gridPipeline{
             .size = sizeof(SceneTransforms),
             .range = sizeof(SceneTransforms),
         },
-    .init =
-        [](Rp &rp) -> void {
-            RpAttachVertShader(rp, "nyla/apps/shipgame/shaders/build/grid.vs.hlsl.spv");
-            RpAttachFragShader(rp, "nyla/apps/shipgame/shaders/build/grid.ps.hlsl.spv");
-        },
+    .init = [](Rp &rp) -> void {
+        RpAttachVertShader(rp, "nyla/apps/shipgame/shaders/build/grid.vs.hlsl.spv");
+        RpAttachFragShader(rp, "nyla/apps/shipgame/shaders/build/grid.ps.hlsl.spv");
+    },
 };
 
 } // namespace nyla

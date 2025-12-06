@@ -7,6 +7,14 @@ namespace nyla
 
 using CharView = std::span<const char>;
 
+template <typename T, size_t N> inline auto CharViewSpan(std::span<T, N> in) -> std::span<const char>
+{
+    return {
+        reinterpret_cast<const char *>(in.data()),
+        in.size() * sizeof(T),
+    };
+}
+
 template <typename T> inline auto CharViewSpan(std::span<T> in) -> std::span<const char>
 {
     return {

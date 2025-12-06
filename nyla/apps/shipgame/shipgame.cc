@@ -4,11 +4,11 @@
 #include <complex>
 #include <cstdint>
 #include <cstring>
+#include <numbers>
 
 #include "nyla/apps/shipgame/world_renderer.h"
 #include "nyla/commons/math/lerp.h"
-#include "nyla/commons/math/math.h"
-#include "nyla/commons/math/vec/vec2f.h"
+#include "nyla/commons/math/vec.h"
 #include "nyla/commons/os/clock.h"
 #include "nyla/fwk/dbg_text_renderer.h"
 #include "nyla/platform/abstract_input.h"
@@ -28,28 +28,28 @@ using Vertex = Vertex;
 GameObject gameSolarSystem{};
 GameObject gameShip{};
 
-static Vec2f gameCameraPos = {};
+static float2 gameCameraPos = {};
 static float gameCameraZoom = 1.f;
 
-static auto GenCircle(size_t n, float radius, Vec3f color) -> std::vector<Vertex>
+static auto GenCircle(size_t n, float radius, float3 color) -> std::vector<Vertex>
 {
     CHECK(n > 4);
 
     std::vector<Vertex> ret;
     ret.reserve(n * 3);
 
-    const float theta = 2.f * kPi / n;
+    const float theta = 2.f * std::numbers::pi_v<float> / static_cast<float>(n);
     std::complex<float> r = 1.f;
 
     for (size_t i = 0; i < n; ++i)
     {
-        ret.emplace_back(Vertex{Vec2f{}, color});
-        ret.emplace_back(Vertex{Vec2f{r.real() * radius, r.imag() * radius}, color});
+        ret.emplace_back(Vertex{float2{}, color});
+        ret.emplace_back(Vertex{float2{r.real() * radius, r.imag() * radius}, color});
 
         using namespace std::complex_literals;
         r *= std::cos(theta) + std::sin(theta) * 1if;
 
-        ret.emplace_back(Vertex{Vec2f{r.real() * radius, r.imag() * radius}, color});
+        ret.emplace_back(Vertex{float2{r.real() * radius, r.imag() * radius}, color});
     }
 
     return ret;
@@ -171,7 +171,7 @@ void ShipgameFrame(float dt, uint32_t fps)
                 float angle = std::atan2(-static_cast<float>(dy), static_cast<float>(dx));
                 if (angle < 0.f)
                 {
-                    angle += 2.f * kPi;
+                    angle += 2.f * std::numbers::pi_v<float>;
                 }
 
                 gameShip.angleRadians = LerpAngle(gameShip.angleRadians, angle, kStep * 5.f);
@@ -181,12 +181,12 @@ void ShipgameFrame(float dt, uint32_t fps)
             {
                 AbstractInputRelease(kBoost);
 
-                Lerp(gameShip.velocity, Vec2f{}, kStep * 5.f);
+                Lerp(gameShip.velocity, float2{}, kStep * 5.f);
             }
             else if (Pressed(kBoost))
             {
-                const Vec2f direction =
-                    Vec2fNorm(Vec2f{std::cos(gameShip.angleRadians), std::sin(gameShip.angleRadians)});
+                const float2 direction =
+                    float2{std::cos(gameShip.angleRadians), std::sin(gameShip.angleRadians)}.Normalized();
 
                 uint32_t duration = PressedFor(kBoost, GetMonotonicTimeMicros());
 
@@ -200,23 +200,21 @@ void ShipgameFrame(float dt, uint32_t fps)
                     maxSpeed = 100 + (duration - 100000) / 10000.f;
                 }
 
-                Lerp(gameShip.velocity, Vec2fMul(direction, maxSpeed), kStep);
+                Lerp(gameShip.velocity, direction * maxSpeed, kStep);
 
-                if (Vec2fLen(gameShip.velocity) < 20)
-                {
-                    gameShip.velocity = Vec2fResized(gameShip.velocity, 20);
-                }
+                if (gameShip.velocity.Len() < 20)
+                    gameShip.velocity = gameShip.velocity * (20.f / gameShip.velocity.Len());
             }
             else
             {
-                Lerp(gameShip.velocity, Vec2f{}, kStep);
+                Lerp(gameShip.velocity, float2{}, kStep);
             }
 
-            Vec2fAdd(gameShip.pos, Vec2fMul(gameShip.velocity, kStep));
+            gameShip.pos += gameShip.velocity * kStep;
         }
 
         {
-            Lerp(gameCameraPos, gameShip.pos, Vec2fLen(Vec2fDif(gameCameraPos, gameShip.pos)) * kStep);
+            Lerp(gameCameraPos, gameShip.pos, (gameCameraPos - gameShip.pos).Len() * kStep);
         }
 
         {
@@ -224,27 +222,24 @@ void ShipgameFrame(float dt, uint32_t fps)
             {
                 using namespace std::complex_literals;
 
-                const Vec2f v = Vec2fDif(gameSolarSystem.pos, planet.pos);
-                const float r = Vec2fLen(v);
+                const float2 v = gameSolarSystem.pos - planet.pos;
+                const float r = v.Len();
 
-                const Vec2f v2 =
-                    Vec2fSum(Vec2fMul(Vec2fNorm(Vec2fApply(Vec2fDif(planet.pos, gameSolarSystem.pos), 1.f / 1if)),
-                                      std::max(0.f, planet.orbitRadius - r / 5.f)),
-                             gameSolarSystem.pos);
+                const float2 v2 =
+                    (float2(std::complex<float>(planet.pos - gameSolarSystem.pos) * (1.f / 1if)).Normalized() *
+                     std::max(0.f, planet.orbitRadius - r / 5.f)) +
+                    gameSolarSystem.pos;
 
-                const Vec2f vv = Vec2fDif(v2, planet.pos);
+                const float2 vv = v2 - planet.pos;
 
                 float f = 6.7f * planet.mass * gameSolarSystem.mass / (r * r);
-                Vec2f fv = Vec2fResized(vv, f);
+                float2 fv = vv * (f / vv.Len());
 
-                Vec2fAdd(planet.velocity, Vec2fMul(fv, kStep / planet.mass));
+                planet.velocity += fv * (kStep / planet.mass);
+                if (planet.velocity.Len() > 10.f)
+                    planet.velocity = planet.velocity * (10.f / planet.velocity.Len());
 
-                if (Vec2fLen(planet.velocity) > 10.f)
-                {
-                    planet.velocity = Vec2fResized(planet.velocity, 10.f);
-                }
-
-                Vec2fAdd(planet.pos, Vec2fMul(planet.velocity, kStep));
+                planet.pos += planet.velocity * kStep;
             }
         }
 
