@@ -283,7 +283,7 @@ void RhiCmdBindGraphicsPipeline(RhiCmdList cmd, RhiGraphicsPipeline pipeline)
     cmdData.boundGraphicsPipeline = pipeline;
 }
 
-void RhiCmdPushGraphicsConstants(RhiCmdList cmd, uint32_t offset, RhiShaderStage stage, CharView data)
+void RhiCmdPushGraphicsConstants(RhiCmdList cmd, uint32_t offset, RhiShaderStage stage, ByteView data)
 {
     const VulkanCmdListData &cmdData = RhiHandleGetData(rhiHandles.cmdLists, cmd);
     const VulkanPipelineData &pipelineData =

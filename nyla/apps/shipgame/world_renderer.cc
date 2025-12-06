@@ -59,8 +59,8 @@ void WorldSetUp(float2 cameraPos, float zoom)
         .invVp = invVp,
     };
 
-    RpStaticUniformCopy(worldPipeline, CharViewPtr(&scene));
-    RpStaticUniformCopy(gridPipeline, CharViewPtr(&scene));
+    RpStaticUniformCopy(worldPipeline, ByteViewPtr(&scene));
+    RpStaticUniformCopy(gridPipeline, ByteViewPtr(&scene));
 }
 
 void WorldRender(float2 pos, float angleRadians, float scalar, std::span<Vertex> vertices)
@@ -69,8 +69,8 @@ void WorldRender(float2 pos, float angleRadians, float scalar, std::span<Vertex>
     model = model.Mult(float4x4::Rotate(angleRadians));
     model = model.Mult(float4x4::Scale(float4{scalar, scalar, 1.f, 1.f}));
 
-    CharView vertexData = CharViewSpan(vertices);
-    CharView dynamicUniformData = CharViewPtr(&model);
+    ByteView vertexData = ByteViewSpan(vertices);
+    ByteView dynamicUniformData = ByteViewPtr(&model);
     RpMesh mesh = RpVertCopy(worldPipeline, vertices.size(), vertexData);
     RpDraw(worldPipeline, mesh, dynamicUniformData);
 }

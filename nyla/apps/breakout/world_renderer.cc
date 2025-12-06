@@ -54,7 +54,7 @@ void WorldSetUp()
         .invVp = invVp,
     };
 
-    RpPushConst(worldPipeline, CharViewPtr(&scene));
+    RpPushConst(worldPipeline, ByteViewPtr(&scene));
 }
 
 void WorldRender(float2 pos, float3 color, float width, float height, const RpMesh &mesh)
@@ -65,7 +65,7 @@ void WorldRender(float2 pos, float3 color, float width, float height, const RpMe
     dynamicData.model = float4x4::Translate(pos);
     dynamicData.model = dynamicData.model.Mult(float4x4::Scale(float4{width, height, 1, 1}));
 
-    RpDraw(worldPipeline, mesh, CharViewPtr(&dynamicData));
+    RpDraw(worldPipeline, mesh, ByteViewPtr(&dynamicData));
 }
 
 Rp worldPipeline{

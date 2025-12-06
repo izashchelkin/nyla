@@ -50,7 +50,7 @@ void DbgText(int32_t x, int32_t y, std::string_view text)
         *(ubo.words[i]) = w;
     }
 
-    RpDraw(dbgTextPipeline, {.vertCount = 3}, CharViewPtr(&ubo));
+    RpDraw(dbgTextPipeline, {.vertCount = 3}, ByteViewPtr(&ubo));
 }
 
 Rp dbgTextPipeline{
@@ -62,11 +62,10 @@ Rp dbgTextPipeline{
             .size = 1 << 15,
             .range = sizeof(DbgTextLine),
         },
-    .init =
-        [](Rp &rp) -> void {
-            RpAttachVertShader(rp, "/home/izashchelkin/nyla/nyla/engine0/shaders/build/dbgtext.vs.hlsl.spv");
-            RpAttachFragShader(rp, "/home/izashchelkin/nyla/nyla/engine0/shaders/build/dbgtext.ps.hlsl.spv");
-        },
+    .init = [](Rp &rp) -> void {
+        RpAttachVertShader(rp, "/home/izashchelkin/nyla/nyla/engine0/shaders/build/dbgtext.vs.hlsl.spv");
+        RpAttachFragShader(rp, "/home/izashchelkin/nyla/nyla/engine0/shaders/build/dbgtext.ps.hlsl.spv");
+    },
 };
 
 } // namespace nyla

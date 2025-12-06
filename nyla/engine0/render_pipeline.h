@@ -58,9 +58,9 @@ void RpInit(Rp &rp);
 void RpAttachVertShader(Rp &rp, const std::string &path);
 void RpAttachFragShader(Rp &rp, const std::string &path);
 void RpBegin(Rp &rp);
-void RpPushConst(Rp &rp, CharView data);
-void RpStaticUniformCopy(Rp &rp, CharView data);
-auto RpVertCopy(Rp &rp, uint32_t vertCount, CharView vertData) -> RpMesh;
-void RpDraw(Rp &rp, RpMesh mesh, CharView dynamicUniformData);
+void RpPushConst(Rp &rp, ByteView data);
+void RpStaticUniformCopy(Rp &rp, ByteView data);
+auto RpVertCopy(Rp &rp, uint32_t vertCount, ByteView vertData) -> RpMesh;
+void RpDraw(Rp &rp, RpMesh mesh, ByteView dynamicUniformData);
 
 } // namespace nyla

@@ -166,7 +166,7 @@ void RpBegin(Rp &rp)
     RhiCmdBindGraphicsPipeline(RhiFrameGetCmdList(), rp.pipeline);
 }
 
-static void RpBufCopy(RpBuf &buf, CharView data)
+static void RpBufCopy(RpBuf &buf, ByteView data)
 {
     CHECK(buf.enabled);
     CHECK(!data.empty());
@@ -177,13 +177,13 @@ static void RpBufCopy(RpBuf &buf, CharView data)
     buf.written += data.size();
 }
 
-void RpStaticUniformCopy(Rp &rp, CharView data)
+void RpStaticUniformCopy(Rp &rp, ByteView data)
 {
     CHECK_EQ(rp.staticUniform.size, data.size());
     RpBufCopy(rp.staticUniform, data);
 }
 
-auto RpVertCopy(Rp &rp, uint32_t vertCount, CharView vertData) -> RpMesh
+auto RpVertCopy(Rp &rp, uint32_t vertCount, ByteView vertData) -> RpMesh
 {
     const uint32_t offset = rp.vertBuf.written;
     const uint32_t size = vertCount * GetVertBindingStride(rp);
@@ -197,7 +197,7 @@ auto RpVertCopy(Rp &rp, uint32_t vertCount, CharView vertData) -> RpMesh
     };
 }
 
-void RpPushConst(Rp &rp, CharView data)
+void RpPushConst(Rp &rp, ByteView data)
 {
     CHECK(!data.empty());
     CHECK_LE(data.size(), kRhiMaxPushConstantSize);
@@ -206,7 +206,7 @@ void RpPushConst(Rp &rp, CharView data)
     RhiCmdPushGraphicsConstants(cmd, 0, RhiShaderStage::Vertex | RhiShaderStage::Fragment, data);
 }
 
-void RpDraw(Rp &rp, RpMesh mesh, CharView dynamicUniformData)
+void RpDraw(Rp &rp, RpMesh mesh, ByteView dynamicUniformData)
 {
     RhiCmdList cmd = RhiFrameGetCmdList();
     uint32_t frameIndex = RhiFrameGetIndex();

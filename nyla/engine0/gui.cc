@@ -28,7 +28,7 @@ void UiFrameBegin()
         .windowWidth = static_cast<float>(RhiGetSurfaceWidth()),
         .windowHeight = static_cast<float>(RhiGetSurfaceHeight()),
     };
-    RpStaticUniformCopy(guiPipeline, CharViewPtr(&ubo));
+    RpStaticUniformCopy(guiPipeline, ByteViewPtr(&ubo));
 }
 
 static void UiBoxBegin(float x, float y, float width, float height)
@@ -51,7 +51,7 @@ static void UiBoxBegin(float x, float y, float width, float height)
         float4{x + width, y + height, z, w},
     };
 
-    RpMesh mesh = RpVertCopy(guiPipeline, std::size(rect), CharViewSpan(std::span{rect}));
+    RpMesh mesh = RpVertCopy(guiPipeline, std::size(rect), ByteViewSpan(std::span{rect}));
     RpDraw(guiPipeline, mesh, {});
 }
 

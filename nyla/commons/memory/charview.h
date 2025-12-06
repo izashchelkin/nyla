@@ -5,30 +5,21 @@
 namespace nyla
 {
 
-using CharView = std::span<const char>;
+using ByteView = std::span<const std::byte>;
 
-template <typename T, size_t N> inline auto CharViewSpan(std::span<T, N> in) -> std::span<const char>
+template <typename T, size_t N> inline auto ByteViewSpan(std::span<T, N> in) -> ByteView
 {
-    return {
-        reinterpret_cast<const char *>(in.data()),
-        in.size() * sizeof(T),
-    };
+    return std::as_bytes(in);
 }
 
-template <typename T> inline auto CharViewSpan(std::span<T> in) -> std::span<const char>
+template <typename T> inline auto ByteViewSpan(std::span<T> in) -> ByteView
 {
-    return {
-        reinterpret_cast<const char *>(in.data()),
-        in.size() * sizeof(T),
-    };
+    return std::as_bytes(in);
 }
 
-template <typename T> inline auto CharViewPtr(T *in) -> std::span<const char>
+template <typename T> inline auto ByteViewPtr(const T *in) -> ByteView
 {
-    return {
-        reinterpret_cast<const char *>(in),
-        sizeof(*in),
-    };
+    return std::as_bytes(std::span{in, 1});
 }
 
 } // namespace nyla

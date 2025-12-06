@@ -141,7 +141,7 @@ void RhiCmdBindVertexBuffers(RhiCmdList cmd, uint32_t firstBinding, std::span<co
                              std::span<const uint32_t> offsets);
 void RhiCmdBindGraphicsBindGroup(RhiCmdList, uint32_t setIndex, RhiBindGroup bindGroup,
                                  std::span<const uint32_t> dynamicOffsets);
-void RhiCmdPushGraphicsConstants(RhiCmdList cmd, uint32_t offset, RhiShaderStage stage, CharView data);
+void RhiCmdPushGraphicsConstants(RhiCmdList cmd, uint32_t offset, RhiShaderStage stage, ByteView data);
 void RhiCmdDraw(RhiCmdList cmd, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
                 uint32_t firstInstance);
 
