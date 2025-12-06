@@ -2,9 +2,9 @@
 
 #include "absl/container/flat_hash_set.h"
 
-namespace nyla {
+namespace nyla
+{
 
-template <typename E>
-using Set = absl::flat_hash_set<E>;
+template <typename E> using Set = absl::flat_hash_set<E>;
 
-}  // namespace nyla
+} // namespace nyla

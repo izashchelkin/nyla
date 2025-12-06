@@ -2,10 +2,11 @@
 
 #include <cstdint>
 
-namespace nyla {
+namespace nyla
+{
 
-uint64_t GetMonotonicTimeMillis();
-uint64_t GetMonotonicTimeMicros();
-uint64_t GetMonotonicTimeNanos();
+auto GetMonotonicTimeMillis() -> uint64_t;
+auto GetMonotonicTimeMicros() -> uint64_t;
+auto GetMonotonicTimeNanos() -> uint64_t;
 
-}  // namespace nyla
+} // namespace nyla

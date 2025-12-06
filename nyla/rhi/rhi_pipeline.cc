@@ -1,17 +1,20 @@
 #include "nyla/rhi/rhi_pipeline.h"
 
-namespace nyla {
+namespace nyla
+{
 
-uint32_t RhiGetVertexFormatSize(RhiVertexFormat format) {
-  switch (format) {
+auto RhiGetVertexFormatSize(RhiVertexFormat format) -> uint32_t
+{
+    switch (format)
+    {
     case nyla::RhiVertexFormat::None:
-      break;
+        break;
 
-    case RhiVertexFormat::R32G32B32A32_Float:
-      return 16;
-  }
-  CHECK(false);
-  return 0;
+    case RhiVertexFormat::R32G32B32A32Float:
+        return 16;
+    }
+    CHECK(false);
+    return 0;
 }
 
-}  // namespace nyla
+} // namespace nyla

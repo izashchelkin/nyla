@@ -1,83 +1,94 @@
 #include "nyla/apps/breakout/world_renderer.h"
+#include "nyla/commons/math/vec.h"
 
-#include "nyla/commons/math/mat4.h"
-#include "nyla/commons/math/vec/vec2f.h"
+#include "nyla/commons/math/mat.h"
 #include "nyla/commons/memory/charview.h"
 #include "nyla/fwk/render_pipeline.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_pipeline.h"
 
-namespace nyla {
+namespace nyla
+{
 
-namespace {
+namespace
+{
 
-struct PushConstData {
-  Mat4 view;
-  Mat4 proj;
+struct SceneTransforms
+{
+    float4x4 vp;
+    float4x4 invVp;
 };
 
-struct DynamicUbo {
-  Mat4 model;
-  Vec3f color;
-  float pad;
+struct DynamicUbo
+{
+    float4x4 model;
+    float3 color;
+    float pad;
 };
 
-}  // namespace
+} // namespace
 
 constexpr float kMetersOnScreen = 64.f;
 
-void WorldSetUp() {
-  float world_w;
-  float world_h;
+void WorldSetUp()
+{
+    float worldW;
+    float worldH;
 
-  const float base = kMetersOnScreen;
+    const float base = kMetersOnScreen;
 
-  const float width = static_cast<float>(RhiGetSurfaceWidth());
-  const float height = static_cast<float>(RhiGetSurfaceHeight());
-  const float aspect = width / height;
+    const auto width = static_cast<float>(RhiGetSurfaceWidth());
+    const auto height = static_cast<float>(RhiGetSurfaceHeight());
+    const float aspect = width / height;
 
-  world_h = base;
-  world_w = base * aspect;
+    worldH = base;
+    worldW = base * aspect;
 
-  const PushConstData push_const = {
-      .view = Identity4,
-      .proj = Ortho(-world_w * .5f, world_w * .5f, world_h * .5f, -world_h * .5f, 0.f, 1.f),
-  };
-  RpPushConst(world_pipeline, CharViewPtr(&push_const));
+    float4x4 view = float4x4::Identity();
+    float4x4 proj = float4x4::Ortho(-worldW * .5f, worldW * .5f, worldH * .5f, -worldH * .5f, 0.f, 1.f);
+
+    float4x4 vp = proj.Mult(view);
+    float4x4 invVp = vp.Inversed();
+    SceneTransforms scene = {
+        .vp = vp,
+        .invVp = invVp,
+    };
+
+    RpPushConst(worldPipeline, CharViewPtr(&scene));
 }
 
-void WorldRender(Vec2f pos, Vec3f color, float width, float height, const RpMesh& mesh) {
-  DynamicUbo dynamic_data{};
-  dynamic_data.color = color;
+void WorldRender(float2 pos, float3 color, float width, float height, const RpMesh &mesh)
+{
+    DynamicUbo dynamicData{};
+    dynamicData.color = color;
 
-  dynamic_data.model = Translate(pos);
-  dynamic_data.model = Mult(dynamic_data.model, ScaleXY(width, height));
+    dynamicData.model = float4x4::Translate(pos);
+    dynamicData.model = dynamicData.model.Mult(float4x4::Scale(float4{width, height, 1, 1}));
 
-  RpDraw(world_pipeline, mesh, CharViewPtr(&dynamic_data));
+    RpDraw(worldPipeline, mesh, CharViewPtr(&dynamicData));
 }
 
-Rp world_pipeline{
-    .debug_name = "World",
-    .dynamic_uniform =
+Rp worldPipeline{
+    .debugName = "World",
+    .dynamicUniform =
         {
             .enabled = true,
             .size = 60000,
             .range = sizeof(DynamicUbo),
         },
-    .vert_buf =
+    .vertBuf =
         {
             .enabled = true,
             .size = 1 << 22,
             .attrs =
                 {
-                    RhiVertexFormat::R32G32B32A32_Float,
+                    RhiVertexFormat::R32G32B32A32Float,
                 },
         },
-    .Init =
-        [](Rp& rp) {
-          RpAttachVertShader(rp, "nyla/apps/breakout/shaders/build/world.vert.spv");
-          RpAttachFragShader(rp, "nyla/apps/breakout/shaders/build/world.frag.spv");
-        },
+    .init = [](Rp &rp) -> void {
+        RpAttachVertShader(rp, "nyla/apps/breakout/shaders/build/world.vs.hlsl.spv");
+        RpAttachFragShader(rp, "nyla/apps/breakout/shaders/build/world.ps.hlsl.spv");
+    },
 };
 
-}  // namespace nyla
+} // namespace nyla

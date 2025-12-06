@@ -6,23 +6,26 @@
 
 #include "absl/log/check.h"
 
-namespace nyla {
+namespace nyla
+{
 
-static std::vector<char> ReadFileInternal(std::ifstream& file) {
-  CHECK(file.is_open());
+static auto ReadFileInternal(std::ifstream &file) -> std::vector<char>
+{
+    CHECK(file.is_open());
 
-  std::vector<char> buffer(file.tellg());
+    std::vector<char> buffer(file.tellg());
 
-  file.seekg(0);
-  file.read(buffer.data(), buffer.size());
+    file.seekg(0);
+    file.read(buffer.data(), buffer.size());
 
-  file.close();
-  return buffer;
+    file.close();
+    return buffer;
 }
 
-std::vector<char> ReadFile(const std::string& filename) {
-  std::ifstream file(filename, std::ios::ate | std::ios::binary);
-  return ReadFileInternal(file);
+auto ReadFile(const std::string &filename) -> std::vector<char>
+{
+    std::ifstream file(filename, std::ios::ate | std::ios::binary);
+    return ReadFileInternal(file);
 }
 
-}  // namespace nyla
+} // namespace nyla

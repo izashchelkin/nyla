@@ -2,14 +2,16 @@
 
 #include <optional>
 
-namespace nyla {
+namespace nyla
+{
 
-template <typename T>
-std::optional<T> Unown(T* p) {
-  if (!p) return {};
-  T&& ret = std::move(*p);
-  free(p);
-  return ret;
+template <typename T> auto Unown(T *p) -> std::optional<T>
+{
+    if (!p)
+        return {};
+    T &&ret = std::move(*p);
+    free(p);
+    return ret;
 }
 
-}  // namespace nyla
+} // namespace nyla

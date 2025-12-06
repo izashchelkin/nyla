@@ -4,39 +4,45 @@
 
 #include "absl/log/check.h"
 
-namespace nyla {
+namespace nyla
+{
 
-namespace {
+namespace
+{
 
-struct TempArena {
-  char* base;
-  char* at;
-  size_t size;
+struct TempArena
+{
+    char *base;
+    char *at;
+    size_t size;
 };
 
-}  // namespace
+} // namespace
 
-static TempArena temp_arena;
+static TempArena tempArena;
 
-void TArenaInit() {
-  temp_arena.size = 1 << 20;
-  temp_arena.base = (char*)malloc(temp_arena.size);
-  temp_arena.at = temp_arena.base;
+void TArenaInit()
+{
+    tempArena.size = 1 << 20;
+    tempArena.base = (char *)malloc(tempArena.size);
+    tempArena.at = tempArena.base;
 }
 
-void* TAlloc(size_t bytes, size_t align) {
-  CHECK_LT(bytes + align, temp_arena.size);
+auto TAlloc(size_t bytes, size_t align) -> void *
+{
+    CHECK_LT(bytes + align, tempArena.size);
 
-  const size_t used = temp_arena.at - temp_arena.base;
-  const size_t pad = (align - (used % align)) % align;
-  if (used + pad + bytes > temp_arena.size) {
-    temp_arena.at = temp_arena.base;
-    return TAlloc(bytes, align);
-  }
+    const size_t used = tempArena.at - tempArena.base;
+    const size_t pad = (align - (used % align)) % align;
+    if (used + pad + bytes > tempArena.size)
+    {
+        tempArena.at = tempArena.base;
+        return TAlloc(bytes, align);
+    }
 
-  char* ret = temp_arena.at + pad;
-  temp_arena.at += bytes + pad;
-  return ret;
+    char *ret = tempArena.at + pad;
+    tempArena.at += bytes + pad;
+    return ret;
 }
 
-}  // namespace nyla
+} // namespace nyla

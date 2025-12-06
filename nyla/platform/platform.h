@@ -6,7 +6,8 @@
 #include "nyla/platform/abstract_input.h"
 #include "nyla/platform/key_physical.h"
 
-namespace nyla {
+namespace nyla
+{
 
 void PlatformInit();
 
@@ -14,28 +15,31 @@ void PlatformMapInputBegin();
 void PlatformMapInput(AbstractInputMapping mapping, KeyPhysical key);
 void PlatformMapInputEnd();
 
-struct PlatformWindow {
-  uint32_t handle;
+struct PlatformWindow
+{
+    uint32_t handle;
 };
-PlatformWindow PlatformCreateWindow();
+auto PlatformCreateWindow() -> PlatformWindow;
 
-struct PlatformWindowSize {
-  uint32_t width;
-  uint32_t height;
+struct PlatformWindowSize
+{
+    uint32_t width;
+    uint32_t height;
 };
 
-PlatformWindowSize PlatformGetWindowSize(PlatformWindow window);
+auto PlatformGetWindowSize(PlatformWindow window) -> PlatformWindowSize;
 
-void PlatformFsWatch(const std::string& path);
+void PlatformFsWatch(const std::string &path);
 
-struct PlatformFsChange {
-  bool isdir;
-  bool seen;
-  std::string path;
+struct PlatformFsChange
+{
+    bool isdir;
+    bool seen;
+    std::string path;
 };
-std::span<PlatformFsChange> PlatformFsGetChanges();
+auto PlatformFsGetChanges() -> std::span<PlatformFsChange>;
 
 void PlatformProcessEvents();
-bool PlatformShouldExit();
+auto PlatformShouldExit() -> bool;
 
-}  // namespace nyla
+} // namespace nyla

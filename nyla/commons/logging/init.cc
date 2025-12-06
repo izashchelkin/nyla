@@ -3,11 +3,13 @@
 #include "absl/log/globals.h"
 #include "absl/log/initialize.h"
 
-namespace nyla {
+namespace nyla
+{
 
-void LoggingInit() {
-  absl::InitializeLog();
-  absl::SetStderrThreshold(absl::LogSeverityAtLeast::kInfo);
+void LoggingInit()
+{
+    absl::InitializeLog();
+    absl::SetStderrThreshold(absl::LogSeverityAtLeast::kInfo);
 }
 
-}  // namespace nyla
+} // namespace nyla

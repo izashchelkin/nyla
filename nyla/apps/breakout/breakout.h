@@ -4,7 +4,8 @@
 
 #include "nyla/platform/abstract_input.h"
 
-namespace nyla {
+namespace nyla
+{
 
 #define NYLA_INPUT_MAPPING(X) X(Right) X(Left) X(Boost) X(Fire)
 
@@ -15,4 +16,4 @@ NYLA_INPUT_MAPPING(X)
 void BreakoutInit();
 void BreakoutFrame(float dt, uint32_t fps);
 
-}  // namespace nyla
+} // namespace nyla

@@ -1,67 +1,83 @@
 #include "nyla/platform/x11/platform_x11_wm_hints.h"
 
-namespace nyla {
+namespace nyla
+{
 
-namespace platform_x11_internal {
+namespace platform_x11_internal
+{
 
-void Initialize(WM_Hints& h) {
-  if (!(h.flags & WM_Hints::kInputHint)) {
-    h.input = true;
-  }
+void Initialize(WmHints &h)
+{
+    if (!(h.flags & WmHints::kInputHint))
+    {
+        h.input = true;
+    }
 
-  if (!(h.flags & WM_Hints::kStateHint)) {
-    h.initial_state = 0;
-  }
+    if (!(h.flags & WmHints::kStateHint))
+    {
+        h.initialState = 0;
+    }
 
-  if (!(h.flags & WM_Hints::kIconPixmapHint)) {
-    h.icon_pixmap = 0;
-  }
+    if (!(h.flags & WmHints::kIconPixmapHint))
+    {
+        h.iconPixmap = 0;
+    }
 
-  if (!(h.flags & WM_Hints::kIconWindowHint)) {
-    h.icon_window = 0;
-  }
+    if (!(h.flags & WmHints::kIconWindowHint))
+    {
+        h.iconWindow = 0;
+    }
 
-  if (!(h.icon_x & WM_Hints::kIconPositionHint)) {
-    h.icon_x = 0;
-    h.icon_y = 0;
-  }
+    if (!(h.iconX & WmHints::kIconPositionHint))
+    {
+        h.iconX = 0;
+        h.iconY = 0;
+    }
 
-  if (!(h.icon_x & WM_Hints::kIconMaskHint)) {
-    h.icon_mask = 0;
-  }
+    if (!(h.iconX & WmHints::kIconMaskHint))
+    {
+        h.iconMask = 0;
+    }
 }
 
-void Initialize(WM_Normal_Hints& h) {
-  if (!(h.flags & WM_Normal_Hints::kPMinSize)) {
-    h.min_width = 0;
-    h.min_height = 0;
-  }
+void Initialize(WmNormalHints &h)
+{
+    if (!(h.flags & WmNormalHints::kPMinSize))
+    {
+        h.minWidth = 0;
+        h.minHeight = 0;
+    }
 
-  if (!(h.flags & WM_Normal_Hints::kPMaxSize)) {
-    h.max_width = 0;
-    h.max_height = 0;
-  }
+    if (!(h.flags & WmNormalHints::kPMaxSize))
+    {
+        h.maxWidth = 0;
+        h.maxHeight = 0;
+    }
 
-  if (!(h.flags & WM_Normal_Hints::kPResizeInc)) {
-    h.width_inc = 0;
-    h.height_inc = 0;
-  }
+    if (!(h.flags & WmNormalHints::kPResizeInc))
+    {
+        h.widthInc = 0;
+        h.heightInc = 0;
+    }
 
-  if (!(h.flags & WM_Normal_Hints::kPAspect)) {
-    h.min_aspect = {};
-    h.max_aspect = {};
-  }
+    if (!(h.flags & WmNormalHints::kPAspect))
+    {
+        h.minAspect = {};
+        h.maxAspect = {};
+    }
 
-  if (!(h.flags & WM_Normal_Hints::kPBaseSize)) {
-    h.base_width = 0;
-    h.base_height = 0;
-  }
+    if (!(h.flags & WmNormalHints::kPBaseSize))
+    {
+        h.baseWidth = 0;
+        h.baseHeight = 0;
+    }
 
-  if (!(h.flags & WM_Normal_Hints::kPWinGravity)) {
-    h.win_gravity = {};
-  }
+    if (!(h.flags & WmNormalHints::kPWinGravity))
+    {
+        h.winGravity = {};
+    }
 }
 
-}  // namespace platform_x11_internal
+} // namespace platform_x11_internal
 
-}  // namespace nyla
+} // namespace nyla

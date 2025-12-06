@@ -1,113 +1,127 @@
 #include "nyla/apps/shipgame/world_renderer.h"
 
-#include "nyla/commons/math/mat4.h"
-#include "nyla/commons/math/vec/vec2f.h"
+#include "nyla/commons/math/mat.h"
+#include "nyla/commons/math/vec.h"
 #include "nyla/commons/memory/charview.h"
 #include "nyla/fwk/render_pipeline.h"
 #include "nyla/rhi/rhi.h"
+#include "nyla/rhi/rhi_pipeline.h"
 
-namespace nyla {
+namespace nyla
+{
 
-namespace {
+namespace
+{
 
-struct StaticUbo {
-  Mat4 view;
-  Mat4 proj;
+struct SceneTransforms
+{
+    float4x4 vp;
+    float4x4 invVp;
 };
 
-struct DynamicUbo {
-  Mat4 model;
+struct DynamicUbo
+{
+    float4 model;
 };
 
-}  // namespace
+} // namespace
 
 constexpr float kMetersOnScreen = 64.f;
 
-void WorldSetUp(Vec2f camera_pos, float zoom) {
-  float world_w;
-  float world_h;
+void WorldSetUp(float2 cameraPos, float zoom)
+{
+    float worldW;
+    float worldH;
 
-  const float base = kMetersOnScreen * zoom;
+    const float base = kMetersOnScreen * zoom;
 
-  const float width = static_cast<float>(RhiGetSurfaceWidth());
-  const float height = static_cast<float>(RhiGetSurfaceHeight());
-  const float aspect = width / height;
-  if (aspect >= 1.0f) {
-    world_h = base;
-    world_w = base * aspect;
-  } else {
-    world_w = base;
-    world_h = base / aspect;
-  }
+    const auto width = static_cast<float>(RhiGetSurfaceWidth());
+    const auto height = static_cast<float>(RhiGetSurfaceHeight());
+    const float aspect = width / height;
+    if (aspect >= 1.0f)
+    {
+        worldH = base;
+        worldW = base * aspect;
+    }
+    else
+    {
+        worldW = base;
+        worldH = base / aspect;
+    }
 
-  const StaticUbo static_ubo = {
-      .view = Translate(Vec2fNeg(camera_pos)),
-      .proj = Ortho(-world_w * .5f, world_w * .5f, world_h * .5f, -world_h * .5f, 0.f, 1.f),
-  };
+    float4x4 view = float4x4::Translate(-cameraPos);
+    float4x4 proj = float4x4::Ortho(-worldW * .5f, worldW * .5f, worldH * .5f, -worldH * .5f, 0.f, 1.f);
 
-  RpStaticUniformCopy(world_pipeline, CharViewPtr(&static_ubo));
-  RpStaticUniformCopy(grid_pipeline, CharViewPtr(&static_ubo));
+    float4x4 vp = proj.Mult(view);
+    float4x4 invVp = vp.Inversed();
+    SceneTransforms scene = {
+        .vp = vp,
+        .invVp = invVp,
+    };
+
+    RpStaticUniformCopy(worldPipeline, CharViewPtr(&scene));
+    RpStaticUniformCopy(gridPipeline, CharViewPtr(&scene));
 }
 
-void WorldRender(Vec2f pos, float angle_radians, float scalar, std::span<Vertex> vertices) {
-  Mat4 model = Translate(pos);
-  model = Mult(model, Rotate2D(angle_radians));
-  model = Mult(model, ScaleXY(scalar, scalar));
+void WorldRender(float2 pos, float angleRadians, float scalar, std::span<Vertex> vertices)
+{
+    float4x4 model = float4x4::Translate(pos);
+    model = model.Mult(float4x4::Rotate(angleRadians));
+    model = model.Mult(float4x4::Scale(float4{scalar, scalar, 1.f, 1.f}));
 
-  CharView vertex_data = CharViewSpan(vertices);
-  CharView dynamic_uniform_data = CharViewPtr(&model);
-  RpMesh mesh = RpVertCopy(world_pipeline, vertices.size(), vertex_data);
-  RpDraw(world_pipeline, mesh, dynamic_uniform_data);
+    CharView vertexData = CharViewSpan(vertices);
+    CharView dynamicUniformData = CharViewPtr(&model);
+    RpMesh mesh = RpVertCopy(worldPipeline, vertices.size(), vertexData);
+    RpDraw(worldPipeline, mesh, dynamicUniformData);
 }
 
-Rp world_pipeline{
-    .debug_name = "World",
-    .static_uniform =
+Rp worldPipeline{
+    .debugName = "World",
+    .staticUniform =
         {
             .enabled = true,
-            .size = sizeof(StaticUbo),
-            .range = sizeof(StaticUbo),
+            .size = sizeof(SceneTransforms),
+            .range = sizeof(SceneTransforms),
         },
-    .dynamic_uniform =
+    .dynamicUniform =
         {
             .enabled = true,
             .size = 60000,
             .range = sizeof(DynamicUbo),
         },
-    .vert_buf =
+    .vertBuf =
         {
             .enabled = true,
             .size = 1 << 22,
             .attrs =
                 {
-                    RhiVertexAttributeType::Float4,
-                    RhiVertexAttributeType::Float4,
+                    RhiVertexFormat::R32G32B32A32Float,
+                    RhiVertexFormat::R32G32B32A32Float,
                 },
         },
-    .Init =
-        [](Rp& rp) {
-          RpAttachVertShader(rp, "nyla/apps/shipgame/shaders/build/world.vert.spv");
-          RpAttachFragShader(rp, "nyla/apps/shipgame/shaders/build/world.frag.spv");
-        },
+    .init = [](Rp &rp) -> void {
+        RpAttachVertShader(rp, "nyla/apps/shipgame/shaders/build/world.vs.hlsl.spv");
+        RpAttachFragShader(rp, "nyla/apps/shipgame/shaders/build/world.ps.hlsl.spv");
+    },
 };
 
-void GridRender() {
-  RpDraw(grid_pipeline, {.vert_count = 3}, {});
+void GridRender()
+{
+    RpDraw(gridPipeline, {.vertCount = 3}, {});
 }
 
-Rp grid_pipeline{
-    .debug_name = "WorldGrid",
-    .static_uniform =
+Rp gridPipeline{
+    .debugName = "WorldGrid",
+    .staticUniform =
         {
             .enabled = true,
-            .size = sizeof(StaticUbo),
-            .range = sizeof(StaticUbo),
+            .size = sizeof(SceneTransforms),
+            .range = sizeof(SceneTransforms),
         },
-    .Init =
-        [](Rp& rp) {
-          RpAttachVertShader(rp, "nyla/apps/shipgame/shaders/build/grid.vert.spv");
-          RpAttachFragShader(rp, "nyla/apps/shipgame/shaders/build/grid.frag.spv");
-        },
+    .init = [](Rp &rp) -> void {
+        RpAttachVertShader(rp, "nyla/apps/shipgame/shaders/build/grid.vs.hlsl.spv");
+        RpAttachFragShader(rp, "nyla/apps/shipgame/shaders/build/grid.ps.hlsl.spv");
+    },
 };
 
-}  // namespace nyla
+} // namespace nyla

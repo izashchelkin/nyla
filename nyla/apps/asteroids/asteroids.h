@@ -1,6 +1,7 @@
 #pragma once
 
-namespace nyla {
+namespace nyla
+{
 
 void AsteroidsInit();
 

@@ -5,92 +5,114 @@
 
 #include "absl/strings/str_format.h"
 
-namespace nyla {
+namespace nyla
+{
 
-class Rect {
- public:
-  Rect(int32_t x, int32_t y, uint32_t width, uint32_t height) : x_{x}, y_{y}, width_{width}, height_{height} {}
-  Rect(uint32_t width, uint32_t height) : Rect{0, 0, width, height} {}
-  Rect() : Rect{0, 0, 0, 0} {}
+class Rect
+{
+  public:
+    Rect(int32_t x, int32_t y, uint32_t width, uint32_t height) : x{x}, y{y}, width{width}, height{height}
+    {
+    }
+    Rect(uint32_t width, uint32_t height) : Rect{0, 0, width, height}
+    {
+    }
+    Rect() : Rect{0, 0, 0, 0}
+    {
+    }
 
-  void operator=(const Rect& rhs) {
-    this->x_ = rhs.x_;
-    this->y_ = rhs.y_;
-    this->width_ = rhs.width_;
-    this->height_ = rhs.height_;
-  }
+    void operator=(const Rect &rhs)
+    {
+        this->x = rhs.x;
+        this->y = rhs.y;
+        this->width = rhs.width;
+        this->height = rhs.height;
+    }
 
-  bool operator==(const Rect& rhs) const {
-    return this->x_ == rhs.x_ && this->y_ == rhs.y_ && this->width_ == rhs.width_ && this->height_ == rhs.height_;
-  }
-  bool operator!=(const Rect& rhs) const {
-    return !(*this == rhs);
-  }
+    auto operator==(const Rect &rhs) const -> bool
+    {
+        return this->x == rhs.x && this->y == rhs.y && this->width == rhs.width && this->height == rhs.height;
+    }
+    auto operator!=(const Rect &rhs) const -> bool
+    {
+        return !(*this == rhs);
+    }
 
-  template <typename Sink>
-  friend void AbslStringify(Sink& sink, const Rect& rect);
+    template <typename Sink> friend void AbslStringify(Sink &sink, const Rect &rect);
 
-  int32_t& x() {
-    return x_;
-  }
-  const int32_t& x() const {
-    return x_;
-  }
+    auto X() -> int32_t &
+    {
+        return x;
+    }
+    auto X() const -> const int32_t &
+    {
+        return x;
+    }
 
-  int32_t& y() {
-    return y_;
-  }
-  const int32_t& y() const {
-    return y_;
-  }
+    auto Y() -> int32_t &
+    {
+        return y;
+    }
+    auto Y() const -> const int32_t &
+    {
+        return y;
+    }
 
-  uint32_t& width() {
-    return width_;
-  }
-  const uint32_t& width() const {
-    return width_;
-  }
+    auto Width() -> uint32_t &
+    {
+        return width;
+    }
+    auto Width() const -> const uint32_t &
+    {
+        return width;
+    }
 
-  uint32_t& height() {
-    return height_;
-  }
-  const uint32_t& height() const {
-    return height_;
-  }
+    auto Height() -> uint32_t &
+    {
+        return height;
+    }
+    auto Height() const -> const uint32_t &
+    {
+        return height;
+    }
 
- private:
-  int32_t x_;
-  int32_t y_;
-  uint32_t width_;
-  uint32_t height_;
+  private:
+    int32_t x;
+    int32_t y;
+    uint32_t width;
+    uint32_t height;
 };
 static_assert(sizeof(Rect) == 16);
 
-template <typename Sink>
-void AbslStringify(Sink& sink, const Rect& rect) {
-  absl::Format(&sink, "%dx%d at (%d, %d)", rect.width_, rect.height_, rect.x_, rect.y_);
+template <typename Sink> void AbslStringify(Sink &sink, const Rect &rect)
+{
+    absl::Format(&sink, "%dx%d at (%d, %d)", rect.width, rect.height, rect.x, rect.y);
 }
 
-inline bool IsSameWH(const Rect& lhs, const Rect& rhs) {
-  if (lhs.width() != rhs.width()) return false;
-  if (lhs.height() != rhs.height()) return false;
-  return true;
+inline auto IsSameWH(const Rect &lhs, const Rect &rhs) -> bool
+{
+    if (lhs.Width() != rhs.Width())
+        return false;
+    if (lhs.Height() != rhs.Height())
+        return false;
+    return true;
 }
 
-Rect TryApplyPadding(const Rect& rect, uint32_t padding);
-Rect TryApplyMargin(const Rect& rect, uint32_t margin);
-Rect TryApplyMarginTop(const Rect& rect, uint32_t margin_top);
+auto TryApplyPadding(const Rect &rect, uint32_t padding) -> Rect;
+auto TryApplyMargin(const Rect &rect, uint32_t margin) -> Rect;
+auto TryApplyMarginTop(const Rect &rect, uint32_t marginTop) -> Rect;
 
-enum class LayoutType {
-  kColumns,
-  kRows,
-  kGrid,
-  /* kFibonacciSpiral */
+enum class LayoutType
+{
+    KColumns,
+    KRows,
+    KGrid,
+    /* kFibonacciSpiral */
 };
 
-void CycleLayoutType(LayoutType& layout);
+void CycleLayoutType(LayoutType &layout);
 
-std::vector<Rect> ComputeLayout(const Rect& bounding_rect, uint32_t n, uint32_t padding,
-                                LayoutType layout_type = LayoutType::kColumns);
+auto ComputeLayout(const Rect &boundingRect, uint32_t n, uint32_t padding,
+                                LayoutType layoutType = LayoutType::KColumns) -> std::vector<Rect>;
 
-}  // namespace nyla
+} // namespace nyla

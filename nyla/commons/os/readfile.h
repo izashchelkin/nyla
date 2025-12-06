@@ -3,8 +3,9 @@
 #include <string>
 #include <vector>
 
-namespace nyla {
+namespace nyla
+{
 
-std::vector<char> ReadFile(const std::string& filename);
+auto ReadFile(const std::string &filename) -> std::vector<char>;
 
-}  // namespace nyla
+} // namespace nyla

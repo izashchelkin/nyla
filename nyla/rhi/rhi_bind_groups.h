@@ -4,52 +4,66 @@
 #include "nyla/rhi/rhi_handle.h"
 #include "nyla/rhi/rhi_shader.h"
 
-namespace nyla {
+namespace nyla
+{
 
-constexpr inline uint32_t rhi_max_bind_group_layouts = 4;
+constexpr inline uint32_t kRhiMaxBindGroupLayouts = 4;
 
-struct RhiBindGroup : RhiHandle {};
-struct RhiBindGroupLayout : RhiHandle {};
-
-enum class RhiBindingType { UniformBuffer, UniformBufferDynamic };
-
-struct RhiBufferBinding {
-  RhiBuffer buffer;
-  uint32_t offset;
-  uint32_t size;
+struct RhiBindGroup : RhiHandle
+{
+};
+struct RhiBindGroupLayout : RhiHandle
+{
 };
 
-struct RhiBindGroupEntry {
-  uint32_t binding;
-  RhiBindingType type;
-  uint32_t array_index;
-  union {
-    RhiBufferBinding buffer;
-  };
+enum class RhiBindingType
+{
+    UniformBuffer,
+    UniformBufferDynamic
 };
 
-struct RhiBindGroupDesc {
-  RhiBindGroupLayout layout;
-  RhiBindGroupEntry entries[4];
-  uint32_t entries_count;
+struct RhiBufferBinding
+{
+    RhiBuffer buffer;
+    uint32_t offset;
+    uint32_t size;
 };
 
-struct RhiBindingDesc {
-  uint32_t binding;
-  RhiBindingType type;
-  uint32_t array_size;
-  RhiShaderStage stage_flags;
+struct RhiBindGroupEntry
+{
+    uint32_t binding;
+    RhiBindingType type;
+    uint32_t arrayIndex;
+    union {
+        RhiBufferBinding buffer;
+    };
 };
 
-struct RhiBindGroupLayoutDesc {
-  RhiBindingDesc bindings[16];
-  uint32_t binding_count;
+struct RhiBindGroupDesc
+{
+    RhiBindGroupLayout layout;
+    RhiBindGroupEntry entries[4];
+    uint32_t entriesCount;
 };
 
-RhiBindGroupLayout RhiCreateBindGroupLayout(const RhiBindGroupLayoutDesc&);
+struct RhiBindingDesc
+{
+    uint32_t binding;
+    RhiBindingType type;
+    uint32_t arraySize;
+    RhiShaderStage stageFlags;
+};
+
+struct RhiBindGroupLayoutDesc
+{
+    RhiBindingDesc bindings[16];
+    uint32_t bindingCount;
+};
+
+auto RhiCreateBindGroupLayout(const RhiBindGroupLayoutDesc &) -> RhiBindGroupLayout;
 void RhiDestroyBindGroupLayout(RhiBindGroupLayout);
 
-RhiBindGroup RhiCreateBindGroup(const RhiBindGroupDesc&);
+auto RhiCreateBindGroup(const RhiBindGroupDesc &) -> RhiBindGroup;
 void RhiDestroyBindGroup(RhiBindGroup);
 
-}  // namespace nyla
+} // namespace nyla

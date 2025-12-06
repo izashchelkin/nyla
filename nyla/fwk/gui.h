@@ -4,12 +4,13 @@
 
 #include "nyla/fwk/render_pipeline.h"
 
-namespace nyla {
+namespace nyla
+{
 
-extern Rp gui_pipeline;
+extern Rp guiPipeline;
 
-void UI_FrameBegin();
-void UI_BoxBegin(int32_t x, int32_t y, uint32_t width, uint32_t height);
-void UI_Text(std::string_view text);
+void UiFrameBegin();
+void UiBoxBegin(int32_t x, int32_t y, uint32_t width, uint32_t height);
+void UiText(std::string_view text);
 
-}  // namespace nyla
+} // namespace nyla

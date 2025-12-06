@@ -1,8 +1,9 @@
 #pragma once
 
-namespace nyla {
+namespace nyla
+{
 
-bool RenderDocCaptureStart();
-bool RenderDocCaptureEnd();
+auto RenderDocCaptureStart() -> bool;
+auto RenderDocCaptureEnd() -> bool;
 
-}  // namespace nyla
+} // namespace nyla

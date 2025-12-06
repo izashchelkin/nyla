@@ -27,7 +27,6 @@ target_link_libraries(${TARGET}
         absl::log
         absl::check
         absl::log_initialize
-        absl::str_format
         absl::flat_hash_set
         absl::flat_hash_map
 )

@@ -14,44 +14,49 @@
 #include "nyla/rhi/rhi.h"
 #include "xcb/xproto.h"
 
-namespace nyla {
+namespace nyla
+{
 
 using namespace platform_x11_internal;
 
-xcb_window_t background_window;
+xcb_window_t backgroundWindow;
 
-void DrawBackground(uint32_t num_clients, std::string_view bar_text) {
-  if (RecompileShadersIfNeeded()) {
-    RpInit(dbg_text_pipeline);
-    RpInit(gui_pipeline);
-  }
+void DrawBackground(uint32_t numClients, std::string_view barText)
+{
+    if (RecompileShadersIfNeeded())
+    {
+        RpInit(dbgTextPipeline);
+        RpInit(guiPipeline);
+    }
 
-  RhiFrameBegin();
-  UI_FrameBegin();
+    RhiFrameBegin();
+    UiFrameBegin();
 
-  RpBegin(dbg_text_pipeline);
-  DbgText(1, 1, bar_text);
+    RpBegin(dbgTextPipeline);
+    DbgText(1, 1, barText);
 
-  RpBegin(gui_pipeline);
+    RpBegin(guiPipeline);
 
-  for (uint32_t i = 0; i < num_clients; ++i) {
-    UI_BoxBegin(25 + 25 * i, 45, 20, 20);
-  }
+    for (uint32_t i = 0; i < numClients; ++i)
+    {
+        UiBoxBegin(25 + 25 * i, 45, 20, 20);
+    }
 
-  RhiFrameEnd();
+    RhiFrameEnd();
 }
 
-std::future<void> InitWMBackground() {
-  background_window =
-      X11_CreateWindow(x11.screen->width_in_pixels, x11.screen->height_in_pixels, true, XCB_EVENT_MASK_EXPOSURE);
-  xcb_configure_window(x11.conn, background_window, XCB_CONFIG_WINDOW_STACK_MODE, (uint32_t[]){XCB_STACK_MODE_BELOW});
-  X11_Flush();
+auto InitWMBackground() -> std::future<void>
+{
+    backgroundWindow =
+        X11CreateWindow(x11.screen->width_in_pixels, x11.screen->height_in_pixels, true, XCB_EVENT_MASK_EXPOSURE);
+    xcb_configure_window(x11.conn, backgroundWindow, XCB_CONFIG_WINDOW_STACK_MODE, (uint32_t[]){XCB_STACK_MODE_BELOW});
+    X11Flush();
 
-  return std::async(std::launch::async, [] {
-    RhiInit(RhiDesc{
-        .window = PlatformWindow{background_window},
+    return std::async(std::launch::async, [] -> void {
+        RhiInit(RhiDesc{
+            .window = PlatformWindow{backgroundWindow},
+        });
     });
-  });
 }
 
-}  // namespace nyla
+} // namespace nyla

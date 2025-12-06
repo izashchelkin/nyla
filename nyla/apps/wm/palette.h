@@ -2,14 +2,16 @@
 
 #include <cstdint>
 
-namespace nyla {
+namespace nyla
+{
 
-enum class Color : uint32_t {
-  kNone = 0x000000,
-  kActive = 0x95A3B3,
-  kReserved0 = 0xC0FF1F,
-  kActiveFollow = 0x84DCC6,
-  kReserved1 = 0x5E1FFF,
+enum class Color : uint32_t
+{
+    KNone = 0x000000,
+    KActive = 0x95A3B3,
+    KReserved0 = 0xC0FF1F,
+    KActiveFollow = 0x84DCC6,
+    KReserved1 = 0x5E1FFF,
 };
 
-}
+} // namespace nyla

@@ -4,32 +4,34 @@
 
 #include "nyla/platform/platform.h"
 
-namespace nyla {
+namespace nyla
+{
 
-constexpr inline uint32_t rhi_max_num_frames_in_flight = 3;
+constexpr inline uint32_t kRhiMaxNumFramesInFlight = 3;
 
 #if defined(NDEBUG)
-constexpr inline bool rhi_validations = false;
+constexpr inline bool kRhiValidations = false;
 #else
-constexpr inline bool rhi_validations = true;
+constexpr inline bool kRhiValidations = true;
 #endif
 
-constexpr inline bool rhi_checkpoints = false;
+constexpr inline bool kRhiCheckpoints = false;
 
 //
 
-struct RhiDesc {
-  PlatformWindow window;
-  uint32_t num_frames_in_flight;
+struct RhiDesc
+{
+    PlatformWindow window;
+    uint32_t numFramesInFlight;
 };
 
-void RhiInit(const RhiDesc&);
-uint32_t RhiGetNumFramesInFlight();
-uint32_t RhiFrameGetIndex();
+void RhiInit(const RhiDesc &);
+auto RhiGetNumFramesInFlight() -> uint32_t;
+auto RhiFrameGetIndex() -> uint32_t;
 
-uint32_t RhiGetSurfaceWidth();
-uint32_t RhiGetSurfaceHeight();
+auto RhiGetSurfaceWidth() -> uint32_t;
+auto RhiGetSurfaceHeight() -> uint32_t;
 
-uint32_t RhiGetMinUniformBufferOffsetAlignment();
+auto RhiGetMinUniformBufferOffsetAlignment() -> uint32_t;
 
-}  // namespace nyla
+} // namespace nyla
