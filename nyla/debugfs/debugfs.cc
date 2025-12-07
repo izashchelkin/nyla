@@ -281,11 +281,11 @@ void DebugFsRegister(const char *name, void *data, void (*setContentHandler)(Deb
 
     CHECK(setContentHandler);
     debugfs.files.emplace(nextInode++, DebugFsFile{
-                                            .name = name,
-                                            .data = data,
-                                            .setContentHandler = setContentHandler,
-                                            .readNotifyHandler = readNotifyHandler,
-                                        });
+                                           .name = name,
+                                           .data = data,
+                                           .setContentHandler = setContentHandler,
+                                           .readNotifyHandler = readNotifyHandler,
+                                       });
 }
 
 void DebugFsProcess()

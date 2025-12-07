@@ -31,9 +31,9 @@ static void ComputeColumns(const Rect &boundingRect, uint32_t n, uint32_t paddin
     uint32_t width = boundingRect.Width() / n;
     for (uint32_t i = 0; i < n; ++i)
     {
-        out.emplace_back(TryApplyPadding(Rect(static_cast<int32_t>(boundingRect.X() + (i * width)), boundingRect.Y(),
-                                              width, boundingRect.Height()),
-                                         padding));
+        out.emplace_back(TryApplyPadding(
+            Rect(static_cast<int32_t>(boundingRect.X() + (i * width)), boundingRect.Y(), width, boundingRect.Height()),
+            padding));
     }
 }
 
@@ -42,9 +42,9 @@ static void ComputeRows(const Rect &boundingRect, uint32_t n, uint32_t padding, 
     uint32_t height = boundingRect.Height() / n;
     for (uint32_t i = 0; i < n; ++i)
     {
-        out.emplace_back(TryApplyPadding(Rect(boundingRect.X(), static_cast<int32_t>(boundingRect.Y() + (i * height)),
-                                              boundingRect.Width(), height),
-                                         padding));
+        out.emplace_back(TryApplyPadding(
+            Rect(boundingRect.X(), static_cast<int32_t>(boundingRect.Y() + (i * height)), boundingRect.Width(), height),
+            padding));
     }
 }
 
@@ -65,10 +65,10 @@ static void ComputeGrid(const Rect &boundingRect, uint32_t n, uint32_t padding, 
 
         for (uint32_t i = 0; i < n; ++i)
         {
-            out.emplace_back(TryApplyPadding(Rect(static_cast<int32_t>(boundingRect.X() + ((i % numCols) * width)),
-                                                  static_cast<int32_t>(boundingRect.Y() + ((i / numCols) * height)),
-                                                  width, height),
-                                             padding));
+            out.emplace_back(
+                TryApplyPadding(Rect(static_cast<int32_t>(boundingRect.X() + ((i % numCols) * width)),
+                                     static_cast<int32_t>(boundingRect.Y() + ((i / numCols) * height)), width, height),
+                                padding));
         }
     }
 }

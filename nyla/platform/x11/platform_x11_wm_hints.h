@@ -84,9 +84,8 @@ template <typename Sink> void AbslStringify(Sink &sink, const WmNormalHints &h)
                  "height_inc=%v min_aspect=%v/%v max_aspect=%v/%v base_width=%v "
                  "base_height=%v "
                  "win_gravity=%v}",
-                 h.flags, h.minWidth, h.minHeight, h.maxWidth, h.maxHeight, h.widthInc, h.heightInc,
-                 h.minAspect.num, h.minAspect.den, h.maxAspect.num, h.maxAspect.den, h.baseWidth, h.baseHeight,
-                 h.winGravity);
+                 h.flags, h.minWidth, h.minHeight, h.maxWidth, h.maxHeight, h.widthInc, h.heightInc, h.minAspect.num,
+                 h.minAspect.den, h.maxAspect.num, h.maxAspect.den, h.baseWidth, h.baseHeight, h.winGravity);
 }
 
 } // namespace platform_x11_internal

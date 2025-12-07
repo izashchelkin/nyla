@@ -64,8 +64,8 @@ void DBusProcess()
             const char *newOwner;
 
             DBusErrorWrapper err;
-            if (!dbus_message_get_args(msg, err,                     //
-                                       DBUS_TYPE_STRING, &name,      //
+            if (!dbus_message_get_args(msg, err,                    //
+                                       DBUS_TYPE_STRING, &name,     //
                                        DBUS_TYPE_STRING, &oldOwner, //
                                        DBUS_TYPE_STRING, &newOwner, //
                                        DBUS_TYPE_INVALID))

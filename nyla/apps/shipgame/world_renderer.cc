@@ -70,7 +70,7 @@ void WorldRender(float2 pos, float angleRadians, float scalar, std::span<Vertex>
     model = model.Mult(float4x4::Rotate(angleRadians));
     model = model.Mult(float4x4::Scale(float4{scalar, scalar, 1.f, 1.f}));
 
-    DynamicUbo dynamicUbo { .model = model };
+    DynamicUbo dynamicUbo{.model = model};
 
     ByteView vertexData = ByteViewSpan(vertices);
     ByteView dynamicUniformData = ByteViewPtr(&dynamicUbo);

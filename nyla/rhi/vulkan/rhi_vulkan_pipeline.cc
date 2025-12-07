@@ -289,8 +289,8 @@ void RhiCmdPushGraphicsConstants(RhiCmdList cmd, uint32_t offset, RhiShaderStage
     const VulkanPipelineData &pipelineData =
         RhiHandleGetData(rhiHandles.graphicsPipelines, cmdData.boundGraphicsPipeline);
 
-    vkCmdPushConstants(cmdData.cmdbuf, pipelineData.layout, ConvertRhiShaderStageIntoVkShaderStageFlags(stage),
-                       offset, data.size(), data.data());
+    vkCmdPushConstants(cmdData.cmdbuf, pipelineData.layout, ConvertRhiShaderStageIntoVkShaderStageFlags(stage), offset,
+                       data.size(), data.data());
 }
 
 void RhiCmdBindVertexBuffers(RhiCmdList cmd, uint32_t firstBinding, std::span<const RhiBuffer> buffers,

@@ -136,7 +136,8 @@ float4 main(PSInput input) : SV_Target
         discard;
 
     uint line_width_px = text_line.origin_px_and_word_count.z * 4u * WIDTH;
-    if (top_left_pos.x >= int(line_width_px)) {
+    if (top_left_pos.x >= int(line_width_px))
+    {
         discard;
     }
 

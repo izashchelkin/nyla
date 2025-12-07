@@ -39,7 +39,7 @@ static void HandleMessage(DBusMessage *msg)
         const char *inReason;
 
         DBusErrorWrapper err;
-        if (!dbus_message_get_args(msg, err,                     //
+        if (!dbus_message_get_args(msg, err,                    //
                                    DBUS_TYPE_STRING, &inName,   //
                                    DBUS_TYPE_STRING, &inReason, //
                                    DBUS_TYPE_INVALID))
@@ -69,7 +69,7 @@ static void HandleMessage(DBusMessage *msg)
         uint32_t inCookie;
 
         DBusErrorWrapper err;
-        if (!dbus_message_get_args(msg, err,                     //
+        if (!dbus_message_get_args(msg, err,                    //
                                    DBUS_TYPE_UINT32, &inCookie, //
                                    DBUS_TYPE_INVALID))
         {
@@ -109,23 +109,23 @@ void ScreenSaverInhibitorInit()
 
     auto handler = new DBusObjectPathHandler{
         .introspectXml = "<node>"
-                          " <interface name='org.freedesktop.ScreenSaver'>"
-                          "  <method name='Inhibit'>"
-                          "   <arg name='application' type='s' direction='in'/>"
-                          "   <arg name='reason' type='s' direction='in'/>"
-                          "   <arg name='cookie' type='u' direction='out'/>"
-                          "  </method>"
-                          "  <method name='UnInhibit'>"
-                          "   <arg name='cookie' type='u' direction='in'/>"
-                          "  </method>"
-                          "  <method name='SimulateUserActivity'/>"
-                          " </interface>"
-                          " <interface name='org.freedesktop.DBus.Introspectable'>"
-                          "  <method name='Introspect'>"
-                          "   <arg name='xml' type='s' direction='out'/>"
-                          "  </method>"
-                          " </interface>"
-                          "</node>",
+                         " <interface name='org.freedesktop.ScreenSaver'>"
+                         "  <method name='Inhibit'>"
+                         "   <arg name='application' type='s' direction='in'/>"
+                         "   <arg name='reason' type='s' direction='in'/>"
+                         "   <arg name='cookie' type='u' direction='out'/>"
+                         "  </method>"
+                         "  <method name='UnInhibit'>"
+                         "   <arg name='cookie' type='u' direction='in'/>"
+                         "  </method>"
+                         "  <method name='SimulateUserActivity'/>"
+                         " </interface>"
+                         " <interface name='org.freedesktop.DBus.Introspectable'>"
+                         "  <method name='Introspect'>"
+                         "   <arg name='xml' type='s' direction='out'/>"
+                         "  </method>"
+                         " </interface>"
+                         "</node>",
         .messageHandler = HandleMessage,
         .nameOwnerChangedHandler = HandleNameOwnerChange,
     };
@@ -134,7 +134,7 @@ void ScreenSaverInhibitorInit()
     DBusRegisterHandler("org.freedesktop.ScreenSaver", "/ScreenSaver", handler);
 
     DebugFsRegister(
-        "screensaver_inhibitors", nullptr,                   //
+        "screensaver_inhibitors", nullptr,                           //
         [](auto &file) -> auto { file.content = DumpInhibitors(); }, //
         nullptr);
 }

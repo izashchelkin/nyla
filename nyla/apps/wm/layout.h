@@ -112,7 +112,7 @@ enum class LayoutType
 
 void CycleLayoutType(LayoutType &layout);
 
-auto ComputeLayout(const Rect &boundingRect, uint32_t n, uint32_t padding,
-                                LayoutType layoutType = LayoutType::KColumns) -> std::vector<Rect>;
+auto ComputeLayout(const Rect &boundingRect, uint32_t n, uint32_t padding, LayoutType layoutType = LayoutType::KColumns)
+    -> std::vector<Rect>;
 
 } // namespace nyla
