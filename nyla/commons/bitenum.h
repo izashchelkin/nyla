@@ -65,4 +65,9 @@ template <BitmaskEnum E> constexpr auto Any(E val)
     return static_cast<U>(val) != 0;
 }
 
+template <BitmaskEnum E> constexpr auto None()
+{
+    return static_cast<E>(0);
+}
+
 } // namespace nyla

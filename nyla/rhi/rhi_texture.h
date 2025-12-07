@@ -19,7 +19,7 @@ enum class RhiTextureFormat
     // B8G8R8A8_UNorm,
     //
     // R8G8B8_sRGB,
-    R8G8B8A8SRgb,
+    R8G8B8A8_sRGB,
     // B8G8R8A8_sRGB,
     //
     // R16_UNorm,
@@ -62,7 +62,7 @@ enum class RhiTextureFormat
     //
     // D16_UNorm,
     // X8_D24_UNorm,
-    // D32_Float,
+    D32_Float,
     //
     // D16_UNorm_S8_UInt,
     // D24_UNorm_S8_UInt,

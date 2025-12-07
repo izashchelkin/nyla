@@ -16,7 +16,7 @@ uint16_t ientity;
 
 static auto Main() -> int
 {
-    Engine0Init();
+    Engine0Init(true);
 
     PlatformMapInputBegin();
     PlatformMapInput(kUp, KeyPhysical::E);

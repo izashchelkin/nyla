@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "absl/log/check.h"
+#include "absl/log/log.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_bind_groups.h"
 #include "nyla/rhi/rhi_cmdlist.h"
@@ -11,15 +12,19 @@
 #include "vulkan/vk_enum_string_helper.h"
 #include "vulkan/vulkan_core.h"
 
-#define VK_CHECK(res)                                                                                                  \
-    CHECK_EQ(res, VK_SUCCESS) << "Vulkan error: " << string_VkResult(res) << "; Last checkpoint "                      \
-                              << ((res) == VK_ERROR_DEVICE_LOST ? RhiGetLastCheckpointData(RhiQueueType::Graphics)     \
-                                                                : 999999);
-
 #define VK_GET_INSTANCE_PROC_ADDR(name) reinterpret_cast<PFN_##name>(vkGetInstanceProcAddr(vk.instance, #name))
 
 namespace nyla::rhi_vulkan_internal
 {
+
+inline auto VkCheckImpl(VkResult res)
+{
+    if (res == VK_ERROR_DEVICE_LOST)
+        LOG(ERROR) << "Last checkpoint: " << RhiGetLastCheckpointData(RhiQueueType::Graphics);
+
+    CHECK_EQ(res, VK_SUCCESS) << "Vulkan error: " << string_VkResult(res);
+};
+#define VK_CHECK(res) VkCheckImpl(res)
 
 struct DeviceQueue
 {
@@ -35,6 +40,8 @@ struct VulkanData
 {
     VkAllocationCallbacks *alloc;
 
+    RhiFlags flags;
+
     VkInstance instance;
     VkDevice dev;
     VkPhysicalDevice physDev;
@@ -47,23 +54,23 @@ struct VulkanData
     VkExtent2D surfaceExtent;
     VkSurfaceFormatKHR surfaceFormat;
     VkSwapchainKHR swapchain;
-    std::array<VkImage, 8> swapchainImages;
-    uint32_t swapchainImageCount;
-    std::array<VkImageView, 8> swapchainImageViews;
+
+    uint32_t swapchainImageIndex;
+    uint32_t swapchainImagesCount;
+    std::array<VkImage, kRhiMaxNumSwapchainImages> swapchainImages;
+    std::array<VkImageView, kRhiMaxNumSwapchainImages> swapchainImageViews;
+    std::array<VkSemaphore, kRhiMaxNumSwapchainImages> renderFinishedSemaphores;
     std::array<VkSemaphore, kRhiMaxNumFramesInFlight> swapchainAcquireSemaphores;
-    std::array<VkSemaphore, 8> renderFinishedSemaphores;
 
     DeviceQueue graphicsQueue;
+    uint32_t frameIndex;
+    uint32_t numFramesInFlight;
     std::array<RhiCmdList, kRhiMaxNumFramesInFlight> graphicsQueueCmd;
     std::array<uint64_t, kRhiMaxNumFramesInFlight> graphicsQueueCmdDone;
 
     DeviceQueue transferQueue;
     RhiCmdList transferQueueCmd;
     uint64_t transferQueueCmdDone;
-
-    uint32_t numFramesInFlight;
-    uint32_t frameIndex;
-    uint32_t swapchainImageIndex;
 };
 
 extern VulkanData vk;

@@ -107,6 +107,7 @@ void RhiInit(const RhiDesc &rhiDesc)
         vk.numFramesInFlight = 2;
     }
 
+    vk.flags = rhiDesc.flags;
     vk.window = rhiDesc.window;
 
     const VkApplicationInfo appInfo{
@@ -268,7 +269,7 @@ void RhiInit(const RhiDesc &rhiDesc)
                 }
             }
         }
- 
+
         if (missingExtensions)
         {
             LOG(WARNING) << "Missing " << missingExtensions << " extensions";
@@ -388,9 +389,17 @@ void RhiInit(const RhiDesc &rhiDesc)
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
         .pNext = &v12,
     };
+
+    VkPhysicalDevicePresentModeFifoLatestReadyFeaturesKHR fifoLatestReadyFeatures = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRESENT_MODE_FIFO_LATEST_READY_FEATURES_KHR,
+        .pNext = &v11,
+        .presentModeFifoLatestReady = VK_TRUE,
+    };
+
     VkPhysicalDeviceFeatures2 features{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-        .pNext = &v11,
+        .pNext = &fifoLatestReadyFeatures,
+        .features = {},
     };
 
     const VkDeviceCreateInfo deviceCreateInfo{

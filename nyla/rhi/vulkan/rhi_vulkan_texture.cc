@@ -1,6 +1,7 @@
 #include "nyla/rhi/rhi_handle.h"
 #include "nyla/rhi/rhi_texture.h"
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
+#include <vulkan/vulkan_core.h>
 
 namespace nyla
 {
@@ -17,8 +18,10 @@ auto ConvertRhiTextureFormatIntoVkFormat(RhiTextureFormat format) -> VkFormat
     {
     case RhiTextureFormat::None:
         break;
-    case RhiTextureFormat::R8G8B8A8SRgb:
+    case RhiTextureFormat::R8G8B8A8_sRGB:
         return VK_FORMAT_R8G8B8A8_SRGB;
+    case RhiTextureFormat::D32_Float:
+        return VK_FORMAT_D32_SFLOAT;
     }
 
     CHECK(false);

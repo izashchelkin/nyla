@@ -26,7 +26,7 @@ uint64_t frameStart = 0;
 
 } // namespace
 
-auto Engine0Init() -> void
+auto Engine0Init(bool vsync) -> void
 {
     LoggingInit();
     FrameArenaInit();
@@ -36,7 +36,12 @@ auto Engine0Init() -> void
     PlatformInit();
     PlatformWindow window = PlatformCreateWindow();
 
+    RhiFlags flags = None<RhiFlags>();
+    if (vsync)
+        flags |= RhiFlags::VSync;
+
     RhiInit(RhiDesc{
+        .flags = flags,
         .window = window,
     });
 }

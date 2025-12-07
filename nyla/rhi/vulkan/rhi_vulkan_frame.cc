@@ -71,6 +71,10 @@ auto RhiFrameBegin() -> RhiCmdList
         .clearValue = {{{0.0f, 0.0f, 0.0f, 1.0f}}},
     };
 
+    const VkRenderingAttachmentInfo depthAttachmentInfo{
+        .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+    };
+
     const VkRenderingInfo renderingInfo{
         .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
         .renderArea = {{0, 0}, vk.surfaceExtent},

@@ -13,7 +13,7 @@ namespace nyla
 
 static auto Main() -> int
 {
-    Engine0Init();
+    Engine0Init(false);
 
     PlatformMapInputBegin();
     PlatformMapInput(kLeft, KeyPhysical::S);

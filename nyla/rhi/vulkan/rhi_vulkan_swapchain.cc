@@ -3,6 +3,7 @@
 #include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/vulkan_core.h>
 
+#include "nyla/rhi/rhi.h"
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
 
 namespace nyla::rhi_vulkan_internal
@@ -12,7 +13,7 @@ void CreateSwapchain()
 {
     VkSwapchainKHR oldSwapchain = vk.swapchain;
     auto oldImageViews = vk.swapchainImageViews;
-    uint32_t oldImagesViewsCount = vk.swapchainImageCount;
+    uint32_t oldImagesViewsCount = vk.swapchainImagesCount;
 
     VkSurfaceCapabilitiesKHR surfaceCapabilities;
     VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vk.physDev, vk.surface, &surfaceCapabilities));
@@ -37,22 +38,45 @@ void CreateSwapchain()
         std::vector<VkPresentModeKHR> presentModes;
         uint32_t presentModeCount = 0;
         vkGetPhysicalDeviceSurfacePresentModesKHR(vk.physDev, vk.surface, &presentModeCount, nullptr);
-        CHECK(presentModeCount);
 
         presentModes.resize(presentModeCount);
         vkGetPhysicalDeviceSurfacePresentModesKHR(vk.physDev, vk.surface, &presentModeCount, presentModes.data());
 
-        if (logPresentModes)
+        VkPresentModeKHR bestMode = VK_PRESENT_MODE_FIFO_KHR;
+        for (VkPresentModeKHR presentMode : presentModes)
         {
-            for (auto presentMode : presentModes)
+            if (logPresentModes)
                 LOG(INFO) << "Present Mode available: " << string_VkPresentModeKHR(presentMode);
-            logPresentModes = false;
+
+            bool better;
+            switch (presentMode)
+            {
+
+            case VK_PRESENT_MODE_FIFO_LATEST_READY_KHR: {
+                better = !Any(vk.flags & RhiFlags::VSync);
+                break;
+            }
+            case VK_PRESENT_MODE_IMMEDIATE_KHR: {
+                better = !Any(vk.flags & RhiFlags::VSync) && bestMode != VK_PRESENT_MODE_FIFO_LATEST_READY_KHR;
+                break;
+            }
+
+            default: {
+                better = false;
+                break;
+            }
+            }
+
+            if (better)
+                bestMode = presentMode;
         }
 
-        if constexpr (false)
-            return VK_PRESENT_MODE_FIFO_KHR; // TODO:
-        else
-            return VK_PRESENT_MODE_FIFO_LATEST_READY_KHR;
+        if (logPresentModes)
+            LOG(INFO) << "Chose " << string_VkPresentModeKHR(bestMode);
+
+        logPresentModes = false;
+
+        return bestMode;
     }();
 
     vk.surfaceExtent = [surfaceCapabilities] -> VkExtent2D {
