@@ -12,6 +12,7 @@
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_handle.h"
 #include "nyla/rhi/rhi_pipeline.h"
+#include "nyla/rhi/rhi_texture.h"
 
 namespace nyla
 {
@@ -117,8 +118,12 @@ void RpInit(Rp &rp)
         }
     }
 
+    RhiTextureInfo backbuffer = RhiGetTextureInfo(RhiGetBackbufferTexture());
+
     RhiGraphicsPipelineDesc desc{
         .debugName = std::format("Rp %v", rp.debugName),
+        .colorTargetFormats = {backbuffer.format},
+        .colorTargetFormatsCount = 1,
         .cullMode = rp.disableCulling ? RhiCullMode::None : RhiCullMode::Back,
         .frontFace = RhiFrontFace::CCW,
     };

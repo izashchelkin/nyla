@@ -41,69 +41,6 @@ auto RhiFrameBegin() -> RhiCmdList
     };
     VK_CHECK(vkBeginCommandBuffer(cmdbuf, &commandBufferBeginInfo));
 
-    const VulkanTextureData swapchainTextureData =
-        RhiHandleGetData(rhiHandles.textures, vk.swapchainTextures[vk.swapchainTextureIndex]);
-
-    const VkImageMemoryBarrier imageMemoryBarrier{
-        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-        .srcAccessMask = 0,
-        .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-        .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED, // TODO:
-        .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        .image = swapchainTextureData.image,
-        .subresourceRange =
-            {
-                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                .baseMipLevel = 0,
-                .levelCount = 1,
-                .baseArrayLayer = 0,
-                .layerCount = 1,
-            },
-    };
-
-    vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, nullptr, 0, nullptr, 1,
-                         &imageMemoryBarrier);
-
-    const VkRenderingAttachmentInfo colorAttachmentInfo{
-        .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-        .imageView = swapchainTextureData.imageView,
-        .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-        .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-        .clearValue = {{{0.0f, 0.0f, 0.0f, 1.0f}}},
-    };
-
-    const VkRenderingAttachmentInfo depthAttachmentInfo{
-        .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-    };
-
-    const VkRenderingInfo renderingInfo{
-        .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
-        .renderArea = {{0, 0}, vk.surfaceExtent},
-        .layerCount = 1,
-        .colorAttachmentCount = 1,
-        .pColorAttachments = &colorAttachmentInfo,
-    };
-
-    vkCmdBeginRendering(cmdbuf, &renderingInfo);
-
-    const VkViewport viewport{
-        .x = 0.f,
-        .y = static_cast<float>(vk.surfaceExtent.height),
-        .width = static_cast<float>(vk.surfaceExtent.width),
-        .height = -static_cast<float>(vk.surfaceExtent.height),
-        .minDepth = 0.0f,
-        .maxDepth = 1.0f,
-    };
-    vkCmdSetViewport(cmdbuf, 0, 1, &viewport);
-
-    const VkRect2D scissor{
-        .offset = {0, 0},
-        .extent = vk.surfaceExtent,
-    };
-    vkCmdSetScissor(cmdbuf, 0, 1, &scissor);
-
     return cmd;
 }
 
@@ -111,29 +48,6 @@ void RhiFrameEnd()
 {
     RhiCmdList cmd = vk.graphicsQueueCmd[vk.frameIndex];
     VkCommandBuffer cmdbuf = RhiHandleGetData(rhiHandles.cmdLists, cmd).cmdbuf;
-    vkCmdEndRendering(cmdbuf);
-
-    const VulkanTextureData swapchainTextureData =
-        RhiHandleGetData(rhiHandles.textures, vk.swapchainTextures[vk.swapchainTextureIndex]);
-
-    const VkImageMemoryBarrier imageMemoryBarrier{
-        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-        .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-        .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-        .image = swapchainTextureData.image,
-        .subresourceRange =
-            {
-                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                .baseMipLevel = 0,
-                .levelCount = 1,
-                .baseArrayLayer = 0,
-                .layerCount = 1,
-            },
-    };
-
-    vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0,
-                         0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
 
     VK_CHECK(vkEndCommandBuffer(cmdbuf));
 

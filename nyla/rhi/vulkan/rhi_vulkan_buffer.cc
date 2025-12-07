@@ -1,5 +1,6 @@
 #include <cstdint>
 
+#include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_handle.h"
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
 #include "vulkan/vulkan_core.h"
@@ -47,6 +48,8 @@ auto ConvertRhiMemoryUsageIntoVkMemoryPropertyFlags(RhiMemoryUsage usage) -> VkM
 
     switch (usage)
     {
+    case nyla::RhiMemoryUsage::Unknown:
+        break;
     case RhiMemoryUsage::GpuOnly:
         return VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
     case RhiMemoryUsage::CpuToGpu:

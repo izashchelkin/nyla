@@ -7,7 +7,13 @@
 #include "nyla/rhi/rhi_texture.h"
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
 
-namespace nyla::rhi_vulkan_internal
+namespace nyla
+{
+
+using namespace rhi_internal;
+using namespace rhi_vulkan_internal;
+
+namespace rhi_vulkan_internal
 {
 
 void CreateSwapchain()
@@ -16,24 +22,6 @@ void CreateSwapchain()
 
     std::array oldSwapchainTextures = vk.swapchainTextures;
     uint32_t oldImagesViewsCount = vk.swapchainTexturesCount;
-
-    VkSurfaceCapabilitiesKHR surfaceCapabilities;
-    VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vk.physDev, vk.surface, &surfaceCapabilities));
-
-    vk.surfaceFormat = [] -> VkSurfaceFormatKHR {
-        uint32_t surfaceFormatCount;
-        VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(vk.physDev, vk.surface, &surfaceFormatCount, nullptr));
-
-        std::vector<VkSurfaceFormatKHR> surfaceFormats(surfaceFormatCount);
-        vkGetPhysicalDeviceSurfaceFormatsKHR(vk.physDev, vk.surface, &surfaceFormatCount, surfaceFormats.data());
-
-        auto it = std::ranges::find_if(surfaceFormats, [](VkSurfaceFormatKHR surfaceFormat) -> bool {
-            return surfaceFormat.format == VK_FORMAT_B8G8R8A8_SRGB &&
-                   surfaceFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
-        });
-        CHECK(it != surfaceFormats.end());
-        return *it;
-    }();
 
     static bool logPresentModes = true;
     VkPresentModeKHR presentMode = [] -> VkPresentModeKHR {
@@ -81,11 +69,27 @@ void CreateSwapchain()
         return bestMode;
     }();
 
-    vk.surfaceExtent = [surfaceCapabilities] -> VkExtent2D {
+    VkSurfaceCapabilitiesKHR surfaceCapabilities;
+    VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vk.physDev, vk.surface, &surfaceCapabilities));
+
+    auto surfaceFormat = [] -> VkSurfaceFormatKHR {
+        uint32_t surfaceFormatCount;
+        VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(vk.physDev, vk.surface, &surfaceFormatCount, nullptr));
+
+        std::vector<VkSurfaceFormatKHR> surfaceFormats(surfaceFormatCount);
+        vkGetPhysicalDeviceSurfaceFormatsKHR(vk.physDev, vk.surface, &surfaceFormatCount, surfaceFormats.data());
+
+        auto it = std::ranges::find_if(surfaceFormats, [](VkSurfaceFormatKHR surfaceFormat) -> bool {
+            return surfaceFormat.format == VK_FORMAT_B8G8R8A8_SRGB &&
+                   surfaceFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+        });
+        CHECK(it != surfaceFormats.end());
+        return *it;
+    }();
+
+    auto surfaceExtent = [surfaceCapabilities] -> VkExtent2D {
         if (surfaceCapabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
-        {
             return surfaceCapabilities.currentExtent;
-        }
 
         const PlatformWindowSize windowSize = PlatformGetWindowSize(vk.window);
         return VkExtent2D{
@@ -105,9 +109,9 @@ void CreateSwapchain()
         .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
         .surface = vk.surface,
         .minImageCount = swapchainMinImageCount,
-        .imageFormat = vk.surfaceFormat.format,
-        .imageColorSpace = vk.surfaceFormat.colorSpace,
-        .imageExtent = vk.surfaceExtent,
+        .imageFormat = surfaceFormat.format,
+        .imageColorSpace = surfaceFormat.colorSpace,
+        .imageExtent = surfaceExtent,
         .imageArrayLayers = 1,
         .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
         .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
@@ -129,7 +133,7 @@ void CreateSwapchain()
 
     for (size_t i = 0; i < swapchainImageCount; ++i)
     {
-        vk.swapchainTextures[i] = RhiCreateTextureFromSwapchainImage(swapchainImages[i], vk.surfaceFormat);
+        vk.swapchainTextures[i] = RhiCreateTextureFromSwapchainImage(swapchainImages[i], surfaceFormat, surfaceExtent);
 
 #if 0
         const VkImageCreateInfo depthImageCreateInfo{
@@ -194,9 +198,11 @@ void CreateSwapchain()
     }
 }
 
-auto RhiGetBackbufferFormat() -> RhiTextureFormat
+} // namespace rhi_vulkan_internal
+
+auto RhiGetBackbufferTexture() -> RhiTexture
 {
-    return ConvertVkFormatIntoRhiTextureFormat(vk.surfaceFormat.format);
+    return vk.swapchainTextures[vk.swapchainTextureIndex];
 }
 
-} // namespace nyla::rhi_vulkan_internal
+} // namespace nyla

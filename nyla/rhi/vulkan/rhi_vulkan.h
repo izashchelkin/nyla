@@ -53,8 +53,6 @@ struct VulkanData
 
     PlatformWindow window;
     VkSurfaceKHR surface;
-    VkExtent2D surfaceExtent;
-    VkSurfaceFormatKHR surfaceFormat;
     VkSwapchainKHR swapchain;
 
     uint32_t swapchainTextureIndex;
@@ -106,6 +104,7 @@ struct VulkanTextureData
     VkImageView imageView;
     VkDeviceMemory memory;
     VkFormat format;
+    VkExtent3D extent;
 };
 
 struct RhiHandles
@@ -126,7 +125,8 @@ auto DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeveri
 
 void CreateSwapchain();
 
-auto RhiCreateTextureFromSwapchainImage(VkImage image, VkSurfaceFormatKHR surfaceFormat) -> RhiTexture;
+auto RhiCreateTextureFromSwapchainImage(VkImage image, VkSurfaceFormatKHR surfaceFormat, VkExtent2D surfaceExtent)
+    -> RhiTexture;
 void RhiDestroySwapchainTexture(RhiTexture texture);
 
 auto CreateTimeline(uint64_t initialValue) -> VkSemaphore;

@@ -4,8 +4,8 @@
 #include "nyla/commons/math/mat.h"
 #include "nyla/commons/memory/charview.h"
 #include "nyla/engine0/render_pipeline.h"
-#include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_pipeline.h"
+#include "nyla/rhi/rhi_texture.h"
 
 namespace nyla
 {
@@ -37,8 +37,9 @@ void WorldSetUp()
 
     const float base = kMetersOnScreen;
 
-    const auto width = static_cast<float>(RhiGetSurfaceWidth());
-    const auto height = static_cast<float>(RhiGetSurfaceHeight());
+    const RhiTextureInfo backbuffer = RhiGetTextureInfo(RhiGetBackbufferTexture());
+    const auto width = static_cast<float>(backbuffer.width);
+    const auto height = static_cast<float>(backbuffer.height);
     const float aspect = width / height;
 
     worldH = base;

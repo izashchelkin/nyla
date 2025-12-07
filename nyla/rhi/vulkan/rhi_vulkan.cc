@@ -483,16 +483,6 @@ auto RhiGetMinUniformBufferOffsetAlignment() -> uint32_t
     return vk.physDevProps.limits.minUniformBufferOffsetAlignment;
 }
 
-auto RhiGetSurfaceWidth() -> uint32_t
-{
-    return vk.surfaceExtent.width;
-}
-
-auto RhiGetSurfaceHeight() -> uint32_t
-{
-    return vk.surfaceExtent.height;
-}
-
 } // namespace nyla
 
 #undef VK_CHECK

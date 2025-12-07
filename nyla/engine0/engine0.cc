@@ -6,6 +6,8 @@
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_cmdlist.h"
+#include "nyla/rhi/rhi_pass.h"
+#include "nyla/rhi/rhi_texture.h"
 #include <cstdint>
 #include <thread>
 
@@ -82,6 +84,10 @@ auto Engine0FrameBegin() -> void
     }
 
     PlatformProcessEvents();
+
+    RhiPassBegin({
+        .colorTarget = RhiGetBackbufferTexture(),
+    });
 }
 
 auto Engine0GetDt() -> float
@@ -96,6 +102,10 @@ auto Engine0GetFps() -> uint32_t
 
 auto Engine0FrameEnd() -> void
 {
+    RhiPassEnd({
+        .colorTarget = RhiGetBackbufferTexture(),
+    });
+
     RhiFrameEnd();
 
     uint64_t frameEnd = GetMonotonicTimeMicros();

@@ -1,6 +1,7 @@
 #include <unistd.h>
 
 #include <cstdint>
+#include <vulkan/vulkan_core.h>
 
 #include "nyla/rhi/rhi_handle.h"
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
@@ -181,10 +182,18 @@ auto RhiCreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGraphi
         .pDynamicStates = dynamicStates.data(),
     };
 
+    std::array<VkFormat, std::size(desc.colorTargetFormats)> colorTargetFormats;
+
+    CHECK_LE(desc.colorTargetFormatsCount, std::size(desc.colorTargetFormats));
+    for (uint32_t i = 0; i < desc.colorTargetFormatsCount; ++i)
+    {
+        colorTargetFormats[i] = ConvertRhiTextureFormatIntoVkFormat(desc.colorTargetFormats[i]);
+    }
+
     const VkPipelineRenderingCreateInfo pipelineRenderingCreateInfo{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-        .colorAttachmentCount = 1,
-        .pColorAttachmentFormats = &vk.surfaceFormat.format,
+        .colorAttachmentCount = desc.colorTargetFormatsCount,
+        .pColorAttachmentFormats = colorTargetFormats.data(),
     };
 
     std::array<VkPipelineShaderStageCreateInfo, 2> stages{

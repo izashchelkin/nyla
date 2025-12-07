@@ -20,18 +20,32 @@ auto ConvertRhiTextureFormatIntoVkFormat(RhiTextureFormat format) -> VkFormat
         break;
     case RhiTextureFormat::R8G8B8A8_sRGB:
         return VK_FORMAT_R8G8B8A8_SRGB;
+    case RhiTextureFormat::B8G8R8A8_sRGB:
+        return VK_FORMAT_B8G8R8A8_SRGB;
     case RhiTextureFormat::D32_Float:
         return VK_FORMAT_D32_SFLOAT;
     case RhiTextureFormat::D32_Float_S8_UINT:
         return VK_FORMAT_D32_SFLOAT_S8_UINT;
     }
-
     CHECK(false);
     return static_cast<VkFormat>(0);
 }
 
 auto ConvertVkFormatIntoRhiTextureFormat(VkFormat format) -> RhiTextureFormat
 {
+    switch (format)
+    {
+    case VK_FORMAT_R8G8B8A8_SRGB:
+        return RhiTextureFormat::R8G8B8A8_sRGB;
+    case VK_FORMAT_B8G8R8A8_SRGB:
+        return RhiTextureFormat::B8G8R8A8_sRGB;
+    case VK_FORMAT_D32_SFLOAT:
+        return RhiTextureFormat::D32_Float;
+    case VK_FORMAT_D32_SFLOAT_S8_UINT:
+        return RhiTextureFormat::D32_Float_S8_UINT;
+    default:
+        break;
+    }
     CHECK(false);
     return static_cast<RhiTextureFormat>(0);
 }
@@ -92,13 +106,14 @@ auto RhiCreateTexture(RhiTextureDesc desc) -> RhiTexture
 namespace rhi_vulkan_internal
 {
 
-auto RhiCreateTextureFromSwapchainImage(VkImage image, VkSurfaceFormatKHR surfaceFormat) -> RhiTexture
+auto RhiCreateTextureFromSwapchainImage(VkImage image, VkSurfaceFormatKHR surfaceFormat, VkExtent2D surfaceExtent)
+    -> RhiTexture
 {
     const VkImageViewCreateInfo imageViewCreateInfo{
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
         .image = image,
         .viewType = VK_IMAGE_VIEW_TYPE_2D,
-        .format = vk.surfaceFormat.format,
+        .format = surfaceFormat.format,
         .subresourceRange =
             {
                 .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -118,6 +133,7 @@ auto RhiCreateTextureFromSwapchainImage(VkImage image, VkSurfaceFormatKHR surfac
         .imageView = imageView,
         .memory = VK_NULL_HANDLE,
         .format = surfaceFormat.format,
+        .extent = {surfaceExtent.width, surfaceExtent.height, 1},
     };
 
     return RhiHandleAcquire(rhiHandles.textures, textureData);
@@ -135,6 +151,16 @@ void RhiDestroySwapchainTexture(RhiTexture texture)
 }
 
 } // namespace rhi_vulkan_internal
+
+auto RhiGetTextureInfo(RhiTexture texture) -> RhiTextureInfo
+{
+    const VulkanTextureData textureData = RhiHandleGetData(rhiHandles.textures, texture);
+    return {
+        .width = textureData.extent.width,
+        .height = textureData.extent.height,
+        .format = ConvertVkFormatIntoRhiTextureFormat(textureData.format),
+    };
+}
 
 void RhiDestroyTexture(RhiTexture texture)
 {

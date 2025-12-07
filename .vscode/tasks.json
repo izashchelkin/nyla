@@ -3,6 +3,17 @@
 	"tasks": [
 		{
 			"type": "cmake",
+			"label": "breakout build",
+			"command": "build",
+			"targets": [
+				"breakout"
+			],
+			"preset": "debug",
+			"group": "build",
+			"problemMatcher": [],
+		},
+		{
+			"type": "cmake",
 			"label": "shipgame build",
 			"command": "build",
 			"targets": [

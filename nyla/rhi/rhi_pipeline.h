@@ -7,6 +7,7 @@
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_handle.h"
 #include "nyla/rhi/rhi_shader.h"
+#include "nyla/rhi/rhi_texture.h"
 
 namespace nyla
 {
@@ -20,60 +21,7 @@ struct RhiGraphicsPipeline : RhiHandle
 enum class RhiVertexFormat
 {
     None,
-
-    // R32_Float,
-    // R32G32_Float,
-    // R32G32B32_Float,
     R32G32B32A32Float,
-    //
-    // R16_Float,
-    // R16G16_Float,
-    // R16G16B16A16_Float,
-    //
-    // R32_SInt,
-    // R32G32_SInt,
-    // R32G32B32_SInt,
-    // R32G32B32A32_SInt,
-    //
-    // R32_UInt,
-    // R32G32_UInt,
-    // R32G32B32_UInt,
-    // R32G32B32A32_UInt,
-    //
-    // R16_SNorm,
-    // R16G16_SNorm,
-    // R16G16B16A16_SNorm,
-    //
-    // R16_UNorm,
-    // R16G16_UNorm,
-    // R16G16B16A16_UNorm,
-    //
-    // R16_SInt,
-    // R16G16_SInt,
-    // R16G16B16A16_SInt,
-    //
-    // R16_UInt,
-    // R16G16_UInt,
-    // R16G16B16A16_UInt,
-    //
-    // R8_UNorm,
-    // R8G8_UNorm,
-    // R8G8B8A8_UNorm,
-    //
-    // R8_SNorm,
-    // R8G8_SNorm,
-    // R8G8B8A8_SNorm,
-    //
-    // R8_UInt,
-    // R8G8_UInt,
-    // R8G8B8A8_UInt,
-    //
-    // R8_SInt,
-    // R8G8_SInt,
-    // R8G8B8A8_SInt,
-    //
-    // B10G11R11_UFloat,
-    // R10G10B10A2_UNorm,
 };
 
 enum class RhiInputRate
@@ -84,8 +32,8 @@ enum class RhiInputRate
 
 enum class RhiCullMode
 {
-    None,
     Back,
+    None,
     Front
 };
 
@@ -125,6 +73,9 @@ struct RhiGraphicsPipelineDesc
 
     std::array<RhiVertexAttributeDesc, 16> vertexAttributes;
     uint32_t vertexAttributeCount;
+
+    std::array<RhiTextureFormat, 4> colorTargetFormats;
+    uint32_t colorTargetFormatsCount;
 
     RhiCullMode cullMode;
     RhiFrontFace frontFace;

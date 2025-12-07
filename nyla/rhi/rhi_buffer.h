@@ -21,6 +21,7 @@ template <> struct EnableBitMaskOps<RhiBufferUsage> : std::true_type
 
 enum class RhiMemoryUsage
 {
+    Unknown,
     GpuOnly,
     CpuToGpu,
     GpuToCpu

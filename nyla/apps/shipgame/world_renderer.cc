@@ -1,11 +1,9 @@
 #include "nyla/apps/shipgame/world_renderer.h"
 
-#include "nyla/commons/debug/debugger.h"
 #include "nyla/commons/math/mat.h"
 #include "nyla/commons/math/vec.h"
 #include "nyla/commons/memory/charview.h"
 #include "nyla/engine0/render_pipeline.h"
-#include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_pipeline.h"
 
 namespace nyla
@@ -36,8 +34,9 @@ void WorldSetUp(float2 cameraPos, float zoom)
 
     const float base = kMetersOnScreen * zoom;
 
-    const auto width = static_cast<float>(RhiGetSurfaceWidth());
-    const auto height = static_cast<float>(RhiGetSurfaceHeight());
+    const RhiTextureInfo backbuffer = RhiGetTextureInfo(RhiGetBackbufferTexture());
+    const auto width = static_cast<float>(backbuffer.width);
+    const auto height = static_cast<float>(backbuffer.height);
     const float aspect = width / height;
     if (aspect >= 1.0f)
     {

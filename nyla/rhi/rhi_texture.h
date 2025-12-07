@@ -13,6 +13,7 @@ enum class RhiTextureFormat
     None,
 
     R8G8B8A8_sRGB,
+    B8G8R8A8_sRGB,
 
     D32_Float,
     D32_Float_S8_UINT,
@@ -30,9 +31,17 @@ struct RhiTextureDesc
     RhiTextureFormat format;
 };
 
+struct RhiTextureInfo
+{
+    uint32_t width;
+    uint32_t height;
+    RhiTextureFormat format;
+};
+
 auto RhiCreateTexture(RhiTextureDesc) -> RhiTexture;
 void RhiDestroyTexture(RhiTexture);
+auto RhiGetTextureInfo(RhiTexture) -> RhiTextureInfo;
 
-auto RhiGetBackbufferFormat() -> RhiTextureFormat;
+auto RhiGetBackbufferTexture() -> RhiTexture;
 
 } // namespace nyla

@@ -5,7 +5,6 @@
 #include "nyla/commons/math/vec.h"
 #include "nyla/commons/memory/charview.h"
 #include "nyla/engine0/render_pipeline.h"
-#include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_pipeline.h"
 
 namespace nyla
@@ -24,9 +23,10 @@ struct StaticUbo
 
 void UiFrameBegin()
 {
+    const RhiTextureInfo backbuffer = RhiGetTextureInfo(RhiGetBackbufferTexture());
     StaticUbo ubo{
-        .windowWidth = static_cast<float>(RhiGetSurfaceWidth()),
-        .windowHeight = static_cast<float>(RhiGetSurfaceHeight()),
+        .windowWidth = static_cast<float>(backbuffer.width),
+        .windowHeight = static_cast<float>(backbuffer.height),
     };
     RpStaticUniformCopy(guiPipeline, ByteViewPtr(&ubo));
 }
@@ -36,10 +36,11 @@ static void UiBoxBegin(float x, float y, float width, float height)
     const float z = 0.f;
     const float w = 0.f;
 
+    const RhiTextureInfo backbuffer = RhiGetTextureInfo(RhiGetBackbufferTexture());
     if (x < 0.f)
-        x += static_cast<float>(RhiGetSurfaceWidth()) - width;
+        x += static_cast<float>(backbuffer.width) - width;
     if (y < 0.f)
-        y += static_cast<float>(RhiGetSurfaceHeight()) - height;
+        y += static_cast<float>(backbuffer.height) - height;
 
     std::array<float4, 6> rect = {
         float4{x, y, z, w},
