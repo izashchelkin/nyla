@@ -1,18 +1,21 @@
 {
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
     "configurations": [
         {
-            "name": "Breakout",
+            "name": "shipgame",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/bazel-out/k8-dbg/bin/nyla/apps/breakout/breakout",
+            "program": "${workspaceFolder}/build/debug/nyla/apps/shipgame/shipgame",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
+            "preLaunchTask": "shipgame build",
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",
-            "preLaunchTask": "build_breakout_dbg",
-            "envFile": "${workspaceFolder}/.env",
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",
@@ -24,84 +27,7 @@
                     "text": "-gdb-set disassembly-flavor intel",
                     "ignoreFailures": true
                 }
-            ],
-        },
-        {
-            "name": "Shipgame",
-            "type": "cppdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/bazel-out/k8-dbg/bin/nyla/apps/shipgame/shipgame",
-            "args": [],
-            "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",
-            "environment": [],
-            "externalConsole": false,
-            "MIMode": "gdb",
-            "preLaunchTask": "build_shipgame_dbg",
-            "envFile": "${workspaceFolder}/.env",
-            "setupCommands": [
-                {
-                    "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                },
-                {
-                    "description": "Set Disassembly Flavor to Intel",
-                    "text": "-gdb-set disassembly-flavor intel",
-                    "ignoreFailures": true
-                }
-            ],
-        },
-        {
-            "name": "GUI Demo",
-            "type": "cppdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/bazel-out/k8-dbg/bin/nyla/apps/guidemo/guidemo",
-            "args": [],
-            "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",
-            "environment": [],
-            "externalConsole": false,
-            "MIMode": "gdb",
-            "preLaunchTask": "build_guidemo_dbg",
-            "envFile": "${workspaceFolder}/.env",
-            "setupCommands": [
-                {
-                    "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                },
-                {
-                    "description": "Set Disassembly Flavor to Intel",
-                    "text": "-gdb-set disassembly-flavor intel",
-                    "ignoreFailures": true
-                }
-            ],
-        },
-        {
-            "name": "Window Manager Background",
-            "type": "cppdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/bazel-out/k8-dbg/bin/nyla/apps/wm/wmbackground",
-            "args": [],
-            "stopAtEntry": false,
-            "cwd": "/home/izashchelkin",
-            "environment": [],
-            "externalConsole": false,
-            "MIMode": "gdb",
-            "preLaunchTask": "build_wm_background_dbg",
-            "setupCommands": [
-                {
-                    "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                },
-                {
-                    "description": "Set Disassembly Flavor to Intel",
-                    "text": "-gdb-set disassembly-flavor intel",
-                    "ignoreFailures": true
-                }
-            ],
+            ]
         }
     ]
 }

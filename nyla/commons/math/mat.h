@@ -8,13 +8,11 @@
 #include <cmath>
 #include <concepts>
 #include <cstdint>
-#include <ranges>
 
 namespace nyla
 {
 
-template <typename T, uint32_t N>
-class Mat
+template <typename T, uint32_t N> class Mat
 {
   public:
     Mat() = default;
@@ -36,7 +34,7 @@ class Mat
         auto it = cols.begin();
         for (uint32_t col = 0; col < N; ++col, ++it)
         {
-            const Vec<T, N>& v = *it;
+            const Vec<T, N> &v = *it;
             for (uint32_t row = 0; row < N; ++row)
                 m_data[col][row] = v[row];
         }
@@ -44,7 +42,7 @@ class Mat
 
     template <typename K, uint32_t M>
         requires std::convertible_to<K, T>
-    explicit Mat(const Mat<K, M>& v)
+    explicit Mat(const Mat<K, M> &v)
     {
         const auto count = std::min<uint32_t>(N, M);
         for (uint32_t col = 0; col < count; ++col)
@@ -57,18 +55,26 @@ class Mat
     [[nodiscard]]
     static auto Identity() -> Mat
     {
-        Mat ret{}; // zero-init
+        Mat ret{};
         for (uint32_t i = 0; i < N; ++i)
             ret[i][i] = static_cast<T>(1);
         return ret;
     }
 
-    [[nodiscard]] auto operator[](uint32_t col) -> std::array<T, N>& { CHECK_LT(col, N);return m_data[col]; }
-    [[nodiscard]] auto operator[](uint32_t col) const -> const std::array<T, N>& { CHECK_LT(col, N);return m_data[col]; }
+    [[nodiscard]] auto operator[](uint32_t col) -> std::array<T, N> &
+    {
+        CHECK_LT(col, N);
+        return m_data[col];
+    }
+    [[nodiscard]] auto operator[](uint32_t col) const -> const std::array<T, N> &
+    {
+        CHECK_LT(col, N);
+        return m_data[col];
+    }
 
     // Column-major matrix multiply: this * rhs
     [[nodiscard]]
-    auto Mult(const Mat& rhs) const -> Mat
+    auto Mult(const Mat &rhs) const -> Mat
     {
         Mat ret{}; // zero-init
         for (uint32_t row = 0; row < N; ++row)
@@ -107,7 +113,7 @@ class Mat
                 T v = std::fabs(a[row][col]);
                 if (v > maxAbs)
                 {
-                    maxAbs   = v;
+                    maxAbs = v;
                     pivotRow = row;
                 }
             }
@@ -151,7 +157,7 @@ class Mat
     template <typename K, uint32_t M>
         requires std::convertible_to<K, T>
     [[nodiscard]]
-    static auto Translate(const Vec<K, M>& v) -> Mat
+    static auto Translate(const Vec<K, M> &v) -> Mat
     {
         Mat ret = Mat::Identity();
         const auto count = std::min<uint32_t>(N, M);
@@ -163,7 +169,7 @@ class Mat
     template <typename K, uint32_t M>
         requires std::convertible_to<K, T>
     [[nodiscard]]
-    static auto Scale(const Vec<K, M>& v) -> Mat
+    static auto Scale(const Vec<K, M> &v) -> Mat
     {
         Mat ret = Mat::Identity();
         const auto count = std::min<uint32_t>(N, M);
@@ -193,14 +199,23 @@ class Mat
         requires(N == 4 && std::floating_point<T>)
     {
         const T two = static_cast<T>(2);
-        const T rl  = (right - left);
-        const T tb  = (top - bottom);
-        const T fn  = (far - near);
+        const T rl = (right - left);
+        const T tb = (top - bottom);
+        const T fn = (far - near);
 
         return {
-            two / rl,          static_cast<T>(0), static_cast<T>(0), static_cast<T>(0),
-            static_cast<T>(0), two / tb,         static_cast<T>(0), static_cast<T>(0),
-            static_cast<T>(0), static_cast<T>(0), static_cast<T>(1) / fn, static_cast<T>(0),
+            two / rl,
+            static_cast<T>(0),
+            static_cast<T>(0),
+            static_cast<T>(0),
+            static_cast<T>(0),
+            two / tb,
+            static_cast<T>(0),
+            static_cast<T>(0),
+            static_cast<T>(0),
+            static_cast<T>(0),
+            static_cast<T>(1) / fn,
+            static_cast<T>(0),
             -(right + left) / rl,
             -(top + bottom) / tb,
             -near / fn,

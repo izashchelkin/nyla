@@ -4,6 +4,7 @@ Checks: >
   -clang-analyzer-optin.core.EnumCastOutOfRange,
 
   bugprone-*,
+  -bugprone-easily-swappable-parameters
 
   performance-*,
   -performance-enum-size,
@@ -49,7 +50,7 @@ CheckOptions:
     value: k
  
   - key: readability-identifier-naming.MethodIgnoredRegexp
-    value: '^(data|size|begin|end)$'
+    value: '^(data|size|begin|end|cbegin|cend|empty|max_size|clear|push_back|emplace_back)$'
 
 HeaderFilterRegex: 'nyla/nyla/.*'
 FormatStyle: none

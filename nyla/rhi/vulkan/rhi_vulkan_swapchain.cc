@@ -1,4 +1,7 @@
+#include "absl/log/log.h"
 #include <cstdint>
+#include <vulkan/vk_enum_string_helper.h>
+#include <vulkan/vulkan_core.h>
 
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
 
@@ -29,6 +32,7 @@ void CreateSwapchain()
         return *it;
     }();
 
+    static bool logPresentModes = true;
     VkPresentModeKHR presentMode = [] -> VkPresentModeKHR {
         std::vector<VkPresentModeKHR> presentModes;
         uint32_t presentModeCount = 0;
@@ -38,7 +42,17 @@ void CreateSwapchain()
         presentModes.resize(presentModeCount);
         vkGetPhysicalDeviceSurfacePresentModesKHR(vk.physDev, vk.surface, &presentModeCount, presentModes.data());
 
-        return VK_PRESENT_MODE_FIFO_KHR; // TODO:
+        if (logPresentModes)
+        {
+            for (auto presentMode : presentModes)
+                LOG(INFO) << "Present Mode available: " << string_VkPresentModeKHR(presentMode);
+            logPresentModes = false;
+        }
+
+        if constexpr (false)
+            return VK_PRESENT_MODE_FIFO_KHR; // TODO:
+        else
+            return VK_PRESENT_MODE_FIFO_LATEST_READY_KHR;
     }();
 
     vk.surfaceExtent = [surfaceCapabilities] -> VkExtent2D {

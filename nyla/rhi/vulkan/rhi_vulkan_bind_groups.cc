@@ -1,6 +1,5 @@
 #include <cstdint>
 
-#include "nyla/commons/memory/temp.h"
 #include "nyla/rhi/rhi_handle.h"
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
 #include "vulkan/vulkan_core.h"
@@ -77,8 +76,11 @@ auto RhiCreateBindGroup(const RhiBindGroupDesc &desc) -> RhiBindGroup
     VkDescriptorSet descriptorSet;
     VK_CHECK(vkAllocateDescriptorSets(vk.dev, &descriptorSetAllocInfo, &descriptorSet));
 
-    VkWriteDescriptorSet writes[std::size(desc.entries)];
+    std::array<VkWriteDescriptorSet, std::size(desc.entries)> writes;
     CHECK_LE(desc.entriesCount, std::size(desc.entries));
+
+    std::array<VkDescriptorBufferInfo, std::size(desc.entries)> bufferInfos;
+    uint32_t bufferInfosIndex = 0;
 
     for (uint32_t i = 0; i < desc.entriesCount; ++i)
     {
@@ -88,12 +90,11 @@ auto RhiCreateBindGroup(const RhiBindGroupDesc &desc) -> RhiBindGroup
         case RhiBindingType::UniformBuffer:
         case RhiBindingType::UniformBufferDynamic: {
             const VulkanBufferData &bufferData = RhiHandleGetData(rhiHandles.buffers, entry.buffer.buffer);
-
-            auto bufferInfo = &Tmake(VkDescriptorBufferInfo{
+            const auto &bufferInfo = bufferInfos[bufferInfosIndex++] = VkDescriptorBufferInfo{
                 .buffer = bufferData.buffer,
                 .offset = entry.buffer.offset,
-                .range = entry.buffer.size,
-            });
+                .range = entry.buffer.range,
+            };
 
             writes[i] = {
                 .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -102,7 +103,7 @@ auto RhiCreateBindGroup(const RhiBindGroupDesc &desc) -> RhiBindGroup
                 .dstArrayElement = entry.arrayIndex,
                 .descriptorCount = 1,
                 .descriptorType = ConvertVulkanBindingType(entry.type),
-                .pBufferInfo = bufferInfo,
+                .pBufferInfo = &bufferInfo,
             };
             break;
         }
@@ -113,7 +114,7 @@ auto RhiCreateBindGroup(const RhiBindGroupDesc &desc) -> RhiBindGroup
         }
     }
 
-    vkUpdateDescriptorSets(vk.dev, desc.entriesCount, writes, 0, nullptr);
+    vkUpdateDescriptorSets(vk.dev, desc.entriesCount, writes.data(), 0, nullptr);
 
     return RhiHandleAcquire(rhiHandles.bindGroups, descriptorSet);
 }

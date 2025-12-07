@@ -1,7 +1,7 @@
 #include "nyla/apps/asteroids/asteroids.h"
 #include "nyla/commons/logging/init.h"
-#include "nyla/commons/memory/temp.h"
 #include "nyla/commons/signal/signal.h"
+#include "nyla/engine0/frame_arena.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
 
@@ -11,7 +11,7 @@ namespace nyla
 static auto Main() -> int
 {
     LoggingInit();
-    TArenaInit();
+    engine0_internal::FrameArenaInit();
     SigIntCoreDump();
 
     PlatformInit();

@@ -1,49 +1,16 @@
 {
-    "version": "2.0.0",
-    "tasks": [
-        {
-            "label": "build_breakout_dbg",
-            "type": "bazel",
-            "command": "build",
-            "options": [
-                "--compilation_mode=dbg"
-            ],
-            "targets": [
-                "//nyla/apps/breakout"
-            ]
-        },
-        {
-            "label": "build_shipgame_dbg",
-            "type": "bazel",
-            "command": "build",
-            "options": [
-                "--compilation_mode=dbg"
-            ],
-            "targets": [
-                "//nyla/apps/shipgame"
-            ]
-        },
-        {
-            "label": "build_guidemo_dbg",
-            "type": "bazel",
-            "command": "build",
-            "options": [
-                "--compilation_mode=dbg"
-            ],
-            "targets": [
-                "//nyla/apps/guidemo"
-            ]
-        },
-        {
-            "label": "build_wm_background_dbg",
-            "type": "bazel",
-            "command": "build",
-            "options": [
-                "--compilation_mode=dbg"
-            ],
-            "targets": [
-                "//nyla/apps/wm:wmbackground"
-            ]
-        }
-    ]
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "cmake",
+			"label": "shipgame build",
+			"command": "build",
+			"targets": [
+				"shipgame"
+			],
+			"preset": "debug",
+			"group": "build",
+			"problemMatcher": [],
+		}
+	]
 }

@@ -13,7 +13,6 @@
 #include "nyla/apps/wm/wm_background.h"
 #include "nyla/commons/future.h"
 #include "nyla/commons/logging/init.h"
-#include "nyla/commons/memory/temp.h"
 #include "nyla/commons/os/spawn.h"
 #include "nyla/commons/os/timerfd.h"
 #include "nyla/commons/signal/signal.h"
@@ -32,7 +31,6 @@ using namespace platform_x11_internal;
 auto Main(int argc, char **argv) -> int
 {
     LoggingInit();
-    TArenaInit();
     SigIntCoreDump();
     SigSegvExitZero();
 

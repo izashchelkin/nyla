@@ -6,8 +6,8 @@
 
 #include "absl/log/check.h"
 #include "absl/log/log.h"
+#include "nyla/commons/containers/inline_vec.h"
 #include "nyla/commons/debug/debugger.h"
-#include "nyla/commons/memory/temp.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_pipeline.h"
 #include "vulkan/vulkan_core.h"
@@ -118,51 +118,102 @@ void RhiInit(const RhiDesc &rhiDesc)
         .apiVersion = VK_API_VERSION_1_4,
     };
 
+    InlineVec<const char *, 4> enabledInstanceExtensions;
+    enabledInstanceExtensions.emplace_back(VK_KHR_SURFACE_EXTENSION_NAME);
+    enabledInstanceExtensions.emplace_back(VK_KHR_XCB_SURFACE_EXTENSION_NAME);
+
+    InlineVec<const char *, 2> instanceLayers;
+    if (kRhiValidations)
+    {
+        instanceLayers.emplace_back("VK_LAYER_KHRONOS_validation");
+    }
+
+    InlineVec<VkValidationFeatureEnableEXT, 4> validationEnabledFeatures;
+    InlineVec<VkValidationFeatureDisableEXT, 4> validationDisabledFeatures;
+    VkValidationFeaturesEXT validationFeatures = {
+        .sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT,
+        .enabledValidationFeatureCount = 0,
+        .pEnabledValidationFeatures = validationEnabledFeatures.data(),
+        .disabledValidationFeatureCount = 0,
+        .pDisabledValidationFeatures = validationDisabledFeatures.data(),
+    };
+
+    VkDebugUtilsMessengerCreateInfoEXT debugMessengerCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+        .pNext = &validationFeatures,
+        .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+                           VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                           VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
+        .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                       VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
+        .pfnUserCallback = DebugMessengerCallback,
+    };
+
+    std::vector<VkLayerProperties> layers;
+    uint32_t layerCount;
+    vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+
+    layers.resize(layerCount);
+    vkEnumerateInstanceLayerProperties(&layerCount, layers.data());
+
+    {
+        std::vector<VkExtensionProperties> instanceExtensions;
+        uint32_t instanceExtensionsCount;
+        vkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionsCount, nullptr);
+
+        instanceExtensions.resize(instanceExtensionsCount);
+        vkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionsCount, instanceExtensions.data());
+
+        LOG(INFO);
+        LOG(INFO) << instanceExtensionsCount << " Instance Extensions available";
+        for (uint32_t i = 0; i < instanceExtensionsCount; ++i)
+        {
+            const auto &extension = instanceExtensions[i];
+            LOG(INFO) << "" << extension.extensionName;
+        }
+    }
+
+    LOG(INFO);
+    LOG(INFO) << layers.size() << " Layers available";
+    for (uint32_t i = 0; i < layerCount; ++i)
+    {
+        const auto &layer = layers[i];
+        LOG(INFO) << "    " << layer.layerName;
+
+        std::vector<VkExtensionProperties> layerExtensions;
+        uint32_t layerExtensionProperties;
+        vkEnumerateInstanceExtensionProperties(layer.layerName, &layerExtensionProperties, nullptr);
+
+        layerExtensions.resize(layerExtensionProperties);
+        vkEnumerateInstanceExtensionProperties(layer.layerName, &layerExtensionProperties, layerExtensions.data());
+
+        for (uint32_t i = 0; i < layerExtensionProperties; ++i)
+        {
+            const auto &extension = layerExtensions[i];
+            LOG(INFO) << "        " << extension.extensionName;
+        }
+    }
+
+    VkDebugUtilsMessengerEXT debugMessenger{};
+
     const void *instancePNext = nullptr;
-    std::vector<const char *> instanceExtensions;
-    std::vector<const char *> instanceLayers;
-
-    instanceExtensions.emplace_back(VK_KHR_SURFACE_EXTENSION_NAME);
-    instanceExtensions.emplace_back(VK_KHR_XCB_SURFACE_EXTENSION_NAME);
-
-    VkDebugUtilsMessengerCreateInfoEXT *debugMessengerCreateInfo = nullptr;
-
     if constexpr (kRhiValidations)
     {
-        instanceExtensions.emplace_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-
-        VkValidationFeaturesEXT *validationFeatures = nullptr;
         if constexpr (false)
         {
-            instanceExtensions.emplace_back(VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME);
+            validationEnabledFeatures.emplace_back(VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT);
+            validationEnabledFeatures.emplace_back(VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_RESERVE_BINDING_SLOT_EXT);
+            validationEnabledFeatures.emplace_back(VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT);
+            validationEnabledFeatures.emplace_back(VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT);
+            validationFeatures.enabledValidationFeatureCount = validationEnabledFeatures.size();
 
-            std::span<VkValidationFeatureEnableEXT> enabledValidations = Tmake(std::array{
-                VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT,
-                VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_RESERVE_BINDING_SLOT_EXT,
-                VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT,
-                VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT,
-            });
-
-            validationFeatures = &Tmake(VkValidationFeaturesEXT{
-                .sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT,
-                .enabledValidationFeatureCount = static_cast<uint32_t>(std::size(enabledValidations)),
-                .pEnabledValidationFeatures = enabledValidations.data(),
-            });
+            validationDisabledFeatures.emplace_back(VK_VALIDATION_FEATURE_DISABLE_CORE_CHECKS_EXT);
+            validationFeatures.disabledValidationFeatureCount = validationEnabledFeatures.size();
         }
 
-        debugMessengerCreateInfo = &Tmake(VkDebugUtilsMessengerCreateInfoEXT{
-            .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
-            .pNext = validationFeatures,
-            .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-                               VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-                               VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
-            .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-                           VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-                           VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
-            .pfnUserCallback = DebugMessengerCallback,
-        });
-
-        instancePNext = debugMessengerCreateInfo;
+        instancePNext = &debugMessengerCreateInfo;
+        enabledInstanceExtensions.emplace_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+        enabledInstanceExtensions.emplace_back(VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME);
     }
 
     const VkInstanceCreateInfo instanceCreateInfo{
@@ -171,16 +222,15 @@ void RhiInit(const RhiDesc &rhiDesc)
         .pApplicationInfo = &appInfo,
         .enabledLayerCount = static_cast<uint32_t>(instanceLayers.size()),
         .ppEnabledLayerNames = instanceLayers.data(),
-        .enabledExtensionCount = static_cast<uint32_t>(instanceExtensions.size()),
-        .ppEnabledExtensionNames = instanceExtensions.data(),
+        .enabledExtensionCount = static_cast<uint32_t>(enabledInstanceExtensions.size()),
+        .ppEnabledExtensionNames = enabledInstanceExtensions.data(),
     };
     VK_CHECK(vkCreateInstance(&instanceCreateInfo, nullptr, &vk.instance));
 
-    VkDebugUtilsMessengerEXT debugMessenger{};
     if constexpr (kRhiValidations)
     {
-        VK_CHECK(VK_GET_INSTANCE_PROC_ADDR(vkCreateDebugUtilsMessengerEXT)(vk.instance, debugMessengerCreateInfo,
-                                                                           nullptr, &debugMessenger));
+        auto createDebugUtilsMessenger = VK_GET_INSTANCE_PROC_ADDR(vkCreateDebugUtilsMessengerEXT);
+        VK_CHECK(createDebugUtilsMessenger(vk.instance, &debugMessengerCreateInfo, nullptr, &debugMessenger));
     }
 
     uint32_t numPhysDevices = 0;
@@ -191,6 +241,7 @@ void RhiInit(const RhiDesc &rhiDesc)
 
     std::vector<const char *> deviceExtensions;
     deviceExtensions.emplace_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+    deviceExtensions.emplace_back(VK_EXT_PRESENT_MODE_FIFO_LATEST_READY_EXTENSION_NAME);
 
     if constexpr (kRhiCheckpoints)
     {
@@ -211,17 +262,16 @@ void RhiInit(const RhiDesc &rhiDesc)
             {
                 if (strcmp(extensions[i].extensionName, deviceExtension) == 0)
                 {
+                    LOG(INFO) << "Found device extension: " << deviceExtension;
                     --missingExtensions;
                     break;
                 }
-                else
-                {
-                    // LOG(INFO) << extensions[i].extensionName << " " << device_extensions[j];
-                }
             }
         }
+ 
         if (missingExtensions)
         {
+            LOG(WARNING) << "Missing " << missingExtensions << " extensions";
             continue;
         }
 
@@ -325,13 +375,13 @@ void RhiInit(const RhiDesc &rhiDesc)
     VkPhysicalDeviceVulkan13Features v13{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
         .pNext = &v14,
+        .shaderDemoteToHelperInvocation = VK_TRUE,
         .synchronization2 = VK_TRUE,
         .dynamicRendering = VK_TRUE,
     };
     VkPhysicalDeviceVulkan12Features v12{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
         .pNext = &v13,
-        .scalarBlockLayout = VK_TRUE,
         .timelineSemaphore = VK_TRUE,
     };
     VkPhysicalDeviceVulkan11Features v11{
@@ -381,18 +431,19 @@ void RhiInit(const RhiDesc &rhiDesc)
             i = RhiCreateCmdList(queueType);
         }
     };
-    initQueue(vk.graphicsQueue, RhiQueueType::Graphics,
-               std::span{vk.graphicsQueueCmd.data(), vk.numFramesInFlight});
+    initQueue(vk.graphicsQueue, RhiQueueType::Graphics, std::span{vk.graphicsQueueCmd.data(), vk.numFramesInFlight});
     initQueue(vk.transferQueue, RhiQueueType::Transfer, std::span{&vk.transferQueueCmd, 1});
 
+    const VkSemaphoreCreateInfo semaphoreCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+    };
     for (size_t i = 0; i < vk.numFramesInFlight; ++i)
     {
-        const VkSemaphoreCreateInfo semaphoreCreateInfo{
-            .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
-        };
-
-        VK_CHECK(
-            vkCreateSemaphore(vk.dev, &semaphoreCreateInfo, nullptr, vk.swapchainAcquireSemaphores.data() + i));
+        VK_CHECK(vkCreateSemaphore(vk.dev, &semaphoreCreateInfo, nullptr, vk.swapchainAcquireSemaphores.data() + i));
+    }
+    for (size_t i = 0; i < std::size(vk.swapchainImages); ++i)
+    {
+        VK_CHECK(vkCreateSemaphore(vk.dev, &semaphoreCreateInfo, nullptr, vk.renderFinishedSemaphores.data() + i));
     }
 
     const std::array<VkDescriptorPoolSize, 2> descriptorPoolSizes{

@@ -1,6 +1,7 @@
 #include "absl/log/log.h"
-#include "nyla/commons/os/clock.h"
 #include "nyla/platform/platform.h"
+#include <cmath>
+#include <cstdint>
 
 namespace nyla
 {
@@ -59,27 +60,30 @@ auto RecompileShadersIfNeeded() -> bool
     return false;
 }
 
-void UpdateDtFps(uint32_t &fps, float &dt)
+void UpdateDtFps(uint64_t nowUs, uint32_t &fps, float &dt)
 {
-    static uint64_t last = GetMonotonicTimeNanos();
-    const uint64_t now = GetMonotonicTimeNanos();
-    const uint64_t dtnanos = now - last;
-    last = now;
+    static uint64_t lastUs = nowUs;
+    static uint64_t dtUsAccum = 0;
+    static uint32_t numFramesCounted = 0;
 
-    dt = dtnanos / 1e9;
+    const uint64_t dtUs = nowUs - lastUs;
+    lastUs = nowUs;
 
-    static float dtnanosaccum = .0f;
-    dtnanosaccum += dtnanos;
+    dt = static_cast<float>(dtUs) * 1e-6f;
 
-    static uint32_t fpsFrames = 0;
-    ++fpsFrames;
+    dtUsAccum += dtUs;
+    ++numFramesCounted;
 
-    if (dtnanosaccum >= .5f * 1e9)
+    constexpr uint64_t kSecondInUs = 1'000'000ull;
+    if (dtUsAccum >= kSecondInUs / 2)
     {
-        fps = (1e9 / dtnanosaccum) * fpsFrames;
+        const double seconds = static_cast<double>(dtUsAccum) / 1'000'000.0;
+        const double fpsF64 = numFramesCounted / seconds;
 
-        fpsFrames = 0;
-        dtnanosaccum = .0f;
+        fps = std::lround(fpsF64);
+
+        dtUsAccum = 0;
+        numFramesCounted = 0;
     }
 }
 

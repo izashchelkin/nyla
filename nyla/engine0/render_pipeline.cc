@@ -63,9 +63,9 @@ void RpInit(Rp &rp)
             }
         }
 
-        auto initBuffer = [&bindGroupLayoutDesc,
-                            &bindGroupDesc](RpBuf &buf, RhiBufferUsage bufferUsage, RhiMemoryUsage memoryUsage,
-                                              RhiBindingType bindingType, uint32_t binding, uint32_t i) -> void {
+        auto initBuffer = [&bindGroupLayoutDesc, &bindGroupDesc](RpBuf &buf, RhiBufferUsage bufferUsage,
+                                                                 RhiMemoryUsage memoryUsage, RhiBindingType bindingType,
+                                                                 uint32_t binding, uint32_t i) -> void {
             bindGroupLayoutDesc.bindings[i] = {
                 .binding = binding,
                 .type = bindingType,
@@ -90,6 +90,7 @@ void RpInit(Rp &rp)
                             .buffer = buf.buffer[iframe],
                             .offset = 0,
                             .size = buf.size,
+                            .range = buf.range,
                         },
                 };
             }
@@ -99,12 +100,12 @@ void RpInit(Rp &rp)
         if (rp.staticUniform.enabled)
         {
             initBuffer(rp.staticUniform, RhiBufferUsage::Uniform, RhiMemoryUsage::CpuToGpu,
-                        RhiBindingType::UniformBuffer, 0, i++);
+                       RhiBindingType::UniformBuffer, 0, i++);
         }
         if (rp.dynamicUniform.enabled)
         {
             initBuffer(rp.dynamicUniform, RhiBufferUsage::Uniform, RhiMemoryUsage::CpuToGpu,
-                        RhiBindingType::UniformBufferDynamic, 1, i++);
+                       RhiBindingType::UniformBufferDynamic, 1, i++);
         }
 
         rp.bindGroupLayout = RhiCreateBindGroupLayout(bindGroupLayoutDesc);
@@ -249,7 +250,6 @@ void RpAttachVertShader(Rp &rp, const std::string &path)
     rp.vertexShader = RhiCreateShader(RhiShaderDesc{
         .code = ReadFile(path),
     });
-
     PlatformFsWatch(path);
 }
 

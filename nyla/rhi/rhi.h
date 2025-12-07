@@ -12,7 +12,7 @@ constexpr inline uint32_t kRhiMaxNumFramesInFlight = 3;
 #if defined(NDEBUG)
 constexpr inline bool kRhiValidations = false;
 #else
-constexpr inline bool kRhiValidations = true;
+constexpr inline bool kRhiValidations = false;
 #endif
 
 constexpr inline bool kRhiCheckpoints = false;

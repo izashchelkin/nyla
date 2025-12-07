@@ -12,9 +12,9 @@ auto RhiFrameBegin() -> RhiCmdList
 {
     WaitTimeline(vk.graphicsQueue.timeline, vk.graphicsQueueCmdDone[vk.frameIndex]);
 
-    VkResult acquireResult = vkAcquireNextImageKHR(vk.dev, vk.swapchain, std::numeric_limits<uint64_t>::max(),
-                                                    vk.swapchainAcquireSemaphores[vk.frameIndex], VK_NULL_HANDLE,
-                                                    &vk.swapchainImageIndex);
+    VkResult acquireResult =
+        vkAcquireNextImageKHR(vk.dev, vk.swapchain, std::numeric_limits<uint64_t>::max(),
+                              vk.swapchainAcquireSemaphores[vk.frameIndex], VK_NULL_HANDLE, &vk.swapchainImageIndex);
     switch (acquireResult)
     {
     case VK_ERROR_OUT_OF_DATE_KHR:
@@ -43,6 +43,7 @@ auto RhiFrameBegin() -> RhiCmdList
 
     const VkImageMemoryBarrier imageMemoryBarrier{
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+        .srcAccessMask = 0,
         .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
         .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED, // TODO:
         .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
@@ -57,8 +58,9 @@ auto RhiFrameBegin() -> RhiCmdList
             },
     };
 
-    vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0,
-                         nullptr, 0, nullptr, 1, &imageMemoryBarrier);
+    vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, nullptr, 0, nullptr, 1,
+                         &imageMemoryBarrier);
 
     const VkRenderingAttachmentInfo colorAttachmentInfo{
         .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
@@ -106,7 +108,7 @@ void RhiFrameEnd()
 
     const VkImageMemoryBarrier imageMemoryBarrier{
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-        .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT,
+        .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
         .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
         .image = vk.swapchainImages[vk.swapchainImageIndex],
@@ -125,49 +127,43 @@ void RhiFrameEnd()
 
     VK_CHECK(vkEndCommandBuffer(cmdbuf));
 
-    const VkPipelineStageFlags waitStages[] = {
+    const std::array<VkPipelineStageFlags, 1> waitStages = {
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
     };
 
-    uint64_t &cmdDone = vk.graphicsQueueCmdDone[vk.frameIndex];
-    cmdDone = vk.graphicsQueue.timelineNext++;
+    const VkSemaphore acquireSemaphore = vk.swapchainAcquireSemaphores[vk.frameIndex];
+    const VkSemaphore renderFinishedSemaphore = vk.renderFinishedSemaphores[vk.swapchainImageIndex];
+
+    const std::array<VkSemaphore, 2> signalSemaphores{
+        vk.graphicsQueue.timeline,
+        renderFinishedSemaphore,
+    };
+
+    vk.graphicsQueueCmdDone[vk.frameIndex] = vk.graphicsQueue.timelineNext++;
 
     const VkTimelineSemaphoreSubmitInfo timelineSubmitInfo{
         .sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
-        .signalSemaphoreValueCount = 1,
-        .pSignalSemaphoreValues = &cmdDone,
+        .signalSemaphoreValueCount = signalSemaphores.size(),
+        .pSignalSemaphoreValues = &vk.graphicsQueueCmdDone[vk.frameIndex],
     };
 
-    const VkSemaphore acquireSemaphore = vk.swapchainAcquireSemaphores[vk.frameIndex];
-    // const VkSemaphore render_finished_semaphore = vk.render_finished_semaphores[vk.frame_index];
-
-    const VkSemaphore signalSemaphores[] = {
-        // render_finished_semaphore,
-        vk.graphicsQueue.timeline,
-    };
     const VkSubmitInfo submitInfo{
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
         .pNext = &timelineSubmitInfo,
         .waitSemaphoreCount = 1,
         .pWaitSemaphores = &acquireSemaphore,
-        .pWaitDstStageMask = waitStages,
+        .pWaitDstStageMask = waitStages.data(),
         .commandBufferCount = 1,
         .pCommandBuffers = &cmdbuf,
         .signalSemaphoreCount = std::size(signalSemaphores),
-        .pSignalSemaphores = signalSemaphores,
+        .pSignalSemaphores = signalSemaphores.data(),
     };
     VK_CHECK(vkQueueSubmit(vk.graphicsQueue.queue, 1, &submitInfo, VK_NULL_HANDLE));
 
-    const VkTimelineSemaphoreSubmitInfo timelineWaitInfo{
-        .sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
-        .waitSemaphoreValueCount = 1,
-        .pWaitSemaphoreValues = &cmdDone,
-    };
     const VkPresentInfoKHR presentInfo{
         .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-        .pNext = &timelineWaitInfo,
         .waitSemaphoreCount = 1,
-        .pWaitSemaphores = &vk.graphicsQueue.timeline,
+        .pWaitSemaphores = &renderFinishedSemaphore,
         .swapchainCount = 1,
         .pSwapchains = &vk.swapchain,
         .pImageIndices = &vk.swapchainImageIndex,

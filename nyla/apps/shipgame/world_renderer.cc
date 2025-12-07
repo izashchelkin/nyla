@@ -1,5 +1,6 @@
 #include "nyla/apps/shipgame/world_renderer.h"
 
+#include "nyla/commons/debug/debugger.h"
 #include "nyla/commons/math/mat.h"
 #include "nyla/commons/math/vec.h"
 #include "nyla/commons/memory/charview.h"
@@ -21,7 +22,7 @@ struct SceneTransforms
 
 struct DynamicUbo
 {
-    float4 model;
+    float4x4 model;
 };
 
 } // namespace
@@ -69,8 +70,10 @@ void WorldRender(float2 pos, float angleRadians, float scalar, std::span<Vertex>
     model = model.Mult(float4x4::Rotate(angleRadians));
     model = model.Mult(float4x4::Scale(float4{scalar, scalar, 1.f, 1.f}));
 
+    DynamicUbo dynamicUbo { .model = model };
+
     ByteView vertexData = ByteViewSpan(vertices);
-    ByteView dynamicUniformData = ByteViewPtr(&model);
+    ByteView dynamicUniformData = ByteViewPtr(&dynamicUbo);
     RpMesh mesh = RpVertCopy(worldPipeline, vertices.size(), vertexData);
     RpDraw(worldPipeline, mesh, dynamicUniformData);
 }

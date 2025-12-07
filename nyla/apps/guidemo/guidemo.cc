@@ -1,49 +1,25 @@
-#include <cstdint>
-
-#include "nyla/commons/logging/init.h"
-#include "nyla/commons/memory/temp.h"
-#include "nyla/commons/signal/signal.h"
 #include "nyla/engine0/dbg_text_renderer.h"
+#include "nyla/engine0/engine0.h"
 #include "nyla/engine0/gui.h"
 #include "nyla/engine0/render_pipeline.h"
 #include "nyla/engine0/staging.h"
-#include "nyla/platform/platform.h"
 
 namespace nyla
 {
 
 static auto Main() -> int
 {
-    LoggingInit();
-    TArenaInit();
-    SigIntCoreDump();
+    Engine0Init();
 
-    PlatformInit();
-    PlatformWindow window = PlatformCreateWindow();
-
-    RhiInit(RhiDesc{
-        .window = window,
-    });
-
-    for (;;)
+    while (!Engine0ShouldExit())
     {
-        PlatformProcessEvents();
-        if (PlatformShouldExit())
-        {
-            break;
-        }
+        Engine0FrameBegin();
 
         if (RecompileShadersIfNeeded())
         {
             RpInit(guiPipeline);
             RpInit(dbgTextPipeline);
         }
-
-        RhiFrameBegin();
-
-        static uint32_t fps;
-        float dt;
-        UpdateDtFps(fps, dt);
 
         RpBegin(guiPipeline);
         UiFrameBegin();
@@ -55,9 +31,9 @@ static auto Main() -> int
         UiText("Hello world");
 
         RpBegin(dbgTextPipeline);
-        DbgText(10, 10, "fps= " + std::to_string(fps));
+        DbgText(10, 10, "fps= " + std::to_string(Engine0GetFps()));
 
-        RhiFrameEnd();
+        Engine0FrameEnd();
     }
 
     return 0;

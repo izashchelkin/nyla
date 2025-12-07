@@ -3,6 +3,7 @@
 #include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_handle.h"
 #include "nyla/rhi/rhi_shader.h"
+#include <cstdint>
 
 namespace nyla
 {
@@ -27,6 +28,7 @@ struct RhiBufferBinding
     RhiBuffer buffer;
     uint32_t offset;
     uint32_t size;
+    uint32_t range;
 };
 
 struct RhiBindGroupEntry

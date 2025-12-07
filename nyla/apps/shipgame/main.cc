@@ -2,11 +2,8 @@
 
 #include "nyla/apps/shipgame/shipgame.h"
 #include "nyla/apps/shipgame/world_renderer.h"
-#include "nyla/commons/logging/init.h"
-#include "nyla/commons/memory/temp.h"
-#include "nyla/commons/os/clock.h"
-#include "nyla/commons/signal/signal.h"
 #include "nyla/engine0/dbg_text_renderer.h"
+#include "nyla/engine0/engine0.h"
 #include "nyla/engine0/render_pipeline.h"
 #include "nyla/engine0/staging.h"
 #include "nyla/platform/key_physical.h"
@@ -19,12 +16,7 @@ uint16_t ientity;
 
 static auto Main() -> int
 {
-    LoggingInit();
-    TArenaInit();
-    SigIntCoreDump();
-
-    PlatformInit();
-    PlatformWindow window = PlatformCreateWindow();
+    Engine0Init();
 
     PlatformMapInputBegin();
     PlatformMapInput(kUp, KeyPhysical::E);
@@ -38,16 +30,11 @@ static auto Main() -> int
     PlatformMapInput(kZoomLess, KeyPhysical::I);
     PlatformMapInputEnd();
 
-    RhiInit(RhiDesc{
-        .window = window,
-    });
     ShipgameInit();
 
-    for (;;)
+    while (!Engine0ShouldExit())
     {
-        PlatformProcessEvents();
-        if (PlatformShouldExit())
-            break;
+        Engine0FrameBegin();
 
         if (RecompileShadersIfNeeded())
         {
@@ -56,13 +43,9 @@ static auto Main() -> int
             RpInit(gridPipeline);
         }
 
-        static uint32_t fps;
-        float dt;
-        UpdateDtFps(fps, dt);
+        ShipgameFrame(Engine0GetDt(), Engine0GetFps());
 
-        RhiFrameBegin();
-        ShipgameFrame(dt, fps);
-        RhiFrameEnd();
+        Engine0FrameEnd();
     }
 
     return 0;

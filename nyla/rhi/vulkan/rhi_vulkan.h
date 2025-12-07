@@ -51,6 +51,7 @@ struct VulkanData
     uint32_t swapchainImageCount;
     std::array<VkImageView, 8> swapchainImageViews;
     std::array<VkSemaphore, kRhiMaxNumFramesInFlight> swapchainAcquireSemaphores;
+    std::array<VkSemaphore, 8> renderFinishedSemaphores;
 
     DeviceQueue graphicsQueue;
     std::array<RhiCmdList, kRhiMaxNumFramesInFlight> graphicsQueueCmd;
