@@ -53,7 +53,7 @@ auto VulkanTextureStateGetSyncInfo(RhiTextureState state) -> VulkanTextureStateS
 
     case RhiTextureState::Present:
         return {
-            .stage = VK_PIPELINE_STAGE_2_NONE,
+            .stage = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
             .access = VK_ACCESS_2_NONE,
             .layout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
         };
@@ -144,6 +144,7 @@ auto RhiCreateTextureFromSwapchainImage(VkImage image, VkSurfaceFormatKHR surfac
         .isSwapchain = true,
         .image = image,
         .imageView = imageView,
+        .state = RhiTextureState::Present,
         .memory = VK_NULL_HANDLE,
         .format = surfaceFormat.format,
         .extent = {surfaceExtent.width, surfaceExtent.height, 1},
@@ -234,20 +235,20 @@ void RhiCmdTransitionTexture(RhiCmdList cmd, RhiTexture texture, RhiTextureState
 
     VulkanTextureData &textureData = RhiHandleGetData(rhiHandles.textures, texture);
 
-    if (newState == textureData.state)
+    const VulkanTextureStateSyncInfo newSyncInfo = VulkanTextureStateGetSyncInfo(newState);
+    if (newSyncInfo.layout == textureData.layout)
         return;
 
-    const VulkanTextureStateSyncInfo oldSync = VulkanTextureStateGetSyncInfo(textureData.state);
-    const VulkanTextureStateSyncInfo newSync = VulkanTextureStateGetSyncInfo(newState);
+    const VulkanTextureStateSyncInfo oldSyncInfo = VulkanTextureStateGetSyncInfo(textureData.state);
 
     const VkImageMemoryBarrier2 imageMemoryBarrier{
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-        .srcStageMask = oldSync.stage,
-        .srcAccessMask = oldSync.access,
-        .dstStageMask = newSync.stage,
-        .dstAccessMask = newSync.access,
-        .oldLayout = oldSync.layout,
-        .newLayout = newSync.layout,
+        .srcStageMask = oldSyncInfo.stage,
+        .srcAccessMask = oldSyncInfo.access,
+        .dstStageMask = newSyncInfo.stage,
+        .dstAccessMask = newSyncInfo.access,
+        .oldLayout = textureData.layout,
+        .newLayout = newSyncInfo.layout,
         .image = textureData.image,
         .subresourceRange =
             {
@@ -267,6 +268,7 @@ void RhiCmdTransitionTexture(RhiCmdList cmd, RhiTexture texture, RhiTextureState
     vkCmdPipelineBarrier2(cmdbuf, &dependencyInfo);
 
     textureData.state = newState;
+    textureData.layout = newSyncInfo.layout;
 }
 
 void RhiDestroyTexture(RhiTexture texture)

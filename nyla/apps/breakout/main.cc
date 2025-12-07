@@ -54,13 +54,13 @@ static auto Main() -> int
         RhiTexture offscreenTexture = offscreenTextures[RhiFrameGetIndex()];
 
         RhiPassBegin({
-            .colorTarget = offscreenTexture,
+            .colorTarget = RhiGetBackbufferTexture(),
         });
 
         BreakoutFrame(Engine0GetDt(), Engine0GetFps());
 
         RhiPassEnd({
-            .colorTarget = offscreenTexture,
+            .colorTarget = RhiGetBackbufferTexture(),
         });
 
         Engine0FrameEnd();

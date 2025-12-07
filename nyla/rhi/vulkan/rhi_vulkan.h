@@ -104,6 +104,7 @@ struct VulkanTextureData
     VkImageView imageView;
     VkDeviceMemory memory;
     RhiTextureState state;
+    VkImageLayout layout;
     VkFormat format;
     VkExtent3D extent;
 };
