@@ -12,6 +12,8 @@
 #include "nyla/engine0/staging.h"
 #include "nyla/platform/x11/platform_x11.h"
 #include "nyla/rhi/rhi.h"
+#include "nyla/rhi/rhi_pass.h"
+#include "nyla/rhi/rhi_texture.h"
 #include "xcb/xproto.h"
 
 namespace nyla
@@ -30,6 +32,11 @@ void DrawBackground(uint32_t numClients, std::string_view barText)
     }
 
     RhiFrameBegin();
+
+    RhiPassBegin({
+        .colorTarget = RhiGetBackbufferTexture(),
+    });
+
     UiFrameBegin();
 
     RpBegin(dbgTextPipeline);
@@ -41,6 +48,10 @@ void DrawBackground(uint32_t numClients, std::string_view barText)
     {
         UiBoxBegin(25 + 25 * i, 45, 20, 20);
     }
+
+    RhiPassEnd({
+        .colorTarget = RhiGetBackbufferTexture(),
+    });
 
     RhiFrameEnd();
 }

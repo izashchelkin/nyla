@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "nyla/rhi/rhi_buffer.h"
+#include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_handle.h"
 
 namespace nyla
@@ -17,6 +18,17 @@ enum class RhiTextureFormat
 
     D32_Float,
     D32_Float_S8_UINT,
+};
+
+enum class RhiTextureState
+{
+    Undefined,
+    ColorTarget,
+    DepthTarget,
+    ShaderRead,
+    Present,
+    TransferSrc,
+    TransferDst,
 };
 
 struct RhiTexture : RhiHandle
@@ -41,6 +53,7 @@ struct RhiTextureInfo
 auto RhiCreateTexture(RhiTextureDesc) -> RhiTexture;
 void RhiDestroyTexture(RhiTexture);
 auto RhiGetTextureInfo(RhiTexture) -> RhiTextureInfo;
+void RhiCmdTransitionTexture(RhiCmdList, RhiTexture, RhiTextureState);
 
 auto RhiGetBackbufferTexture() -> RhiTexture;
 

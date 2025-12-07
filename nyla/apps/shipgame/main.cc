@@ -8,6 +8,7 @@
 #include "nyla/engine0/staging.h"
 #include "nyla/platform/key_physical.h"
 #include "nyla/platform/platform.h"
+#include "nyla/rhi/rhi_pass.h"
 
 namespace nyla
 {
@@ -43,7 +44,15 @@ static auto Main() -> int
             RpInit(gridPipeline);
         }
 
+        RhiPassBegin({
+            .colorTarget = RhiGetBackbufferTexture(),
+        });
+
         ShipgameFrame(Engine0GetDt(), Engine0GetFps());
+
+        RhiPassEnd({
+            .colorTarget = RhiGetBackbufferTexture(),
+        });
 
         Engine0FrameEnd();
     }

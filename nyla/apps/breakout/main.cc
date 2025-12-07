@@ -7,6 +7,11 @@
 #include "nyla/engine0/staging.h"
 #include "nyla/platform/key_physical.h"
 #include "nyla/platform/platform.h"
+#include "nyla/rhi/rhi.h"
+#include "nyla/rhi/rhi_buffer.h"
+#include "nyla/rhi/rhi_pass.h"
+#include "nyla/rhi/rhi_texture.h"
+#include <cstdint>
 
 namespace nyla
 {
@@ -24,6 +29,17 @@ static auto Main() -> int
 
     BreakoutInit();
 
+    std::array<RhiTexture, kRhiMaxNumFramesInFlight> offscreenTextures;
+    for (uint32_t i = 0; i < RhiGetNumFramesInFlight(); ++i)
+    {
+        offscreenTextures[i] = RhiCreateTexture(RhiTextureDesc{
+            .width = 1000,
+            .height = 1000,
+            .memoryUsage = RhiMemoryUsage::GpuOnly,
+            .format = RhiTextureFormat::R8G8B8A8_sRGB,
+        });
+    }
+
     while (!Engine0ShouldExit())
     {
         Engine0FrameBegin();
@@ -35,7 +51,17 @@ static auto Main() -> int
             RpInit(dbgTextPipeline);
         }
 
+        RhiTexture offscreenTexture = offscreenTextures[RhiFrameGetIndex()];
+
+        RhiPassBegin({
+            .colorTarget = offscreenTexture,
+        });
+
         BreakoutFrame(Engine0GetDt(), Engine0GetFps());
+
+        RhiPassEnd({
+            .colorTarget = offscreenTexture,
+        });
 
         Engine0FrameEnd();
     }

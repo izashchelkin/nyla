@@ -9,6 +9,75 @@ namespace nyla
 using namespace rhi_internal;
 using namespace rhi_vulkan_internal;
 
+namespace
+{
+
+struct VulkanTextureStateSyncInfo
+{
+    VkPipelineStageFlags2 stage;
+    VkAccessFlags2 access;
+    VkImageLayout layout;
+};
+
+auto VulkanTextureStateGetSyncInfo(RhiTextureState state) -> VulkanTextureStateSyncInfo
+{
+    switch (state)
+    {
+    case RhiTextureState::Undefined:
+        return {
+            .stage = VK_PIPELINE_STAGE_2_NONE,
+            .access = VK_ACCESS_2_NONE,
+            .layout = VK_IMAGE_LAYOUT_UNDEFINED,
+        };
+
+    case RhiTextureState::ColorTarget:
+        return {
+            .stage = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+            .access = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+            .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        };
+
+    case RhiTextureState::DepthTarget:
+        return {
+            .stage = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+            .access = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
+            .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+        };
+
+    case RhiTextureState::ShaderRead:
+        return {
+            .stage = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+            .access = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+            .layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        };
+
+    case RhiTextureState::Present:
+        return {
+            .stage = VK_PIPELINE_STAGE_2_NONE,
+            .access = VK_ACCESS_2_NONE,
+            .layout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+        };
+
+    case RhiTextureState::TransferSrc:
+        return {
+            .stage = VK_PIPELINE_STAGE_2_COPY_BIT | VK_PIPELINE_STAGE_2_BLIT_BIT | VK_PIPELINE_STAGE_2_RESOLVE_BIT,
+            .access = VK_ACCESS_2_TRANSFER_READ_BIT,
+            .layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+        };
+
+    case RhiTextureState::TransferDst:
+        return {
+            .stage = VK_PIPELINE_STAGE_2_COPY_BIT | VK_PIPELINE_STAGE_2_BLIT_BIT | VK_PIPELINE_STAGE_2_RESOLVE_BIT,
+            .access = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+            .layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        };
+    }
+    CHECK(false);
+    return {};
+}
+
+} // namespace
+
 namespace rhi_vulkan_internal
 {
 
@@ -49,62 +118,6 @@ auto ConvertVkFormatIntoRhiTextureFormat(VkFormat format) -> RhiTextureFormat
     CHECK(false);
     return static_cast<RhiTextureFormat>(0);
 }
-
-} // namespace rhi_vulkan_internal
-
-auto RhiCreateTexture(RhiTextureDesc desc) -> RhiTexture
-{
-    VulkanTextureData textureData{
-        .format = ConvertRhiTextureFormatIntoVkFormat(desc.format),
-    };
-
-    VkMemoryPropertyFlags memoryPropertyFlags = ConvertRhiMemoryUsageIntoVkMemoryPropertyFlags(desc.memoryUsage);
-
-    const VkImageCreateInfo imageCreateInfo{
-        .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-        .imageType = VK_IMAGE_TYPE_2D,
-        .format = textureData.format,
-        .extent = {desc.width, desc.height, 1},
-        .mipLevels = 1,
-        .arrayLayers = 1,
-        .samples = VK_SAMPLE_COUNT_1_BIT,
-        .tiling = VK_IMAGE_TILING_OPTIMAL,
-        .usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-        .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-    };
-    VK_CHECK(vkCreateImage(vk.dev, &imageCreateInfo, vk.alloc, &textureData.image));
-
-    VkMemoryRequirements memoryRequirements;
-    vkGetImageMemoryRequirements(vk.dev, textureData.image, &memoryRequirements);
-
-    const VkMemoryAllocateInfo memoryAllocInfo{
-        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-        .allocationSize = memoryRequirements.size,
-        .memoryTypeIndex = FindMemoryTypeIndex(memoryRequirements, memoryPropertyFlags),
-    };
-    vkAllocateMemory(vk.dev, &memoryAllocInfo, vk.alloc, &textureData.memory);
-
-    const VkImageViewCreateInfo imageViewCreateInfo{
-        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-        .image = textureData.image,
-        .format = textureData.format,
-        .subresourceRange =
-            {
-                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                .baseMipLevel = 0,
-                .levelCount = 1,
-                .baseArrayLayer = 0,
-                .layerCount = 1,
-            },
-    };
-    vkCreateImageView(vk.dev, &imageViewCreateInfo, vk.alloc, &textureData.imageView);
-
-    return RhiHandleAcquire(rhiHandles.textures, textureData);
-}
-
-namespace rhi_vulkan_internal
-{
 
 auto RhiCreateTextureFromSwapchainImage(VkImage image, VkSurfaceFormatKHR surfaceFormat, VkExtent2D surfaceExtent)
     -> RhiTexture
@@ -152,6 +165,59 @@ void RhiDestroySwapchainTexture(RhiTexture texture)
 
 } // namespace rhi_vulkan_internal
 
+auto RhiCreateTexture(RhiTextureDesc desc) -> RhiTexture
+{
+    VulkanTextureData textureData{
+        .format = ConvertRhiTextureFormatIntoVkFormat(desc.format),
+    };
+
+    VkMemoryPropertyFlags memoryPropertyFlags = ConvertRhiMemoryUsageIntoVkMemoryPropertyFlags(desc.memoryUsage);
+
+    const VkImageCreateInfo imageCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+        .imageType = VK_IMAGE_TYPE_2D,
+        .format = textureData.format,
+        .extent = {desc.width, desc.height, 1},
+        .mipLevels = 1,
+        .arrayLayers = 1,
+        .samples = VK_SAMPLE_COUNT_1_BIT,
+        .tiling = VK_IMAGE_TILING_OPTIMAL,
+        .usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+    };
+    VK_CHECK(vkCreateImage(vk.dev, &imageCreateInfo, vk.alloc, &textureData.image));
+
+    VkMemoryRequirements memoryRequirements;
+    vkGetImageMemoryRequirements(vk.dev, textureData.image, &memoryRequirements);
+
+    const VkMemoryAllocateInfo memoryAllocInfo{
+        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+        .allocationSize = memoryRequirements.size,
+        .memoryTypeIndex = FindMemoryTypeIndex(memoryRequirements, memoryPropertyFlags),
+    };
+    vkAllocateMemory(vk.dev, &memoryAllocInfo, vk.alloc, &textureData.memory);
+    vkBindImageMemory(vk.dev, textureData.image, textureData.memory, 0);
+
+    const VkImageViewCreateInfo imageViewCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+        .image = textureData.image,
+        .viewType = VK_IMAGE_VIEW_TYPE_2D,
+        .format = textureData.format,
+        .subresourceRange =
+            {
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .baseMipLevel = 0,
+                .levelCount = 1,
+                .baseArrayLayer = 0,
+                .layerCount = 1,
+            },
+    };
+    vkCreateImageView(vk.dev, &imageViewCreateInfo, vk.alloc, &textureData.imageView);
+
+    return RhiHandleAcquire(rhiHandles.textures, textureData);
+}
+
 auto RhiGetTextureInfo(RhiTexture texture) -> RhiTextureInfo
 {
     const VulkanTextureData textureData = RhiHandleGetData(rhiHandles.textures, texture);
@@ -160,6 +226,47 @@ auto RhiGetTextureInfo(RhiTexture texture) -> RhiTextureInfo
         .height = textureData.extent.height,
         .format = ConvertVkFormatIntoRhiTextureFormat(textureData.format),
     };
+}
+
+void RhiCmdTransitionTexture(RhiCmdList cmd, RhiTexture texture, RhiTextureState newState)
+{
+    VkCommandBuffer cmdbuf = RhiHandleGetData(rhiHandles.cmdLists, cmd).cmdbuf;
+
+    VulkanTextureData &textureData = RhiHandleGetData(rhiHandles.textures, texture);
+
+    if (newState == textureData.state)
+        return;
+
+    const VulkanTextureStateSyncInfo oldSync = VulkanTextureStateGetSyncInfo(textureData.state);
+    const VulkanTextureStateSyncInfo newSync = VulkanTextureStateGetSyncInfo(newState);
+
+    const VkImageMemoryBarrier2 imageMemoryBarrier{
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+        .srcStageMask = oldSync.stage,
+        .srcAccessMask = oldSync.access,
+        .dstStageMask = newSync.stage,
+        .dstAccessMask = newSync.access,
+        .oldLayout = oldSync.layout,
+        .newLayout = newSync.layout,
+        .image = textureData.image,
+        .subresourceRange =
+            {
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, // TODO: wtf here
+                .baseMipLevel = 0,
+                .levelCount = 1,
+                .baseArrayLayer = 0,
+                .layerCount = 1,
+            },
+    };
+
+    const VkDependencyInfo dependencyInfo{
+        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .imageMemoryBarrierCount = 1,
+        .pImageMemoryBarriers = &imageMemoryBarrier,
+    };
+    vkCmdPipelineBarrier2(cmdbuf, &dependencyInfo);
+
+    textureData.state = newState;
 }
 
 void RhiDestroyTexture(RhiTexture texture)

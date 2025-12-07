@@ -84,10 +84,6 @@ auto Engine0FrameBegin() -> void
     }
 
     PlatformProcessEvents();
-
-    RhiPassBegin({
-        .colorTarget = RhiGetBackbufferTexture(),
-    });
 }
 
 auto Engine0GetDt() -> float
@@ -102,10 +98,6 @@ auto Engine0GetFps() -> uint32_t
 
 auto Engine0FrameEnd() -> void
 {
-    RhiPassEnd({
-        .colorTarget = RhiGetBackbufferTexture(),
-    });
-
     RhiFrameEnd();
 
     uint64_t frameEnd = GetMonotonicTimeMicros();
