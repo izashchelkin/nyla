@@ -4,6 +4,7 @@
 #include <vulkan/vulkan_core.h>
 
 #include "nyla/rhi/rhi.h"
+#include "nyla/rhi/rhi_texture.h"
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
 
 namespace nyla::rhi_vulkan_internal
@@ -12,8 +13,9 @@ namespace nyla::rhi_vulkan_internal
 void CreateSwapchain()
 {
     VkSwapchainKHR oldSwapchain = vk.swapchain;
-    auto oldImageViews = vk.swapchainImageViews;
-    uint32_t oldImagesViewsCount = vk.swapchainImagesCount;
+
+    std::array oldSwapchainTextures = vk.swapchainTextures;
+    uint32_t oldImagesViewsCount = vk.swapchainTexturesCount;
 
     VkSurfaceCapabilitiesKHR surfaceCapabilities;
     VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vk.physDev, vk.surface, &surfaceCapabilities));
@@ -94,11 +96,10 @@ void CreateSwapchain()
         };
     }();
 
-    uint32_t swapchainMinImageCount = surfaceCapabilities.minImageCount + 1;
+    CHECK_GE(kRhiMaxNumSwapchainTextures, surfaceCapabilities.minImageCount);
+    uint32_t swapchainMinImageCount = std::min(kRhiMaxNumSwapchainTextures, surfaceCapabilities.minImageCount + 1);
     if (surfaceCapabilities.maxImageCount)
-    {
         swapchainMinImageCount = std::min(surfaceCapabilities.maxImageCount, swapchainMinImageCount);
-    }
 
     const VkSwapchainCreateInfoKHR createInfo{
         .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
@@ -121,19 +122,57 @@ void CreateSwapchain()
     uint32_t swapchainImageCount;
     vkGetSwapchainImagesKHR(vk.dev, vk.swapchain, &swapchainImageCount, nullptr);
 
-    CHECK_LE(swapchainImageCount, std::size(vk.swapchainImages));
-    vkGetSwapchainImagesKHR(vk.dev, vk.swapchain, &swapchainImageCount, vk.swapchainImages.data());
+    CHECK_LE(swapchainImageCount, kRhiMaxNumSwapchainTextures);
+    std::array<VkImage, kRhiMaxNumSwapchainTextures> swapchainImages;
+
+    vkGetSwapchainImagesKHR(vk.dev, vk.swapchain, &swapchainImageCount, swapchainImages.data());
 
     for (size_t i = 0; i < swapchainImageCount; ++i)
     {
-        const VkImageViewCreateInfo createInfo{
+        vk.swapchainTextures[i] = RhiCreateTextureFromSwapchainImage(swapchainImages[i], vk.surfaceFormat);
+
+#if 0
+        const VkImageCreateInfo depthImageCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+
+            .imageType = VK_IMAGE_TYPE_2D,
+            .format = VK_FORMAT_D32_SFLOAT,
+            .extent = VkExtent3D{vk.surfaceExtent.width, vk.surfaceExtent.height, 1},
+            .mipLevels = 1,
+            .arrayLayers = 1,
+            .samples = VK_SAMPLE_COUNT_1_BIT,
+            .tiling = VK_IMAGE_TILING_OPTIMAL,
+            .usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+            .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+
+            // const void*              pNext;
+            // VkImageCreateFlags       flags;
+            // VkImageType              imageType;
+            // VkFormat                 format;
+            // VkExtent3D               extent;
+            // uint32_t                 mipLevels;
+            // uint32_t                 arrayLayers;
+            // VkSampleCountFlagBits    samples;
+            // VkImageTiling            tiling;
+            // VkImageUsageFlags        usage;
+            // VkSharingMode            sharingMode;
+            // uint32_t                 queueFamilyIndexCount;
+            // const uint32_t*          pQueueFamilyIndices;
+            // VkImageLayout            initialLayout;
+
+        };
+
+        VkImage depthImage;
+        VK_CHECK(vkCreateImage(vk.dev, &depthImageCreateInfo, vk.alloc, &depthImage));
+
+        const VkImageViewCreateInfo depthImageImageViewCreateInfo{
             .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-            .image = vk.swapchainImages[i],
+            .image = depthImage,
             .viewType = VK_IMAGE_VIEW_TYPE_2D,
-            .format = vk.surfaceFormat.format,
+            .format = VK_FORMAT_D32_SFLOAT_S8_UINT,
             .subresourceRange =
                 {
-                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
                     .baseMipLevel = 0,
                     .levelCount = 1,
                     .baseArrayLayer = 0,
@@ -141,15 +180,15 @@ void CreateSwapchain()
                 },
         };
 
-        VK_CHECK(vkCreateImageView(vk.dev, &createInfo, nullptr, &vk.swapchainImageViews[i]));
+        VkImageView depthImageView;
+        // VK_CHECK(vkCreateImageView(vk.dev, &depthImageImageViewCreateInfo, vk.alloc, &depthImageView));
+#endif
     }
 
     if (oldSwapchain)
     {
         for (uint32_t i = 0; i < oldImagesViewsCount; ++i)
-        {
-            vkDestroyImageView(vk.dev, oldImageViews[i], nullptr);
-        }
+            RhiDestroySwapchainTexture(oldSwapchainTextures[i]);
 
         vkDestroySwapchainKHR(vk.dev, oldSwapchain, nullptr);
     }

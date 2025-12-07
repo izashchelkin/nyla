@@ -22,6 +22,8 @@ auto ConvertRhiTextureFormatIntoVkFormat(RhiTextureFormat format) -> VkFormat
         return VK_FORMAT_R8G8B8A8_SRGB;
     case RhiTextureFormat::D32_Float:
         return VK_FORMAT_D32_SFLOAT;
+    case RhiTextureFormat::D32_Float_S8_UINT:
+        return VK_FORMAT_D32_SFLOAT_S8_UINT;
     }
 
     CHECK(false);
@@ -40,8 +42,9 @@ auto RhiCreateTexture(RhiTextureDesc desc) -> RhiTexture
 {
     VulkanTextureData textureData{
         .format = ConvertRhiTextureFormatIntoVkFormat(desc.format),
-        .memoryPropertyFlags = ConvertRhiMemoryUsageIntoVkMemoryPropertyFlags(desc.memoryUsage),
     };
+
+    VkMemoryPropertyFlags memoryPropertyFlags = ConvertRhiMemoryUsageIntoVkMemoryPropertyFlags(desc.memoryUsage);
 
     const VkImageCreateInfo imageCreateInfo{
         .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
@@ -64,7 +67,7 @@ auto RhiCreateTexture(RhiTextureDesc desc) -> RhiTexture
     const VkMemoryAllocateInfo memoryAllocInfo{
         .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
         .allocationSize = memoryRequirements.size,
-        .memoryTypeIndex = FindMemoryTypeIndex(memoryRequirements, textureData.memoryPropertyFlags),
+        .memoryTypeIndex = FindMemoryTypeIndex(memoryRequirements, memoryPropertyFlags),
     };
     vkAllocateMemory(vk.dev, &memoryAllocInfo, vk.alloc, &textureData.memory);
 
@@ -86,12 +89,65 @@ auto RhiCreateTexture(RhiTextureDesc desc) -> RhiTexture
     return RhiHandleAcquire(rhiHandles.textures, textureData);
 }
 
+namespace rhi_vulkan_internal
+{
+
+auto RhiCreateTextureFromSwapchainImage(VkImage image, VkSurfaceFormatKHR surfaceFormat) -> RhiTexture
+{
+    const VkImageViewCreateInfo imageViewCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+        .image = image,
+        .viewType = VK_IMAGE_VIEW_TYPE_2D,
+        .format = vk.surfaceFormat.format,
+        .subresourceRange =
+            {
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .baseMipLevel = 0,
+                .levelCount = 1,
+                .baseArrayLayer = 0,
+                .layerCount = 1,
+            },
+    };
+
+    VkImageView imageView;
+    VK_CHECK(vkCreateImageView(vk.dev, &imageViewCreateInfo, vk.alloc, &imageView));
+
+    VulkanTextureData textureData{
+        .isSwapchain = true,
+        .image = image,
+        .imageView = imageView,
+        .memory = VK_NULL_HANDLE,
+        .format = surfaceFormat.format,
+    };
+
+    return RhiHandleAcquire(rhiHandles.textures, textureData);
+}
+
+void RhiDestroySwapchainTexture(RhiTexture texture)
+{
+    VulkanTextureData textureData = RhiHandleRelease(rhiHandles.textures, texture);
+    CHECK(textureData.isSwapchain);
+
+    CHECK(textureData.imageView);
+    vkDestroyImageView(vk.dev, textureData.imageView, vk.alloc);
+
+    CHECK(textureData.image);
+}
+
+} // namespace rhi_vulkan_internal
+
 void RhiDestroyTexture(RhiTexture texture)
 {
     VulkanTextureData textureData = RhiHandleRelease(rhiHandles.textures, texture);
+    CHECK(!textureData.isSwapchain);
 
+    CHECK(textureData.imageView);
     vkDestroyImageView(vk.dev, textureData.imageView, vk.alloc);
+
+    CHECK(textureData.image);
     vkDestroyImage(vk.dev, textureData.image, vk.alloc);
+
+    CHECK(textureData.memory);
     vkFreeMemory(vk.dev, textureData.memory, vk.alloc);
 }
 

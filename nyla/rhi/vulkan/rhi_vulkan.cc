@@ -450,7 +450,7 @@ void RhiInit(const RhiDesc &rhiDesc)
     {
         VK_CHECK(vkCreateSemaphore(vk.dev, &semaphoreCreateInfo, nullptr, vk.swapchainAcquireSemaphores.data() + i));
     }
-    for (size_t i = 0; i < std::size(vk.swapchainImages); ++i)
+    for (size_t i = 0; i < kRhiMaxNumSwapchainTextures; ++i)
     {
         VK_CHECK(vkCreateSemaphore(vk.dev, &semaphoreCreateInfo, nullptr, vk.renderFinishedSemaphores.data() + i));
     }

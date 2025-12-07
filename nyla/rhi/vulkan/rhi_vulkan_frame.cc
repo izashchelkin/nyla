@@ -14,9 +14,9 @@ auto RhiFrameBegin() -> RhiCmdList
 
     VkResult acquireResult =
         vkAcquireNextImageKHR(vk.dev, vk.swapchain, std::numeric_limits<uint64_t>::max(),
-                              vk.swapchainAcquireSemaphores[vk.frameIndex], VK_NULL_HANDLE, &vk.swapchainImageIndex);
+                              vk.swapchainAcquireSemaphores[vk.frameIndex], VK_NULL_HANDLE, &vk.swapchainTextureIndex);
     switch (acquireResult)
-    {
+    { // TODO: is drag a problem?
     case VK_ERROR_OUT_OF_DATE_KHR:
     case VK_SUBOPTIMAL_KHR: {
         vkDeviceWaitIdle(vk.dev);
@@ -41,13 +41,16 @@ auto RhiFrameBegin() -> RhiCmdList
     };
     VK_CHECK(vkBeginCommandBuffer(cmdbuf, &commandBufferBeginInfo));
 
+    const VulkanTextureData swapchainTextureData =
+        RhiHandleGetData(rhiHandles.textures, vk.swapchainTextures[vk.swapchainTextureIndex]);
+
     const VkImageMemoryBarrier imageMemoryBarrier{
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
         .srcAccessMask = 0,
         .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
         .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED, // TODO:
         .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        .image = vk.swapchainImages[vk.swapchainImageIndex],
+        .image = swapchainTextureData.image,
         .subresourceRange =
             {
                 .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -64,7 +67,7 @@ auto RhiFrameBegin() -> RhiCmdList
 
     const VkRenderingAttachmentInfo colorAttachmentInfo{
         .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-        .imageView = vk.swapchainImageViews[vk.swapchainImageIndex],
+        .imageView = swapchainTextureData.imageView,
         .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
         .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
@@ -110,12 +113,15 @@ void RhiFrameEnd()
     VkCommandBuffer cmdbuf = RhiHandleGetData(rhiHandles.cmdLists, cmd).cmdbuf;
     vkCmdEndRendering(cmdbuf);
 
+    const VulkanTextureData swapchainTextureData =
+        RhiHandleGetData(rhiHandles.textures, vk.swapchainTextures[vk.swapchainTextureIndex]);
+
     const VkImageMemoryBarrier imageMemoryBarrier{
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
         .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
         .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-        .image = vk.swapchainImages[vk.swapchainImageIndex],
+        .image = swapchainTextureData.image,
         .subresourceRange =
             {
                 .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -136,7 +142,7 @@ void RhiFrameEnd()
     };
 
     const VkSemaphore acquireSemaphore = vk.swapchainAcquireSemaphores[vk.frameIndex];
-    const VkSemaphore renderFinishedSemaphore = vk.renderFinishedSemaphores[vk.swapchainImageIndex];
+    const VkSemaphore renderFinishedSemaphore = vk.renderFinishedSemaphores[vk.swapchainTextureIndex];
 
     const std::array<VkSemaphore, 2> signalSemaphores{
         vk.graphicsQueue.timeline,
@@ -170,7 +176,7 @@ void RhiFrameEnd()
         .pWaitSemaphores = &renderFinishedSemaphore,
         .swapchainCount = 1,
         .pSwapchains = &vk.swapchain,
-        .pImageIndices = &vk.swapchainImageIndex,
+        .pImageIndices = &vk.swapchainTextureIndex,
     };
 
     const VkResult presentResult = vkQueuePresentKHR(vk.graphicsQueue.queue, &presentInfo);

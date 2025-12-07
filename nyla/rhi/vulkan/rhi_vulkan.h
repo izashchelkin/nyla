@@ -17,6 +17,8 @@
 namespace nyla::rhi_vulkan_internal
 {
 
+using namespace rhi_internal;
+
 inline auto VkCheckImpl(VkResult res)
 {
     if (res == VK_ERROR_DEVICE_LOST)
@@ -55,11 +57,10 @@ struct VulkanData
     VkSurfaceFormatKHR surfaceFormat;
     VkSwapchainKHR swapchain;
 
-    uint32_t swapchainImageIndex;
-    uint32_t swapchainImagesCount;
-    std::array<VkImage, kRhiMaxNumSwapchainImages> swapchainImages;
-    std::array<VkImageView, kRhiMaxNumSwapchainImages> swapchainImageViews;
-    std::array<VkSemaphore, kRhiMaxNumSwapchainImages> renderFinishedSemaphores;
+    uint32_t swapchainTextureIndex;
+    uint32_t swapchainTexturesCount;
+    std::array<RhiTexture, kRhiMaxNumSwapchainTextures> swapchainTextures;
+    std::array<VkSemaphore, kRhiMaxNumSwapchainTextures> renderFinishedSemaphores;
     std::array<VkSemaphore, kRhiMaxNumFramesInFlight> swapchainAcquireSemaphores;
 
     DeviceQueue graphicsQueue;
@@ -100,22 +101,22 @@ struct VulkanPipelineData
 
 struct VulkanTextureData
 {
+    bool isSwapchain;
     VkImage image;
     VkImageView imageView;
     VkDeviceMemory memory;
     VkFormat format;
-    VkMemoryPropertyFlags memoryPropertyFlags;
 };
 
 struct RhiHandles
 {
-    rhi_internal::RhiHandlePool<RhiBindGroupLayout, VkDescriptorSetLayout, 16> bindGroupLayouts;
-    rhi_internal::RhiHandlePool<RhiBindGroup, VkDescriptorSet, 16> bindGroups;
-    rhi_internal::RhiHandlePool<RhiBuffer, VulkanBufferData, 16> buffers;
-    rhi_internal::RhiHandlePool<RhiCmdList, VulkanCmdListData, 16> cmdLists;
-    rhi_internal::RhiHandlePool<RhiShader, VkShaderModule, 16> shaders;
-    rhi_internal::RhiHandlePool<RhiGraphicsPipeline, VulkanPipelineData, 16> graphicsPipelines;
-    rhi_internal::RhiHandlePool<RhiTexture, VulkanTextureData, 16> textures;
+    RhiHandlePool<RhiBindGroupLayout, VkDescriptorSetLayout, 16> bindGroupLayouts;
+    RhiHandlePool<RhiBindGroup, VkDescriptorSet, 16> bindGroups;
+    RhiHandlePool<RhiBuffer, VulkanBufferData, 16> buffers;
+    RhiHandlePool<RhiCmdList, VulkanCmdListData, 16> cmdLists;
+    RhiHandlePool<RhiShader, VkShaderModule, 16> shaders;
+    RhiHandlePool<RhiGraphicsPipeline, VulkanPipelineData, 16> graphicsPipelines;
+    RhiHandlePool<RhiTexture, VulkanTextureData, 16> textures;
 };
 extern RhiHandles rhiHandles;
 
@@ -124,6 +125,9 @@ auto DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeveri
                             const VkDebugUtilsMessengerCallbackDataEXT *callbackData, void *userData) -> VkBool32;
 
 void CreateSwapchain();
+
+auto RhiCreateTextureFromSwapchainImage(VkImage image, VkSurfaceFormatKHR surfaceFormat) -> RhiTexture;
+void RhiDestroySwapchainTexture(RhiTexture texture);
 
 auto CreateTimeline(uint64_t initialValue) -> VkSemaphore;
 void WaitTimeline(VkSemaphore timeline, uint64_t waitValue);

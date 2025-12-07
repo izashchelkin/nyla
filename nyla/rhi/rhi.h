@@ -9,7 +9,7 @@ namespace nyla
 {
 
 constexpr inline uint32_t kRhiMaxNumFramesInFlight = 3;
-constexpr inline uint32_t kRhiMaxNumSwapchainImages = 4;
+constexpr inline uint32_t kRhiMaxNumSwapchainTextures = 4;
 
 #if defined(NDEBUG)
 constexpr inline bool kRhiValidations = false;
