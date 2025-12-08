@@ -22,7 +22,7 @@ struct RhiShader : RhiHandle
 
 struct RhiShaderDesc
 {
-    std::vector<char> code;
+    std::vector<std::byte> code;
 };
 
 auto RhiCreateShader(const RhiShaderDesc &) -> RhiShader;

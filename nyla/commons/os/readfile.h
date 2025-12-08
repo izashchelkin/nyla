@@ -6,6 +6,6 @@
 namespace nyla
 {
 
-auto ReadFile(const std::string &filename) -> std::vector<char>;
+auto ReadFile(const std::string &filename) -> std::vector<std::byte>;
 
 } // namespace nyla

@@ -1,6 +1,7 @@
 # set(CMAKE_CXX_CLANG_TIDY "clang-tidy")
 
 add_subdirectory(apps)
+add_subdirectory(spirview)
 add_subdirectory(commons)
 add_subdirectory(dbus)
 add_subdirectory(debugfs)

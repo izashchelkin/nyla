@@ -3,6 +3,17 @@
 	"tasks": [
 		{
 			"type": "cmake",
+			"label": "spirview build",
+			"command": "build",
+			"targets": [
+				"nyla_spirview_bin"
+			],
+			"preset": "debug",
+			"group": "build",
+			"problemMatcher": [],
+		},
+		{
+			"type": "cmake",
 			"label": "breakout build",
 			"command": "build",
 			"targets": [
