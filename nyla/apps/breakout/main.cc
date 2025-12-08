@@ -68,7 +68,7 @@ static auto Main() -> int
 
         RhiPassBegin({
             .colorTarget = RhiGetBackbufferTexture(),
-            .state = RhiTextureState::Present,
+            .state = RhiTextureState::ColorTarget,
         });
 
         RhiPassEnd({
