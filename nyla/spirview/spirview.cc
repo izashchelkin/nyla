@@ -13,6 +13,12 @@ namespace spirview_internal
 {
 };
 
+constexpr uint32_t kSpirvMagic = 0x07230203;
+
+void DecodeSpirvWord()
+{
+}
+
 void Reflect(std::span<const std::byte> spirvBytes)
 {
     for (uint32_t i = 0; i < spirvBytes.size(); i += 4)
