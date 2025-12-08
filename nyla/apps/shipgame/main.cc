@@ -9,6 +9,7 @@
 #include "nyla/platform/key_physical.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi_pass.h"
+#include "nyla/rhi/rhi_texture.h"
 
 namespace nyla
 {
@@ -46,12 +47,14 @@ static auto Main() -> int
 
         RhiPassBegin({
             .colorTarget = RhiGetBackbufferTexture(),
+            .state = RhiTextureState::ColorTarget,
         });
 
         ShipgameFrame(Engine0GetDt(), Engine0GetFps());
 
         RhiPassEnd({
             .colorTarget = RhiGetBackbufferTexture(),
+            .state = RhiTextureState::Present,
         });
 
         Engine0FrameEnd();

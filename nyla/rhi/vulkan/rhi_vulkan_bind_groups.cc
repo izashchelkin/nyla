@@ -1,5 +1,7 @@
 #include <cstdint>
 
+#include "nyla/rhi/rhi_bind_groups.h"
+#include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_handle.h"
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
 #include "vulkan/vulkan_core.h"
@@ -21,6 +23,10 @@ auto ConvertVulkanBindingType(RhiBindingType bindingType) -> VkDescriptorType
         return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     case RhiBindingType::UniformBufferDynamic:
         return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+    case RhiBindingType::Texture:
+        return VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+    case RhiBindingType::Sampler:
+        return VK_DESCRIPTOR_TYPE_SAMPLER;
     }
     CHECK(false);
     return static_cast<VkDescriptorType>(0);
@@ -31,7 +37,7 @@ auto ConvertVulkanBindingType(RhiBindingType bindingType) -> VkDescriptorType
 auto RhiCreateBindGroupLayout(const RhiBindGroupLayoutDesc &desc) -> RhiBindGroupLayout
 {
     CHECK_LE(desc.bindingCount, std::size(desc.bindings));
-    VkDescriptorSetLayoutBinding descriptorSetLayoutBindings[std::size(desc.bindings)];
+    std::array<VkDescriptorSetLayoutBinding, std::size(desc.bindings)> descriptorSetLayoutBindings;
 
     for (uint32_t ibinding = 0; ibinding < desc.bindingCount; ++ibinding)
     {
@@ -47,7 +53,7 @@ auto RhiCreateBindGroupLayout(const RhiBindGroupLayoutDesc &desc) -> RhiBindGrou
     const VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
         .bindingCount = desc.bindingCount,
-        .pBindings = descriptorSetLayoutBindings,
+        .pBindings = descriptorSetLayoutBindings.data(),
     };
 
     VkDescriptorSetLayout descriptorSetLayout;
@@ -80,31 +86,54 @@ auto RhiCreateBindGroup(const RhiBindGroupDesc &desc) -> RhiBindGroup
     CHECK_LE(desc.entriesCount, std::size(desc.entries));
 
     std::array<VkDescriptorBufferInfo, std::size(desc.entries)> bufferInfos;
-    uint32_t bufferInfosIndex = 0;
+    std::array<VkDescriptorImageInfo, std::size(desc.entries)> imageInfos;
 
     for (uint32_t i = 0; i < desc.entriesCount; ++i)
     {
         const RhiBindGroupEntry &entry = desc.entries[i];
+
+        writes[i] = {
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .dstSet = descriptorSet,
+            .dstBinding = entry.binding,
+            .dstArrayElement = entry.arrayIndex,
+            .descriptorCount = 1,
+            .descriptorType = ConvertVulkanBindingType(entry.type),
+        };
+
         switch (entry.type)
         {
         case RhiBindingType::UniformBuffer:
         case RhiBindingType::UniformBufferDynamic: {
             const VulkanBufferData &bufferData = RhiHandleGetData(rhiHandles.buffers, entry.buffer.buffer);
-            const auto &bufferInfo = bufferInfos[bufferInfosIndex++] = VkDescriptorBufferInfo{
+            const VkDescriptorBufferInfo &bufferInfo = bufferInfos[i] = VkDescriptorBufferInfo{
                 .buffer = bufferData.buffer,
                 .offset = entry.buffer.offset,
                 .range = entry.buffer.range,
             };
 
-            writes[i] = {
-                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                .dstSet = descriptorSet,
-                .dstBinding = entry.binding,
-                .dstArrayElement = entry.arrayIndex,
-                .descriptorCount = 1,
-                .descriptorType = ConvertVulkanBindingType(entry.type),
-                .pBufferInfo = &bufferInfo,
+            writes[i].pBufferInfo = &bufferInfo;
+            break;
+        }
+
+        case RhiBindingType::Texture: {
+            const VulkanTextureData &textureData = RhiHandleGetData(rhiHandles.textures, entry.texture.texture);
+            const VkDescriptorImageInfo &imageInfo = imageInfos[i] = VkDescriptorImageInfo{
+                .imageView = textureData.imageView,
+                .imageLayout = textureData.layout,
             };
+
+            writes[i].pImageInfo = &imageInfo;
+            break;
+        }
+
+        case RhiBindingType::Sampler: {
+            const VulkanSamplerData &samplerData = RhiHandleGetData(rhiHandles.samplers, entry.sampler.sampler);
+            const VkDescriptorImageInfo &imageInfo = imageInfos[i] = VkDescriptorImageInfo{
+                .sampler = samplerData.sampler,
+            };
+
+            writes[i].pImageInfo = &imageInfo;
             break;
         }
 

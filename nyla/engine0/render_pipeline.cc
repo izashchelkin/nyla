@@ -84,8 +84,8 @@ void RpInit(Rp &rp)
 
                 bindGroupDesc[iframe].entries[i] = RhiBindGroupEntry{
                     .binding = binding,
-                    .type = bindingType,
                     .arrayIndex = 0,
+                    .type = bindingType,
                     .buffer =
                         {
                             .buffer = buf.buffer[iframe],

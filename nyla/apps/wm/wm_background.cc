@@ -35,6 +35,7 @@ void DrawBackground(uint32_t numClients, std::string_view barText)
 
     RhiPassBegin({
         .colorTarget = RhiGetBackbufferTexture(),
+        .state = RhiTextureState::ColorTarget,
     });
 
     UiFrameBegin();
@@ -51,6 +52,7 @@ void DrawBackground(uint32_t numClients, std::string_view barText)
 
     RhiPassEnd({
         .colorTarget = RhiGetBackbufferTexture(),
+        .state = RhiTextureState::Present,
     });
 
     RhiFrameEnd();

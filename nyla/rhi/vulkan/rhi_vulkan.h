@@ -8,6 +8,7 @@
 #include "nyla/rhi/rhi_bind_groups.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_pipeline.h"
+#include "nyla/rhi/rhi_sampler.h"
 #include "nyla/rhi/rhi_texture.h"
 #include "vulkan/vk_enum_string_helper.h"
 #include "vulkan/vulkan_core.h"
@@ -109,6 +110,11 @@ struct VulkanTextureData
     VkExtent3D extent;
 };
 
+struct VulkanSamplerData
+{
+    VkSampler sampler;
+};
+
 struct RhiHandles
 {
     RhiHandlePool<RhiBindGroupLayout, VkDescriptorSetLayout, 16> bindGroupLayouts;
@@ -118,6 +124,7 @@ struct RhiHandles
     RhiHandlePool<RhiShader, VkShaderModule, 16> shaders;
     RhiHandlePool<RhiGraphicsPipeline, VulkanPipelineData, 16> graphicsPipelines;
     RhiHandlePool<RhiTexture, VulkanTextureData, 16> textures;
+    RhiHandlePool<RhiSampler, VulkanSamplerData, 16> samplers;
 };
 extern RhiHandles rhiHandles;
 

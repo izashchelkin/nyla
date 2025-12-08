@@ -2,7 +2,9 @@
 
 #include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_handle.h"
+#include "nyla/rhi/rhi_sampler.h"
 #include "nyla/rhi/rhi_shader.h"
+#include "nyla/rhi/rhi_texture.h"
 #include <cstdint>
 
 namespace nyla
@@ -20,7 +22,9 @@ struct RhiBindGroupLayout : RhiHandle
 enum class RhiBindingType
 {
     UniformBuffer,
-    UniformBufferDynamic
+    UniformBufferDynamic,
+    Texture,
+    Sampler,
 };
 
 struct RhiBufferBinding
@@ -31,20 +35,33 @@ struct RhiBufferBinding
     uint32_t range;
 };
 
+struct RhiSamplerBinding
+{
+    RhiSampler sampler;
+};
+
+struct RhiTextureBinding
+{
+    RhiTexture texture;
+};
+
 struct RhiBindGroupEntry
 {
     uint32_t binding;
-    RhiBindingType type;
     uint32_t arrayIndex;
+
+    RhiBindingType type;
     union {
         RhiBufferBinding buffer;
+        RhiSamplerBinding sampler;
+        RhiTextureBinding texture;
     };
 };
 
 struct RhiBindGroupDesc
 {
     RhiBindGroupLayout layout;
-    RhiBindGroupEntry entries[4];
+    std::array<RhiBindGroupEntry, 4> entries;
     uint32_t entriesCount;
 };
 
@@ -58,7 +75,7 @@ struct RhiBindingDesc
 
 struct RhiBindGroupLayoutDesc
 {
-    RhiBindingDesc bindings[16];
+    std::array<RhiBindingDesc, 16> bindings;
     uint32_t bindingCount;
 };
 
