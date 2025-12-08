@@ -147,6 +147,8 @@ auto ConvertRhiVertexFormatIntoVkFormat(RhiVertexFormat format) -> VkFormat;
 auto ConvertRhiTextureFormatIntoVkFormat(RhiTextureFormat format) -> VkFormat;
 auto ConvertVkFormatIntoRhiTextureFormat(VkFormat format) -> RhiTextureFormat;
 
+auto ConvertRhiTextureUsageToVkImageUsageFlags(RhiTextureUsage usage) -> VkImageUsageFlags;
+
 auto ConvertRhiShaderStageIntoVkShaderStageFlags(RhiShaderStage stageFlags) -> VkShaderStageFlags;
 
 } // namespace nyla::rhi_vulkan_internal

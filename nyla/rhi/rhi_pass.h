@@ -8,6 +8,7 @@ namespace nyla
 struct RhiPassDesc
 {
     RhiTexture colorTarget;
+    RhiTextureState state;
 };
 
 void RhiPassBegin(RhiPassDesc);

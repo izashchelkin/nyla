@@ -86,13 +86,11 @@ inline auto RhiHandleRelease(RhiHandlePool<Handle, Data, Size> &pool, Handle han
     CHECK_LT(handle.index, Size);
 
     auto &slot = pool.slots[handle.index];
-    if (slot.used && handle.gen == slot.gen)
-    {
-        slot.used = false;
-        return slot.data;
-    }
+    CHECK_EQ(handle.gen, slot.gen);
+    CHECK(slot.used);
 
-    CHECK(false);
+    slot.used = false;
+    return slot.data;
 }
 
 } // namespace rhi_internal

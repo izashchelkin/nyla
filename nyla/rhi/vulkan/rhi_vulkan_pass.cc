@@ -14,7 +14,7 @@ void RhiPassBegin(RhiPassDesc desc)
     RhiCmdList cmd = vk.graphicsQueueCmd[vk.frameIndex];
     VkCommandBuffer cmdbuf = RhiHandleGetData(rhiHandles.cmdLists, cmd).cmdbuf;
 
-    RhiCmdTransitionTexture(cmd, desc.colorTarget, RhiTextureState::ColorTarget);
+    RhiCmdTransitionTexture(cmd, desc.colorTarget, desc.state);
 
     const VulkanTextureData colorTargetData = RhiHandleGetData(rhiHandles.textures, desc.colorTarget);
 
@@ -64,7 +64,7 @@ void RhiPassEnd(RhiPassDesc desc)
     VkCommandBuffer cmdbuf = RhiHandleGetData(rhiHandles.cmdLists, cmd).cmdbuf;
     vkCmdEndRendering(cmdbuf);
 
-    RhiCmdTransitionTexture(cmd, desc.colorTarget, RhiTextureState::Present);
+    RhiCmdTransitionTexture(cmd, desc.colorTarget, desc.state);
 }
 
 } // namespace nyla

@@ -123,15 +123,14 @@ void CreateSwapchain()
     };
     VK_CHECK(vkCreateSwapchainKHR(vk.dev, &createInfo, nullptr, &vk.swapchain));
 
-    uint32_t swapchainImageCount;
-    vkGetSwapchainImagesKHR(vk.dev, vk.swapchain, &swapchainImageCount, nullptr);
+    vkGetSwapchainImagesKHR(vk.dev, vk.swapchain, &vk.swapchainTexturesCount, nullptr);
 
-    CHECK_LE(swapchainImageCount, kRhiMaxNumSwapchainTextures);
+    CHECK_LE(vk.swapchainTexturesCount, kRhiMaxNumSwapchainTextures);
     std::array<VkImage, kRhiMaxNumSwapchainTextures> swapchainImages;
 
-    vkGetSwapchainImagesKHR(vk.dev, vk.swapchain, &swapchainImageCount, swapchainImages.data());
+    vkGetSwapchainImagesKHR(vk.dev, vk.swapchain, &vk.swapchainTexturesCount, swapchainImages.data());
 
-    for (size_t i = 0; i < swapchainImageCount; ++i)
+    for (size_t i = 0; i < vk.swapchainTexturesCount; ++i)
     {
         vk.swapchainTextures[i] = RhiCreateTextureFromSwapchainImage(swapchainImages[i], surfaceFormat, surfaceExtent);
 
@@ -191,11 +190,57 @@ void CreateSwapchain()
 
     if (oldSwapchain)
     {
+        CHECK_GT(oldImagesViewsCount, 0);
         for (uint32_t i = 0; i < oldImagesViewsCount; ++i)
             RhiDestroySwapchainTexture(oldSwapchainTextures[i]);
 
         vkDestroySwapchainKHR(vk.dev, oldSwapchain, nullptr);
     }
+}
+
+auto RhiCreateTextureFromSwapchainImage(VkImage image, VkSurfaceFormatKHR surfaceFormat, VkExtent2D surfaceExtent)
+    -> RhiTexture
+{
+    const VkImageViewCreateInfo imageViewCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+        .image = image,
+        .viewType = VK_IMAGE_VIEW_TYPE_2D,
+        .format = surfaceFormat.format,
+        .subresourceRange =
+            {
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .baseMipLevel = 0,
+                .levelCount = 1,
+                .baseArrayLayer = 0,
+                .layerCount = 1,
+            },
+    };
+
+    VkImageView imageView;
+    VK_CHECK(vkCreateImageView(vk.dev, &imageViewCreateInfo, vk.alloc, &imageView));
+
+    VulkanTextureData textureData{
+        .isSwapchain = true,
+        .image = image,
+        .imageView = imageView,
+        .state = RhiTextureState::Present,
+        .memory = VK_NULL_HANDLE,
+        .format = surfaceFormat.format,
+        .extent = {surfaceExtent.width, surfaceExtent.height, 1},
+    };
+
+    return RhiHandleAcquire(rhiHandles.textures, textureData);
+}
+
+void RhiDestroySwapchainTexture(RhiTexture texture)
+{
+    VulkanTextureData textureData = RhiHandleRelease(rhiHandles.textures, texture);
+    CHECK(textureData.isSwapchain);
+
+    CHECK(textureData.imageView);
+    vkDestroyImageView(vk.dev, textureData.imageView, vk.alloc);
+
+    CHECK(textureData.image);
 }
 
 } // namespace rhi_vulkan_internal

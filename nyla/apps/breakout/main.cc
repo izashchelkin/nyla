@@ -36,7 +36,8 @@ static auto Main() -> int
             .width = 1000,
             .height = 1000,
             .memoryUsage = RhiMemoryUsage::GpuOnly,
-            .format = RhiTextureFormat::R8G8B8A8_sRGB,
+            .usage = RhiTextureUsage::ColorTarget | RhiTextureUsage::ShaderSampled,
+            .format = RhiTextureFormat::B8G8R8A8_sRGB,
         });
     }
 
@@ -54,13 +55,25 @@ static auto Main() -> int
         RhiTexture offscreenTexture = offscreenTextures[RhiFrameGetIndex()];
 
         RhiPassBegin({
-            .colorTarget = RhiGetBackbufferTexture(),
+            .colorTarget = offscreenTexture,
+            .state = RhiTextureState::ColorTarget,
         });
 
         BreakoutFrame(Engine0GetDt(), Engine0GetFps());
 
         RhiPassEnd({
+            .colorTarget = offscreenTexture,
+            .state = RhiTextureState::ShaderRead,
+        });
+
+        RhiPassBegin({
             .colorTarget = RhiGetBackbufferTexture(),
+            .state = RhiTextureState::Present,
+        });
+
+        RhiPassEnd({
+            .colorTarget = RhiGetBackbufferTexture(),
+            .state = RhiTextureState::Present,
         });
 
         Engine0FrameEnd();

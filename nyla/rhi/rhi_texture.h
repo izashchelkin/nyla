@@ -20,6 +20,23 @@ enum class RhiTextureFormat
     D32_Float_S8_UINT,
 };
 
+enum class RhiTextureUsage
+{
+    None = 0,
+
+    ShaderSampled = 1 << 0,
+    ColorTarget = 1 << 1,
+    DepthStencil = 1 << 2,
+    TransferSrc = 1 << 3,
+    TransferDst = 1 << 4,
+    Storage = 1 << 5,
+    Present = 1 << 6,
+};
+
+template <> struct EnableBitMaskOps<RhiTextureUsage> : std::true_type
+{
+};
+
 enum class RhiTextureState
 {
     Undefined,
@@ -40,6 +57,7 @@ struct RhiTextureDesc
     uint32_t width;
     uint32_t height;
     RhiMemoryUsage memoryUsage;
+    RhiTextureUsage usage;
     RhiTextureFormat format;
 };
 

@@ -119,49 +119,39 @@ auto ConvertVkFormatIntoRhiTextureFormat(VkFormat format) -> RhiTextureFormat
     return static_cast<RhiTextureFormat>(0);
 }
 
-auto RhiCreateTextureFromSwapchainImage(VkImage image, VkSurfaceFormatKHR surfaceFormat, VkExtent2D surfaceExtent)
-    -> RhiTexture
+auto ConvertRhiTextureUsageToVkImageUsageFlags(RhiTextureUsage usage) -> VkImageUsageFlags
 {
-    const VkImageViewCreateInfo imageViewCreateInfo{
-        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-        .image = image,
-        .viewType = VK_IMAGE_VIEW_TYPE_2D,
-        .format = surfaceFormat.format,
-        .subresourceRange =
-            {
-                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                .baseMipLevel = 0,
-                .levelCount = 1,
-                .baseArrayLayer = 0,
-                .layerCount = 1,
-            },
-    };
+    VkImageUsageFlags flags = 0;
 
-    VkImageView imageView;
-    VK_CHECK(vkCreateImageView(vk.dev, &imageViewCreateInfo, vk.alloc, &imageView));
+    if (Any(usage & RhiTextureUsage::ShaderSampled))
+    {
+        flags |= VK_IMAGE_USAGE_SAMPLED_BIT;
+    }
+    if (Any(usage & RhiTextureUsage::ColorTarget))
+    {
+        flags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    }
+    if (Any(usage & RhiTextureUsage::DepthStencil))
+    {
+        flags |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    }
+    if (Any(usage & RhiTextureUsage::TransferSrc))
+    {
+        flags |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    }
+    if (Any(usage & RhiTextureUsage::TransferDst))
+    {
+        flags |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    }
+    if (Any(usage & RhiTextureUsage::Storage))
+    {
+        flags |= VK_IMAGE_USAGE_STORAGE_BIT;
+    }
+    if (Any(usage & RhiTextureUsage::Present))
+    {
+    }
 
-    VulkanTextureData textureData{
-        .isSwapchain = true,
-        .image = image,
-        .imageView = imageView,
-        .state = RhiTextureState::Present,
-        .memory = VK_NULL_HANDLE,
-        .format = surfaceFormat.format,
-        .extent = {surfaceExtent.width, surfaceExtent.height, 1},
-    };
-
-    return RhiHandleAcquire(rhiHandles.textures, textureData);
-}
-
-void RhiDestroySwapchainTexture(RhiTexture texture)
-{
-    VulkanTextureData textureData = RhiHandleRelease(rhiHandles.textures, texture);
-    CHECK(textureData.isSwapchain);
-
-    CHECK(textureData.imageView);
-    vkDestroyImageView(vk.dev, textureData.imageView, vk.alloc);
-
-    CHECK(textureData.image);
+    return flags;
 }
 
 } // namespace rhi_vulkan_internal
@@ -170,6 +160,7 @@ auto RhiCreateTexture(RhiTextureDesc desc) -> RhiTexture
 {
     VulkanTextureData textureData{
         .format = ConvertRhiTextureFormatIntoVkFormat(desc.format),
+        .extent = {desc.width, desc.height, 1},
     };
 
     VkMemoryPropertyFlags memoryPropertyFlags = ConvertRhiMemoryUsageIntoVkMemoryPropertyFlags(desc.memoryUsage);
@@ -183,7 +174,7 @@ auto RhiCreateTexture(RhiTextureDesc desc) -> RhiTexture
         .arrayLayers = 1,
         .samples = VK_SAMPLE_COUNT_1_BIT,
         .tiling = VK_IMAGE_TILING_OPTIMAL,
-        .usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        .usage = ConvertRhiTextureUsageToVkImageUsageFlags(desc.usage),
         .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
         .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
     };
