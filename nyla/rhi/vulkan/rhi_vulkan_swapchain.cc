@@ -223,8 +223,8 @@ auto RhiCreateTextureFromSwapchainImage(VkImage image, VkSurfaceFormatKHR surfac
         .isSwapchain = true,
         .image = image,
         .imageView = imageView,
-        .state = RhiTextureState::Present,
         .memory = VK_NULL_HANDLE,
+        .state = RhiTextureState::Present,
         .format = surfaceFormat.format,
         .extent = {surfaceExtent.width, surfaceExtent.height, 1},
     };
