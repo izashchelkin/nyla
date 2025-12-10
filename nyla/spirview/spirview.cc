@@ -66,6 +66,10 @@ auto ParseStringLiteral(std::span<const uint32_t> in, uint32_t &iin, std::span<u
     return false;
 }
 
+auto ParseDecoration() -> bool
+{
+}
+
 struct SpirvParserState
 {
     struct IdMetadata
@@ -95,7 +99,7 @@ void ProcessOp(spv::Op op, std::span<const uint32_t> args)
 
     case spv::OpEntryPoint: {
         auto executionModel = spv::ExecutionModel(args[i++]);
-        auto entryPointId = args[i++];
+        spv::Id entryPointId = args[i++];
 
         std::array<uint32_t, 16> name;
         CHECK(ParseStringLiteral(args, i, name));
@@ -103,6 +107,24 @@ void ProcessOp(spv::Op op, std::span<const uint32_t> args)
         LOG(INFO) << "    " << spv::ExecutionModelToString(executionModel) << " " << entryPointId << " "
                   << (const char *)name.data();
 
+        break;
+    }
+
+    case spv::OpDecorate: {
+        spv::Id idTarget = args[i++];
+        auto decoration = spv::Decoration(args[i++]);
+
+        LOG(INFO) << "    " << idTarget << " " << spv::DecorationToString(decoration);
+        break;
+    }
+
+    case spv::OpMemberDecorate: {
+        spv::Id structType = args[i++];
+        uint32_t member = args[i++];
+        auto decoration = spv::Decoration(args[i++]);
+
+        LOG(INFO) << "    " << args.size() << "    " << structType << " " << member << " "
+                  << spv::DecorationToString(decoration);
         break;
     }
 
