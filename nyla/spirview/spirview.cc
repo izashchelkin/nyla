@@ -33,12 +33,79 @@ auto FormatWord(uint32_t word)
     return std::format("0x{:08x}", word);
 }
 
-void ProcessOp(spv::Op op, std::span<const uint32_t> data)
+auto HasByte(uint32_t word, std::byte byte) -> bool
 {
-    LOG(INFO) << OpToString(op) << " " << data.size();
+    if ((word & 0x000000FF) == uint32_t(byte))
+        return true;
+    if ((word & 0x0000FF00) == uint32_t(byte))
+        return true;
+    if ((word & 0x00FF0000) == uint32_t(byte))
+        return true;
+    if ((word & 0xFF000000) == uint32_t(byte))
+        return true;
+    return false;
+}
+
+auto ParseStringLiteral(std::span<const uint32_t> in, uint32_t &iin, std::span<uint32_t> out) -> bool
+{
+    uint32_t iout = 0;
+    for (;;)
+    {
+        if (iin >= in.size())
+            return false;
+        if (iout >= out.size())
+            return false;
+
+        out[iout++] = in[iin];
+        if (HasByte(in[iin], std::byte(0)))
+            return true;
+
+        ++iin;
+    }
+
+    return false;
+}
+
+struct SpirvParserState
+{
+    struct IdMetadata
+    {
+        bool exists;
+    };
+
+    std::array<IdMetadata, 256> ids;
+};
+
+void ProcessOp(spv::Op op, std::span<const uint32_t> args)
+{
+    LOG(INFO) << OpToString(op) << " " << args.size();
+
+    uint32_t i = 0;
 
     switch (op)
     {
+    case spv::OpMemoryModel: {
+        auto addressingModel = spv::AddressingModel(args[i++]);
+        auto memoryModel = spv::MemoryModel(args[i++]);
+
+        LOG(INFO) << "    " << spv::AddressingModelToString(addressingModel) << " "
+                  << spv::MemoryModelToString(memoryModel);
+        break;
+    }
+
+    case spv::OpEntryPoint: {
+        auto executionModel = spv::ExecutionModel(args[i++]);
+        auto entryPointId = args[i++];
+
+        std::array<uint32_t, 16> name;
+        CHECK(ParseStringLiteral(args, i, name));
+
+        LOG(INFO) << "    " << spv::ExecutionModelToString(executionModel) << " " << entryPointId << " "
+                  << (const char *)name.data();
+
+        break;
+    }
+
     default: {
         break;
     }
