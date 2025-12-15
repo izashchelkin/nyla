@@ -1,14 +1,12 @@
 #include <cstdint>
 
 #include "nyla/rhi/rhi_buffer.h"
-#include "nyla/rhi/rhi_handle.h"
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
 #include "vulkan/vulkan_core.h"
 
 namespace nyla
 {
 
-using namespace rhi_internal;
 using namespace rhi_vulkan_internal;
 
 namespace rhi_vulkan_internal
@@ -118,18 +116,18 @@ auto RhiCreateBuffer(const RhiBufferDesc &desc) -> RhiBuffer
     VK_CHECK(vkAllocateMemory(vk.dev, &memoryAllocInfo, nullptr, &bufferData.memory));
     VK_CHECK(vkBindBufferMemory(vk.dev, bufferData.buffer, bufferData.memory, 0));
 
-    return RhiHandleAcquire(rhiHandles.buffers, bufferData);
+    return HandleAcquire(rhiHandles.buffers, bufferData);
 }
 
 void RhiNameBuffer(RhiBuffer buf, std::string_view name)
 {
-    VulkanBufferData &bufferData = RhiHandleGetData(rhiHandles.buffers, buf);
+    VulkanBufferData &bufferData = HandleGetData(rhiHandles.buffers, buf);
     VulkanNameHandle(VK_OBJECT_TYPE_BUFFER, (uint64_t)bufferData.buffer, name);
 }
 
 void RhiDestroyBuffer(RhiBuffer buffer)
 {
-    VulkanBufferData bufferData = RhiHandleRelease(rhiHandles.buffers, buffer);
+    VulkanBufferData bufferData = HandleRelease(rhiHandles.buffers, buffer);
 
     if (bufferData.mapped)
     {
@@ -141,7 +139,7 @@ void RhiDestroyBuffer(RhiBuffer buffer)
 
 auto RhiMapBuffer(RhiBuffer buffer, bool idempotent) -> void *
 {
-    VulkanBufferData &bufferData = RhiHandleGetData(rhiHandles.buffers, buffer);
+    VulkanBufferData &bufferData = HandleGetData(rhiHandles.buffers, buffer);
     if (!bufferData.mapped)
     {
         vkMapMemory(vk.dev, bufferData.memory, 0, VK_WHOLE_SIZE, 0, (void **)&bufferData.mapped);
@@ -156,7 +154,7 @@ auto RhiMapBuffer(RhiBuffer buffer, bool idempotent) -> void *
 
 void RhiUnmapBuffer(RhiBuffer buffer, bool idempotent)
 {
-    VulkanBufferData &bufferData = RhiHandleGetData(rhiHandles.buffers, buffer);
+    VulkanBufferData &bufferData = HandleGetData(rhiHandles.buffers, buffer);
     if (bufferData.mapped)
     {
         vkUnmapMemory(vk.dev, bufferData.memory);

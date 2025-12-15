@@ -1,7 +1,8 @@
 #pragma once
 
 #include "nyla/commons/bitenum.h"
-#include "nyla/rhi/rhi_handle.h"
+#include "nyla/commons/handle.h"
+#include <string_view>
 
 namespace nyla
 {
@@ -27,7 +28,7 @@ enum class RhiMemoryUsage
     GpuToCpu
 };
 
-struct RhiBuffer : RhiHandle
+struct RhiBuffer : Handle
 {
 };
 
@@ -42,7 +43,7 @@ auto RhiCreateBuffer(const RhiBufferDesc &) -> RhiBuffer;
 void RhiNameBuffer(RhiBuffer, std::string_view name);
 void RhiDestroyBuffer(RhiBuffer);
 
-auto RhiMapBuffer(RhiBuffer, bool idempotent = true) -> void *;
-void RhiUnmapBuffer(RhiBuffer, bool idempotent = true);
+auto RhiMapBuffer(RhiBuffer, bool persistent = true) -> void *;
+void RhiUnmapBuffer(RhiBuffer, bool persistent = true);
 
 } // namespace nyla

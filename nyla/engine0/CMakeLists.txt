@@ -26,6 +26,7 @@ target_link_libraries(${TARGET}
     PUBLIC
         nyla::platform
         nyla::rhi
+        nyla::spirview
 )
 
 set(TARGET_NDEBUG nyla_engine0_ndebug)
@@ -48,4 +49,5 @@ target_link_libraries(${TARGET_NDEBUG}
     PUBLIC
         nyla::platform
         nyla::rhi_ndebug
+        nyla::spirview
 )

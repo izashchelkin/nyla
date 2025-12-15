@@ -1,11 +1,11 @@
 #pragma once
 
-#include "nyla/rhi/rhi_handle.h"
+#include "nyla/commons/handle.h"
 
 namespace nyla
 {
 
-struct RhiSampler : RhiHandle
+struct RhiSampler : Handle
 {
 };
 

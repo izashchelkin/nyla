@@ -10,7 +10,6 @@
 namespace nyla
 {
 
-using namespace rhi_internal;
 using namespace rhi_vulkan_internal;
 
 namespace rhi_vulkan_internal
@@ -229,12 +228,12 @@ auto RhiCreateTextureFromSwapchainImage(VkImage image, VkSurfaceFormatKHR surfac
         .extent = {surfaceExtent.width, surfaceExtent.height, 1},
     };
 
-    return RhiHandleAcquire(rhiHandles.textures, textureData);
+    return HandleAcquire(rhiHandles.textures, textureData);
 }
 
 void RhiDestroySwapchainTexture(RhiTexture texture)
 {
-    VulkanTextureData textureData = RhiHandleRelease(rhiHandles.textures, texture);
+    VulkanTextureData textureData = HandleRelease(rhiHandles.textures, texture);
     CHECK(textureData.isSwapchain);
 
     CHECK(textureData.imageView);

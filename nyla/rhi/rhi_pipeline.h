@@ -1,11 +1,12 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 
+#include "nyla/commons/handle.h"
 #include "nyla/commons/memory/charview.h"
 #include "nyla/rhi/rhi_bind_groups.h"
 #include "nyla/rhi/rhi_cmdlist.h"
-#include "nyla/rhi/rhi_handle.h"
 #include "nyla/rhi/rhi_shader.h"
 #include "nyla/rhi/rhi_texture.h"
 
@@ -14,7 +15,7 @@ namespace nyla
 
 constexpr inline uint32_t kRhiMaxPushConstantSize = 256;
 
-struct RhiGraphicsPipeline : RhiHandle
+struct RhiGraphicsPipeline : Handle
 {
 };
 

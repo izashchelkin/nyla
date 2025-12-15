@@ -1,11 +1,9 @@
 #include "nyla/rhi/rhi.h"
-#include "nyla/rhi/rhi_handle.h"
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
 
 namespace nyla
 {
 
-using namespace rhi_internal;
 using namespace rhi_vulkan_internal;
 
 auto RhiFrameBegin() -> RhiCmdList
@@ -32,7 +30,7 @@ auto RhiFrameBegin() -> RhiCmdList
     }
 
     RhiCmdList cmd = vk.graphicsQueueCmd[vk.frameIndex];
-    VkCommandBuffer cmdbuf = RhiHandleGetData(rhiHandles.cmdLists, cmd).cmdbuf;
+    VkCommandBuffer cmdbuf = HandleGetData(rhiHandles.cmdLists, cmd).cmdbuf;
 
     VK_CHECK(vkResetCommandBuffer(cmdbuf, 0));
 
@@ -47,7 +45,7 @@ auto RhiFrameBegin() -> RhiCmdList
 void RhiFrameEnd()
 {
     RhiCmdList cmd = vk.graphicsQueueCmd[vk.frameIndex];
-    VkCommandBuffer cmdbuf = RhiHandleGetData(rhiHandles.cmdLists, cmd).cmdbuf;
+    VkCommandBuffer cmdbuf = HandleGetData(rhiHandles.cmdLists, cmd).cmdbuf;
 
     VK_CHECK(vkEndCommandBuffer(cmdbuf));
 

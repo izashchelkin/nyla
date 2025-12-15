@@ -1,5 +1,7 @@
 #include "nyla/rhi/rhi_pipeline.h"
 
+#include "absl/log/check.h"
+
 namespace nyla
 {
 

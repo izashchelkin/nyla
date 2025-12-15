@@ -6,17 +6,16 @@
 namespace nyla
 {
 
-using namespace rhi_internal;
 using namespace rhi_vulkan_internal;
 
 void RhiPassBegin(RhiPassDesc desc)
 {
     RhiCmdList cmd = vk.graphicsQueueCmd[vk.frameIndex];
-    VkCommandBuffer cmdbuf = RhiHandleGetData(rhiHandles.cmdLists, cmd).cmdbuf;
+    VkCommandBuffer cmdbuf = HandleGetData(rhiHandles.cmdLists, cmd).cmdbuf;
 
     RhiCmdTransitionTexture(cmd, desc.colorTarget, desc.state);
 
-    const VulkanTextureData colorTargetData = RhiHandleGetData(rhiHandles.textures, desc.colorTarget);
+    const VulkanTextureData colorTargetData = HandleGetData(rhiHandles.textures, desc.colorTarget);
 
     const VkRenderingAttachmentInfo colorAttachmentInfo{
         .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
@@ -61,7 +60,7 @@ void RhiPassBegin(RhiPassDesc desc)
 void RhiPassEnd(RhiPassDesc desc)
 {
     RhiCmdList cmd = vk.graphicsQueueCmd[vk.frameIndex];
-    VkCommandBuffer cmdbuf = RhiHandleGetData(rhiHandles.cmdLists, cmd).cmdbuf;
+    VkCommandBuffer cmdbuf = HandleGetData(rhiHandles.cmdLists, cmd).cmdbuf;
     vkCmdEndRendering(cmdbuf);
 
     RhiCmdTransitionTexture(cmd, desc.colorTarget, desc.state);

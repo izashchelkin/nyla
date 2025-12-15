@@ -1,4 +1,3 @@
-#include "nyla/rhi/rhi_handle.h"
 #include "nyla/rhi/rhi_sampler.h"
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
 
@@ -7,7 +6,6 @@
 namespace nyla
 {
 
-using namespace rhi_internal;
 using namespace rhi_vulkan_internal;
 
 auto RhiCreateSampler(RhiSamplerDesc) -> RhiSampler
@@ -35,12 +33,12 @@ auto RhiCreateSampler(RhiSamplerDesc) -> RhiSampler
     VulkanSamplerData samplerData;
     VK_CHECK(vkCreateSampler(vk.dev, &createInfo, vk.alloc, &samplerData.sampler));
 
-    return RhiHandleAcquire(rhiHandles.samplers, samplerData);
+    return HandleAcquire(rhiHandles.samplers, samplerData);
 }
 
 void RhiDestroySampler(RhiSampler sampler)
 {
-    VulkanSamplerData samplerData = RhiHandleRelease(rhiHandles.samplers, sampler);
+    VulkanSamplerData samplerData = HandleRelease(rhiHandles.samplers, sampler);
     vkDestroySampler(vk.dev, samplerData.sampler, vk.alloc);
 }
 

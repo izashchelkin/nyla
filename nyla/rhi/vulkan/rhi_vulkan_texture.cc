@@ -1,4 +1,3 @@
-#include "nyla/rhi/rhi_handle.h"
 #include "nyla/rhi/rhi_texture.h"
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
 #include <vulkan/vulkan_core.h>
@@ -6,7 +5,6 @@
 namespace nyla
 {
 
-using namespace rhi_internal;
 using namespace rhi_vulkan_internal;
 
 namespace
@@ -207,12 +205,12 @@ auto RhiCreateTexture(RhiTextureDesc desc) -> RhiTexture
     };
     vkCreateImageView(vk.dev, &imageViewCreateInfo, vk.alloc, &textureData.imageView);
 
-    return RhiHandleAcquire(rhiHandles.textures, textureData);
+    return HandleAcquire(rhiHandles.textures, textureData);
 }
 
 auto RhiGetTextureInfo(RhiTexture texture) -> RhiTextureInfo
 {
-    const VulkanTextureData textureData = RhiHandleGetData(rhiHandles.textures, texture);
+    const VulkanTextureData textureData = HandleGetData(rhiHandles.textures, texture);
     return {
         .width = textureData.extent.width,
         .height = textureData.extent.height,
@@ -222,9 +220,9 @@ auto RhiGetTextureInfo(RhiTexture texture) -> RhiTextureInfo
 
 void RhiCmdTransitionTexture(RhiCmdList cmd, RhiTexture texture, RhiTextureState newState)
 {
-    VkCommandBuffer cmdbuf = RhiHandleGetData(rhiHandles.cmdLists, cmd).cmdbuf;
+    VkCommandBuffer cmdbuf = HandleGetData(rhiHandles.cmdLists, cmd).cmdbuf;
 
-    VulkanTextureData &textureData = RhiHandleGetData(rhiHandles.textures, texture);
+    VulkanTextureData &textureData = HandleGetData(rhiHandles.textures, texture);
 
     const VulkanTextureStateSyncInfo newSyncInfo = VulkanTextureStateGetSyncInfo(newState);
     if (newSyncInfo.layout == textureData.layout)
@@ -264,7 +262,7 @@ void RhiCmdTransitionTexture(RhiCmdList cmd, RhiTexture texture, RhiTextureState
 
 void RhiDestroyTexture(RhiTexture texture)
 {
-    VulkanTextureData textureData = RhiHandleRelease(rhiHandles.textures, texture);
+    VulkanTextureData textureData = HandleRelease(rhiHandles.textures, texture);
     CHECK(!textureData.isSwapchain);
 
     CHECK(textureData.imageView);

@@ -1,7 +1,9 @@
 #pragma once
 
 #include "nyla/commons/bitenum.h"
-#include "nyla/rhi/rhi_handle.h"
+#include "nyla/commons/handle.h"
+#include <cstdint>
+#include <span>
 
 namespace nyla
 {
@@ -16,13 +18,13 @@ template <> struct EnableBitMaskOps<RhiShaderStage> : std::true_type
 {
 };
 
-struct RhiShader : RhiHandle
+struct RhiShader : Handle
 {
 };
 
 struct RhiShaderDesc
 {
-    std::vector<std::byte> code;
+    std::span<const uint32_t> spirv;
 };
 
 auto RhiCreateShader(const RhiShaderDesc &) -> RhiShader;

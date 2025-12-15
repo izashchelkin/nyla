@@ -1,6 +1,7 @@
 #pragma once
 
-#include "nyla/rhi/rhi_handle.h"
+#include "nyla/commons/handle.h"
+#include <string_view>
 
 namespace nyla
 {
@@ -11,7 +12,7 @@ enum class RhiQueueType
     Transfer
 };
 
-struct RhiCmdList : RhiHandle
+struct RhiCmdList : Handle
 {
 };
 

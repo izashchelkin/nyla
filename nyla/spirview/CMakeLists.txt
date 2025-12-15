@@ -1,20 +1,12 @@
-file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/*.cc"
-)
-
-file(GLOB_RECURSE HEADERS CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/*.h"
-)
-
 set(TARGET nyla_spirview)
 add_library(${TARGET})
 add_library(nyla::spirview ALIAS ${TARGET})
 
 target_sources(${TARGET}
     PRIVATE
-        ${SOURCES}
+        spirview.cc
     PUBLIC
-        ${HEADERS}
+        spirview.h
 )
 
 target_include_directories(${TARGET}
@@ -29,13 +21,14 @@ target_link_libraries(${TARGET}
 
 
 
-# TEMPORARY!
+
 add_executable(${TARGET}_bin)
 
 target_sources(${TARGET}_bin
     PRIVATE
-        ${SOURCES}
-        ${HEADERS}
+        spirview.cc
+        spirview.h
+        main.cc
 )
 
 target_include_directories(${TARGET}_bin
@@ -47,5 +40,3 @@ target_link_libraries(${TARGET}_bin
     PUBLIC
         nyla::commons
 )
-
-# TEMPORARY!

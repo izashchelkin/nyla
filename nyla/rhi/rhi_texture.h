@@ -2,9 +2,9 @@
 
 #include <cstdint>
 
+#include "nyla/commons/handle.h"
 #include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
-#include "nyla/rhi/rhi_handle.h"
 
 namespace nyla
 {
@@ -48,7 +48,7 @@ enum class RhiTextureState
     TransferDst,
 };
 
-struct RhiTexture : RhiHandle
+struct RhiTexture : Handle
 {
 };
 

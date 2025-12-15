@@ -1,15 +1,11 @@
-#include <unistd.h>
-
 #include <cstdint>
 #include <vulkan/vulkan_core.h>
 
-#include "nyla/rhi/rhi_handle.h"
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
 
 namespace nyla
 {
 
-using namespace rhi_internal;
 using namespace rhi_vulkan_internal;
 
 namespace
@@ -65,19 +61,19 @@ auto RhiCreateShader(const RhiShaderDesc &desc) -> RhiShader
 {
     const VkShaderModuleCreateInfo createInfo{
         .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-        .codeSize = desc.code.size(),
-        .pCode = reinterpret_cast<const uint32_t *>(desc.code.data()),
+        .codeSize = desc.spirv.size_bytes(),
+        .pCode = desc.spirv.data(),
     };
 
     VkShaderModule shaderModule;
     VK_CHECK(vkCreateShaderModule(vk.dev, &createInfo, nullptr, &shaderModule));
 
-    return RhiHandleAcquire(rhiHandles.shaders, shaderModule);
+    return HandleAcquire(rhiHandles.shaders, shaderModule);
 }
 
 void RhiDestroyShader(RhiShader shader)
 {
-    VkShaderModule shaderModule = RhiHandleRelease(rhiHandles.shaders, shader);
+    VkShaderModule shaderModule = HandleRelease(rhiHandles.shaders, shader);
     vkDestroyShaderModule(vk.dev, shaderModule, nullptr);
 }
 
@@ -200,13 +196,13 @@ auto RhiCreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGraphi
         VkPipelineShaderStageCreateInfo{
             .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
             .stage = VK_SHADER_STAGE_VERTEX_BIT,
-            .module = RhiHandleGetData(rhiHandles.shaders, desc.vertShader),
+            .module = HandleGetData(rhiHandles.shaders, desc.vertShader),
             .pName = "main",
         },
         VkPipelineShaderStageCreateInfo{
             .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
             .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-            .module = RhiHandleGetData(rhiHandles.shaders, desc.fragShader),
+            .module = HandleGetData(rhiHandles.shaders, desc.fragShader),
             .pName = "main",
         },
     };
@@ -224,7 +220,7 @@ auto RhiCreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGraphi
     std::array<VkDescriptorSetLayout, kRhiMaxBindGroupLayouts> descriptorSetLayouts;
     for (uint32_t i = 0; i < desc.bindGroupLayoutsCount; ++i)
     {
-        descriptorSetLayouts[i] = RhiHandleGetData(rhiHandles.bindGroupLayouts, desc.bindGroupLayouts[i]);
+        descriptorSetLayouts[i] = HandleGetData(rhiHandles.bindGroupLayouts, desc.bindGroupLayouts[i]);
     }
 
     const VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{
@@ -259,18 +255,18 @@ auto RhiCreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGraphi
     VK_CHECK(
         vkCreateGraphicsPipelines(vk.dev, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &pipelineData.pipeline));
 
-    return RhiHandleAcquire(rhiHandles.graphicsPipelines, pipelineData);
+    return HandleAcquire(rhiHandles.graphicsPipelines, pipelineData);
 }
 
 void RhiNameGraphicsPipeline(RhiGraphicsPipeline pipeline, std::string_view name)
 {
-    const VulkanPipelineData &pipelineData = RhiHandleGetData(rhiHandles.graphicsPipelines, pipeline);
+    const VulkanPipelineData &pipelineData = HandleGetData(rhiHandles.graphicsPipelines, pipeline);
     VulkanNameHandle(VK_OBJECT_TYPE_PIPELINE, (uint64_t)pipelineData.pipeline, name);
 }
 
 void RhiDestroyGraphicsPipeline(RhiGraphicsPipeline pipeline)
 {
-    auto pipelineData = RhiHandleRelease(rhiHandles.graphicsPipelines, pipeline);
+    auto pipelineData = HandleRelease(rhiHandles.graphicsPipelines, pipeline);
     vkDeviceWaitIdle(vk.dev);
 
     if (pipelineData.layout)
@@ -285,8 +281,8 @@ void RhiDestroyGraphicsPipeline(RhiGraphicsPipeline pipeline)
 
 void RhiCmdBindGraphicsPipeline(RhiCmdList cmd, RhiGraphicsPipeline pipeline)
 {
-    VulkanCmdListData &cmdData = RhiHandleGetData(rhiHandles.cmdLists, cmd);
-    const VulkanPipelineData &pipelineData = RhiHandleGetData(rhiHandles.graphicsPipelines, pipeline);
+    VulkanCmdListData &cmdData = HandleGetData(rhiHandles.cmdLists, cmd);
+    const VulkanPipelineData &pipelineData = HandleGetData(rhiHandles.graphicsPipelines, pipeline);
 
     vkCmdBindPipeline(cmdData.cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineData.pipeline);
     cmdData.boundGraphicsPipeline = pipeline;
@@ -294,9 +290,8 @@ void RhiCmdBindGraphicsPipeline(RhiCmdList cmd, RhiGraphicsPipeline pipeline)
 
 void RhiCmdPushGraphicsConstants(RhiCmdList cmd, uint32_t offset, RhiShaderStage stage, ByteView data)
 {
-    const VulkanCmdListData &cmdData = RhiHandleGetData(rhiHandles.cmdLists, cmd);
-    const VulkanPipelineData &pipelineData =
-        RhiHandleGetData(rhiHandles.graphicsPipelines, cmdData.boundGraphicsPipeline);
+    const VulkanCmdListData &cmdData = HandleGetData(rhiHandles.cmdLists, cmd);
+    const VulkanPipelineData &pipelineData = HandleGetData(rhiHandles.graphicsPipelines, cmdData.boundGraphicsPipeline);
 
     vkCmdPushConstants(cmdData.cmdbuf, pipelineData.layout, ConvertRhiShaderStageIntoVkShaderStageFlags(stage), offset,
                        data.size(), data.data());
@@ -312,18 +307,18 @@ void RhiCmdBindVertexBuffers(RhiCmdList cmd, uint32_t firstBinding, std::span<co
     std::array<VkDeviceSize, 4> vkOffsets;
     for (uint32_t i = 0; i < buffers.size(); ++i)
     {
-        vkBufs[i] = RhiHandleGetData(rhiHandles.buffers, buffers[i]).buffer;
+        vkBufs[i] = HandleGetData(rhiHandles.buffers, buffers[i]).buffer;
         vkOffsets[i] = offsets[i];
     }
 
-    VulkanCmdListData cmdData = RhiHandleGetData(rhiHandles.cmdLists, cmd);
+    VulkanCmdListData cmdData = HandleGetData(rhiHandles.cmdLists, cmd);
     vkCmdBindVertexBuffers(cmdData.cmdbuf, firstBinding, buffers.size(), vkBufs.data(), vkOffsets.data());
 }
 
 void RhiCmdDraw(RhiCmdList cmd, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
                 uint32_t firstInstance)
 {
-    VulkanCmdListData cmdData = RhiHandleGetData(rhiHandles.cmdLists, cmd);
+    VulkanCmdListData cmdData = HandleGetData(rhiHandles.cmdLists, cmd);
     vkCmdDraw(cmdData.cmdbuf, vertexCount, instanceCount, firstVertex, firstInstance);
 }
 

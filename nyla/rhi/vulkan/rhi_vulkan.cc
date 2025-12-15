@@ -20,7 +20,6 @@
 namespace nyla
 {
 
-using namespace rhi_internal;
 using namespace rhi_vulkan_internal;
 
 namespace rhi_vulkan_internal

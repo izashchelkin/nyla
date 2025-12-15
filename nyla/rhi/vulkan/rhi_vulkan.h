@@ -4,6 +4,7 @@
 
 #include "absl/log/check.h"
 #include "absl/log/log.h"
+#include "nyla/commons/handle_pool.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_bind_groups.h"
 #include "nyla/rhi/rhi_cmdlist.h"
@@ -17,8 +18,6 @@
 
 namespace nyla::rhi_vulkan_internal
 {
-
-using namespace rhi_internal;
 
 inline auto VkCheckImpl(VkResult res)
 {
@@ -117,14 +116,14 @@ struct VulkanSamplerData
 
 struct RhiHandles
 {
-    RhiHandlePool<RhiBindGroupLayout, VkDescriptorSetLayout, 16> bindGroupLayouts;
-    RhiHandlePool<RhiBindGroup, VkDescriptorSet, 16> bindGroups;
-    RhiHandlePool<RhiBuffer, VulkanBufferData, 16> buffers;
-    RhiHandlePool<RhiCmdList, VulkanCmdListData, 16> cmdLists;
-    RhiHandlePool<RhiShader, VkShaderModule, 16> shaders;
-    RhiHandlePool<RhiGraphicsPipeline, VulkanPipelineData, 16> graphicsPipelines;
-    RhiHandlePool<RhiTexture, VulkanTextureData, 16> textures;
-    RhiHandlePool<RhiSampler, VulkanSamplerData, 16> samplers;
+    HandlePool<RhiBindGroupLayout, VkDescriptorSetLayout, 16> bindGroupLayouts;
+    HandlePool<RhiBindGroup, VkDescriptorSet, 16> bindGroups;
+    HandlePool<RhiBuffer, VulkanBufferData, 16> buffers;
+    HandlePool<RhiCmdList, VulkanCmdListData, 16> cmdLists;
+    HandlePool<RhiShader, VkShaderModule, 16> shaders;
+    HandlePool<RhiGraphicsPipeline, VulkanPipelineData, 16> graphicsPipelines;
+    HandlePool<RhiTexture, VulkanTextureData, 16> textures;
+    HandlePool<RhiSampler, VulkanSamplerData, 16> samplers;
 };
 extern RhiHandles rhiHandles;
 

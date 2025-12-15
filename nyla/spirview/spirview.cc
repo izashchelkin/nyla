@@ -1,10 +1,5 @@
 #include "nyla/spirview/spirview.h"
 #include "absl/log/check.h"
-#include "absl/log/log.h"
-#include "nyla/commons/logging/init.h"
-#include "nyla/commons/os/readfile.h"
-
-#include <cstddef>
 #include <cstdint>
 #include <span>
 #include <variant>
@@ -256,40 +251,4 @@ auto SpirviewReflect(std::span<const uint32_t> spirv, SpirviewReflectResult *res
     return true;
 }
 
-namespace
-{
-
-auto Main() -> int
-{
-    LoggingInit();
-
-    std::vector<std::byte> spirvBytes = ReadFile("nyla/apps/breakout/shaders/build/world.vs.hlsl.spv");
-    if (spirvBytes.size() % 4)
-    {
-        LOG(ERROR) << "invalid spirv";
-        return 1;
-    }
-
-    std::span<const uint32_t> spirvWords = {reinterpret_cast<uint32_t *>(spirvBytes.data()), spirvBytes.size() / 4};
-
-    SpirviewReflectResult result{};
-    CHECK(SpirviewReflect(spirvWords, &result));
-
-    for (uint32_t i = 0; i < result.resourcesCount; ++i)
-    {
-        const auto &resource = std::get<SpirviewResource>(result.records[result.resources[i]]);
-        LOG(INFO) << "Resource kind=" << uint32_t(resource.kind) << " set=" << resource.set
-                  << " binding=" << resource.binding;
-    }
-
-    return 0;
-}
-
-} // namespace
-
 } // namespace nyla
-
-auto main() -> int
-{
-    return nyla::Main();
-}

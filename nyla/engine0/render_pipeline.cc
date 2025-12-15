@@ -2,17 +2,19 @@
 
 #include <unistd.h>
 
+#include "absl/log/check.h"
+#include "nyla/commons/os/readfile.h"
 #include <cstdint>
 
+#include "nyla/commons/handle.h"
 #include "nyla/commons/memory/align.h"
 #include "nyla/commons/memory/charview.h"
-#include "nyla/commons/os/readfile.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_cmdlist.h"
-#include "nyla/rhi/rhi_handle.h"
 #include "nyla/rhi/rhi_pipeline.h"
 #include "nyla/rhi/rhi_texture.h"
+#include "nyla/spirview/spirview.h"
 
 namespace nyla
 {
@@ -36,7 +38,7 @@ void RpInit(Rp &rp)
 {
     CHECK(!rp.debugName.empty());
 
-    if (RhiHandleIsSet(rp.pipeline))
+    if (HandleIsSet(rp.pipeline))
     {
         RhiDestroyGraphicsPipeline(rp.pipeline);
     }
@@ -247,26 +249,38 @@ void RpDraw(Rp &rp, RpMesh mesh, ByteView dynamicUniformData)
 
 void RpAttachVertShader(Rp &rp, const std::string &path)
 {
-    if (RhiHandleIsSet(rp.vertexShader))
+    if (HandleIsSet(rp.vertexShader))
     {
         RhiDestroyShader(rp.vertexShader);
     }
 
+    const std::vector<std::byte> code = ReadFile(path);
+    auto spirv = std::span{reinterpret_cast<const uint32_t *>(code.data()), code.size() / 4};
+
+    SpirviewReflectResult result{};
+    SpirviewReflect(spirv, &result);
+
     rp.vertexShader = RhiCreateShader(RhiShaderDesc{
-        .code = ReadFile(path),
+        .spirv = spirv,
     });
     PlatformFsWatch(path);
 }
 
 void RpAttachFragShader(Rp &rp, const std::string &path)
 {
-    if (RhiHandleIsSet(rp.fragmentShader))
+    if (HandleIsSet(rp.fragmentShader))
     {
         RhiDestroyShader(rp.fragmentShader);
     }
 
+    const std::vector<std::byte> code = ReadFile(path);
+    auto spirv = std::span{reinterpret_cast<const uint32_t *>(code.data()), code.size() / 4};
+
+    SpirviewReflectResult result{};
+    SpirviewReflect(spirv, &result);
+
     rp.fragmentShader = RhiCreateShader(RhiShaderDesc{
-        .code = ReadFile(path),
+        .spirv = spirv,
     });
     PlatformFsWatch(path);
 }

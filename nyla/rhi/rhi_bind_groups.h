@@ -1,7 +1,7 @@
 #pragma once
 
+#include "nyla/commons/handle.h"
 #include "nyla/rhi/rhi_buffer.h"
-#include "nyla/rhi/rhi_handle.h"
 #include "nyla/rhi/rhi_sampler.h"
 #include "nyla/rhi/rhi_shader.h"
 #include "nyla/rhi/rhi_texture.h"
@@ -12,10 +12,10 @@ namespace nyla
 
 constexpr inline uint32_t kRhiMaxBindGroupLayouts = 4;
 
-struct RhiBindGroup : RhiHandle
+struct RhiBindGroup : Handle
 {
 };
-struct RhiBindGroupLayout : RhiHandle
+struct RhiBindGroupLayout : Handle
 {
 };
 

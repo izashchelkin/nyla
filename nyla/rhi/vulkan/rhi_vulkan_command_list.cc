@@ -1,13 +1,11 @@
 #include <cstdint>
 
 #include "nyla/rhi/rhi.h"
-#include "nyla/rhi/rhi_handle.h"
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
 
 namespace nyla
 {
 
-using namespace rhi_internal;
 using namespace rhi_vulkan_internal;
 
 namespace
@@ -45,19 +43,19 @@ auto RhiCreateCmdList(RhiQueueType queueType) -> RhiCmdList
         .queueType = queueType,
     };
 
-    RhiCmdList cmd = RhiHandleAcquire(rhiHandles.cmdLists, cmdData);
+    RhiCmdList cmd = HandleAcquire(rhiHandles.cmdLists, cmdData);
     return cmd;
 }
 
 void RhiNameCmdList(RhiCmdList cmd, std::string_view name)
 {
-    VulkanCmdListData cmdData = RhiHandleGetData(rhiHandles.cmdLists, cmd);
+    VulkanCmdListData cmdData = HandleGetData(rhiHandles.cmdLists, cmd);
     VulkanNameHandle(VK_OBJECT_TYPE_COMMAND_BUFFER, (uint64_t)cmdData.cmdbuf, name);
 }
 
 void RhiDestroyCmdList(RhiCmdList cmd)
 {
-    VulkanCmdListData cmdData = RhiHandleRelease(rhiHandles.cmdLists, cmd);
+    VulkanCmdListData cmdData = HandleRelease(rhiHandles.cmdLists, cmd);
     VkCommandPool cmdPool = GetDeviceQueue(cmdData.queueType).cmdPool;
     vkFreeCommandBuffers(vk.dev, cmdPool, 1, &cmdData.cmdbuf);
 }
@@ -69,7 +67,7 @@ auto RhiCmdSetCheckpoint(RhiCmdList cmd, uint64_t data) -> uint64_t
         return data;
     }
 
-    VulkanCmdListData cmdData = RhiHandleGetData(rhiHandles.cmdLists, cmd);
+    VulkanCmdListData cmdData = HandleGetData(rhiHandles.cmdLists, cmd);
 
     static auto fn = VK_GET_INSTANCE_PROC_ADDR(vkCmdSetCheckpointNV);
     fn(cmdData.cmdbuf, (void *)data);

@@ -4,25 +4,12 @@
 #include <cstdint>
 
 #include "absl/log/check.h"
+#include "nyla/commons/handle.h"
 
 namespace nyla
 {
 
-struct RhiHandle
-{
-    uint32_t gen;
-    uint32_t index;
-};
-
-inline auto RhiHandleIsSet(RhiHandle handle) -> bool
-{
-    return handle.gen;
-}
-
-namespace rhi_internal
-{
-
-template <typename Handle, typename Data, size_t Size> struct RhiHandlePool
+template <typename T, typename Data, size_t Size> struct HandlePool
 {
     struct Slot
     {
@@ -33,39 +20,39 @@ template <typename Handle, typename Data, size_t Size> struct RhiHandlePool
     std::array<Slot, Size> slots;
 };
 
-template <typename Handle, typename Data, size_t Size>
-inline auto RhiHandleAcquire(RhiHandlePool<Handle, Data, Size> &pool, Data data, bool allowIntern = false) -> Handle
+template <typename T, typename Data, size_t Size>
+inline auto HandleAcquire(HandlePool<T, Data, Size> &pool, Data data) -> T
 {
-    Handle retHandle{};
+    T retHandle{};
 
     for (uint32_t i = 0; i < Size; ++i)
     {
         auto &slot = pool.slots[i];
         if (slot.used)
         {
-            CHECK(memcmp(&slot.data, &data, sizeof(slot.data)) || allowIntern);
+            CHECK(memcmp(&slot.data, &data, sizeof(slot.data)));
             continue;
         }
 
-        if (!RhiHandleIsSet(retHandle))
+        if (!HandleIsSet(retHandle))
         {
             ++slot.gen;
             slot.used = true;
             slot.data = data;
 
-            retHandle = static_cast<Handle>(RhiHandle{
+            retHandle = static_cast<T>(Handle{
                 .gen = slot.gen,
                 .index = i,
             });
         }
     }
 
-    CHECK(RhiHandleIsSet(retHandle));
+    CHECK(HandleIsSet(retHandle));
     return retHandle;
 }
 
-template <typename Handle, typename Data, size_t Size>
-inline auto RhiHandleGetData(RhiHandlePool<Handle, Data, Size> &pool, Handle handle) -> Data &
+template <typename T, typename Data, size_t Size>
+inline auto HandleGetData(HandlePool<T, Data, Size> &pool, T handle) -> Data &
 {
     CHECK(handle.gen);
     CHECK_LT(handle.index, Size);
@@ -79,8 +66,8 @@ inline auto RhiHandleGetData(RhiHandlePool<Handle, Data, Size> &pool, Handle han
     CHECK(false);
 }
 
-template <typename Handle, typename Data, size_t Size>
-inline auto RhiHandleRelease(RhiHandlePool<Handle, Data, Size> &pool, Handle handle) -> Data
+template <typename T, typename Data, size_t Size>
+inline auto HandleRelease(HandlePool<T, Data, Size> &pool, T handle) -> Data
 {
     CHECK(handle.gen);
     CHECK_LT(handle.index, Size);
@@ -92,7 +79,5 @@ inline auto RhiHandleRelease(RhiHandlePool<Handle, Data, Size> &pool, Handle han
     slot.used = false;
     return slot.data;
 }
-
-} // namespace rhi_internal
 
 } // namespace nyla

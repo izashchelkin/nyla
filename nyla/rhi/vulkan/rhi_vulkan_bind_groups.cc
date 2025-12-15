@@ -2,14 +2,12 @@
 
 #include "nyla/rhi/rhi_bind_groups.h"
 #include "nyla/rhi/rhi_cmdlist.h"
-#include "nyla/rhi/rhi_handle.h"
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
 #include "vulkan/vulkan_core.h"
 
 namespace nyla
 {
 
-using namespace rhi_internal;
 using namespace rhi_vulkan_internal;
 
 namespace
@@ -59,18 +57,18 @@ auto RhiCreateBindGroupLayout(const RhiBindGroupLayoutDesc &desc) -> RhiBindGrou
     VkDescriptorSetLayout descriptorSetLayout;
     VK_CHECK(vkCreateDescriptorSetLayout(vk.dev, &descriptorSetLayoutCreateInfo, nullptr, &descriptorSetLayout));
 
-    return RhiHandleAcquire(rhiHandles.bindGroupLayouts, descriptorSetLayout);
+    return HandleAcquire(rhiHandles.bindGroupLayouts, descriptorSetLayout);
 }
 
 void RhiDestroyBindGroupLayout(RhiBindGroupLayout layout)
 {
-    VkDescriptorSetLayout descriptorSetLayout = RhiHandleRelease(rhiHandles.bindGroupLayouts, layout);
+    VkDescriptorSetLayout descriptorSetLayout = HandleRelease(rhiHandles.bindGroupLayouts, layout);
     vkDestroyDescriptorSetLayout(vk.dev, descriptorSetLayout, nullptr);
 }
 
 auto RhiCreateBindGroup(const RhiBindGroupDesc &desc) -> RhiBindGroup
 {
-    VkDescriptorSetLayout descriptorSetLayout = RhiHandleGetData(rhiHandles.bindGroupLayouts, desc.layout);
+    VkDescriptorSetLayout descriptorSetLayout = HandleGetData(rhiHandles.bindGroupLayouts, desc.layout);
 
     const VkDescriptorSetAllocateInfo descriptorSetAllocInfo{
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
@@ -105,7 +103,7 @@ auto RhiCreateBindGroup(const RhiBindGroupDesc &desc) -> RhiBindGroup
         {
         case RhiBindingType::UniformBuffer:
         case RhiBindingType::UniformBufferDynamic: {
-            const VulkanBufferData &bufferData = RhiHandleGetData(rhiHandles.buffers, entry.buffer.buffer);
+            const VulkanBufferData &bufferData = HandleGetData(rhiHandles.buffers, entry.buffer.buffer);
             const VkDescriptorBufferInfo &bufferInfo = bufferInfos[i] = VkDescriptorBufferInfo{
                 .buffer = bufferData.buffer,
                 .offset = entry.buffer.offset,
@@ -117,7 +115,7 @@ auto RhiCreateBindGroup(const RhiBindGroupDesc &desc) -> RhiBindGroup
         }
 
         case RhiBindingType::Texture: {
-            const VulkanTextureData &textureData = RhiHandleGetData(rhiHandles.textures, entry.texture.texture);
+            const VulkanTextureData &textureData = HandleGetData(rhiHandles.textures, entry.texture.texture);
             const VkDescriptorImageInfo &imageInfo = imageInfos[i] = VkDescriptorImageInfo{
                 .imageView = textureData.imageView,
                 .imageLayout = textureData.layout,
@@ -128,7 +126,7 @@ auto RhiCreateBindGroup(const RhiBindGroupDesc &desc) -> RhiBindGroup
         }
 
         case RhiBindingType::Sampler: {
-            const VulkanSamplerData &samplerData = RhiHandleGetData(rhiHandles.samplers, entry.sampler.sampler);
+            const VulkanSamplerData &samplerData = HandleGetData(rhiHandles.samplers, entry.sampler.sampler);
             const VkDescriptorImageInfo &imageInfo = imageInfos[i] = VkDescriptorImageInfo{
                 .sampler = samplerData.sampler,
             };
@@ -145,22 +143,21 @@ auto RhiCreateBindGroup(const RhiBindGroupDesc &desc) -> RhiBindGroup
 
     vkUpdateDescriptorSets(vk.dev, desc.entriesCount, writes.data(), 0, nullptr);
 
-    return RhiHandleAcquire(rhiHandles.bindGroups, descriptorSet);
+    return HandleAcquire(rhiHandles.bindGroups, descriptorSet);
 }
 
 void RhiDestroyBindGroup(RhiBindGroup bindGroup)
 {
-    VkDescriptorSet descriptorSet = RhiHandleRelease(rhiHandles.bindGroups, bindGroup);
+    VkDescriptorSet descriptorSet = HandleRelease(rhiHandles.bindGroups, bindGroup);
     vkFreeDescriptorSets(vk.dev, vk.descriptorPool, 1, &descriptorSet);
 }
 
 void RhiCmdBindGraphicsBindGroup(RhiCmdList cmd, uint32_t setIndex, RhiBindGroup bindGroup,
                                  std::span<const uint32_t> dynamicOffsets)
 { // TODO: validate dynamic offsets size !!!
-    const VulkanCmdListData &cmdData = RhiHandleGetData(rhiHandles.cmdLists, cmd);
-    const VulkanPipelineData &pipelineData =
-        RhiHandleGetData(rhiHandles.graphicsPipelines, cmdData.boundGraphicsPipeline);
-    const VkDescriptorSet &descriptorSet = RhiHandleGetData(rhiHandles.bindGroups, bindGroup);
+    const VulkanCmdListData &cmdData = HandleGetData(rhiHandles.cmdLists, cmd);
+    const VulkanPipelineData &pipelineData = HandleGetData(rhiHandles.graphicsPipelines, cmdData.boundGraphicsPipeline);
+    const VkDescriptorSet &descriptorSet = HandleGetData(rhiHandles.bindGroups, bindGroup);
 
     vkCmdBindDescriptorSets(cmdData.cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineData.layout, setIndex, 1,
                             &descriptorSet, dynamicOffsets.size(), dynamicOffsets.data());
