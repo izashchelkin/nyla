@@ -4,8 +4,10 @@
 #include <cstddef>
 #include <cstdint>
 #include <ctime>
+#include <future>
 #include <iterator>
 #include <limits>
+#include <memory>
 #include <span>
 #include <vector>
 
@@ -19,6 +21,7 @@
 #include "nyla/apps/wm/screen_saver_inhibitor.h"
 #include "nyla/apps/wm/wm_background.h"
 #include "nyla/commons/containers/map.h"
+#include "nyla/commons/future.h"
 #include "nyla/debugfs/debugfs.h"
 #include "nyla/platform/x11/platform_x11.h"
 #include "nyla/platform/x11/platform_x11_error.h"
@@ -1090,7 +1093,14 @@ void UpdateBackground()
     std::string barText =
         absl::StrFormat("%.2f, %.2f, %.2f %s %v", loadAvg[0], loadAvg[1], loadAvg[2],
                         absl::FormatTime("%H:%M:%S %d.%m.%Y", absl::Now(), absl::LocalTimeZone()), activeClientName);
-    DrawBackground(wmClients.size(), barText);
+
+    static std::future<void> fut;
+    if (IsFutureReady(fut))
+    {
+        fut = std::async(std::launch::async, [wmClientSize = wmClients.size(), barText = std::move(barText)] -> void {
+            DrawBackground(wmClientSize, barText);
+        });
+    }
 }
 
 static auto DumpClients() -> std::string
