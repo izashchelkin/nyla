@@ -63,20 +63,20 @@ struct RhiGraphicsPipelineDesc
 {
     std::string debugName;
 
-    RhiShader vertShader;
-    RhiShader fragShader;
+    RhiShader vs;
+    RhiShader ps;
 
-    std::array<RhiBindGroupLayout, kRhiMaxBindGroupLayouts> bindGroupLayouts;
     uint32_t bindGroupLayoutsCount;
+    std::array<RhiBindGroupLayout, kRhiMaxBindGroupLayouts> bindGroupLayouts;
 
-    std::array<RhiVertexBindingDesc, 4> vertexBindings;
     uint32_t vertexBindingsCount;
+    std::array<RhiVertexBindingDesc, 4> vertexBindings;
 
-    std::array<RhiVertexAttributeDesc, 16> vertexAttributes;
     uint32_t vertexAttributeCount;
+    std::array<RhiVertexAttributeDesc, 16> vertexAttributes;
 
-    std::array<RhiTextureFormat, 4> colorTargetFormats;
     uint32_t colorTargetFormatsCount;
+    std::array<RhiTextureFormat, 4> colorTargetFormats;
 
     RhiCullMode cullMode;
     RhiFrontFace frontFace;

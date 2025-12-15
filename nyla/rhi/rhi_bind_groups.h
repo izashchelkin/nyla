@@ -75,8 +75,8 @@ struct RhiBindingDesc
 
 struct RhiBindGroupLayoutDesc
 {
-    std::array<RhiBindingDesc, 16> bindings;
     uint32_t bindingCount;
+    std::array<RhiBindingDesc, 16> bindings;
 };
 
 auto RhiCreateBindGroupLayout(const RhiBindGroupLayoutDesc &) -> RhiBindGroupLayout;

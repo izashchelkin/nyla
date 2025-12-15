@@ -159,8 +159,8 @@ void RpInit(Rp &rp)
 
     rp.init(rp);
 
-    desc.vertShader = rp.vertexShader;
-    desc.fragShader = rp.fragmentShader;
+    desc.vs = rp.vertexShader;
+    desc.ps = rp.fragmentShader;
 
     rp.pipeline = RhiCreateGraphicsPipeline(desc);
 }

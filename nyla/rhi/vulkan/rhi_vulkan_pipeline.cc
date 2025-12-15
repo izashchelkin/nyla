@@ -196,13 +196,13 @@ auto RhiCreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGraphi
         VkPipelineShaderStageCreateInfo{
             .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
             .stage = VK_SHADER_STAGE_VERTEX_BIT,
-            .module = HandleGetData(rhiHandles.shaders, desc.vertShader),
+            .module = HandleGetData(rhiHandles.shaders, desc.vs),
             .pName = "main",
         },
         VkPipelineShaderStageCreateInfo{
             .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
             .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-            .module = HandleGetData(rhiHandles.shaders, desc.fragShader),
+            .module = HandleGetData(rhiHandles.shaders, desc.ps),
             .pName = "main",
         },
     };
