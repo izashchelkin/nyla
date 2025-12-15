@@ -1,6 +1,4 @@
-#include <string_view>
-#define SPV_ENABLE_UTILITY_CODE
-
+#include "nyla/spirview/spirview.h"
 #include "absl/log/check.h"
 #include "absl/log/log.h"
 #include "nyla/commons/logging/init.h"
@@ -9,7 +7,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <span>
+#include <variant>
 
+#define SPV_ENABLE_UTILITY_CODE
 #include <spirv/unified1/spirv.hpp>
 
 namespace nyla
@@ -18,113 +18,125 @@ namespace nyla
 namespace spirview_internal
 {
 
-struct SpirvDecoderState
+struct SpirvTypeIdState
 {
+    uint32_t typeWidth = -1;
+    uint32_t typeSignedness = -1;
+    uint32_t block = -1;
 };
 
-}; // namespace spirview_internal
-
-void DecodeSpirvWord()
+struct SpirvVarIdState
 {
-}
+    uint32_t varType = -1;
+    spv::StorageClass storageClass = spv::StorageClass::StorageClassMax;
+    uint32_t set = -1;
+    uint32_t binding = -1;
+    uint32_t location = -1;
+};
 
-auto FormatWord(uint32_t word)
-{
-    return std::format("0x{:08x}", word);
-}
-
-auto HasByte(uint32_t word, std::byte byte) -> bool
-{
-    if ((word & 0x000000FF) == uint32_t(byte))
-        return true;
-    if ((word & 0x0000FF00) == uint32_t(byte))
-        return true;
-    if ((word & 0x00FF0000) == uint32_t(byte))
-        return true;
-    if ((word & 0xFF000000) == uint32_t(byte))
-        return true;
-    return false;
-}
-
-auto ParseStringLiteral(std::span<const uint32_t> in, uint32_t &iin, std::span<uint32_t> out) -> bool
-{
-    uint32_t iout = 0;
-    for (;;)
-    {
-        if (iin >= in.size())
-            return false;
-        if (iout >= out.size())
-            return false;
-
-        out[iout++] = in[iin];
-        if (HasByte(in[iin], std::byte(0)))
-            return true;
-
-        ++iin;
-    }
-
-    return false;
-}
-
-auto ParseDecoration() -> bool
-{
-}
+using SpirvIdState = std::variant<std::monostate, SpirvTypeIdState, SpirvVarIdState>;
 
 struct SpirvParserState
 {
-    struct IdMetadata
-    {
-        bool exists;
-    };
-
-    std::array<IdMetadata, 256> ids;
+    spv::ExecutionModel executionModel;
+    std::array<SpirvIdState, 1024> perId;
 };
 
-void ProcessOp(spv::Op op, std::span<const uint32_t> args)
+template <typename T> auto SpirvIdStateGetOrCreate(SpirvParserState &parser, uint32_t id) -> T &
 {
-    LOG(INFO) << OpToString(op) << " " << args.size();
+    auto &variant = parser.perId[id];
+    if (std::holds_alternative<std::monostate>(variant))
+    {
+        variant = T{};
+    }
 
+    return std::get<T>(variant);
+}
+
+auto GetVar(SpirvParserState &parser, uint32_t id) -> auto &
+{
+    return SpirvIdStateGetOrCreate<SpirvVarIdState>(parser, id);
+}
+
+auto GetType(SpirvParserState &parser, uint32_t id) -> auto &
+{
+    return SpirvIdStateGetOrCreate<SpirvTypeIdState>(parser, id);
+}
+
+void ProcessOp(SpirvParserState &parser, spv::Op op, std::span<const uint32_t> args)
+{
     uint32_t i = 0;
 
     switch (op)
     {
-    case spv::OpMemoryModel: {
-        auto addressingModel = spv::AddressingModel(args[i++]);
-        auto memoryModel = spv::MemoryModel(args[i++]);
-
-        LOG(INFO) << "    " << spv::AddressingModelToString(addressingModel) << " "
-                  << spv::MemoryModelToString(memoryModel);
-        break;
-    }
 
     case spv::OpEntryPoint: {
-        auto executionModel = spv::ExecutionModel(args[i++]);
-        spv::Id entryPointId = args[i++];
-
-        std::array<uint32_t, 16> name;
-        CHECK(ParseStringLiteral(args, i, name));
-
-        LOG(INFO) << "    " << spv::ExecutionModelToString(executionModel) << " " << entryPointId << " "
-                  << (const char *)name.data();
-
+        parser.executionModel = spv::ExecutionModel(args[i++]);
         break;
     }
 
     case spv::OpDecorate: {
-        spv::Id idTarget = args[i++];
-        auto decoration = spv::Decoration(args[i++]);
+        spv::Id targetId = args[i++];
 
-        LOG(INFO) << "    " << idTarget << " " << spv::DecorationToString(decoration);
+        auto decoration = spv::Decoration(args[i++]);
+        switch (decoration)
+        {
+        case spv::Decoration::DecorationDescriptorSet: {
+            auto &var = GetVar(parser, targetId);
+            var.set = args[i++];
+            break;
+        }
+        case spv::Decoration::DecorationBinding: {
+            auto &var = GetVar(parser, targetId);
+            var.binding = args[i++];
+            break;
+        }
+        case spv::Decoration::DecorationLocation: {
+            auto &var = GetVar(parser, targetId);
+            var.location = args[i++];
+            break;
+        }
+        case spv::Decoration::DecorationBlock: {
+            auto &type = GetType(parser, targetId);
+            type.block = true;
+            break;
+        }
+        }
+
         break;
     }
 
-    case spv::OpMemberDecorate: {
-        spv::Id structType = args[i++];
-        uint32_t member = args[i++];
-        auto decoration = spv::Decoration(args[i++]);
+    case spv::OpVariable: {
+        spv::Id resultType = args[i++];
+        spv::Id resultId = args[i++];
+        auto &var = GetVar(parser, resultId);
+        var.varType = resultType;
+        var.storageClass = spv::StorageClass(args[i++]);
+        break;
+    }
 
-        LOG(INFO) << "    " << args.size() << "    " << structType << " " << member << " "
-                  << spv::DecorationToString(decoration);
+    case spv::OpTypeInt: {
+        spv::Id resultId = args[i++];
+
+        auto &type = GetType(parser, resultId);
+        type.typeWidth = args[i++];
+        type.typeSignedness = args[i++];
+        break;
+    }
+
+    case spv::OpTypeFloat: {
+        spv::Id resultId = args[i++];
+
+        auto &type = GetType(parser, resultId);
+        type.typeWidth = args[i++];
+        break;
+    }
+
+    case spv::OpTypeStruct: {
+        spv::Id resultId = args[i++];
+
+        auto &type = GetType(parser, resultId);
+        // TODO: members
         break;
     }
 
@@ -134,13 +146,33 @@ void ProcessOp(spv::Op op, std::span<const uint32_t> args)
     }
 }
 
-void Reflect(std::span<const uint32_t> spirv)
+namespace
 {
-    if (spirv[0] != spv::MagicNumber)
+
+auto SpvStorageClassToSpirviewResourceKind(spv::StorageClass storageClass) -> SpirviewResourceKind
+{
+    switch (storageClass)
     {
-        LOG(ERROR) << "invalid spirv magic";
-        return;
+    case spv::StorageClass::StorageClassUniformConstant:
+    case spv::StorageClass::StorageClassUniform:
+        return SpirviewResourceKind::ConstantBuffer;
+    case spv::StorageClass::StorageClassPushConstant:
+        return SpirviewResourceKind::PushConstant;
+
+    default:
+        return SpirviewResourceKind::Unknown;
     }
+}
+
+} // namespace
+
+}; // namespace spirview_internal
+
+auto SpirviewReflect(std::span<const uint32_t> spirv, SpirviewReflectResult *result) -> bool
+{
+    using namespace spirview_internal;
+
+    CHECK_EQ(spirv[0], spv::MagicNumber);
 
     const uint32_t headerVersionMinor = (spirv[1] >> 8) & 0xFF;
     const uint32_t headerVersionMajor = (spirv[1] >> 16) & 0xFF;
@@ -148,12 +180,7 @@ void Reflect(std::span<const uint32_t> spirv)
     const uint32_t headerGeneratorMagic = spirv[2];
     const uint32_t headerIdBound = spirv[3];
 
-    LOG(INFO) << "Version: " << FormatWord(spirv[1]) << " " << headerVersionMajor << "." << headerVersionMinor;
-    LOG(INFO) << "Generator Magic: " << FormatWord(headerGeneratorMagic);
-    LOG(INFO) << "Bound: " << headerIdBound;
-    LOG(INFO) << "Words: " << spirv.size();
-    LOG(INFO);
-
+    SpirvParserState state;
     for (uint32_t i = 5; i < spirv.size();)
     {
         const uint32_t word = spirv[i];
@@ -162,9 +189,71 @@ void Reflect(std::span<const uint32_t> spirv)
         const uint16_t wordCount = word >> spv::WordCountShift;
         CHECK(wordCount);
 
-        ProcessOp(op, {spirv.data() + i + 1, uint16_t((wordCount - 1) * 4)});
+        ProcessOp(state, op, std::span{spirv.data() + i + 1, static_cast<uint16_t>(wordCount - 1)});
         i += wordCount;
     }
+
+    uint32_t itype = 0;
+    for (uint32_t id = 0; id < state.perId.size(); ++id)
+    {
+        const auto &variant = state.perId[id];
+
+        if (std::holds_alternative<SpirvTypeIdState>(variant))
+        {
+            auto &type = std::get<SpirvTypeIdState>(variant);
+            auto &resultType = result->records[id];
+
+            CHECK(std::holds_alternative<std::monostate>(resultType));
+            resultType = SpirviewType{
+                .block = static_cast<bool>(type.block),
+            };
+            result->types[itype++] = id;
+
+            continue;
+        }
+    }
+
+    uint32_t iresource = 0;
+    for (uint32_t id = 0; id < state.perId.size(); ++id)
+    {
+        const auto &variant = state.perId[id];
+
+        if (std::holds_alternative<SpirvVarIdState>(variant))
+        {
+            auto &var = std::get<SpirvVarIdState>(variant);
+
+            switch (var.storageClass)
+            {
+            case spv::StorageClass::StorageClassUniform:
+            case spv::StorageClass::StorageClassUniformConstant:
+            case spv::StorageClass::StorageClassStorageBuffer:
+            case spv::StorageClass::StorageClassImage:
+            case spv::StorageClass::StorageClassPushConstant:
+                break;
+
+            default:
+                continue;
+            }
+
+            auto &resultResource = result->records[id];
+
+            CHECK(std::holds_alternative<std::monostate>(resultResource));
+            resultResource = SpirviewResource{
+                .typeId = var.varType,
+                .kind = SpvStorageClassToSpirviewResourceKind(var.storageClass),
+                .set = var.set,
+                .binding = var.binding,
+            };
+            result->resources[iresource++] = id;
+
+            continue;
+        }
+    }
+
+    result->typesCount = itype;
+    result->resourcesCount = iresource;
+
+    return true;
 }
 
 namespace
@@ -182,7 +271,16 @@ auto Main() -> int
     }
 
     std::span<const uint32_t> spirvWords = {reinterpret_cast<uint32_t *>(spirvBytes.data()), spirvBytes.size() / 4};
-    Reflect(spirvWords);
+
+    SpirviewReflectResult result{};
+    CHECK(SpirviewReflect(spirvWords, &result));
+
+    for (uint32_t i = 0; i < result.resourcesCount; ++i)
+    {
+        const auto &resource = std::get<SpirviewResource>(result.records[result.resources[i]]);
+        LOG(INFO) << "Resource kind=" << uint32_t(resource.kind) << " set=" << resource.set
+                  << " binding=" << resource.binding;
+    }
 
     return 0;
 }
