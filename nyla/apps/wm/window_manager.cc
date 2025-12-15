@@ -1065,8 +1065,6 @@ void ProcessWMEvents(const bool &isRunning, uint16_t modifier, std::vector<Keybi
 
 void UpdateBackground()
 {
-    wmBackgroundDirty = false;
-
     const WindowStack &stack = GetActiveStack();
 
     std::string activeClientName;
@@ -1097,6 +1095,7 @@ void UpdateBackground()
     static std::future<void> fut;
     if (IsFutureReady(fut))
     {
+        wmBackgroundDirty = false;
         fut = std::async(std::launch::async, [wmClientSize = wmClients.size(), barText = std::move(barText)] -> void {
             DrawBackground(wmClientSize, barText);
         });
