@@ -30,8 +30,8 @@ enum class RhiBindingType
 struct RhiBufferBinding
 {
     RhiBuffer buffer;
-    uint32_t offset;
     uint32_t size;
+    uint32_t offset;
     uint32_t range;
 };
 
@@ -61,8 +61,8 @@ struct RhiBindGroupEntry
 struct RhiBindGroupDesc
 {
     RhiBindGroupLayout layout;
-    std::array<RhiBindGroupEntry, 4> entries;
     uint32_t entriesCount;
+    std::array<RhiBindGroupEntry, 4> entries;
 };
 
 struct RhiBindingDesc

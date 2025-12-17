@@ -1,60 +1,64 @@
 #include "nyla/engine0/shader_manager.h"
 #include "nyla/commons/handle_pool.h"
+#include "nyla/commons/math/mat.h"
 #include "nyla/commons/math/vec.h"
 #include "nyla/commons/os/readfile.h"
 #include "nyla/engine0/engine0_internal.h"
 #include "nyla/rhi/rhi_bind_groups.h"
+#include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_pipeline.h"
 #include "nyla/rhi/rhi_shader.h"
-#include "nyla/spirview/spirview.h"
 #include <cstdint>
 #include <format>
+#include <unistd.h>
 
 namespace nyla
 {
 
 using namespace engine0_internal;
 
-auto E0GetShader(std::string_view name) -> E0Shader
+namespace
 {
-    for (uint32_t i = 0; i < e0Handles.shaders.slots.size(); ++i)
-    {
-        const auto &shaderSlot = e0Handles.shaders.slots[i];
-        if (shaderSlot.used && shaderSlot.data.name == name)
-        {
-            return static_cast<E0Shader>(Handle{
-                .gen = shaderSlot.gen,
-                .index = i,
-            });
-        }
-    }
 
+auto CreateShader(std::string_view name) -> RhiShader
+{
     const std::string path = std::format("nyla/shaders/build/{}.hlsl.spv", name);
     const std::vector<std::byte> code = ReadFile(path);
     const auto spirv = std::span{reinterpret_cast<const uint32_t *>(code.data()), code.size() / 4};
 
-    E0ShaderData shaderData{
-        .name = name,
-        .shader = RhiCreateShader(RhiShaderDesc{
-            .spirv = spirv,
-        }),
-    };
-    SpirviewReflect(spirv, &shaderData.reflectResult);
-
-    return HandleAcquire(e0Handles.shaders, shaderData);
+    RhiShader shader = RhiCreateShader(RhiShaderDesc{
+        .spirv = spirv,
+    });
+    return shader;
 }
 
-struct E0SolidPipelineVertex
+struct VertexInput
 {
     float4 pos;
     float4 color;
 };
 
-auto E0SolidPipeline()
+struct PerDrawUbo
 {
-    RhiTextureInfo backbuffer = RhiGetTextureInfo(RhiGetBackbufferTexture());
+    float4 color;
+};
 
-    RhiBindGroupLayout bindGroupLayout = RhiCreateBindGroupLayout(RhiBindGroupLayoutDesc{
+struct CBuffer
+{
+    float4x4 vp;
+    float4x4 invVp;
+};
+
+struct Renderer
+{
+    RhiGraphicsPipeline pipeline;
+    RhiBindGroupLayout bindGroupLayout;
+    RhiBindGroup bindGroup;
+};
+
+auto CreateRenderer() -> Renderer
+{
+    const RhiBindGroupLayout bindGroupLayout = RhiCreateBindGroupLayout(RhiBindGroupLayoutDesc{
         .bindingCount = 1,
         .bindings =
             {
@@ -67,19 +71,24 @@ auto E0SolidPipeline()
             },
     });
 
-    E0Shader vs = E0GetShader("world.vs");
-    E0Shader ps = E0GetShader("world.ps");
+    const RhiShader vs = CreateShader("world.ps");
+    const RhiShader ps = CreateShader("world.vs");
 
-    RhiCreateGraphicsPipeline(RhiGraphicsPipelineDesc{
+    const RhiGraphicsPipelineDesc pipelineDesc{
         .debugName = "E0Solid",
+        .vs = vs,
+        .ps = ps,
         .bindGroupLayoutsCount = 1,
-        .bindGroupLayouts = {bindGroupLayout},
+        .bindGroupLayouts =
+            {
+                bindGroupLayout,
+            },
         .vertexBindingsCount = 1,
         .vertexBindings =
             {
                 RhiVertexBindingDesc{
                     .binding = 0,
-                    .stride = sizeof(E0SolidPipelineVertex),
+                    .stride = sizeof(VertexInput),
                     .inputRate = RhiInputRate::PerVertex,
                 },
             },
@@ -87,23 +96,71 @@ auto E0SolidPipeline()
         .vertexAttributes =
             {
                 RhiVertexAttributeDesc{
-                    .location = 0,
                     .binding = 0,
+                    .location = 0,
                     .format = RhiVertexFormat::R32G32B32A32Float,
-                    .offset = offsetof(E0SolidPipelineVertex, pos),
+                    .offset = offsetof(VertexInput, pos),
                 },
                 RhiVertexAttributeDesc{
-                    .location = 1,
                     .binding = 0,
+                    .location = 1,
                     .format = RhiVertexFormat::R32G32B32A32Float,
-                    .offset = offsetof(E0SolidPipelineVertex, color),
+                    .offset = offsetof(VertexInput, color),
                 },
             },
         .colorTargetFormatsCount = 1,
-        .colorTargetFormats = {backbuffer.format},
+        .colorTargetFormats =
+            {
+                RhiGetTextureInfo(RhiGetBackbufferTexture()).format,
+            },
+        .pushConstantSize = sizeof(CBuffer),
         .cullMode = RhiCullMode::None,
         .frontFace = RhiFrontFace::CCW,
+    };
+
+    const RhiGraphicsPipeline pipeline = RhiCreateGraphicsPipeline(pipelineDesc);
+
+    constexpr uint32_t kVertexBufferSize = 1 << 20;
+    const RhiBuffer vertexBuffer = RhiCreateBuffer(RhiBufferDesc{
+        .size = kVertexBufferSize,
+        .bufferUsage = RhiBufferUsage::Vertex,
+        .memoryUsage = RhiMemoryUsage::CpuToGpu,
     });
+
+    constexpr uint32_t kPerDrawBufferSize = 1 << 10;
+    const RhiBuffer perDrawBuffer = RhiCreateBuffer(RhiBufferDesc{
+        .size = kPerDrawBufferSize,
+        .bufferUsage = RhiBufferUsage::Uniform,
+        .memoryUsage = RhiMemoryUsage::CpuToGpu,
+    });
+
+    const RhiBindGroup bindGroup = RhiCreateBindGroup(RhiBindGroupDesc{
+        .layout = bindGroupLayout,
+        .entriesCount = 1,
+        .entries =
+            {
+                RhiBindGroupEntry{
+                    .binding = 0,
+                    .arrayIndex = 0,
+                    .type = RhiBindingType::UniformBufferDynamic,
+                    .buffer =
+                        RhiBufferBinding{
+                            .buffer = perDrawBuffer,
+                            .size = kPerDrawBufferSize,
+                            .offset = 0,
+                            .range = sizeof(PerDrawUbo),
+                        },
+                },
+            },
+    });
+
+    return Renderer{
+        .pipeline = pipeline,
+        .bindGroupLayout = bindGroupLayout,
+        .bindGroup = bindGroup,
+    };
 }
+
+} // namespace
 
 } // namespace nyla

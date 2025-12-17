@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <vulkan/vulkan_core.h>
 
+#include "nyla/rhi/rhi_pipeline.h"
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
 
 namespace nyla
@@ -211,10 +212,11 @@ auto RhiCreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGraphi
     pipelineData.bindGroupLayoutCount = desc.bindGroupLayoutsCount;
     pipelineData.bindGroupLayouts = desc.bindGroupLayouts;
 
+    CHECK_LE(desc.pushConstantSize, kRhiMaxPushConstantSize);
     const VkPushConstantRange pushConstantRange{
         .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT,
         .offset = 0,
-        .size = kRhiMaxPushConstantSize,
+        .size = desc.pushConstantSize,
     };
 
     std::array<VkDescriptorSetLayout, kRhiMaxBindGroupLayouts> descriptorSetLayouts;
@@ -227,7 +229,7 @@ auto RhiCreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGraphi
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         .setLayoutCount = desc.bindGroupLayoutsCount,
         .pSetLayouts = descriptorSetLayouts.data(),
-        .pushConstantRangeCount = 1,
+        .pushConstantRangeCount = static_cast<bool>(desc.pushConstantSize),
         .pPushConstantRanges = &pushConstantRange,
     };
 
