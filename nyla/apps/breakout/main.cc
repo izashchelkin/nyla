@@ -1,6 +1,7 @@
 #include "nyla/apps/breakout/breakout.h"
 #include "nyla/apps/breakout/world_renderer.h"
 #include "nyla/engine0/dbg_text_renderer.h"
+#include "nyla/engine0/e0basic_renderer.h"
 #include "nyla/engine0/engine0.h"
 #include "nyla/engine0/gui.h"
 #include "nyla/engine0/render_pipeline.h"
@@ -29,47 +30,37 @@ static auto Main() -> int
 
     BreakoutInit();
 
-    std::array<RhiTexture, kRhiMaxNumFramesInFlight> offscreenTextures;
-    for (uint32_t i = 0; i < RhiGetNumFramesInFlight(); ++i)
-    {
-        offscreenTextures[i] = RhiCreateTexture(RhiTextureDesc{
-            .width = 1000,
-            .height = 1000,
-            .memoryUsage = RhiMemoryUsage::GpuOnly,
-            .usage = RhiTextureUsage::ColorTarget | RhiTextureUsage::ShaderSampled,
-            .format = RhiTextureFormat::B8G8R8A8_sRGB,
-        });
-    }
+    // std::array<RhiTexture, kRhiMaxNumFramesInFlight> offscreenTextures;
+    // for (uint32_t i = 0; i < RhiGetNumFramesInFlight(); ++i)
+    // {
+    //     offscreenTextures[i] = RhiCreateTexture(RhiTextureDesc{
+    //         .width = 1000,
+    //         .height = 1000,
+    //         .memoryUsage = RhiMemoryUsage::GpuOnly,
+    //         .usage = RhiTextureUsage::ColorTarget | RhiTextureUsage::ShaderSampled,
+    //         .format = RhiTextureFormat::B8G8R8A8_sRGB,
+    //     });
+    // }
+    //
+    // if (RecompileShadersIfNeeded())
+    // {
+    //     RpInit(worldPipeline);
+    //     RpInit(guiPipeline);
+    //     RpInit(dbgTextPipeline);
+    // }
+
+    // RhiTexture offscreenTexture = offscreenTextures[RhiGetFrameIndex()];
 
     while (!Engine0ShouldExit())
     {
         Engine0FrameBegin();
 
-        if (RecompileShadersIfNeeded())
-        {
-            RpInit(worldPipeline);
-            RpInit(guiPipeline);
-            RpInit(dbgTextPipeline);
-        }
-
-        RhiTexture offscreenTexture = offscreenTextures[RhiFrameGetIndex()];
-
-        RhiPassBegin({
-            .colorTarget = offscreenTexture,
-            .state = RhiTextureState::ColorTarget,
-        });
-
-        BreakoutFrame(Engine0GetDt(), Engine0GetFps());
-
-        RhiPassEnd({
-            .colorTarget = offscreenTexture,
-            .state = RhiTextureState::ShaderRead,
-        });
-
         RhiPassBegin({
             .colorTarget = RhiGetBackbufferTexture(),
             .state = RhiTextureState::ColorTarget,
         });
+
+        BreakoutFrame(Engine0GetDt(), Engine0GetFps());
 
         RhiPassEnd({
             .colorTarget = RhiGetBackbufferTexture(),

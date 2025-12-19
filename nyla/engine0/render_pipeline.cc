@@ -180,7 +180,7 @@ static void RpBufCopy(RpBuf &buf, ByteView data)
     CHECK(!data.empty());
     CHECK_LE(buf.written + data.size(), buf.size);
 
-    void *dst = (char *)RhiMapBuffer(buf.buffer[RhiFrameGetIndex()], true) + buf.written;
+    void *dst = (char *)RhiMapBuffer(buf.buffer[RhiGetFrameIndex()], true) + buf.written;
     memcpy(dst, data.data(), data.size());
     buf.written += data.size();
 }
@@ -217,7 +217,7 @@ void RpPushConst(Rp &rp, ByteView data)
 void RpDraw(Rp &rp, RpMesh mesh, ByteView dynamicUniformData)
 {
     RhiCmdList cmd = RhiFrameGetCmdList();
-    uint32_t frameIndex = RhiFrameGetIndex();
+    uint32_t frameIndex = RhiGetFrameIndex();
 
     if (rp.vertBuf.enabled)
     {

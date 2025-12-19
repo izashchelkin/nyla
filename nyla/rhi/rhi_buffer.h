@@ -43,7 +43,7 @@ auto RhiCreateBuffer(const RhiBufferDesc &) -> RhiBuffer;
 void RhiNameBuffer(RhiBuffer, std::string_view name);
 void RhiDestroyBuffer(RhiBuffer);
 
-auto RhiMapBuffer(RhiBuffer, bool persistent = true) -> void *;
+auto RhiMapBuffer(RhiBuffer, bool persistent = true) -> char *;
 void RhiUnmapBuffer(RhiBuffer, bool persistent = true);
 
 } // namespace nyla

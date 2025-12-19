@@ -137,7 +137,7 @@ void RhiDestroyBuffer(RhiBuffer buffer)
     vkFreeMemory(vk.dev, bufferData.memory, nullptr);
 }
 
-auto RhiMapBuffer(RhiBuffer buffer, bool idempotent) -> void *
+auto RhiMapBuffer(RhiBuffer buffer, bool persistent) -> char *
 {
     VulkanBufferData &bufferData = HandleGetData(rhiHandles.buffers, buffer);
     if (!bufferData.mapped)
@@ -146,13 +146,13 @@ auto RhiMapBuffer(RhiBuffer buffer, bool idempotent) -> void *
     }
     else
     {
-        CHECK(idempotent);
+        CHECK(persistent);
     }
 
     return bufferData.mapped;
 }
 
-void RhiUnmapBuffer(RhiBuffer buffer, bool idempotent)
+void RhiUnmapBuffer(RhiBuffer buffer, bool persistent)
 {
     VulkanBufferData &bufferData = HandleGetData(rhiHandles.buffers, buffer);
     if (bufferData.mapped)
@@ -162,7 +162,7 @@ void RhiUnmapBuffer(RhiBuffer buffer, bool idempotent)
     }
     else
     {
-        CHECK(idempotent);
+        CHECK(persistent);
     }
 }
 
