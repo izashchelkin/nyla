@@ -618,7 +618,8 @@ static void MoveLocal(xcb_timestamp_t time, auto computeIdx)
     if (stack.activeWindow)
     {
         auto it = std::ranges::find(stack.windows, stack.activeWindow);
-        CHECK_NE(it, stack.windows.end());
+        if (it == stack.windows.end())
+            return;
 
         size_t iold = std::distance(stack.windows.begin(), it);
         size_t inew = computeIdx(iold + stack.windows.size()) % stack.windows.size();
