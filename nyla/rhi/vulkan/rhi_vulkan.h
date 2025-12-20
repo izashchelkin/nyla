@@ -7,6 +7,7 @@
 #include "nyla/commons/handle_pool.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_bind_groups.h"
+#include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_pipeline.h"
 #include "nyla/rhi/rhi_sampler.h"
@@ -79,6 +80,11 @@ struct VulkanBufferData
     VkBuffer buffer;
     VkDeviceMemory memory;
     char *mapped;
+    RhiBufferState state;
+    uint32_t dirtyBegin;
+    uint32_t dirtyEnd;
+    bool dirty;
+    bool hostCoherent;
 };
 
 struct VulkanCmdListData

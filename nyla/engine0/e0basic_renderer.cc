@@ -239,8 +239,7 @@ void E0BasicRendererDrawRect(RhiCmdList cmd, E0BasicRenderer *renderer, float x,
 {
     uint32_t frameIndex = RhiGetFrameIndex();
 
-    renderer->dymamicUniformBufferWritten =
-        AlignUp(renderer->dymamicUniformBufferWritten, RhiGetMinUniformBufferOffsetAlignment());
+    AlignUp(renderer->dymamicUniformBufferWritten, RhiGetMinUniformBufferOffsetAlignment());
     new (RhiMapBuffer(renderer->dynamicUniformBuffer[frameIndex]) + renderer->dymamicUniformBufferWritten) EntityUbo{
         .model = float4x4::Translate(float4{x, y, 0, 1}).Mult(float4x4::Scale(float4{width, height, 1, 1})),
         .color = color,

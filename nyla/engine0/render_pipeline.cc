@@ -180,7 +180,7 @@ static void RpBufCopy(RpBuf &buf, ByteView data)
     CHECK(!data.empty());
     CHECK_LE(buf.written + data.size(), buf.size);
 
-    void *dst = (char *)RhiMapBuffer(buf.buffer[RhiGetFrameIndex()], true) + buf.written;
+    void *dst = (char *)RhiMapBuffer(buf.buffer[RhiGetFrameIndex()]) + buf.written;
     memcpy(dst, data.data(), data.size());
     buf.written += data.size();
 }
@@ -234,7 +234,7 @@ void RpDraw(Rp &rp, RpMesh mesh, ByteView dynamicUniformData)
 
         if (rp.dynamicUniform.enabled)
         {
-            rp.dynamicUniform.written = AlignUp(rp.dynamicUniform.written, RhiGetMinUniformBufferOffsetAlignment());
+            rp.dynamicUniform.written = AlignedUp(rp.dynamicUniform.written, RhiGetMinUniformBufferOffsetAlignment());
 
             offsetCount = 1;
             offset = rp.dynamicUniform.written;

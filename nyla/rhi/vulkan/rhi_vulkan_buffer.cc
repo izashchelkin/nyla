@@ -1,6 +1,7 @@
 #include <cstdint>
 
 #include "nyla/rhi/rhi_buffer.h"
+#include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
 #include "vulkan/vulkan_core.h"
 
@@ -137,22 +138,18 @@ void RhiDestroyBuffer(RhiBuffer buffer)
     vkFreeMemory(vk.dev, bufferData.memory, nullptr);
 }
 
-auto RhiMapBuffer(RhiBuffer buffer, bool persistent) -> char *
+auto RhiMapBuffer(RhiBuffer buffer) -> char *
 {
     VulkanBufferData &bufferData = HandleGetData(rhiHandles.buffers, buffer);
     if (!bufferData.mapped)
     {
         vkMapMemory(vk.dev, bufferData.memory, 0, VK_WHOLE_SIZE, 0, (void **)&bufferData.mapped);
     }
-    else
-    {
-        CHECK(persistent);
-    }
 
     return bufferData.mapped;
 }
 
-void RhiUnmapBuffer(RhiBuffer buffer, bool persistent)
+void RhiUnmapBuffer(RhiBuffer buffer)
 {
     VulkanBufferData &bufferData = HandleGetData(rhiHandles.buffers, buffer);
     if (bufferData.mapped)
@@ -160,9 +157,175 @@ void RhiUnmapBuffer(RhiBuffer buffer, bool persistent)
         vkUnmapMemory(vk.dev, bufferData.memory);
         bufferData.mapped = nullptr;
     }
+}
+
+namespace
+{
+
+void EnsureHostWritesVisible(VkCommandBuffer cmdbuf, VulkanBufferData &bufferData)
+{
+    if (!bufferData.hostCoherent || !bufferData.dirty)
+        return;
+
+    const VkBufferMemoryBarrier2 barrier{
+        .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
+        .srcStageMask = VK_PIPELINE_STAGE_2_HOST_BIT,
+        .srcAccessMask = VK_ACCESS_2_HOST_WRITE_BIT,
+        .dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+        .dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT,
+        .buffer = bufferData.buffer,
+        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .offset = bufferData.dirtyBegin,
+        .size = bufferData.dirtyEnd - bufferData.dirtyBegin,
+    };
+
+    const VkDependencyInfo dependencyInfo{
+        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .bufferMemoryBarrierCount = 1,
+        .pBufferMemoryBarriers = &barrier,
+    };
+
+    vkCmdPipelineBarrier2(cmdbuf, &dependencyInfo);
+
+    bufferData.dirty = false;
+}
+
+} // namespace
+
+void RhiCmdCopyBuffer(RhiCmdList cmd, RhiBuffer dst, uint32_t dstOffset, RhiBuffer src, uint32_t srcOffset,
+                      uint32_t size)
+{
+    VkCommandBuffer cmdbuf = HandleGetData(rhiHandles.cmdLists, cmd).cmdbuf;
+
+    VulkanBufferData &dstBufferData = HandleGetData(rhiHandles.buffers, dst);
+    VulkanBufferData &srcBufferData = HandleGetData(rhiHandles.buffers, src);
+
+    EnsureHostWritesVisible(cmdbuf, srcBufferData);
+
+    const VkBufferCopy region{
+        .srcOffset = srcOffset,
+        .dstOffset = dstOffset,
+        .size = size,
+    };
+    vkCmdCopyBuffer(cmdbuf, srcBufferData.buffer, dstBufferData.buffer, 1, &region);
+}
+
+namespace
+{
+
+struct VulkanBufferStateSyncInfo
+{
+    VkPipelineStageFlags2 stage;
+    VkAccessFlags2 access;
+};
+
+auto VulkanBufferStateGetSyncInfo(RhiBufferState state) -> VulkanBufferStateSyncInfo
+{
+    switch (state)
+    {
+    case RhiBufferState::Undefined: {
+        return {.stage = VK_PIPELINE_STAGE_2_NONE, .access = VK_ACCESS_2_NONE};
+    }
+    case RhiBufferState::CopySrc: {
+        return {.stage = VK_PIPELINE_STAGE_2_COPY_BIT, .access = VK_ACCESS_2_TRANSFER_READ_BIT};
+    }
+    case RhiBufferState::CopyDst: {
+        return {.stage = VK_PIPELINE_STAGE_2_COPY_BIT, .access = VK_ACCESS_2_TRANSFER_WRITE_BIT};
+    }
+    case RhiBufferState::ShaderRead: {
+        return {.stage = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT |
+                         VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                .access = VK_ACCESS_2_UNIFORM_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_READ_BIT};
+    }
+    case RhiBufferState::ShaderWrite: {
+        return {.stage = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT |
+                         VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                .access = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT};
+    }
+    case RhiBufferState::Vertex: {
+        return {.stage = VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT, .access = VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT};
+    }
+    case RhiBufferState::Index: {
+        return {.stage = VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT, .access = VK_ACCESS_2_INDEX_READ_BIT};
+    }
+    case RhiBufferState::Indirect: {
+        return {.stage = VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT, .access = VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT};
+    }
+    }
+    CHECK(false);
+    return {};
+}
+
+} // namespace
+
+void RhiCmdTransitionBuffer(RhiCmdList cmd, RhiBuffer buffer, RhiBufferState newState)
+{
+    VkCommandBuffer cmdbuf = HandleGetData(rhiHandles.cmdLists, cmd).cmdbuf;
+    VulkanBufferData &bufferData = HandleGetData(rhiHandles.buffers, buffer);
+
+    VulkanBufferStateSyncInfo oldSync = VulkanBufferStateGetSyncInfo(bufferData.state);
+    VulkanBufferStateSyncInfo newSync = VulkanBufferStateGetSyncInfo(newState);
+
+    const VkBufferMemoryBarrier2 barrier{
+        .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
+        .srcStageMask = oldSync.stage,
+        .srcAccessMask = oldSync.access,
+        .dstStageMask = newSync.stage,
+        .dstAccessMask = newSync.access,
+        .buffer = bufferData.buffer,
+    };
+
+    const VkDependencyInfo dependencyInfo{
+        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .bufferMemoryBarrierCount = 1,
+        .pBufferMemoryBarriers = &barrier,
+    };
+
+    vkCmdPipelineBarrier2(cmdbuf, &dependencyInfo);
+}
+
+void RhiCmdUavBarrierBuffer(RhiCmdList cmd, RhiBuffer buffer)
+{
+    VkCommandBuffer cmdbuf = HandleGetData(rhiHandles.cmdLists, cmd).cmdbuf;
+    VulkanBufferData &bufferData = HandleGetData(rhiHandles.buffers, buffer);
+
+    const VkBufferMemoryBarrier2 barrier{
+        .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
+        .srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+        .srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT,
+        .dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+        .dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT,
+        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .buffer = bufferData.buffer,
+        .offset = 0,
+        .size = VK_WHOLE_SIZE,
+    };
+
+    const VkDependencyInfo dependencyInfo{
+        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .bufferMemoryBarrierCount = 1,
+        .pBufferMemoryBarriers = &barrier,
+    };
+
+    vkCmdPipelineBarrier2(cmdbuf, &dependencyInfo);
+}
+
+void RhiBufferMarkWritten(RhiBuffer buffer, uint32_t offset, uint32_t size)
+{
+    VulkanBufferData &bufferData = HandleGetData(rhiHandles.buffers, buffer);
+
+    if (bufferData.dirty)
+    {
+        bufferData.dirtyBegin = std::min(bufferData.dirtyBegin, offset);
+        bufferData.dirtyEnd = std::max(bufferData.dirtyBegin, offset + size);
+    }
     else
     {
-        CHECK(persistent);
+        bufferData.dirty = true;
+        bufferData.dirtyBegin = offset;
+        bufferData.dirtyEnd = offset + size;
     }
 }
 
