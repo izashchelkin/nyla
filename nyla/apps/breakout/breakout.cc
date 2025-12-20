@@ -10,10 +10,7 @@
 #include "nyla/apps/breakout/world_renderer.h"
 #include "nyla/commons/color.h"
 #include "nyla/commons/math/vec.h"
-#include "nyla/commons/memory/charview.h"
-#include "nyla/engine0/dbg_text_renderer.h"
-#include "nyla/engine0/e0basic_renderer.h"
-#include "nyla/engine0/render_pipeline.h"
+#include "nyla/engine0/renderer2d.h"
 #include "nyla/platform/abstract_input.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_cmdlist.h"
@@ -110,7 +107,7 @@ static auto IsInside(float pos, float size, float2 boundary) -> bool
     return false;
 }
 
-void BreakoutFrame(float dt, uint32_t fps)
+void BreakoutProcess(float dt)
 {
     const int dx = Pressed(kRight) - Pressed(kLeft);
 
@@ -177,36 +174,25 @@ void BreakoutFrame(float dt, uint32_t fps)
             }
         }
     }
+}
 
-    static auto *renderer = CreateE0BasicRenderer();
+void BreakoutRenderGame(RhiCmdList cmd, Renderer2D *renderer, const RhiTextureInfo &colorTargetInfo)
+{
+    Renderer2DPassBegin(cmd, renderer, colorTargetInfo.width, colorTargetInfo.height, 64);
 
-    RhiCmdList cmd = RhiFrameGetCmdList();
-    RhiTextureInfo backbufferInfo = RhiGetTextureInfo(RhiGetBackbufferTexture());
-
-    E0BasicRendererBegin(cmd, renderer, backbufferInfo.width, backbufferInfo.height, 64);
-
-    if (stage == GameStage::KGame)
+    for (Brick &brick : level.bricks)
     {
-        for (Brick &brick : level.bricks)
-        {
-            if (brick.dead)
-                continue;
+        if (brick.dead)
+            continue;
 
-            E0BasicRendererDrawRect(cmd, renderer, brick.x, brick.y, brick.width, brick.height,
-                                    float4{brick.color[0], brick.color[1], brick.color[2], 1.f});
-        }
-
-        E0BasicRendererDrawRect(cmd, renderer, playerPosX, kPlayerPosY, playerWidth, kPlayerHeight,
-                                float4{1.f, 1.f, 1.f, 1});
-
-        E0BasicRendererDrawRect(cmd, renderer, ballPos[0], ballPos[1], kBallRadius * 2, kBallRadius * 2,
-                                float4{1.f, 1.f, 1.f, 1});
+        Renderer2DDrawRect(cmd, renderer, brick.x, brick.y, brick.width, brick.height,
+                           float4{brick.color[0], brick.color[1], brick.color[2], 1.f});
     }
 
-    // RpBegin(dbgTextPipeline);
-    // {
-    //     DbgText(500, 10, std::format("fps={} ball=({:.1f}, {:.1f})", fps, ballPos[0], ballPos[1]));
-    // }
+    Renderer2DDrawRect(cmd, renderer, playerPosX, kPlayerPosY, playerWidth, kPlayerHeight, float4{1.f, 1.f, 1.f, 1});
+
+    Renderer2DDrawRect(cmd, renderer, ballPos[0], ballPos[1], kBallRadius * 2, kBallRadius * 2,
+                       float4{1.f, 1.f, 1.f, 1});
 }
 
 } // namespace nyla

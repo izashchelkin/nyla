@@ -21,15 +21,15 @@ auto CreateStagingBuffer(uint32_t size) -> StagingBuffer *
 
     stagingBuffer->buffer = RhiCreateBuffer(RhiBufferDesc{
         .size = size,
-        .bufferUsage = RhiBufferUsage::TransferSrc,
+        .bufferUsage = RhiBufferUsage::CopySrc,
         .memoryUsage = RhiMemoryUsage::CpuToGpu,
     });
 
     return stagingBuffer;
 }
 
-auto AcquireStagingBuffer(RhiCmdList cmd, StagingBuffer *stagingBuffer, RhiBuffer dst, uint32_t dstOffset,
-                          uint32_t size) -> char *
+auto E0AcquireUploadMemory(RhiCmdList cmd, StagingBuffer *stagingBuffer, RhiBuffer dst, uint32_t dstOffset,
+                           uint32_t size) -> char *
 {
     AlignUp(stagingBuffer->written, RhiGetOptimalBufferCopyOffsetAlignment());
 
@@ -43,7 +43,7 @@ auto AcquireStagingBuffer(RhiCmdList cmd, StagingBuffer *stagingBuffer, RhiBuffe
     return ret;
 }
 
-auto ResetStagingBuffer(StagingBuffer *stagingBuffer)
+void StagingBufferReset(StagingBuffer *stagingBuffer)
 {
     stagingBuffer->written = 0;
 }

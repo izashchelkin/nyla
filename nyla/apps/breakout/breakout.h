@@ -1,8 +1,8 @@
 #pragma once
 
-#include <cstdint>
-
+#include "nyla/engine0/renderer2d.h"
 #include "nyla/platform/abstract_input.h"
+#include "nyla/rhi/rhi_texture.h"
 
 namespace nyla
 {
@@ -14,6 +14,7 @@ NYLA_INPUT_MAPPING(X)
 #undef X
 
 void BreakoutInit();
-void BreakoutFrame(float dt, uint32_t fps);
+void BreakoutProcess(float dt);
+void BreakoutRenderGame(RhiCmdList cmd, Renderer2D *renderer, const RhiTextureInfo &colorTargetInfo);
 
 } // namespace nyla

@@ -53,9 +53,9 @@ auto Engine0ShouldExit() -> bool
     return PlatformShouldExit();
 }
 
-auto Engine0FrameBegin() -> void
+auto Engine0FrameBegin() -> RhiCmdList
 {
-    RhiFrameBegin();
+    RhiCmdList cmd = RhiFrameBegin();
 
     frameStart = GetMonotonicTimeMicros();
 
@@ -84,6 +84,8 @@ auto Engine0FrameBegin() -> void
     }
 
     PlatformProcessEvents();
+
+    return cmd;
 }
 
 auto Engine0GetDt() -> float

@@ -30,11 +30,11 @@ auto ConvertRhiBufferUsageIntoVkBufferUsageFlags(RhiBufferUsage usage) -> VkBuff
     {
         ret |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
     }
-    if (Any(usage & RhiBufferUsage::TransferSrc))
+    if (Any(usage & RhiBufferUsage::CopySrc))
     {
         ret |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
     }
-    if (Any(usage & RhiBufferUsage::TransferDst))
+    if (Any(usage & RhiBufferUsage::CopyDst))
     {
         ret |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
     }
@@ -179,7 +179,7 @@ void EnsureHostWritesVisible(VkCommandBuffer cmdbuf, VulkanBufferData &bufferDat
         return;
 
     const VkBufferMemoryBarrier2 barrier{
-        .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
+        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
         .srcStageMask = VK_PIPELINE_STAGE_2_HOST_BIT,
         .srcAccessMask = VK_ACCESS_2_HOST_WRITE_BIT,
         .dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
@@ -279,12 +279,13 @@ void RhiCmdTransitionBuffer(RhiCmdList cmd, RhiBuffer buffer, RhiBufferState new
     VulkanBufferStateSyncInfo newSync = VulkanBufferStateGetSyncInfo(newState);
 
     const VkBufferMemoryBarrier2 barrier{
-        .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
+        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
         .srcStageMask = oldSync.stage,
         .srcAccessMask = oldSync.access,
         .dstStageMask = newSync.stage,
         .dstAccessMask = newSync.access,
         .buffer = bufferData.buffer,
+        .size = RhiGetBufferSize(buffer),
     };
 
     const VkDependencyInfo dependencyInfo{

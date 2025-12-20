@@ -1,18 +1,13 @@
 #include "nyla/apps/breakout/breakout.h"
 #include "nyla/apps/breakout/world_renderer.h"
-#include "nyla/engine0/dbg_text_renderer.h"
-#include "nyla/engine0/e0basic_renderer.h"
+#include "nyla/engine0/renderer2d.h"
 #include "nyla/engine0/engine0.h"
-#include "nyla/engine0/gui.h"
-#include "nyla/engine0/render_pipeline.h"
-#include "nyla/engine0/staging.h"
+#include "nyla/engine0/staging_buffer.h"
 #include "nyla/platform/key_physical.h"
 #include "nyla/platform/platform.h"
-#include "nyla/rhi/rhi.h"
-#include "nyla/rhi/rhi_buffer.h"
+#include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_pass.h"
 #include "nyla/rhi/rhi_texture.h"
-#include <cstdint>
 
 namespace nyla
 {
@@ -51,16 +46,33 @@ static auto Main() -> int
 
     // RhiTexture offscreenTexture = offscreenTextures[RhiGetFrameIndex()];
 
+    StagingBuffer *stagingBuffer = CreateStagingBuffer(1 << 20);
+    Renderer2D *renderer = CreateRenderer2D();
+
     while (!Engine0ShouldExit())
     {
-        Engine0FrameBegin();
+        RhiCmdList cmd = Engine0FrameBegin();
+
+        const float dt = Engine0GetDt();
+        BreakoutProcess(dt);
+
+        StagingBufferReset(stagingBuffer);
+        Renderer2DFrameBegin(cmd, renderer, stagingBuffer);
+
+        RhiTexture colorTarget = RhiGetBackbufferTexture();
+        RhiTextureInfo colorTargetInfo = RhiGetTextureInfo(colorTarget);
 
         RhiPassBegin({
             .colorTarget = RhiGetBackbufferTexture(),
             .state = RhiTextureState::ColorTarget,
         });
 
-        BreakoutFrame(Engine0GetDt(), Engine0GetFps());
+        BreakoutRenderGame(cmd, renderer, colorTargetInfo);
+
+#if 0 
+        RpBegin(dbgTextPipeline);
+        DbgText(500, 10, std::format("fps={} ball=({:.1f}, {:.1f})", fps, ballPos[0], ballPos[1]));
+#endif
 
         RhiPassEnd({
             .colorTarget = RhiGetBackbufferTexture(),

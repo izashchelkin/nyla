@@ -14,8 +14,8 @@ enum class RhiBufferUsage : uint32_t
     Vertex = 1 << 0,
     Index = 1 << 1,
     Uniform = 1 << 2,
-    TransferSrc = 1 << 3,
-    TransferDst = 1 << 4,
+    CopySrc = 1 << 3,
+    CopyDst = 1 << 4,
 };
 
 template <> struct EnableBitMaskOps<RhiBufferUsage> : std::true_type

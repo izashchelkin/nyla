@@ -1,8 +1,9 @@
-#include "nyla/engine0/e0basic_renderer.h"
+#include "nyla/engine0/renderer2d.h"
 #include "nyla/commons/math/mat.h"
 #include "nyla/commons/math/vec.h"
 #include "nyla/commons/memory/align.h"
 #include "nyla/commons/os/readfile.h"
+#include "nyla/engine0/staging_buffer.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_bind_groups.h"
 #include "nyla/rhi/rhi_buffer.h"
@@ -52,7 +53,7 @@ struct Scene
 
 } // namespace
 
-struct E0BasicRenderer
+struct Renderer2D
 {
     RhiGraphicsPipeline pipeline;
     RhiBindGroupLayout bindGroupLayout;
@@ -62,9 +63,9 @@ struct E0BasicRenderer
     uint32_t dymamicUniformBufferWritten;
 };
 
-auto CreateE0BasicRenderer() -> E0BasicRenderer *
+auto CreateRenderer2D() -> Renderer2D *
 {
-    auto *renderer = new E0BasicRenderer{};
+    auto *renderer = new Renderer2D{};
 
     renderer->bindGroupLayout = RhiCreateBindGroupLayout(RhiBindGroupLayoutDesc{
         .bindingCount = 1,
@@ -131,8 +132,8 @@ auto CreateE0BasicRenderer() -> E0BasicRenderer *
     constexpr uint32_t kVertexBufferSize = 1 << 20;
     renderer->vertexBuffer = RhiCreateBuffer(RhiBufferDesc{
         .size = kVertexBufferSize,
-        .bufferUsage = RhiBufferUsage::Vertex,
-        .memoryUsage = RhiMemoryUsage::CpuToGpu,
+        .bufferUsage = RhiBufferUsage::Vertex | RhiBufferUsage::CopyDst,
+        .memoryUsage = RhiMemoryUsage::GpuOnly,
     });
 
     for (uint32_t i = 0; i < RhiGetNumFramesInFlight(); ++i)
@@ -165,43 +166,52 @@ auto CreateE0BasicRenderer() -> E0BasicRenderer *
         });
     }
 
-    //
-
-    char *vertexBufferMapped = RhiMapBuffer(renderer->vertexBuffer);
-
-    new (vertexBufferMapped) std::array<VSInput, 6>{
-        VSInput{
-            .pos = {-.5f, .5f, .0f, 1.f},
-            .color = {},
-        },
-        VSInput{
-            .pos = {.5f, -.5f, .0f, 1.f},
-            .color = {},
-        },
-        VSInput{
-            .pos = {.5f, .5f, .0f, 1.f},
-            .color = {},
-        },
-
-        VSInput{
-            .pos = {-.5f, .5f, .0f, 1.f},
-            .color = {},
-        },
-        VSInput{
-            .pos = {-.5f, -.5f, .0f, 1.f},
-            .color = {},
-        },
-        VSInput{
-            .pos = {.5f, -.5f, .0f, 1.f},
-            .color = {},
-        },
-    };
-
     return renderer;
 }
 
-void E0BasicRendererBegin(RhiCmdList cmd, E0BasicRenderer *renderer, uint32_t width, uint32_t height,
-                          float metersOnScreen)
+void Renderer2DFrameBegin(RhiCmdList cmd, Renderer2D *renderer, StagingBuffer *stagingBuffer)
+{
+    static bool uploadedVertices = false;
+    if (!uploadedVertices)
+    {
+        RhiCmdTransitionBuffer(cmd, renderer->vertexBuffer, RhiBufferState::CopyDst);
+
+        char *uploadMemory = E0AcquireUploadMemory(cmd, stagingBuffer, renderer->vertexBuffer, 0, 6 * sizeof(VSInput));
+        new (uploadMemory) std::array<VSInput, 6>{
+            VSInput{
+                .pos = {-.5f, .5f, .0f, 1.f},
+                .color = {},
+            },
+            VSInput{
+                .pos = {.5f, -.5f, .0f, 1.f},
+                .color = {},
+            },
+            VSInput{
+                .pos = {.5f, .5f, .0f, 1.f},
+                .color = {},
+            },
+
+            VSInput{
+                .pos = {-.5f, .5f, .0f, 1.f},
+                .color = {},
+            },
+            VSInput{
+                .pos = {-.5f, -.5f, .0f, 1.f},
+                .color = {},
+            },
+            VSInput{
+                .pos = {.5f, -.5f, .0f, 1.f},
+                .color = {},
+            },
+        };
+
+        RhiCmdTransitionBuffer(cmd, renderer->vertexBuffer, RhiBufferState::ShaderRead);
+
+        uploadedVertices = true;
+    }
+}
+
+void Renderer2DPassBegin(RhiCmdList cmd, Renderer2D *renderer, uint32_t width, uint32_t height, float metersOnScreen)
 {
     RhiCmdBindGraphicsPipeline(cmd, renderer->pipeline);
 
@@ -234,8 +244,7 @@ void E0BasicRendererBegin(RhiCmdList cmd, E0BasicRenderer *renderer, uint32_t wi
     renderer->dymamicUniformBufferWritten = 0;
 }
 
-void E0BasicRendererDrawRect(RhiCmdList cmd, E0BasicRenderer *renderer, float x, float y, float width, float height,
-                             float4 color)
+void Renderer2DDrawRect(RhiCmdList cmd, Renderer2D *renderer, float x, float y, float width, float height, float4 color)
 {
     uint32_t frameIndex = RhiGetFrameIndex();
 
