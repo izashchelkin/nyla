@@ -57,6 +57,8 @@ auto RhiCreateBuffer(const RhiBufferDesc &) -> RhiBuffer;
 void RhiNameBuffer(RhiBuffer, std::string_view name);
 void RhiDestroyBuffer(RhiBuffer);
 
+auto RhiGetBufferSize(RhiBuffer) -> uint32_t;
+
 auto RhiMapBuffer(RhiBuffer) -> char *;
 void RhiUnmapBuffer(RhiBuffer);
 void RhiBufferMarkWritten(RhiBuffer, uint32_t offset, uint32_t size);

@@ -42,5 +42,6 @@ void RhiInit(const RhiDesc &);
 auto RhiGetNumFramesInFlight() -> uint32_t;
 auto RhiGetFrameIndex() -> uint32_t;
 auto RhiGetMinUniformBufferOffsetAlignment() -> uint32_t;
+auto RhiGetOptimalBufferCopyOffsetAlignment() -> uint32_t;
 
 } // namespace nyla

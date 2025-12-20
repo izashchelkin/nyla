@@ -78,13 +78,15 @@ extern VulkanData vk;
 struct VulkanBufferData
 {
     VkBuffer buffer;
+    uint32_t size;
+    RhiMemoryUsage memoryUsage;
     VkDeviceMemory memory;
     char *mapped;
     RhiBufferState state;
+
     uint32_t dirtyBegin;
     uint32_t dirtyEnd;
     bool dirty;
-    bool hostCoherent;
 };
 
 struct VulkanCmdListData

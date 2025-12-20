@@ -482,6 +482,11 @@ auto RhiGetMinUniformBufferOffsetAlignment() -> uint32_t
     return vk.physDevProps.limits.minUniformBufferOffsetAlignment;
 }
 
+auto RhiGetOptimalBufferCopyOffsetAlignment() -> uint32_t
+{
+    return vk.physDevProps.limits.optimalBufferCopyOffsetAlignment;
+}
+
 } // namespace nyla
 
 #undef VK_CHECK

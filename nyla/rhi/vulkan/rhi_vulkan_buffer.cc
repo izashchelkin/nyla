@@ -1,5 +1,6 @@
 #include <cstdint>
 
+#include "nyla/commons/handle_pool.h"
 #include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
@@ -93,7 +94,10 @@ auto FindMemoryTypeIndex(VkMemoryRequirements memRequirements, VkMemoryPropertyF
 
 auto RhiCreateBuffer(const RhiBufferDesc &desc) -> RhiBuffer
 {
-    VulkanBufferData bufferData{};
+    VulkanBufferData bufferData{
+        .size = desc.size,
+        .memoryUsage = desc.memoryUsage,
+    };
 
     const VkBufferCreateInfo bufferCreateInfo{
         .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
@@ -138,6 +142,11 @@ void RhiDestroyBuffer(RhiBuffer buffer)
     vkFreeMemory(vk.dev, bufferData.memory, nullptr);
 }
 
+auto RhiGetBufferSize(RhiBuffer buffer) -> uint32_t
+{
+    return HandleGetData(rhiHandles.buffers, buffer).size;
+}
+
 auto RhiMapBuffer(RhiBuffer buffer) -> char *
 {
     VulkanBufferData &bufferData = HandleGetData(rhiHandles.buffers, buffer);
@@ -164,7 +173,9 @@ namespace
 
 void EnsureHostWritesVisible(VkCommandBuffer cmdbuf, VulkanBufferData &bufferData)
 {
-    if (!bufferData.hostCoherent || !bufferData.dirty)
+    if (bufferData.memoryUsage != RhiMemoryUsage::CpuToGpu)
+        return;
+    if (!bufferData.dirty)
         return;
 
     const VkBufferMemoryBarrier2 barrier{
@@ -283,6 +294,8 @@ void RhiCmdTransitionBuffer(RhiCmdList cmd, RhiBuffer buffer, RhiBufferState new
     };
 
     vkCmdPipelineBarrier2(cmdbuf, &dependencyInfo);
+
+    bufferData.state = newState;
 }
 
 void RhiCmdUavBarrierBuffer(RhiCmdList cmd, RhiBuffer buffer)
