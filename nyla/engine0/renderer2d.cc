@@ -73,7 +73,8 @@ auto CreateRenderer2D() -> Renderer2D *
             {
                 RhiBindingDesc{
                     .binding = 0,
-                    .type = RhiBindingType::UniformBufferDynamic,
+                    .type = RhiBindingType::UniformBuffer,
+                    .flags = RhiBindingFlags::Dynamic,
                     .arraySize = 1,
                     .stageFlags = RhiShaderStage::Vertex | RhiShaderStage::Fragment,
                 },
@@ -153,7 +154,6 @@ auto CreateRenderer2D() -> Renderer2D *
                     RhiBindGroupEntry{
                         .binding = 0,
                         .arrayIndex = 0,
-                        .type = RhiBindingType::UniformBufferDynamic,
                         .buffer =
                             RhiBufferBinding{
                                 .buffer = renderer->dynamicUniformBuffer[i],

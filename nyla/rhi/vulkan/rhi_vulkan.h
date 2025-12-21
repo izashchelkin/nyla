@@ -122,9 +122,15 @@ struct VulkanSamplerData
     VkSampler sampler;
 };
 
+struct VulkanBindGroupLayoutData
+{
+    VkDescriptorSetLayout layout;
+    RhiBindGroupLayoutDesc desc;
+};
+
 struct RhiHandles
 {
-    HandlePool<RhiBindGroupLayout, VkDescriptorSetLayout, 16> bindGroupLayouts;
+    HandlePool<RhiBindGroupLayout, VulkanBindGroupLayoutData, 16> bindGroupLayouts;
     HandlePool<RhiBindGroup, VkDescriptorSet, 16> bindGroups;
     HandlePool<RhiBuffer, VulkanBufferData, 16> buffers;
     HandlePool<RhiCmdList, VulkanCmdListData, 16> cmdLists;

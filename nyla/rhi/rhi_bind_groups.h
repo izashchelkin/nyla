@@ -22,10 +22,16 @@ struct RhiBindGroupLayout : Handle
 enum class RhiBindingType
 {
     UniformBuffer,
-    UniformBufferDynamic,
+    StorageBuffer,
     Texture,
     Sampler,
 };
+
+enum class RhiBindingFlags
+{
+    Dynamic = 1 << 0,
+};
+NYLA_BITENUM(RhiBindingFlags)
 
 struct RhiBufferBinding
 {
@@ -49,8 +55,6 @@ struct RhiBindGroupEntry
 {
     uint32_t binding;
     uint32_t arrayIndex;
-
-    RhiBindingType type;
     union {
         RhiBufferBinding buffer;
         RhiSamplerBinding sampler;
@@ -69,6 +73,7 @@ struct RhiBindingDesc
 {
     uint32_t binding;
     RhiBindingType type;
+    RhiBindingFlags flags;
     uint32_t arraySize;
     RhiShaderStage stageFlags;
 };
@@ -76,7 +81,7 @@ struct RhiBindingDesc
 struct RhiBindGroupLayoutDesc
 {
     uint32_t bindingCount;
-    std::array<RhiBindingDesc, 16> bindings;
+    std::array<RhiBindingDesc, 4> bindings;
 };
 
 auto RhiCreateBindGroupLayout(const RhiBindGroupLayoutDesc &) -> RhiBindGroupLayout;

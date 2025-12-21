@@ -11,6 +11,7 @@
 #include "nyla/commons/memory/charview.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
+#include "nyla/rhi/rhi_bind_groups.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_pipeline.h"
 #include "nyla/rhi/rhi_texture.h"
@@ -68,10 +69,11 @@ void RpInit(Rp &rp)
 
         auto initBuffer = [&bindGroupLayoutDesc, &bindGroupDesc](RpBuf &buf, RhiBufferUsage bufferUsage,
                                                                  RhiMemoryUsage memoryUsage, RhiBindingType bindingType,
-                                                                 uint32_t binding, uint32_t i) -> void {
+                                                                 uint32_t binding, uint32_t i, bool dynamic) -> void {
             bindGroupLayoutDesc.bindings[i] = {
                 .binding = binding,
                 .type = bindingType,
+                .flags = dynamic ? RhiBindingFlags::Dynamic : static_cast<RhiBindingFlags>(0),
                 .arraySize = 1,
                 .stageFlags = RpBufStageFlags(buf),
             };
@@ -87,12 +89,11 @@ void RpInit(Rp &rp)
                 bindGroupDesc[iframe].entries[i] = RhiBindGroupEntry{
                     .binding = binding,
                     .arrayIndex = 0,
-                    .type = bindingType,
                     .buffer =
                         {
                             .buffer = buf.buffer[iframe],
-                            .offset = 0,
                             .size = buf.size,
+                            .offset = 0,
                             .range = buf.range,
                         },
                 };
@@ -103,12 +104,12 @@ void RpInit(Rp &rp)
         if (rp.staticUniform.enabled)
         {
             initBuffer(rp.staticUniform, RhiBufferUsage::Uniform, RhiMemoryUsage::CpuToGpu,
-                       RhiBindingType::UniformBuffer, 0, i++);
+                       RhiBindingType::UniformBuffer, 0, i++, false);
         }
         if (rp.dynamicUniform.enabled)
         {
             initBuffer(rp.dynamicUniform, RhiBufferUsage::Uniform, RhiMemoryUsage::CpuToGpu,
-                       RhiBindingType::UniformBufferDynamic, 1, i++);
+                       RhiBindingType::UniformBuffer, 1, i++, true);
         }
 
         rp.bindGroupLayout = RhiCreateBindGroupLayout(bindGroupLayoutDesc);

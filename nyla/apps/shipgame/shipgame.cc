@@ -10,7 +10,7 @@
 #include "nyla/commons/math/lerp.h"
 #include "nyla/commons/math/vec.h"
 #include "nyla/commons/os/clock.h"
-#include "nyla/engine0/dbg_text_renderer.h"
+#include "nyla/engine0/debug_text_renderer.h"
 #include "nyla/platform/abstract_input.h"
 
 namespace nyla

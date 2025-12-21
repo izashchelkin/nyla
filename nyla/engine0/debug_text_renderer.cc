@@ -1,8 +1,7 @@
-#include "nyla/engine0/dbg_text_renderer.h"
+#include "nyla/engine0/debug_text_renderer.h"
 
 #include <cstdint>
 
-#include "absl/log/log.h"
 #include "nyla/commons/memory/charview.h"
 #include "nyla/engine0/render_pipeline.h"
 
@@ -19,11 +18,21 @@ struct DbgTextLine
     int32_t originY;
     uint32_t wordCount;
     uint32_t pad;
-    float fg[4];
-    float bg[4];
+    std::array<float, 4> fg;
+    std::array<float, 4> bg;
 };
 
 } // namespace
+
+struct DebugTextRenderer
+{
+    RhiGraphicsPipeline pipeline;
+    RhiBindGroupLayout bindGroupLayout;
+    RhiBuffer vertexBuffer;
+    std::array<RhiBindGroup, kRhiMaxNumFramesInFlight> bindGroup;
+    std::array<RhiBuffer, kRhiMaxNumFramesInFlight> dynamicUniformBuffer;
+    uint32_t dymamicUniformBufferWritten;
+};
 
 void DbgText(int32_t x, int32_t y, std::string_view text)
 {
@@ -63,8 +72,8 @@ Rp dbgTextPipeline{
             .range = sizeof(DbgTextLine),
         },
     .init = [](Rp &rp) -> void {
-        RpAttachVertShader(rp, "/home/izashchelkin/nyla/nyla/engine0/shaders/build/dbgtext.vs.hlsl.spv");
-        RpAttachFragShader(rp, "/home/izashchelkin/nyla/nyla/engine0/shaders/build/dbgtext.ps.hlsl.spv");
+        RpAttachVertShader(rp, "/home/izashchelkin/nyla/nyla/shaders/build/dbgtext.vs.hlsl.spv");
+        RpAttachFragShader(rp, "/home/izashchelkin/nyla/nyla/shaders/build/dbgtext.ps.hlsl.spv");
     },
 };
 

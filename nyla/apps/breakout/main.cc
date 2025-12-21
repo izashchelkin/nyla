@@ -46,7 +46,7 @@ static auto Main() -> int
 
     // RhiTexture offscreenTexture = offscreenTextures[RhiGetFrameIndex()];
 
-    StagingBuffer *stagingBuffer = CreateStagingBuffer(1 << 20);
+    StagingBuffer *stagingBuffer = CreateStagingBuffer(1 << 10);
     Renderer2D *renderer = CreateRenderer2D();
 
     while (!Engine0ShouldExit())
