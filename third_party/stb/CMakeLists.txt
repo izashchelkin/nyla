@@ -1,5 +1,3 @@
-add_subdirectory(stb)
-
 set(TARGET stb_image)
 add_library(${TARGET})
 
