@@ -1,5 +1,7 @@
 #include "nyla/apps/breakout/breakout.h"
 #include "nyla/apps/breakout/world_renderer.h"
+#include "nyla/commons/logging/init.h"
+#include "nyla/commons/signal/signal.h"
 #include "nyla/engine0/debug_text_renderer.h"
 #include "nyla/engine0/engine0.h"
 #include "nyla/engine0/renderer2d.h"
@@ -15,7 +17,16 @@ namespace nyla
 
 static auto Main() -> int
 {
-    Engine0Init(false);
+    LoggingInit();
+    SigIntCoreDump();
+
+    PlatformInit({
+        .keyboardInput = true,
+        .mouseInput = false,
+    });
+    PlatformWindow window = PlatformCreateWindow();
+
+    Engine0Init({.window = window});
 
     PlatformMapInputBegin();
     PlatformMapInput(kLeft, KeyPhysical::S);
@@ -47,7 +58,7 @@ static auto Main() -> int
 
     // RhiTexture offscreenTexture = offscreenTextures[RhiGetFrameIndex()];
 
-    StagingBuffer *stagingBuffer = CreateStagingBuffer(1 << 10);
+    StagingBuffer *stagingBuffer = CreateStagingBuffer(192);
     Renderer2D *renderer2d = CreateRenderer2D();
     DebugTextRenderer *debugTextRenderer = CreateDebugTextRenderer();
 
@@ -72,6 +83,8 @@ static auto Main() -> int
         });
 
         BreakoutRenderGame(cmd, renderer2d, colorTargetInfo);
+
+        Renderer2DDraw(cmd, renderer2d, colorTargetInfo.width, colorTargetInfo.height, 64);
         DebugTextRendererDraw(cmd, debugTextRenderer);
 
         RhiPassEnd({

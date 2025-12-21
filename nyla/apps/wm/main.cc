@@ -10,8 +10,6 @@
 #include "absl/log/check.h"
 #include "absl/log/log.h"
 #include "nyla/apps/wm/window_manager.h"
-#include "nyla/apps/wm/wm_background.h"
-#include "nyla/commons/future.h"
 #include "nyla/commons/logging/init.h"
 #include "nyla/commons/os/spawn.h"
 #include "nyla/commons/os/timerfd.h"
@@ -36,7 +34,7 @@ auto Main(int argc, char **argv) -> int
 
     bool isRunning = true;
 
-    X11Initialize();
+    X11Initialize(true, true);
 
     xcb_grab_server(x11.conn);
 
@@ -131,6 +129,7 @@ auto Main(int argc, char **argv) -> int
 
     //
 
+#if 0
     {
         std::future<void> fut = InitWMBackground();
         while (!IsFutureReady(fut) && isRunning && !xcb_connection_has_error(x11.conn))
@@ -148,6 +147,7 @@ auto Main(int argc, char **argv) -> int
             }
         }
     }
+#endif
 
     {
         while (isRunning && !xcb_connection_has_error(x11.conn))
@@ -181,6 +181,7 @@ auto Main(int argc, char **argv) -> int
             if (wmBackgroundDirty)
             {
                 UpdateBackground();
+                wmBackgroundDirty = false;
             }
 
             DBusProcess();

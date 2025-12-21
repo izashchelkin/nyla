@@ -1,12 +1,21 @@
 #pragma once
 
+#include "nyla/platform/platform.h"
+#include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include <cstdint>
 
 namespace nyla
 {
 
-auto Engine0Init(bool vsync) -> void;
+struct Engine0Desc
+{
+    uint32_t maxFps;
+    PlatformWindow window;
+    bool vsync;
+};
+
+auto Engine0Init(Engine0Desc) -> void;
 auto Engine0ShouldExit() -> bool;
 auto Engine0FrameBegin() -> RhiCmdList;
 auto Engine0GetDt() -> float;

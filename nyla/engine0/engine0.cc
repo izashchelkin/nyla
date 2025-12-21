@@ -1,8 +1,6 @@
 #include "nyla/engine0/engine0.h"
-#include "absl/log/log.h"
-#include "nyla/commons/logging/init.h"
+#include "nyla/commons/bitenum.h"
 #include "nyla/commons/os/clock.h"
-#include "nyla/commons/signal/signal.h"
 #include "nyla/engine0/frame_arena.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
@@ -22,30 +20,29 @@ namespace
 uint32_t maxFps = 144;
 uint32_t fps = 0;
 float dt = 0;
-auto targetFrameDurationUs = static_cast<uint64_t>(1'000'000.0 / maxFps);
+uint64_t targetFrameDurationUs;
 
 uint64_t frameStart = 0;
 
 } // namespace
 
-auto Engine0Init(bool vsync) -> void
+auto Engine0Init(Engine0Desc desc) -> void
 {
-    LoggingInit();
-    FrameArenaInit();
+    if (desc.maxFps > 0)
+        maxFps = desc.maxFps;
 
-    SigIntCoreDump();
-
-    PlatformInit();
-    PlatformWindow window = PlatformCreateWindow();
+    targetFrameDurationUs = static_cast<uint64_t>(1'000'000.0 / maxFps);
 
     RhiFlags flags = None<RhiFlags>();
-    if (vsync)
+    if (desc.vsync)
         flags |= RhiFlags::VSync;
 
     RhiInit(RhiDesc{
         .flags = flags,
-        .window = window,
+        .window = desc.window,
     });
+
+    FrameArenaInit();
 }
 
 auto Engine0ShouldExit() -> bool

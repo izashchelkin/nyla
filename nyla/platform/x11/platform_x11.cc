@@ -53,9 +53,9 @@ bool shouldExit = false;
 
 }
 
-void PlatformInit()
+void PlatformInit(PlatformInitDesc desc)
 {
-    X11Initialize();
+    X11Initialize(desc.keyboardInput, desc.mouseInput);
 }
 
 static X11KeyResolver keyResolver;
@@ -134,7 +134,7 @@ auto PlatformFsGetFileChanges() -> std::span<PlatformFileChanged>
     return fileChanges;
 }
 
-void PlatformProcessEvents()
+PlatformProcessEventsResult PlatformProcessEvents()
 {
     AbstractInputProcessFrame();
 
@@ -168,6 +168,8 @@ void PlatformProcessEvents()
             }
         }
     }
+
+    PlatformProcessEventsResult ret{};
 
     for (;;)
     {
@@ -212,6 +214,11 @@ void PlatformProcessEvents()
             break;
         }
 
+        case XCB_EXPOSE: {
+            ret.shouldRedraw = true;
+            break;
+        }
+
         case XCB_CLIENT_MESSAGE: {
             auto clientmessage = reinterpret_cast<xcb_client_message_event_t *>(event);
 
@@ -224,6 +231,8 @@ void PlatformProcessEvents()
         }
         }
     }
+
+    return ret;
 }
 
 auto PlatformShouldExit() -> bool
@@ -404,7 +413,7 @@ auto ConvertKeyPhysicalIntoXkbName(KeyPhysical key) -> const char *
 
 X11State x11;
 
-void X11Initialize()
+void X11Initialize(bool keyboardInput, bool mouseInput)
 {
     int iscreen;
     x11.conn = xcb_connect(nullptr, &iscreen);
@@ -420,6 +429,7 @@ void X11Initialize()
     Nyla_X11_Atoms(X)
 #undef X
 
+    if (keyboardInput)
     {
         uint16_t majorXkbVersionOut, minorXkbVersionOut;
         uint8_t baseEventOut, baseErrorOut;
@@ -450,6 +460,7 @@ void X11Initialize()
         }
     }
 
+    if (mouseInput)
     {
         x11.extXi2 = xcb_get_extension_data(x11.conn, &xcb_input_id);
         if (!x11.extXi2 || !x11.extXi2->present)

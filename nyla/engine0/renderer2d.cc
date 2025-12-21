@@ -1,4 +1,5 @@
 #include "nyla/engine0/renderer2d.h"
+#include "nyla/commons/containers/inline_vec.h"
 #include "nyla/commons/math/mat.h"
 #include "nyla/commons/math/vec.h"
 #include "nyla/commons/memory/align.h"
@@ -50,6 +51,8 @@ struct Renderer2D
     std::array<RhiBindGroup, kRhiMaxNumFramesInFlight> bindGroup;
     std::array<RhiBuffer, kRhiMaxNumFramesInFlight> dynamicUniformBuffer;
     uint32_t dymamicUniformBufferWritten;
+
+    InlineVec<uint32_t, 256> pendingDraws;
 };
 
 auto CreateRenderer2D() -> Renderer2D *
@@ -200,7 +203,23 @@ void Renderer2DFrameBegin(RhiCmdList cmd, Renderer2D *renderer, StagingBuffer *s
     }
 }
 
-void Renderer2DPassBegin(RhiCmdList cmd, Renderer2D *renderer, uint32_t width, uint32_t height, float metersOnScreen)
+void Renderer2DRect(RhiCmdList cmd, Renderer2D *renderer, float x, float y, float width, float height, float4 color)
+{
+    const uint32_t frameIndex = RhiGetFrameIndex();
+
+    AlignUp(renderer->dymamicUniformBufferWritten, RhiGetMinUniformBufferOffsetAlignment());
+    new (RhiMapBuffer(renderer->dynamicUniformBuffer[frameIndex]) + renderer->dymamicUniformBufferWritten) EntityUbo{
+        .model = float4x4::Translate(float4{x, y, 0, 1}).Mult(float4x4::Scale(float4{width, height, 1, 1})),
+        .color = color,
+    };
+
+    uint32_t offset = renderer->dymamicUniformBufferWritten;
+    renderer->dymamicUniformBufferWritten += sizeof(EntityUbo);
+
+    renderer->pendingDraws.emplace_back(offset);
+}
+
+void Renderer2DDraw(RhiCmdList cmd, Renderer2D *renderer, uint32_t width, uint32_t height, float metersOnScreen)
 {
     RhiCmdBindGraphicsPipeline(cmd, renderer->pipeline);
 
@@ -231,23 +250,15 @@ void Renderer2DPassBegin(RhiCmdList cmd, Renderer2D *renderer, uint32_t width, u
     RhiCmdBindVertexBuffers(cmd, 0, buffers, offsets);
 
     renderer->dymamicUniformBufferWritten = 0;
-}
 
-void Renderer2DDrawRect(RhiCmdList cmd, Renderer2D *renderer, float x, float y, float width, float height, float4 color)
-{
     const uint32_t frameIndex = RhiGetFrameIndex();
 
-    AlignUp(renderer->dymamicUniformBufferWritten, RhiGetMinUniformBufferOffsetAlignment());
-    new (RhiMapBuffer(renderer->dynamicUniformBuffer[frameIndex]) + renderer->dymamicUniformBufferWritten) EntityUbo{
-        .model = float4x4::Translate(float4{x, y, 0, 1}).Mult(float4x4::Scale(float4{width, height, 1, 1})),
-        .color = color,
-    };
-
-    uint32_t offset = renderer->dymamicUniformBufferWritten;
-    renderer->dymamicUniformBufferWritten += sizeof(EntityUbo);
-
-    RhiCmdBindGraphicsBindGroup(cmd, 0, renderer->bindGroup[frameIndex], {&offset, 1});
-    RhiCmdDraw(cmd, 6, 1, 0, 0);
+    for (uint32_t offset : renderer->pendingDraws)
+    {
+        RhiCmdBindGraphicsBindGroup(cmd, 0, renderer->bindGroup[frameIndex], {&offset, 1});
+        RhiCmdDraw(cmd, 6, 1, 0, 0);
+    }
+    renderer->pendingDraws.clear();
 }
 
 } // namespace nyla

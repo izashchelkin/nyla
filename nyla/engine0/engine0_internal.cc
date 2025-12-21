@@ -17,7 +17,7 @@ Engine0Handles e0Handles;
 
 auto GetShader(const char *name, RhiShaderStage stage) -> RhiShader
 {
-    const std::string path = std::format("nyla/shaders/build/{}.hlsl.spv", name);
+    const std::string path = std::format("/home/izashchelkin/nyla/nyla/shaders/build/{}.hlsl.spv", name);
     PlatformFsWatchFile(path);
 
     const std::vector<std::byte> code = ReadFile(path);

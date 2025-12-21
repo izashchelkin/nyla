@@ -178,21 +178,17 @@ void BreakoutProcess(float dt)
 
 void BreakoutRenderGame(RhiCmdList cmd, Renderer2D *renderer, const RhiTextureInfo &colorTargetInfo)
 {
-    Renderer2DPassBegin(cmd, renderer, colorTargetInfo.width, colorTargetInfo.height, 64);
-
     for (Brick &brick : level.bricks)
     {
         if (brick.dead)
             continue;
 
-        Renderer2DDrawRect(cmd, renderer, brick.x, brick.y, brick.width, brick.height,
-                           float4{brick.color[0], brick.color[1], brick.color[2], 1.f});
+        Renderer2DRect(cmd, renderer, brick.x, brick.y, brick.width, brick.height,
+                       float4{brick.color[0], brick.color[1], brick.color[2], 1.f});
     }
 
-    Renderer2DDrawRect(cmd, renderer, playerPosX, kPlayerPosY, playerWidth, kPlayerHeight, float4{1.f, 1.f, 1.f, 1});
-
-    Renderer2DDrawRect(cmd, renderer, ballPos[0], ballPos[1], kBallRadius * 2, kBallRadius * 2,
-                       float4{1.f, 1.f, 1.f, 1});
+    Renderer2DRect(cmd, renderer, playerPosX, kPlayerPosY, playerWidth, kPlayerHeight, float4{1.f, 1.f, 1.f, 1});
+    Renderer2DRect(cmd, renderer, ballPos[0], ballPos[1], kBallRadius * 2, kBallRadius * 2, float4{1.f, 1.f, 1.f, 1});
 }
 
 } // namespace nyla

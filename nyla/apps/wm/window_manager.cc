@@ -4,10 +4,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <ctime>
-#include <future>
 #include <iterator>
 #include <limits>
-#include <memory>
 #include <span>
 #include <vector>
 
@@ -19,9 +17,7 @@
 #include "nyla/apps/wm/layout.h"
 #include "nyla/apps/wm/palette.h"
 #include "nyla/apps/wm/screen_saver_inhibitor.h"
-#include "nyla/apps/wm/wm_background.h"
 #include "nyla/commons/containers/map.h"
-#include "nyla/commons/future.h"
 #include "nyla/debugfs/debugfs.h"
 #include "nyla/platform/x11/platform_x11.h"
 #include "nyla/platform/x11/platform_x11_error.h"
@@ -1020,11 +1016,11 @@ void ProcessWMEvents(const bool &isRunning, uint16_t modifier, std::vector<Keybi
             break;
         }
         case XCB_EXPOSE: {
+#if 0
             auto expose = reinterpret_cast<xcb_expose_event_t *>(event);
             if (expose->window == backgroundWindow)
-            {
                 wmBackgroundDirty = true;
-            }
+#endif
             break;
         }
 
@@ -1066,6 +1062,7 @@ void ProcessWMEvents(const bool &isRunning, uint16_t modifier, std::vector<Keybi
 
 void UpdateBackground()
 {
+#if 0
     const WindowStack &stack = GetActiveStack();
 
     std::string activeClientName;
@@ -1101,6 +1098,7 @@ void UpdateBackground()
             DrawBackground(wmClientSize, barText);
         });
     }
+#endif
 }
 
 static auto DumpClients() -> std::string
