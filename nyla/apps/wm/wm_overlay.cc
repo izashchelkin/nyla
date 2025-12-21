@@ -1,4 +1,5 @@
 #include "nyla/apps/wm/wm_overlay.h"
+#include "absl/log/log.h"
 #include "nyla/commons/logging/init.h"
 #include "nyla/commons/os/clock.h"
 #include "nyla/commons/signal/signal.h"
@@ -18,6 +19,7 @@
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_pass.h"
 #include "nyla/rhi/rhi_texture.h"
+#include "xcb/xcb.h"
 #include "xcb/xproto.h"
 
 #include "nyla/apps/breakout/world_renderer.h"
@@ -73,12 +75,20 @@ auto Main() -> int
                     break;
                 }
 
-                using namespace std::chrono_literals;
-                std::this_thread::sleep_for(10us);
+                std::array<pollfd, 1> fds{pollfd{
+                    .fd = xcb_get_file_descriptor(x11.conn),
+                    .events = POLLIN,
+                }};
 
-                auto ret = PlatformProcessEvents();
-                if (ret.shouldRedraw)
-                    break;
+                int pollRes = poll(fds.data(), fds.size(), std::max(1, static_cast<int>(diff / 1000)));
+                LOG(INFO) << pollRes;
+                if (pollRes > 0)
+                {
+                    auto ret = PlatformProcessEvents();
+                    if (ret.shouldRedraw)
+                        break;
+                }
+                continue;
             }
         }
 

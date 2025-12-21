@@ -425,9 +425,11 @@ void X11Initialize(bool keyboardInput, bool mouseInput)
     x11.screen = xcb_aux_get_screen(x11.conn, iscreen);
     CHECK(x11.screen);
 
+    {
 #define X(atom) x11.atoms.atom = X11InternAtom(x11.conn, absl::AsciiStrToUpper(#atom));
-    Nyla_X11_Atoms(X)
+        Nyla_X11_Atoms(X)
 #undef X
+    }
 
     if (keyboardInput)
     {
