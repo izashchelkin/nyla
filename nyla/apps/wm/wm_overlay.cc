@@ -92,10 +92,7 @@ auto Main() -> int
             }
         }
 
-        static uint32_t drawCount = 0;
-        DebugText(1, 1,
-                  std::format("{} {}", drawCount++,
-                              absl::FormatTime("%H:%M:%S %d.%m.%Y", absl::Now(), absl::LocalTimeZone())));
+        DebugText(1, 1, std::format("{}", absl::FormatTime("%H:%M:%S %d.%m.%Y", absl::Now(), absl::LocalTimeZone())));
 
         RhiPassBegin({
             .colorTarget = RhiGetBackbufferTexture(),
