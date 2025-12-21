@@ -31,7 +31,7 @@ static auto Main() -> int
         UiText("Hello world");
 
         RpBegin(dbgTextPipeline);
-        DbgText(10, 10, "fps= " + std::to_string(Engine0GetFps()));
+        DebugText(10, 10, "fps= " + std::to_string(Engine0GetFps()));
 
         Engine0FrameEnd();
     }

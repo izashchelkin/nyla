@@ -212,7 +212,7 @@ void RpPushConst(Rp &rp, ByteView data)
     CHECK_LE(data.size(), kRhiMaxPushConstantSize);
 
     RhiCmdList cmd = RhiFrameGetCmdList();
-    RhiCmdPushGraphicsConstants(cmd, 0, RhiShaderStage::Vertex | RhiShaderStage::Fragment, data);
+    RhiCmdPushGraphicsConstants(cmd, 0, RhiShaderStage::Vertex | RhiShaderStage::Pixel, data);
 }
 
 void RpDraw(Rp &rp, RpMesh mesh, ByteView dynamicUniformData)

@@ -41,7 +41,7 @@ void DrawBackground(uint32_t numClients, std::string_view barText)
     UiFrameBegin();
 
     RpBegin(dbgTextPipeline);
-    DbgText(1, 1, barText);
+    DebugText(1, 1, barText);
 
     RpBegin(guiPipeline);
 

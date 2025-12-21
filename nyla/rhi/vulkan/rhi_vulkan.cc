@@ -49,7 +49,7 @@ auto ConvertRhiShaderStageIntoVkShaderStageFlags(RhiShaderStage stageFlags) -> V
     {
         ret |= VK_SHADER_STAGE_VERTEX_BIT;
     }
-    if (Any(stageFlags & RhiShaderStage::Fragment))
+    if (Any(stageFlags & RhiShaderStage::Pixel))
     {
         ret |= VK_SHADER_STAGE_FRAGMENT_BIT;
     }

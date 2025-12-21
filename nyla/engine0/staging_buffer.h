@@ -11,7 +11,7 @@ struct StagingBuffer;
 
 auto CreateStagingBuffer(uint32_t size) -> StagingBuffer *;
 auto E0AcquireUploadMemory(RhiCmdList cmd, StagingBuffer *stagingBuffer, RhiBuffer dst, uint32_t dstOffset,
-                          uint32_t size) -> char *;
+                           uint32_t size) -> char *;
 void StagingBufferReset(StagingBuffer *stagingBuffer);
 
 } // namespace nyla

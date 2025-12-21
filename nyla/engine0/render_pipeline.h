@@ -27,7 +27,7 @@ inline auto RpBufStageFlags(const RpBuf &buf) -> RhiShaderStage
     if (Any(buf.stageFlags))
         return buf.stageFlags;
     else
-        return RhiShaderStage::Vertex | RhiShaderStage::Fragment;
+        return RhiShaderStage::Vertex | RhiShaderStage::Pixel;
 }
 
 struct Rp

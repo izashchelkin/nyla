@@ -1,12 +1,16 @@
 #pragma once
 
-#include "nyla/engine0/render_pipeline.h"
+#include "nyla/rhi/rhi_cmdlist.h"
+#include <cstdint>
+#include <string_view>
 
 namespace nyla
 {
 
-extern Rp dbgTextPipeline;
+struct DebugTextRenderer;
 
-void DbgText(int32_t x, int32_t y, std::string_view text);
+auto CreateDebugTextRenderer() -> DebugTextRenderer *;
+void DebugText(int32_t x, int32_t y, std::string_view text);
+void DebugTextRendererDraw(RhiCmdList cmd, DebugTextRenderer *renderer);
 
 } // namespace nyla

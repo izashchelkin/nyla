@@ -2,7 +2,7 @@
 #include "nyla/commons/math/mat.h"
 #include "nyla/commons/math/vec.h"
 #include "nyla/commons/memory/align.h"
-#include "nyla/commons/os/readfile.h"
+#include "nyla/engine0/engine0_internal.h"
 #include "nyla/engine0/staging_buffer.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_bind_groups.h"
@@ -11,27 +11,16 @@
 #include "nyla/rhi/rhi_pipeline.h"
 #include "nyla/rhi/rhi_shader.h"
 #include <cstdint>
-#include <format>
 #include <sys/types.h>
 #include <unistd.h>
 
 namespace nyla
 {
 
+using namespace engine0_internal;
+
 namespace
 {
-
-auto CreateShader(std::string_view name) -> RhiShader
-{
-    const std::string path = std::format("nyla/shaders/build/{}.hlsl.spv", name);
-    const std::vector<std::byte> code = ReadFile(path);
-    const auto spirv = std::span{reinterpret_cast<const uint32_t *>(code.data()), code.size() / 4};
-
-    RhiShader shader = RhiCreateShader(RhiShaderDesc{
-        .spirv = spirv,
-    });
-    return shader;
-}
 
 struct VSInput
 {
@@ -65,6 +54,9 @@ struct Renderer2D
 
 auto CreateRenderer2D() -> Renderer2D *
 {
+    const RhiShader vs = GetShader("renderer2d.vs", RhiShaderStage::Vertex);
+    const RhiShader ps = GetShader("renderer2d.ps", RhiShaderStage::Pixel);
+
     auto *renderer = new Renderer2D{};
 
     renderer->bindGroupLayout = RhiCreateBindGroupLayout(RhiBindGroupLayoutDesc{
@@ -76,16 +68,13 @@ auto CreateRenderer2D() -> Renderer2D *
                     .type = RhiBindingType::UniformBuffer,
                     .flags = RhiBindingFlags::Dynamic,
                     .arraySize = 1,
-                    .stageFlags = RhiShaderStage::Vertex | RhiShaderStage::Fragment,
+                    .stageFlags = RhiShaderStage::Vertex | RhiShaderStage::Pixel,
                 },
             },
     });
 
-    const RhiShader vs = CreateShader("e0basic.vs");
-    const RhiShader ps = CreateShader("e0basic.ps");
-
     const RhiGraphicsPipelineDesc pipelineDesc{
-        .debugName = "E0Basic",
+        .debugName = "Renderer2D",
         .vs = vs,
         .ps = ps,
         .bindGroupLayoutsCount = 1,
@@ -234,7 +223,7 @@ void Renderer2DPassBegin(RhiCmdList cmd, Renderer2D *renderer, uint32_t width, u
         .invVp = invVp,
     };
 
-    RhiCmdPushGraphicsConstants(cmd, 0, RhiShaderStage::Vertex | RhiShaderStage::Fragment, ByteViewPtr(&scene));
+    RhiCmdPushGraphicsConstants(cmd, 0, RhiShaderStage::Vertex | RhiShaderStage::Pixel, ByteViewPtr(&scene));
 
     std::array<RhiBuffer, 1> buffers{renderer->vertexBuffer};
     std::array<uint32_t, 1> offsets{0};
@@ -246,7 +235,7 @@ void Renderer2DPassBegin(RhiCmdList cmd, Renderer2D *renderer, uint32_t width, u
 
 void Renderer2DDrawRect(RhiCmdList cmd, Renderer2D *renderer, float x, float y, float width, float height, float4 color)
 {
-    uint32_t frameIndex = RhiGetFrameIndex();
+    const uint32_t frameIndex = RhiGetFrameIndex();
 
     AlignUp(renderer->dymamicUniformBufferWritten, RhiGetMinUniformBufferOffsetAlignment());
     new (RhiMapBuffer(renderer->dynamicUniformBuffer[frameIndex]) + renderer->dymamicUniformBufferWritten) EntityUbo{
@@ -258,7 +247,6 @@ void Renderer2DDrawRect(RhiCmdList cmd, Renderer2D *renderer, float x, float y, 
     renderer->dymamicUniformBufferWritten += sizeof(EntityUbo);
 
     RhiCmdBindGraphicsBindGroup(cmd, 0, renderer->bindGroup[frameIndex], {&offset, 1});
-
     RhiCmdDraw(cmd, 6, 1, 0, 0);
 }
 

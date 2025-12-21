@@ -12,7 +12,7 @@ template <typename E> struct EnableBitMaskOps : std::false_type
 #define NYLA_BITENUM(name)                                                                                             \
     template <> struct EnableBitMaskOps<name> : std::true_type                                                         \
     {                                                                                                                  \
-    };                                                                                                                 \
+    };
 
 template <typename E> constexpr bool kEnableBitMaskOpsValue = EnableBitMaskOps<E>::value;
 

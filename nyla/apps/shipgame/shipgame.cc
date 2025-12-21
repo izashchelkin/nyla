@@ -333,7 +333,7 @@ void ShipgameFrame(float dt, uint32_t fps)
     GridRender();
 
     RpBegin(dbgTextPipeline);
-    DbgText(500, 10, "fps= " + std::to_string(fps));
+    DebugText(500, 10, "fps= " + std::to_string(fps));
 }
 
 } // namespace nyla

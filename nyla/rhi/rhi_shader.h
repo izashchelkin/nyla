@@ -11,7 +11,7 @@ namespace nyla
 enum class RhiShaderStage : uint32_t
 {
     Vertex = 1 << 0,
-    Fragment = 1 << 1,
+    Pixel = 1 << 1,
 };
 
 template <> struct EnableBitMaskOps<RhiShaderStage> : std::true_type

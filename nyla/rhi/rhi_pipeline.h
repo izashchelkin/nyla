@@ -33,8 +33,8 @@ enum class RhiInputRate
 
 enum class RhiCullMode
 {
-    Back,
     None,
+    Back,
     Front
 };
 
