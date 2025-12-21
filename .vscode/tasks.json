@@ -3,6 +3,17 @@
 	"tasks": [
 		{
 			"type": "cmake",
+			"label": "wm_overlay build",
+			"command": "build",
+			"targets": [
+				"wm_overlay"
+			],
+			"preset": "debug",
+			"group": "build",
+			"problemMatcher": [],
+		},
+		{
+			"type": "cmake",
 			"label": "spirview build",
 			"command": "build",
 			"targets": [

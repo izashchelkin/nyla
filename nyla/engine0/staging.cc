@@ -20,7 +20,7 @@ auto RecompileShadersIfNeeded() -> bool
     static bool spvChanged = true;
     static bool srcChanged = true;
 
-    for (auto &change : PlatformFsGetChanges())
+    for (auto &change : PlatformFsGetFileChanges())
     {
         if (change.seen)
             continue;

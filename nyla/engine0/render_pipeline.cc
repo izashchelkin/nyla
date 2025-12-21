@@ -11,6 +11,7 @@
 #include "nyla/commons/memory/charview.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
+#include "nyla/rhi/rhi_bind_groups.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_pipeline.h"
 #include "nyla/rhi/rhi_texture.h"
@@ -68,10 +69,11 @@ void RpInit(Rp &rp)
 
         auto initBuffer = [&bindGroupLayoutDesc, &bindGroupDesc](RpBuf &buf, RhiBufferUsage bufferUsage,
                                                                  RhiMemoryUsage memoryUsage, RhiBindingType bindingType,
-                                                                 uint32_t binding, uint32_t i) -> void {
+                                                                 uint32_t binding, uint32_t i, bool dynamic) -> void {
             bindGroupLayoutDesc.bindings[i] = {
                 .binding = binding,
                 .type = bindingType,
+                .flags = dynamic ? RhiBindingFlags::Dynamic : static_cast<RhiBindingFlags>(0),
                 .arraySize = 1,
                 .stageFlags = RpBufStageFlags(buf),
             };
@@ -87,12 +89,11 @@ void RpInit(Rp &rp)
                 bindGroupDesc[iframe].entries[i] = RhiBindGroupEntry{
                     .binding = binding,
                     .arrayIndex = 0,
-                    .type = bindingType,
                     .buffer =
                         {
                             .buffer = buf.buffer[iframe],
-                            .offset = 0,
                             .size = buf.size,
+                            .offset = 0,
                             .range = buf.range,
                         },
                 };
@@ -103,12 +104,12 @@ void RpInit(Rp &rp)
         if (rp.staticUniform.enabled)
         {
             initBuffer(rp.staticUniform, RhiBufferUsage::Uniform, RhiMemoryUsage::CpuToGpu,
-                       RhiBindingType::UniformBuffer, 0, i++);
+                       RhiBindingType::UniformBuffer, 0, i++, false);
         }
         if (rp.dynamicUniform.enabled)
         {
             initBuffer(rp.dynamicUniform, RhiBufferUsage::Uniform, RhiMemoryUsage::CpuToGpu,
-                       RhiBindingType::UniformBufferDynamic, 1, i++);
+                       RhiBindingType::UniformBuffer, 1, i++, true);
         }
 
         rp.bindGroupLayout = RhiCreateBindGroupLayout(bindGroupLayoutDesc);
@@ -180,7 +181,7 @@ static void RpBufCopy(RpBuf &buf, ByteView data)
     CHECK(!data.empty());
     CHECK_LE(buf.written + data.size(), buf.size);
 
-    void *dst = (char *)RhiMapBuffer(buf.buffer[RhiFrameGetIndex()], true) + buf.written;
+    void *dst = (char *)RhiMapBuffer(buf.buffer[RhiGetFrameIndex()]) + buf.written;
     memcpy(dst, data.data(), data.size());
     buf.written += data.size();
 }
@@ -211,13 +212,13 @@ void RpPushConst(Rp &rp, ByteView data)
     CHECK_LE(data.size(), kRhiMaxPushConstantSize);
 
     RhiCmdList cmd = RhiFrameGetCmdList();
-    RhiCmdPushGraphicsConstants(cmd, 0, RhiShaderStage::Vertex | RhiShaderStage::Fragment, data);
+    RhiCmdPushGraphicsConstants(cmd, 0, RhiShaderStage::Vertex | RhiShaderStage::Pixel, data);
 }
 
 void RpDraw(Rp &rp, RpMesh mesh, ByteView dynamicUniformData)
 {
     RhiCmdList cmd = RhiFrameGetCmdList();
-    uint32_t frameIndex = RhiFrameGetIndex();
+    uint32_t frameIndex = RhiGetFrameIndex();
 
     if (rp.vertBuf.enabled)
     {
@@ -234,7 +235,7 @@ void RpDraw(Rp &rp, RpMesh mesh, ByteView dynamicUniformData)
 
         if (rp.dynamicUniform.enabled)
         {
-            rp.dynamicUniform.written = AlignUp(rp.dynamicUniform.written, RhiGetMinUniformBufferOffsetAlignment());
+            rp.dynamicUniform.written = AlignedUp(rp.dynamicUniform.written, RhiGetMinUniformBufferOffsetAlignment());
 
             offsetCount = 1;
             offset = rp.dynamicUniform.written;
@@ -263,7 +264,7 @@ void RpAttachVertShader(Rp &rp, const std::string &path)
     rp.vertexShader = RhiCreateShader(RhiShaderDesc{
         .spirv = spirv,
     });
-    PlatformFsWatch(path);
+    // PlatformFsWatch(path);
 }
 
 void RpAttachFragShader(Rp &rp, const std::string &path)
@@ -282,7 +283,7 @@ void RpAttachFragShader(Rp &rp, const std::string &path)
     rp.fragmentShader = RhiCreateShader(RhiShaderDesc{
         .spirv = spirv,
     });
-    PlatformFsWatch(path);
+    // PlatformFsWatch(path);
 }
 
 } // namespace nyla

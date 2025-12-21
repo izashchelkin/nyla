@@ -1,6 +1,6 @@
 struct VS_INPUT
 {
-    uint vertexId : SV_VertexID
+    uint vertexId : SV_VertexID;
 };
 
 struct VS_OUTPUT
@@ -9,9 +9,9 @@ struct VS_OUTPUT
     float2 uv : TEXCOORD0;
 };
 
-VSOutput main(VS_INPUT v)
+VS_OUTPUT main(VS_INPUT v)
 {
-    VSOutput out;
+    VS_OUTPUT o;
 
     const float2 pos[3] = {
         float2(-1.0f, -1.0f),
@@ -20,8 +20,8 @@ VSOutput main(VS_INPUT v)
     };
     float2 p = pos[v.vertexId];
 
-    out.position = float4(p, 0.0f, 1.0f);
-    out.uv = p;
+    o.position = float4(p, 0.0f, 1.0f);
+    o.uv = p;
 
-    return out;
+    return o;
 }

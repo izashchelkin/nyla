@@ -101,14 +101,14 @@ static const uint4 font_data[96] = {
 
 struct TextLineUBO
 {
-    uint words[68];
+    uint4 words[17];
     int4 origin_px_and_word_count;
     float4 fg;
     float4 bg;
 };
 
-[[vk::binding(1, 0)]]
-ConstantBuffer<TextLineUBO> text_line;
+[[vk::binding(0, 0)]]
+ConstantBuffer<TextLineUBO> textLine;
 
 bool GlyphPixel(uint glyph_idx, uint x, uint y)
 {
@@ -118,16 +118,23 @@ bool GlyphPixel(uint glyph_idx, uint x, uint y)
     return bit != 0u;
 }
 
-struct PSInput
+struct PS_INPUT
 {
     float4 position : SV_Position;
 };
 
-float4 main(PSInput input) : SV_Target
+struct PS_OUTPUT
 {
+    float4 color : SV_TARGET;
+};
+
+PS_OUTPUT main(PS_INPUT input)
+{
+    PS_OUTPUT o;
+
     int2 frag_xy = int2(floor(input.position.xy));
 
-    int2 top_left_pos = frag_xy - text_line.origin_px_and_word_count.xy;
+    int2 top_left_pos = frag_xy - textLine.origin_px_and_word_count.xy;
     if (top_left_pos.x < 0)
         discard;
     if (top_left_pos.y < 0)
@@ -135,11 +142,9 @@ float4 main(PSInput input) : SV_Target
     if (top_left_pos.y >= int(HEIGHT))
         discard;
 
-    uint line_width_px = text_line.origin_px_and_word_count.z * 4u * WIDTH;
+    uint line_width_px = textLine.origin_px_and_word_count.z * 4u * WIDTH;
     if (top_left_pos.x >= int(line_width_px))
-    {
         discard;
-    }
 
     int cx = top_left_pos.x / int(WIDTH);
     int gx = top_left_pos.x % int(WIDTH);
@@ -147,14 +152,15 @@ float4 main(PSInput input) : SV_Target
     uint word_index = uint(cx / 4);
     uint byte_shift = uint(cx % 4) * 8u;
 
-    uint ch = (text_line.words[word_index] >> byte_shift) & 0xFFu;
+    uint word = textLine.words[word_index / 4][word_index % 4];
+    uint ch = (word >> byte_shift) & 0xFFu;
 
-    if (ch != 0u && GlyphPixel(ch - 0x20u, uint(gx), uint(top_left_pos.y)))
+    o.color = textLine.bg;
+    if (ch >= 0x20 && ch && 0x7F)
     {
-        return text_line.fg;
+        if (GlyphPixel(ch - 0x20u, uint(gx), uint(top_left_pos.y)))
+            o.color = textLine.fg;
     }
-    else
-    {
-        return text_line.bg;
-    }
+
+    return o;
 }

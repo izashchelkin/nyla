@@ -7,6 +7,7 @@
 #include "nyla/commons/handle_pool.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_bind_groups.h"
+#include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_pipeline.h"
 #include "nyla/rhi/rhi_sampler.h"
@@ -77,8 +78,15 @@ extern VulkanData vk;
 struct VulkanBufferData
 {
     VkBuffer buffer;
+    uint32_t size;
+    RhiMemoryUsage memoryUsage;
     VkDeviceMemory memory;
     char *mapped;
+    RhiBufferState state;
+
+    uint32_t dirtyBegin;
+    uint32_t dirtyEnd;
+    bool dirty;
 };
 
 struct VulkanCmdListData
@@ -114,9 +122,15 @@ struct VulkanSamplerData
     VkSampler sampler;
 };
 
+struct VulkanBindGroupLayoutData
+{
+    VkDescriptorSetLayout layout;
+    RhiBindGroupLayoutDesc desc;
+};
+
 struct RhiHandles
 {
-    HandlePool<RhiBindGroupLayout, VkDescriptorSetLayout, 16> bindGroupLayouts;
+    HandlePool<RhiBindGroupLayout, VulkanBindGroupLayoutData, 16> bindGroupLayouts;
     HandlePool<RhiBindGroup, VkDescriptorSet, 16> bindGroups;
     HandlePool<RhiBuffer, VulkanBufferData, 16> buffers;
     HandlePool<RhiCmdList, VulkanCmdListData, 16> cmdLists;

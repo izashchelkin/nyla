@@ -33,8 +33,8 @@ enum class RhiInputRate
 
 enum class RhiCullMode
 {
-    Back,
     None,
+    Back,
     Front
 };
 
@@ -53,8 +53,8 @@ struct RhiVertexBindingDesc
 
 struct RhiVertexAttributeDesc
 {
-    uint32_t location;
     uint32_t binding;
+    uint32_t location;
     RhiVertexFormat format;
     uint32_t offset;
 };
@@ -77,6 +77,8 @@ struct RhiGraphicsPipelineDesc
 
     uint32_t colorTargetFormatsCount;
     std::array<RhiTextureFormat, 4> colorTargetFormats;
+
+    uint32_t pushConstantSize;
 
     RhiCullMode cullMode;
     RhiFrontFace frontFace;

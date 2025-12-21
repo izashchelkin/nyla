@@ -9,7 +9,12 @@
 namespace nyla
 {
 
-void PlatformInit();
+struct PlatformInitDesc
+{
+    bool keyboardInput;
+    bool mouseInput;
+};
+void PlatformInit(PlatformInitDesc);
 
 void PlatformMapInputBegin();
 void PlatformMapInput(AbstractInputMapping mapping, KeyPhysical key);
@@ -29,17 +34,20 @@ struct PlatformWindowSize
 
 auto PlatformGetWindowSize(PlatformWindow window) -> PlatformWindowSize;
 
-void PlatformFsWatch(const std::string &path);
-
-struct PlatformFsChange
+struct PlatformFileChanged
 {
-    bool isdir;
     bool seen;
     std::string path;
 };
-auto PlatformFsGetChanges() -> std::span<PlatformFsChange>;
+void PlatformFsWatchFile(const std::string &path);
+auto PlatformFsGetFileChanges() -> std::span<PlatformFileChanged>;
 
-void PlatformProcessEvents();
+struct PlatformProcessEventsResult
+{
+    bool shouldRedraw;
+};
+auto PlatformProcessEvents() -> PlatformProcessEventsResult;
+
 auto PlatformShouldExit() -> bool;
 
 } // namespace nyla

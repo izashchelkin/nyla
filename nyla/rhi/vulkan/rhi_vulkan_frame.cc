@@ -110,7 +110,7 @@ void RhiFrameEnd()
     vk.frameIndex = (vk.frameIndex + 1) % vk.numFramesInFlight;
 }
 
-auto RhiFrameGetIndex() -> uint32_t
+auto RhiGetFrameIndex() -> uint32_t
 {
     return vk.frameIndex;
 }

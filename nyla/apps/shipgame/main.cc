@@ -2,7 +2,7 @@
 
 #include "nyla/apps/shipgame/shipgame.h"
 #include "nyla/apps/shipgame/world_renderer.h"
-#include "nyla/engine0/dbg_text_renderer.h"
+#include "nyla/engine0/debug_text_renderer.h"
 #include "nyla/engine0/engine0.h"
 #include "nyla/engine0/render_pipeline.h"
 #include "nyla/engine0/staging.h"

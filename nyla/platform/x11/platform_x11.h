@@ -36,7 +36,7 @@ struct X11State
 };
 extern X11State x11;
 
-void X11Initialize();
+void X11Initialize(bool keyboardInput, bool mouseInput);
 
 auto X11CreateWindow(uint32_t width, uint32_t height, bool overrideRedirect, xcb_event_mask_t eventMask)
     -> xcb_window_t;

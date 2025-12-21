@@ -8,8 +8,13 @@ namespace nyla
 
 void LoggingInit()
 {
-    absl::InitializeLog();
-    absl::SetStderrThreshold(absl::LogSeverityAtLeast::kInfo);
+    static bool init = false;
+    if (!init)
+    {
+        absl::InitializeLog();
+        absl::SetStderrThreshold(absl::LogSeverityAtLeast::kInfo);
+        init = true;
+    }
 }
 
 } // namespace nyla

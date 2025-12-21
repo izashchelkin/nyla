@@ -1,5 +1,6 @@
 #include "nyla/spirview/spirview.h"
 #include "absl/log/check.h"
+#include "nyla/rhi/rhi_shader.h"
 #include <cstdint>
 #include <span>
 #include <variant>
@@ -67,6 +68,7 @@ void ProcessOp(SpirvParserState &parser, spv::Op op, std::span<const uint32_t> a
 
     case spv::OpEntryPoint: {
         parser.executionModel = spv::ExecutionModel(args[i++]);
+
         break;
     }
 
@@ -247,6 +249,18 @@ auto SpirviewReflect(std::span<const uint32_t> spirv, SpirviewReflectResult *res
 
     result->typesCount = itype;
     result->resourcesCount = iresource;
+
+    switch (state.executionModel)
+    {
+    case spv::ExecutionModel::ExecutionModelVertex:
+        result->stage = SpirviewShaderStage::Vertex;
+        break;
+    case spv::ExecutionModel::ExecutionModelFragment:
+        result->stage = SpirviewShaderStage::Fragment;
+        break;
+    default:
+        break;
+    }
 
     return true;
 }

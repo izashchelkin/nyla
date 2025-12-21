@@ -49,7 +49,7 @@ auto ConvertRhiShaderStageIntoVkShaderStageFlags(RhiShaderStage stageFlags) -> V
     {
         ret |= VK_SHADER_STAGE_VERTEX_BIT;
     }
-    if (Any(stageFlags & RhiShaderStage::Fragment))
+    if (Any(stageFlags & RhiShaderStage::Pixel))
     {
         ret |= VK_SHADER_STAGE_FRAGMENT_BIT;
     }
@@ -480,6 +480,11 @@ void RhiInit(const RhiDesc &rhiDesc)
 auto RhiGetMinUniformBufferOffsetAlignment() -> uint32_t
 {
     return vk.physDevProps.limits.minUniformBufferOffsetAlignment;
+}
+
+auto RhiGetOptimalBufferCopyOffsetAlignment() -> uint32_t
+{
+    return vk.physDevProps.limits.optimalBufferCopyOffsetAlignment;
 }
 
 } // namespace nyla

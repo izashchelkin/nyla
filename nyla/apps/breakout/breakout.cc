@@ -10,11 +10,11 @@
 #include "nyla/apps/breakout/world_renderer.h"
 #include "nyla/commons/color.h"
 #include "nyla/commons/math/vec.h"
-#include "nyla/commons/memory/charview.h"
-#include "nyla/engine0/dbg_text_renderer.h"
-#include "nyla/engine0/render_pipeline.h"
+#include "nyla/engine0/renderer2d.h"
 #include "nyla/platform/abstract_input.h"
 #include "nyla/rhi/rhi.h"
+#include "nyla/rhi/rhi_cmdlist.h"
+#include "nyla/rhi/rhi_texture.h"
 
 namespace nyla
 {
@@ -53,7 +53,7 @@ static GameStage stage = GameStage::KGame;
 template <typename T> static auto FrameLocal(std::vector<T> &vec, auto create) -> T &
 {
     vec.reserve(RhiGetNumFramesInFlight());
-    uint32_t frameIndex = RhiFrameGetIndex();
+    uint32_t frameIndex = RhiGetFrameIndex();
     if (frameIndex >= vec.size())
     {
         vec.emplace_back(create());
@@ -107,7 +107,7 @@ static auto IsInside(float pos, float size, float2 boundary) -> bool
     return false;
 }
 
-void BreakoutFrame(float dt, uint32_t fps)
+void BreakoutProcess(float dt)
 {
     const int dx = Pressed(kRight) - Pressed(kLeft);
 
@@ -174,49 +174,21 @@ void BreakoutFrame(float dt, uint32_t fps)
             }
         }
     }
+}
 
-    RpBegin(worldPipeline);
-    WorldSetUp();
-
+void BreakoutRenderGame(RhiCmdList cmd, Renderer2D *renderer, const RhiTextureInfo &colorTargetInfo)
+{
+    for (Brick &brick : level.bricks)
     {
-        static std ::vector<RpMesh> unitRectMeshes;
-        RpMesh unitRectMesh = FrameLocal(unitRectMeshes, [] -> RpMesh {
-            std::vector<Vertex> unitRect;
-            unitRect.reserve(6);
-            GenUnitRect([&unitRect](float x, float y) -> void { unitRect.emplace_back(Vertex{float2{x, y}}); });
-            return RpVertCopy(worldPipeline, unitRect.size(), ByteViewSpan(std::span{unitRect}));
-        });
+        if (brick.dead)
+            continue;
 
-        static std ::vector<RpMesh> unitCircleMeshes;
-        RpMesh unitCircleMesh = FrameLocal(unitCircleMeshes, [] -> RpMesh {
-            std::vector<Vertex> unitCircle;
-            unitCircle.reserve(32 * 3);
-            GenUnitCircle(32,
-                          [&unitCircle](float x, float y) -> void { unitCircle.emplace_back(Vertex{float2{x, y}}); });
-            return RpVertCopy(worldPipeline, unitCircle.size(), ByteViewSpan(std::span{unitCircle}));
-        });
-
-        if (stage == GameStage::KGame)
-        {
-            for (Brick &brick : level.bricks)
-            {
-                if (brick.dead)
-                    continue;
-
-                WorldRender(float2{brick.x, brick.y}, brick.color, brick.width, brick.height, unitRectMesh);
-            }
-
-            WorldRender(float2{playerPosX, kPlayerPosY}, float3{.1f, .1f, 1.f}, playerWidth, kPlayerHeight,
-                        unitRectMesh);
-
-            WorldRender(ballPos, float3{.5f, 0.f, 1.f}, kBallRadius, kBallRadius, unitCircleMesh);
-        }
+        Renderer2DRect(cmd, renderer, brick.x, brick.y, brick.width, brick.height,
+                       float4{brick.color[0], brick.color[1], brick.color[2], 1.f});
     }
 
-    RpBegin(dbgTextPipeline);
-    {
-        DbgText(500, 10, std::format("fps={} ball=({:.1f}, {:.1f})", fps, ballPos[0], ballPos[1]));
-    }
+    Renderer2DRect(cmd, renderer, playerPosX, kPlayerPosY, playerWidth, kPlayerHeight, float4{1.f, 1.f, 1.f, 1});
+    Renderer2DRect(cmd, renderer, ballPos[0], ballPos[1], kBallRadius * 2, kBallRadius * 2, float4{1.f, 1.f, 1.f, 1});
 }
 
 } // namespace nyla

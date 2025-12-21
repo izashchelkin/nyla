@@ -10,7 +10,7 @@
 #include "nyla/commons/math/lerp.h"
 #include "nyla/commons/math/vec.h"
 #include "nyla/commons/os/clock.h"
-#include "nyla/engine0/dbg_text_renderer.h"
+#include "nyla/engine0/debug_text_renderer.h"
 #include "nyla/platform/abstract_input.h"
 
 namespace nyla
@@ -333,7 +333,7 @@ void ShipgameFrame(float dt, uint32_t fps)
     GridRender();
 
     RpBegin(dbgTextPipeline);
-    DbgText(500, 10, "fps= " + std::to_string(fps));
+    DebugText(500, 10, "fps= " + std::to_string(fps));
 }
 
 } // namespace nyla
