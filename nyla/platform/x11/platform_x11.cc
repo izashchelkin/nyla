@@ -1,5 +1,6 @@
 #include "nyla/platform/x11/platform_x11.h"
 
+#include <string>
 #include <sys/inotify.h>
 #include <unistd.h>
 
@@ -10,6 +11,7 @@
 #include "absl/log/check.h"
 #include "absl/log/log.h"
 #include "absl/strings/ascii.h"
+#include "nyla/commons/containers/set.h"
 #include "nyla/commons/memory/optional.h"
 #include "nyla/commons/os/clock.h"
 #include "nyla/platform/abstract_input.h"
@@ -99,15 +101,21 @@ auto PlatformGetWindowSize(PlatformWindow window) -> PlatformWindowSize
 {
     const xcb_get_geometry_reply_t *windowGeometry =
         xcb_get_geometry_reply(x11.conn, xcb_get_geometry(x11.conn, window.handle), nullptr);
-    return {windowGeometry->width, windowGeometry->height};
+    return {.width = windowGeometry->width, .height = windowGeometry->height};
 }
 
-static int fsNotifyFd = 0;
-static std::array<PlatformFsChange, 16> fsChanges;
-static uint32_t fsChangesAt = 0;
-static std::vector<std::string> fsWatched;
+namespace
+{
 
-void PlatformFsWatch(const std::string &filepath)
+int fsNotifyFd = 0;
+
+std::array<PlatformFileChanged, 16> fileChanges;
+uint32_t fileChangesIndex = 0;
+Set<std::string> filesWatched;
+
+} // namespace
+
+void PlatformFsWatchFile(const std::string &path)
 {
     if (!fsNotifyFd)
     {
@@ -115,12 +123,15 @@ void PlatformFsWatch(const std::string &filepath)
         CHECK_GT(fsNotifyFd, 0);
     }
 
-    fsWatched.emplace_back(filepath);
+    CHECK_LE(filesWatched.size(), fileChanges.size());
+
+    if (auto [it, ok] = filesWatched.emplace(path); ok)
+        inotify_add_watch(fsNotifyFd, path.c_str(), IN_CLOSE);
 }
 
-auto PlatformFsGetChanges() -> std::span<PlatformFsChange>
+auto PlatformFsGetFileChanges() -> std::span<PlatformFileChanged>
 {
-    return fsChanges;
+    return fileChanges;
 }
 
 void PlatformProcessEvents()
@@ -137,17 +148,23 @@ void PlatformProcessEvents()
         {
             while (bufp != buf + numread)
             {
-                inotify_event *event = reinterpret_cast<inotify_event *>(bufp);
+                const auto *event = reinterpret_cast<inotify_event *>(bufp);
                 bufp += sizeof(inotify_event);
+
+                if (event->mask & IN_ISDIR)
+                {
+                    bufp += event->len;
+                    continue;
+                }
 
                 std::string path = {bufp, strlen(bufp)};
                 bufp += event->len;
 
-                fsChanges[fsChangesAt] = {
-                    .isdir = static_cast<bool>(event->mask & IN_ISDIR),
+                fileChanges[fileChangesIndex] = {
+                    .seen = false,
                     .path = path,
                 };
-                fsChangesAt = (fsChangesAt + 1) % fsChanges.size();
+                fileChangesIndex = (fileChangesIndex + 1) % fileChanges.size();
             }
         }
     }

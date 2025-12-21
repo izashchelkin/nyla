@@ -72,12 +72,7 @@ static auto Main() -> int
         });
 
         BreakoutRenderGame(cmd, renderer2d, colorTargetInfo);
-
         DebugTextRendererDraw(cmd, debugTextRenderer);
-
-#if 0 
-        RpBegin(dbgTextPipeline);
-#endif
 
         RhiPassEnd({
             .colorTarget = RhiGetBackbufferTexture(),

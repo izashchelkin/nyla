@@ -264,7 +264,7 @@ void RpAttachVertShader(Rp &rp, const std::string &path)
     rp.vertexShader = RhiCreateShader(RhiShaderDesc{
         .spirv = spirv,
     });
-    PlatformFsWatch(path);
+    // PlatformFsWatch(path);
 }
 
 void RpAttachFragShader(Rp &rp, const std::string &path)
@@ -283,7 +283,7 @@ void RpAttachFragShader(Rp &rp, const std::string &path)
     rp.fragmentShader = RhiCreateShader(RhiShaderDesc{
         .spirv = spirv,
     });
-    PlatformFsWatch(path);
+    // PlatformFsWatch(path);
 }
 
 } // namespace nyla

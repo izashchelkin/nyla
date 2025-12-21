@@ -1,4 +1,5 @@
 #include "nyla/engine0/engine0.h"
+#include "absl/log/log.h"
 #include "nyla/commons/logging/init.h"
 #include "nyla/commons/os/clock.h"
 #include "nyla/commons/signal/signal.h"
@@ -6,8 +7,7 @@
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_cmdlist.h"
-#include "nyla/rhi/rhi_pass.h"
-#include "nyla/rhi/rhi_texture.h"
+#include <cmath>
 #include <cstdint>
 #include <thread>
 
@@ -84,6 +84,44 @@ auto Engine0FrameBegin() -> RhiCmdList
     }
 
     PlatformProcessEvents();
+
+#if 0
+    static bool spvChanged = true;
+    static bool srcChanged = true;
+
+    for (PlatformFileChanged change : PlatformFsGetFileChanges())
+    {
+        if (change.seen)
+            continue;
+        change.seen = true;
+
+        const auto &path = change.path;
+        if (path.ends_with(".spv"))
+        {
+            spvChanged = true;
+        }
+        else if (path.ends_with(".hlsl"))
+        {
+            srcChanged = true;
+        }
+    }
+
+    if (srcChanged)
+    {
+        LOG(INFO) << "shaders recompiling";
+        system("python3 /home/izashchelkin/nyla/scripts/shaders.py");
+        usleep(1e6);
+        PlatformProcessEvents();
+
+        srcChanged = false;
+    }
+
+    if (spvChanged)
+    {
+        spvChanged = false;
+        return true;
+    }
+#endif
 
     return cmd;
 }
