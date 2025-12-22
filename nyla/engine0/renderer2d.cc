@@ -10,7 +10,9 @@
 #include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_pipeline.h"
+#include "nyla/rhi/rhi_sampler.h"
 #include "nyla/rhi/rhi_shader.h"
+#include "nyla/rhi/rhi_texture.h"
 #include <cstdint>
 #include <sys/types.h>
 #include <unistd.h>
@@ -55,7 +57,7 @@ struct Renderer2D
     InlineVec<uint32_t, 256> pendingDraws;
 };
 
-auto CreateRenderer2D() -> Renderer2D *
+auto CreateRenderer2D(RhiTexture texture, RhiSampler sampler) -> Renderer2D *
 {
     const RhiShader vs = GetShader("renderer2d.vs", RhiShaderStage::Vertex);
     const RhiShader ps = GetShader("renderer2d.ps", RhiShaderStage::Pixel);
@@ -63,7 +65,7 @@ auto CreateRenderer2D() -> Renderer2D *
     auto *renderer = new Renderer2D{};
 
     renderer->bindGroupLayout = RhiCreateBindGroupLayout(RhiBindGroupLayoutDesc{
-        .bindingCount = 1,
+        .bindingCount = 3,
         .bindings =
             {
                 RhiBindingDesc{
@@ -72,6 +74,18 @@ auto CreateRenderer2D() -> Renderer2D *
                     .flags = RhiBindingFlags::Dynamic,
                     .arraySize = 1,
                     .stageFlags = RhiShaderStage::Vertex | RhiShaderStage::Pixel,
+                },
+                RhiBindingDesc{
+                    .binding = 1,
+                    .type = RhiBindingType::Texture,
+                    .arraySize = 1,
+                    .stageFlags = RhiShaderStage::Pixel,
+                },
+                RhiBindingDesc{
+                    .binding = 2,
+                    .type = RhiBindingType::Sampler,
+                    .arraySize = 1,
+                    .stageFlags = RhiShaderStage::Pixel,
                 },
             },
     });
@@ -140,7 +154,7 @@ auto CreateRenderer2D() -> Renderer2D *
 
         renderer->bindGroup[i] = RhiCreateBindGroup(RhiBindGroupDesc{
             .layout = renderer->bindGroupLayout,
-            .entriesCount = 1,
+            .entriesCount = 3,
             .entries =
                 {
                     RhiBindGroupEntry{
@@ -152,6 +166,22 @@ auto CreateRenderer2D() -> Renderer2D *
                                 .size = kDynamicUniformBufferSize,
                                 .offset = 0,
                                 .range = sizeof(EntityUbo),
+                            },
+                    },
+                    RhiBindGroupEntry{
+                        .binding = 1,
+                        .arrayIndex = 0,
+                        .texture =
+                            {
+                                .texture = texture,
+                            },
+                    },
+                    RhiBindGroupEntry{
+                        .binding = 2,
+                        .arrayIndex = 0,
+                        .sampler =
+                            {
+                                .sampler = sampler,
                             },
                     },
                 },
@@ -168,7 +198,8 @@ void Renderer2DFrameBegin(RhiCmdList cmd, Renderer2D *renderer, StagingBuffer *s
     {
         RhiCmdTransitionBuffer(cmd, renderer->vertexBuffer, RhiBufferState::CopyDst);
 
-        char *uploadMemory = E0AcquireUploadMemory(cmd, stagingBuffer, renderer->vertexBuffer, 0, 6 * sizeof(VSInput));
+        char *uploadMemory =
+            StagingBufferCopyIntoBuffer(cmd, stagingBuffer, renderer->vertexBuffer, 0, 6 * sizeof(VSInput));
         new (uploadMemory) std::array<VSInput, 6>{
             VSInput{
                 .pos = {-.5f, .5f, .0f, 1.f},

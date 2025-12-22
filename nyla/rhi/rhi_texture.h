@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "nyla/commons/bitenum.h"
 #include "nyla/commons/handle.h"
 #include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
@@ -32,10 +33,7 @@ enum class RhiTextureUsage
     Storage = 1 << 5,
     Present = 1 << 6,
 };
-
-template <> struct EnableBitMaskOps<RhiTextureUsage> : std::true_type
-{
-};
+NYLA_BITENUM(RhiTextureUsage);
 
 enum class RhiTextureState
 {
@@ -72,6 +70,7 @@ auto RhiCreateTexture(RhiTextureDesc) -> RhiTexture;
 void RhiDestroyTexture(RhiTexture);
 auto RhiGetTextureInfo(RhiTexture) -> RhiTextureInfo;
 void RhiCmdTransitionTexture(RhiCmdList, RhiTexture, RhiTextureState);
+void RhiCmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, uint32_t srcOffset, uint32_t size);
 
 auto RhiGetBackbufferTexture() -> RhiTexture;
 

@@ -454,9 +454,11 @@ void RhiInit(const RhiDesc &rhiDesc)
         VK_CHECK(vkCreateSemaphore(vk.dev, &semaphoreCreateInfo, nullptr, vk.renderFinishedSemaphores.data() + i));
     }
 
-    const std::array<VkDescriptorPoolSize, 2> descriptorPoolSizes{
+    const std::array<VkDescriptorPoolSize, 4> descriptorPoolSizes{
         VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 256},
         VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 256},
+        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 256},
+        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_SAMPLER, 256},
     };
     const VkDescriptorPoolCreateInfo descriptorPoolCreateInfo{
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,

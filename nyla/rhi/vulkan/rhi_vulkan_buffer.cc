@@ -3,6 +3,7 @@
 #include "nyla/commons/handle_pool.h"
 #include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
+#include "nyla/rhi/rhi_texture.h"
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
 #include "vulkan/vulkan_core.h"
 
@@ -220,6 +221,31 @@ void RhiCmdCopyBuffer(RhiCmdList cmd, RhiBuffer dst, uint32_t dstOffset, RhiBuff
         .size = size,
     };
     vkCmdCopyBuffer(cmdbuf, srcBufferData.buffer, dstBufferData.buffer, 1, &region);
+}
+
+void RhiCmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, uint32_t srcOffset, uint32_t size)
+{
+    VkCommandBuffer cmdbuf = HandleGetData(rhiHandles.cmdLists, cmd).cmdbuf;
+
+    VulkanTextureData &dstTextureData = HandleGetData(rhiHandles.textures, dst);
+    VulkanBufferData &srcBufferData = HandleGetData(rhiHandles.buffers, src);
+
+    EnsureHostWritesVisible(cmdbuf, srcBufferData);
+
+    const VkBufferImageCopy region{
+        .bufferOffset = srcOffset,
+        .bufferRowLength = 0,
+        .bufferImageHeight = 0,
+        .imageSubresource =
+            {
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .layerCount = 1,
+            },
+        .imageOffset = {0, 0, 0},
+        .imageExtent = dstTextureData.extent,
+    };
+
+    vkCmdCopyBufferToImage(cmdbuf, srcBufferData.buffer, dstTextureData.image, dstTextureData.layout, 1, &region);
 }
 
 namespace

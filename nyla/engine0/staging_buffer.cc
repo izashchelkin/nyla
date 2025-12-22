@@ -4,6 +4,7 @@
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
+#include "nyla/rhi/rhi_texture.h"
 #include <cstdint>
 
 namespace nyla
@@ -28,16 +29,38 @@ auto CreateStagingBuffer(uint32_t size) -> StagingBuffer *
     return stagingBuffer;
 }
 
-auto E0AcquireUploadMemory(RhiCmdList cmd, StagingBuffer *stagingBuffer, RhiBuffer dst, uint32_t dstOffset,
-                           uint32_t size) -> char *
+namespace
+{
+
+auto BeforeCopy(StagingBuffer *stagingBuffer, uint32_t copySize) -> char *
 {
     AlignUp(stagingBuffer->written, RhiGetOptimalBufferCopyOffsetAlignment());
 
-    CHECK_LE(stagingBuffer->written + size, RhiGetBufferSize(stagingBuffer->buffer));
+    CHECK_LE(stagingBuffer->written + copySize, RhiGetBufferSize(stagingBuffer->buffer));
     char *ret = RhiMapBuffer(stagingBuffer->buffer) + stagingBuffer->written;
 
-    RhiBufferMarkWritten(stagingBuffer->buffer, stagingBuffer->written, size);
+    RhiBufferMarkWritten(stagingBuffer->buffer, stagingBuffer->written, copySize);
+    return ret;
+}
+
+} // namespace
+
+auto StagingBufferCopyIntoBuffer(RhiCmdList cmd, StagingBuffer *stagingBuffer, RhiBuffer dst, uint32_t dstOffset,
+                                 uint32_t size) -> char *
+{
+    char *ret = BeforeCopy(stagingBuffer, size);
+
     RhiCmdCopyBuffer(cmd, dst, dstOffset, stagingBuffer->buffer, stagingBuffer->written, size);
+
+    stagingBuffer->written += size;
+    return ret;
+}
+
+auto StagingBufferCopyIntoTexture(RhiCmdList cmd, StagingBuffer *stagingBuffer, RhiTexture dst, uint32_t size) -> char *
+{
+    char *ret = BeforeCopy(stagingBuffer, size);
+
+    RhiCmdCopyTexture(cmd, dst, stagingBuffer->buffer, stagingBuffer->written, size);
 
     stagingBuffer->written += size;
     return ret;

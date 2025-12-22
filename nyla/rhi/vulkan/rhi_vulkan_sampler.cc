@@ -8,7 +8,7 @@ namespace nyla
 
 using namespace rhi_vulkan_internal;
 
-auto RhiCreateSampler(RhiSamplerDesc) -> RhiSampler
+auto RhiCreateSampler(RhiSamplerDesc desc) -> RhiSampler
 {
     const VkSamplerCreateInfo createInfo{
         .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
