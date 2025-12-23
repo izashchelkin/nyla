@@ -8,10 +8,12 @@
 #include "nyla/engine0/staging_buffer.h"
 #include "nyla/platform/key_physical.h"
 #include "nyla/platform/platform.h"
+#include "nyla/rhi/rhi_bind_groups.h"
 #include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_pass.h"
 #include "nyla/rhi/rhi_sampler.h"
+#include "nyla/rhi/rhi_shader.h"
 #include "nyla/rhi/rhi_texture.h"
 #include "third_party/stb/stb_image.h"
 #include <cstdint>
@@ -80,7 +82,7 @@ static auto Main() -> int
 
     RhiSampler sampler = RhiCreateSampler({});
 
-    StagingBuffer *stagingBuffer = CreateStagingBuffer(1 << 20);
+    GpuStagingBuffer *stagingBuffer = CreateStagingBuffer(1 << 20);
 
     Renderer2D *renderer2d;
     DebugTextRenderer *debugTextRenderer;

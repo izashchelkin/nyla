@@ -68,20 +68,20 @@ auto CreateRenderer2D(RhiTexture texture, RhiSampler sampler) -> Renderer2D *
         .bindingCount = 3,
         .bindings =
             {
-                RhiBindingDesc{
+                RhiBindingWriteDesc{
                     .binding = 0,
                     .type = RhiBindingType::UniformBuffer,
                     .flags = RhiBindingFlags::Dynamic,
                     .arraySize = 1,
                     .stageFlags = RhiShaderStage::Vertex | RhiShaderStage::Pixel,
                 },
-                RhiBindingDesc{
+                RhiBindingWriteDesc{
                     .binding = 1,
                     .type = RhiBindingType::Texture,
                     .arraySize = 1,
                     .stageFlags = RhiShaderStage::Pixel,
                 },
-                RhiBindingDesc{
+                RhiBindingWriteDesc{
                     .binding = 2,
                     .type = RhiBindingType::Sampler,
                     .arraySize = 1,
@@ -152,12 +152,12 @@ auto CreateRenderer2D(RhiTexture texture, RhiSampler sampler) -> Renderer2D *
             .memoryUsage = RhiMemoryUsage::CpuToGpu,
         });
 
-        renderer->bindGroup[i] = RhiCreateBindGroup(RhiBindGroupDesc{
+        renderer->bindGroup[i] = RhiCreateBindGroup(RhiBindGroupWriteDesc{
             .layout = renderer->bindGroupLayout,
             .entriesCount = 3,
             .entries =
                 {
-                    RhiBindGroupEntry{
+                    RhiBindGroupWriteEntry{
                         .binding = 0,
                         .arrayIndex = 0,
                         .buffer =
@@ -168,7 +168,7 @@ auto CreateRenderer2D(RhiTexture texture, RhiSampler sampler) -> Renderer2D *
                                 .range = sizeof(EntityUbo),
                             },
                     },
-                    RhiBindGroupEntry{
+                    RhiBindGroupWriteEntry{
                         .binding = 1,
                         .arrayIndex = 0,
                         .texture =
@@ -176,7 +176,7 @@ auto CreateRenderer2D(RhiTexture texture, RhiSampler sampler) -> Renderer2D *
                                 .texture = texture,
                             },
                     },
-                    RhiBindGroupEntry{
+                    RhiBindGroupWriteEntry{
                         .binding = 2,
                         .arrayIndex = 0,
                         .sampler =
@@ -191,7 +191,7 @@ auto CreateRenderer2D(RhiTexture texture, RhiSampler sampler) -> Renderer2D *
     return renderer;
 }
 
-void Renderer2DFrameBegin(RhiCmdList cmd, Renderer2D *renderer, StagingBuffer *stagingBuffer)
+void Renderer2DFrameBegin(RhiCmdList cmd, Renderer2D *renderer, GpuStagingBuffer *stagingBuffer)
 {
     static bool uploadedVertices = false;
     if (!uploadedVertices)

@@ -1,6 +1,6 @@
 #include <cstdint>
-#include <cstdlib>
 
+#include "nyla/commons/handle_pool.h"
 #include "nyla/rhi/rhi_bind_groups.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
@@ -43,24 +43,43 @@ auto ConvertVulkanBindingType(RhiBindingType bindingType, RhiBindingFlags bindin
 
 auto RhiCreateBindGroupLayout(const RhiBindGroupLayoutDesc &desc) -> RhiBindGroupLayout
 {
-    CHECK_LE(desc.bindingCount, std::size(desc.bindings));
-    std::array<VkDescriptorSetLayoutBinding, std::size(desc.bindings)> descriptorSetLayoutBindings;
+    CHECK_LE(desc.entriesCount, std::size(desc.entries));
+    std::array<VkDescriptorSetLayoutBinding, std::size(desc.entries)> bindings;
+    std::array<VkDescriptorBindingFlags, std::size(desc.entries)> bindingFlags;
 
-    for (uint32_t ibinding = 0; ibinding < desc.bindingCount; ++ibinding)
+    for (uint32_t i = 0; i < desc.entriesCount; ++i)
     {
-        const RhiBindingDesc &binding = desc.bindings[ibinding];
-        descriptorSetLayoutBindings[ibinding] = {
-            .binding = binding.binding,
-            .descriptorType = ConvertVulkanBindingType(binding.type, binding.flags),
-            .descriptorCount = binding.arraySize,
-            .stageFlags = ConvertRhiShaderStageIntoVkShaderStageFlags(binding.stageFlags),
+        const RhiBindGroupEntryLayoutDesc &bindingDesc = desc.entries[i];
+
+        CHECK(bindingDesc.arraySize);
+
+        bindings[i] = {
+            .binding = bindingDesc.binding,
+            .descriptorType = ConvertVulkanBindingType(bindingDesc.type, bindingDesc.flags),
+            .descriptorCount = bindingDesc.arraySize,
+            .stageFlags = ConvertRhiShaderStageIntoVkShaderStageFlags(bindingDesc.stageFlags),
         };
+
+        bindingFlags[i] = 0;
+        if (Any(bindingDesc.flags & RhiBindingFlags::PartiallyBound))
+            bindingFlags[i] |= VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
+        if (Any(bindingDesc.flags & RhiBindingFlags::VariableCount))
+            bindingFlags[i] |= VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT;
+        if (Any(bindingDesc.flags & RhiBindingFlags::UpdateAfterBind))
+            bindingFlags[i] |= VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT;
     }
+
+    const VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
+        .bindingCount = desc.entriesCount,
+        .pBindingFlags = bindingFlags.data(),
+    };
 
     const VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-        .bindingCount = desc.bindingCount,
-        .pBindings = descriptorSetLayoutBindings.data(),
+        .pNext = &bindingFlagsCreateInfo,
+        .bindingCount = desc.entriesCount,
+        .pBindings = bindings.data(),
     };
 
     VkDescriptorSetLayout descriptorSetLayout;
@@ -78,10 +97,9 @@ void RhiDestroyBindGroupLayout(RhiBindGroupLayout layout)
     vkDestroyDescriptorSetLayout(vk.dev, descriptorSetLayout, nullptr);
 }
 
-auto RhiCreateBindGroup(const RhiBindGroupDesc &desc) -> RhiBindGroup
+auto RhiCreateBindGroup(RhiBindGroupLayout layout) -> RhiBindGroup
 {
-    const VulkanBindGroupLayoutData &layoutData = HandleGetData(rhiHandles.bindGroupLayouts, desc.layout);
-    const VkDescriptorSetLayout descriptorSetLayout = layoutData.layout;
+    const VkDescriptorSetLayout descriptorSetLayout = HandleGetData(rhiHandles.bindGroupLayouts, layout).layout;
 
     const VkDescriptorSetAllocateInfo descriptorSetAllocInfo{
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
@@ -93,17 +111,26 @@ auto RhiCreateBindGroup(const RhiBindGroupDesc &desc) -> RhiBindGroup
     VkDescriptorSet descriptorSet;
     VK_CHECK(vkAllocateDescriptorSets(vk.dev, &descriptorSetAllocInfo, &descriptorSet));
 
+    return HandleAcquire(rhiHandles.bindGroups, descriptorSet);
+}
+
+void RhiUpdateBindGroup(RhiBindGroup bindGroup, const RhiBindGroupWriteDesc &desc)
+{
+    const VkDescriptorSet descriptorSet = HandleGetData(rhiHandles.bindGroups, bindGroup);
+    const VulkanBindGroupLayoutData &layoutData = HandleGetData(rhiHandles.bindGroupLayouts, desc.layout);
+    const VkDescriptorSetLayout descriptorSetLayout = layoutData.layout;
+
     std::array<VkWriteDescriptorSet, std::size(desc.entries)> writes;
     CHECK_LE(desc.entriesCount, std::size(desc.entries));
 
     std::array<VkDescriptorBufferInfo, std::size(desc.entries)> bufferInfos;
     std::array<VkDescriptorImageInfo, std::size(desc.entries)> imageInfos;
 
-    CHECK_EQ(desc.entriesCount, layoutData.desc.bindingCount);
+    CHECK_EQ(desc.entriesCount, layoutData.desc.entriesCount);
     for (uint32_t i = 0; i < desc.entriesCount; ++i)
     {
-        const RhiBindGroupEntry &bindEntry = desc.entries[i];
-        const RhiBindingDesc &layoutEntry = layoutData.desc.bindings[i];
+        const RhiBindGroupWriteEntry &bindEntry = desc.entries[i];
+        const RhiBindGroupEntryLayoutDesc &layoutEntry = layoutData.desc.entries[i];
         CHECK_EQ(bindEntry.binding, layoutEntry.binding);
 
         writes[i] = {
@@ -157,8 +184,6 @@ auto RhiCreateBindGroup(const RhiBindGroupDesc &desc) -> RhiBindGroup
     }
 
     vkUpdateDescriptorSets(vk.dev, desc.entriesCount, writes.data(), 0, nullptr);
-
-    return HandleAcquire(rhiHandles.bindGroups, descriptorSet);
 }
 
 void RhiDestroyBindGroup(RhiBindGroup bindGroup)

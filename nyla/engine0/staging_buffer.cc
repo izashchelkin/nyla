@@ -10,15 +10,15 @@
 namespace nyla
 {
 
-struct StagingBuffer
+struct GpuStagingBuffer
 {
     RhiBuffer buffer;
     uint32_t written;
 };
 
-auto CreateStagingBuffer(uint32_t size) -> StagingBuffer *
+auto CreateStagingBuffer(uint32_t size) -> GpuStagingBuffer *
 {
-    auto *stagingBuffer = new StagingBuffer{};
+    auto *stagingBuffer = new GpuStagingBuffer{};
 
     stagingBuffer->buffer = RhiCreateBuffer(RhiBufferDesc{
         .size = size,
@@ -32,7 +32,7 @@ auto CreateStagingBuffer(uint32_t size) -> StagingBuffer *
 namespace
 {
 
-auto BeforeCopy(StagingBuffer *stagingBuffer, uint32_t copySize) -> char *
+auto BeforeCopy(GpuStagingBuffer *stagingBuffer, uint32_t copySize) -> char *
 {
     AlignUp(stagingBuffer->written, RhiGetOptimalBufferCopyOffsetAlignment());
 
@@ -45,7 +45,7 @@ auto BeforeCopy(StagingBuffer *stagingBuffer, uint32_t copySize) -> char *
 
 } // namespace
 
-auto StagingBufferCopyIntoBuffer(RhiCmdList cmd, StagingBuffer *stagingBuffer, RhiBuffer dst, uint32_t dstOffset,
+auto StagingBufferCopyIntoBuffer(RhiCmdList cmd, GpuStagingBuffer *stagingBuffer, RhiBuffer dst, uint32_t dstOffset,
                                  uint32_t size) -> char *
 {
     char *ret = BeforeCopy(stagingBuffer, size);
@@ -56,7 +56,7 @@ auto StagingBufferCopyIntoBuffer(RhiCmdList cmd, StagingBuffer *stagingBuffer, R
     return ret;
 }
 
-auto StagingBufferCopyIntoTexture(RhiCmdList cmd, StagingBuffer *stagingBuffer, RhiTexture dst, uint32_t size) -> char *
+auto StagingBufferCopyIntoTexture(RhiCmdList cmd, GpuStagingBuffer *stagingBuffer, RhiTexture dst, uint32_t size) -> char *
 {
     char *ret = BeforeCopy(stagingBuffer, size);
 
@@ -66,7 +66,7 @@ auto StagingBufferCopyIntoTexture(RhiCmdList cmd, StagingBuffer *stagingBuffer, 
     return ret;
 }
 
-void StagingBufferReset(StagingBuffer *stagingBuffer)
+void StagingBufferReset(GpuStagingBuffer *stagingBuffer)
 {
     stagingBuffer->written = 0;
 }

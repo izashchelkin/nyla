@@ -46,13 +46,13 @@ void RpInit(Rp &rp)
     else
     {
         RhiBindGroupLayoutDesc bindGroupLayoutDesc{};
-        bindGroupLayoutDesc.bindingCount = rp.staticUniform.enabled + rp.dynamicUniform.enabled;
+        bindGroupLayoutDesc.entriesCount = rp.staticUniform.enabled + rp.dynamicUniform.enabled;
 
-        std::array<RhiBindGroupDesc, kRhiMaxNumFramesInFlight> bindGroupDesc;
+        std::array<RhiBindGroupWriteDesc, kRhiMaxNumFramesInFlight> bindGroupDesc;
 
         for (uint32_t j = 0; j < RhiGetNumFramesInFlight(); ++j)
         {
-            bindGroupDesc[j].entriesCount = bindGroupLayoutDesc.bindingCount;
+            bindGroupDesc[j].entriesCount = bindGroupLayoutDesc.entriesCount;
         }
 
         if (rp.vertBuf.enabled)
@@ -70,7 +70,7 @@ void RpInit(Rp &rp)
         auto initBuffer = [&bindGroupLayoutDesc, &bindGroupDesc](RpBuf &buf, RhiBufferUsage bufferUsage,
                                                                  RhiMemoryUsage memoryUsage, RhiBindingType bindingType,
                                                                  uint32_t binding, uint32_t i, bool dynamic) -> void {
-            bindGroupLayoutDesc.bindings[i] = {
+            bindGroupLayoutDesc.entries[i] = {
                 .binding = binding,
                 .type = bindingType,
                 .flags = dynamic ? RhiBindingFlags::Dynamic : static_cast<RhiBindingFlags>(0),
@@ -86,7 +86,7 @@ void RpInit(Rp &rp)
                     .memoryUsage = memoryUsage,
                 });
 
-                bindGroupDesc[iframe].entries[i] = RhiBindGroupEntry{
+                bindGroupDesc[iframe].entries[i] = RhiBindGroupWriteEntry{
                     .binding = binding,
                     .arrayIndex = 0,
                     .buffer =

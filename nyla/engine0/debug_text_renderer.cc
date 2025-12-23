@@ -53,7 +53,7 @@ auto CreateDebugTextRenderer() -> DebugTextRenderer *
         .bindingCount = 1,
         .bindings =
             {
-                RhiBindingDesc{
+                RhiBindingWriteDesc{
                     .binding = 0,
                     .type = RhiBindingType::UniformBuffer,
                     .flags = RhiBindingFlags::Dynamic,
@@ -89,12 +89,12 @@ auto CreateDebugTextRenderer() -> DebugTextRenderer *
             .memoryUsage = RhiMemoryUsage::CpuToGpu,
         });
 
-        renderer->bindGroup[i] = RhiCreateBindGroup(RhiBindGroupDesc{
+        renderer->bindGroup[i] = RhiCreateBindGroup(RhiBindGroupWriteDesc{
             .layout = renderer->bindGroupLayout,
             .entriesCount = 1,
             .entries =
                 {
-                    RhiBindGroupEntry{
+                    RhiBindGroupWriteEntry{
                         .binding = 0,
                         .arrayIndex = 0,
                         .buffer =

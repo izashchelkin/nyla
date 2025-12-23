@@ -12,9 +12,6 @@ namespace nyla
 
 constexpr inline uint32_t kRhiMaxBindGroupLayouts = 4;
 
-struct RhiBindGroup : Handle
-{
-};
 struct RhiBindGroupLayout : Handle
 {
 };
@@ -30,8 +27,35 @@ enum class RhiBindingType
 enum class RhiBindingFlags
 {
     Dynamic = 1 << 0,
+    PartiallyBound = 1 << 1,
+    UpdateAfterBind = 1 << 2,
+    VariableCount = 1 << 3,
 };
 NYLA_BITENUM(RhiBindingFlags)
+
+struct RhiBindGroupEntryLayoutDesc
+{
+    uint32_t binding;
+    RhiBindingType type;
+    RhiBindingFlags flags;
+    uint32_t arraySize;
+    RhiShaderStage stageFlags;
+};
+
+struct RhiBindGroupLayoutDesc
+{
+    uint32_t entriesCount;
+    std::array<RhiBindGroupEntryLayoutDesc, 4> entries;
+};
+
+auto RhiCreateBindGroupLayout(const RhiBindGroupLayoutDesc &) -> RhiBindGroupLayout;
+void RhiDestroyBindGroupLayout(RhiBindGroupLayout);
+
+//
+
+struct RhiBindGroup : Handle
+{
+};
 
 struct RhiBufferBinding
 {
@@ -51,7 +75,7 @@ struct RhiTextureBinding
     RhiTexture texture;
 };
 
-struct RhiBindGroupEntry
+struct RhiBindGroupWriteEntry
 {
     uint32_t binding;
     uint32_t arrayIndex;
@@ -62,32 +86,15 @@ struct RhiBindGroupEntry
     };
 };
 
-struct RhiBindGroupDesc
+struct RhiBindGroupWriteDesc
 {
     RhiBindGroupLayout layout;
     uint32_t entriesCount;
-    std::array<RhiBindGroupEntry, 4> entries;
+    std::array<RhiBindGroupWriteEntry, 4> entries;
 };
 
-struct RhiBindingDesc
-{
-    uint32_t binding;
-    RhiBindingType type;
-    RhiBindingFlags flags;
-    uint32_t arraySize;
-    RhiShaderStage stageFlags;
-};
-
-struct RhiBindGroupLayoutDesc
-{
-    uint32_t bindingCount;
-    std::array<RhiBindingDesc, 4> bindings;
-};
-
-auto RhiCreateBindGroupLayout(const RhiBindGroupLayoutDesc &) -> RhiBindGroupLayout;
-void RhiDestroyBindGroupLayout(RhiBindGroupLayout);
-
-auto RhiCreateBindGroup(const RhiBindGroupDesc &) -> RhiBindGroup;
+auto RhiCreateBindGroup(RhiBindGroupLayout) -> RhiBindGroup;
+void RhiUpdateBindGroup(RhiBindGroup, const RhiBindGroupWriteDesc &);
 void RhiDestroyBindGroup(RhiBindGroup);
 
 } // namespace nyla

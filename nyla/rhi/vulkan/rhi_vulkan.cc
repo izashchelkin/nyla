@@ -372,18 +372,27 @@ void RhiInit(const RhiDesc &rhiDesc)
     VkPhysicalDeviceVulkan14Features v14{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES,
     };
+
     VkPhysicalDeviceVulkan13Features v13{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
         .pNext = &v14,
-        .shaderDemoteToHelperInvocation = VK_TRUE,
-        .synchronization2 = VK_TRUE,
-        .dynamicRendering = VK_TRUE,
+        .shaderDemoteToHelperInvocation = true,
+        .synchronization2 = true,
+        .dynamicRendering = true,
     };
+
     VkPhysicalDeviceVulkan12Features v12{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
         .pNext = &v13,
-        .timelineSemaphore = VK_TRUE,
+        .descriptorIndexing = true,
+        .shaderSampledImageArrayNonUniformIndexing = true,
+        .descriptorBindingUpdateUnusedWhilePending = true,
+        .descriptorBindingPartiallyBound = true,
+        .descriptorBindingVariableDescriptorCount = true,
+        .runtimeDescriptorArray = true,
+        .timelineSemaphore = true,
     };
+
     VkPhysicalDeviceVulkan11Features v11{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
         .pNext = &v12,
@@ -392,10 +401,10 @@ void RhiInit(const RhiDesc &rhiDesc)
     VkPhysicalDevicePresentModeFifoLatestReadyFeaturesKHR fifoLatestReadyFeatures = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRESENT_MODE_FIFO_LATEST_READY_FEATURES_KHR,
         .pNext = &v11,
-        .presentModeFifoLatestReady = VK_TRUE,
+        .presentModeFifoLatestReady = true,
     };
 
-    VkPhysicalDeviceFeatures2 features{
+    const VkPhysicalDeviceFeatures2 features{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
         .pNext = &fifoLatestReadyFeatures,
         .features = {},
@@ -460,9 +469,11 @@ void RhiInit(const RhiDesc &rhiDesc)
         VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 256},
         VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_SAMPLER, 256},
     };
+
     const VkDescriptorPoolCreateInfo descriptorPoolCreateInfo{
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-        .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
+        .flags =
+            VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT /* | VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT */,
         .maxSets = 256,
         .poolSizeCount = static_cast<uint32_t>(descriptorPoolSizes.size()),
         .pPoolSizes = descriptorPoolSizes.data(),
