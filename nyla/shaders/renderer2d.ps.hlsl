@@ -9,16 +9,18 @@ struct Entity
 {
     float4x4 model;
     float4 color;
+    uint32_t textureIndex;
+    uint32_t samplerIndex;
 };
 
 [[vk::binding(0, 0)]]
 ConstantBuffer<Entity> entity;
 
-[[vk::binding(1, 0)]]
-Texture2D texture;
+[[vk::binding(0, 1)]]
+SamplerState samplers[];
 
-[[vk::binding(2, 0)]]
-sampler mysampler;
+[[vk::binding(1, 1)]]
+Texture2D textures[];
 
 struct PSOutput
 {
@@ -28,7 +30,11 @@ struct PSOutput
 PSOutput main(VSOutput input)
 {
     PSOutput o;
-    o.color = texture.Sample(mysampler, input.uv);
+
+    Texture2D texture = textures[entity.textureIndex];
+    SamplerState samplerState = samplers[entity.samplerIndex];
+
+    o.color = texture.Sample(samplerState, input.uv);
     // o.color = input.color + entity.color;
     return o;
 }

@@ -4,11 +4,12 @@
 
 #include "absl/log/check.h"
 #include "absl/log/log.h"
+#include "nyla/commons/containers/inline_vec.h"
 #include "nyla/commons/handle_pool.h"
 #include "nyla/rhi/rhi.h"
-#include "nyla/rhi/rhi_bind_groups.h"
 #include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
+#include "nyla/rhi/rhi_descriptor.h"
 #include "nyla/rhi/rhi_pipeline.h"
 #include "nyla/rhi/rhi_sampler.h"
 #include "nyla/rhi/rhi_texture.h"
@@ -101,7 +102,7 @@ struct VulkanPipelineData
     VkPipelineLayout layout;
     VkPipeline pipeline;
     VkPipelineBindPoint bindPoint;
-    std::array<RhiBindGroupLayout, kRhiMaxBindGroupLayouts> bindGroupLayouts;
+    std::array<RhiDescriptorSetLayout, 4> bindGroupLayouts;
     uint32_t bindGroupLayoutCount;
 };
 
@@ -122,16 +123,22 @@ struct VulkanSamplerData
     VkSampler sampler;
 };
 
-struct VulkanBindGroupLayoutData
+struct VulkanDescriptorSetLayoutData
 {
     VkDescriptorSetLayout layout;
-    RhiBindGroupLayoutDesc desc;
+    InlineVec<RhiDescriptorLayoutDesc, 64> descriptors;
+};
+
+struct VulkanDescriptorSetData
+{
+    VkDescriptorSet set;
+    RhiDescriptorSetLayout layout;
 };
 
 struct RhiHandles
 {
-    HandlePool<RhiBindGroupLayout, VulkanBindGroupLayoutData, 16> bindGroupLayouts;
-    HandlePool<RhiBindGroup, VkDescriptorSet, 16> bindGroups;
+    HandlePool<RhiDescriptorSetLayout, VulkanDescriptorSetLayoutData, 16> descriptorSetLayouts;
+    HandlePool<RhiDescriptorSet, VulkanDescriptorSetData, 16> descriptorSets;
     HandlePool<RhiBuffer, VulkanBufferData, 16> buffers;
     HandlePool<RhiCmdList, VulkanCmdListData, 16> cmdLists;
     HandlePool<RhiShader, VkShaderModule, 16> shaders;

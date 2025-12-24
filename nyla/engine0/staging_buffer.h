@@ -8,13 +8,13 @@
 namespace nyla
 {
 
-struct StagingBuffer;
+struct GpuStagingBuffer;
 
-auto CreateStagingBuffer(uint32_t size) -> StagingBuffer *;
-auto StagingBufferCopyIntoBuffer(RhiCmdList cmd, StagingBuffer *stagingBuffer, RhiBuffer dst, uint32_t dstOffset,
+auto CreateStagingBuffer(uint32_t size) -> GpuStagingBuffer *;
+auto StagingBufferCopyIntoBuffer(RhiCmdList cmd, GpuStagingBuffer *stagingBuffer, RhiBuffer dst, uint32_t dstOffset,
                                  uint32_t size) -> char *;
-auto StagingBufferCopyIntoTexture(RhiCmdList cmd, StagingBuffer *stagingBuffer, RhiTexture dst, uint32_t size)
+auto StagingBufferCopyIntoTexture(RhiCmdList cmd, GpuStagingBuffer *stagingBuffer, RhiTexture dst, uint32_t size)
     -> char *;
-void StagingBufferReset(StagingBuffer *stagingBuffer);
+void StagingBufferReset(GpuStagingBuffer *stagingBuffer);
 
 } // namespace nyla

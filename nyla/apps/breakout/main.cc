@@ -4,14 +4,17 @@
 #include "nyla/commons/signal/signal.h"
 #include "nyla/engine0/debug_text_renderer.h"
 #include "nyla/engine0/engine0.h"
+#include "nyla/engine0/gpu_resources.h"
 #include "nyla/engine0/renderer2d.h"
 #include "nyla/engine0/staging_buffer.h"
 #include "nyla/platform/key_physical.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
+#include "nyla/rhi/rhi_descriptor.h"
 #include "nyla/rhi/rhi_pass.h"
 #include "nyla/rhi/rhi_sampler.h"
+#include "nyla/rhi/rhi_shader.h"
 #include "nyla/rhi/rhi_texture.h"
 #include "third_party/stb/stb_image.h"
 #include <cstdint>
@@ -65,25 +68,20 @@ static auto Main() -> int
     RhiTexture offscreenTexture = offscreenTextures[RhiGetFrameIndex()];
 #endif
 
+    GpuResourcesInit();
+
     int texWidth = 0;
     int texHeight = 0;
     int texChannels = 0;
     stbi_uc *texPixels = stbi_load("assets/BBreaker/Player.png", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
 
-    RhiTexture texture = RhiCreateTexture({
-        .width = static_cast<uint32_t>(texWidth),
-        .height = static_cast<uint32_t>(texHeight),
-        .memoryUsage = RhiMemoryUsage::GpuOnly,
-        .usage = RhiTextureUsage::TransferDst | RhiTextureUsage::ShaderSampled,
-        .format = RhiTextureFormat::R8G8B8A8_sRGB,
-    });
+    Texture texture = CreateTexture(texWidth, texHeight, RhiTextureFormat::R8G8B8A8_sRGB);
+    Sampler sampler = CreateSampler();
 
-    RhiSampler sampler = RhiCreateSampler({});
+    GpuStagingBuffer *stagingBuffer = CreateStagingBuffer(1 << 20);
 
-    StagingBuffer *stagingBuffer = CreateStagingBuffer(1 << 20);
-
-    Renderer2D *renderer2d;
-    DebugTextRenderer *debugTextRenderer;
+    Renderer2D *renderer2d = CreateRenderer2D();
+    DebugTextRenderer *debugTextRenderer = CreateDebugTextRenderer();
 
     while (!Engine0ShouldExit())
     {
@@ -120,14 +118,9 @@ static auto Main() -> int
         }
         else
         {
-            RhiCmdTransitionTexture(cmd, texture, RhiTextureState::TransferDst);
-
-            const uint32_t texSize = texWidth * texHeight * 4;
-            char *dst = StagingBufferCopyIntoTexture(cmd, stagingBuffer, texture, texSize);
-            memcpy(dst, texPixels, texSize);
-
-            RhiCmdTransitionTexture(cmd, texture, RhiTextureState::ShaderRead);
-
+            UploadTexture(cmd, stagingBuffer, texture,
+                          std::span{reinterpret_cast<const std::byte *>(texPixels),
+                                    static_cast<size_t>(texWidth * texHeight * 4)});
             inited = true;
 
             RhiPassBegin({
@@ -138,11 +131,9 @@ static auto Main() -> int
                 .colorTarget = RhiGetBackbufferTexture(),
                 .state = RhiTextureState::Present,
             });
-
-            renderer2d = CreateRenderer2D(texture, sampler);
-            debugTextRenderer = CreateDebugTextRenderer();
         }
 
+        GpuResourcesWriteDescriptors();
         Engine0FrameEnd();
     }
 

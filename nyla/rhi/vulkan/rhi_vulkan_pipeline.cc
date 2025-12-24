@@ -219,10 +219,10 @@ auto RhiCreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGraphi
         .size = desc.pushConstantSize,
     };
 
-    std::array<VkDescriptorSetLayout, kRhiMaxBindGroupLayouts> descriptorSetLayouts;
+    std::array<VkDescriptorSetLayout, 4> descriptorSetLayouts;
     for (uint32_t i = 0; i < desc.bindGroupLayoutsCount; ++i)
     {
-        descriptorSetLayouts[i] = HandleGetData(rhiHandles.bindGroupLayouts, desc.bindGroupLayouts[i]).layout;
+        descriptorSetLayouts[i] = HandleGetData(rhiHandles.descriptorSetLayouts, desc.bindGroupLayouts[i]).layout;
     }
 
     const VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{

@@ -7,7 +7,9 @@
 
 #include "nyla/commons/math/vec.h"
 #include "nyla/rhi/rhi.h"
+#include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
+#include "nyla/rhi/rhi_descriptor.h"
 #include "nyla/rhi/rhi_pipeline.h"
 #include "nyla/rhi/rhi_shader.h"
 
@@ -36,8 +38,8 @@ InlineVec<DrawData, 4> pendingDebugTextDraws;
 struct DebugTextRenderer
 {
     RhiGraphicsPipeline pipeline;
-    RhiBindGroupLayout bindGroupLayout;
-    std::array<RhiBindGroup, kRhiMaxNumFramesInFlight> bindGroup;
+    RhiDescriptorSetLayout bindGroupLayout;
+    std::array<RhiDescriptorSet, kRhiMaxNumFramesInFlight> bindGroup;
     std::array<RhiBuffer, kRhiMaxNumFramesInFlight> dynamicUniformBuffer;
     uint32_t dymamicUniformBufferWritten;
 };
@@ -49,18 +51,15 @@ auto CreateDebugTextRenderer() -> DebugTextRenderer *
 
     auto *renderer = new DebugTextRenderer{};
 
-    renderer->bindGroupLayout = RhiCreateBindGroupLayout(RhiBindGroupLayoutDesc{
-        .bindingCount = 1,
-        .bindings =
-            {
-                RhiBindingDesc{
-                    .binding = 0,
-                    .type = RhiBindingType::UniformBuffer,
-                    .flags = RhiBindingFlags::Dynamic,
-                    .arraySize = 1,
-                    .stageFlags = RhiShaderStage::Pixel,
-                },
-            },
+    const RhiDescriptorLayoutDesc descriptorLayout{
+        .binding = 0,
+        .type = RhiBindingType::UniformBuffer,
+        .flags = RhiDescriptorFlags::Dynamic,
+        .arraySize = 1,
+        .stageFlags = RhiShaderStage::Pixel,
+    };
+    renderer->bindGroupLayout = RhiCreateDescriptorSetLayout(RhiDescriptorSetLayoutDesc{
+        .descriptors = std::span{&descriptorLayout, 1},
     });
 
     const RhiGraphicsPipelineDesc pipelineDesc{
@@ -89,24 +88,19 @@ auto CreateDebugTextRenderer() -> DebugTextRenderer *
             .memoryUsage = RhiMemoryUsage::CpuToGpu,
         });
 
-        renderer->bindGroup[i] = RhiCreateBindGroup(RhiBindGroupDesc{
-            .layout = renderer->bindGroupLayout,
-            .entriesCount = 1,
-            .entries =
-                {
-                    RhiBindGroupEntry{
-                        .binding = 0,
-                        .arrayIndex = 0,
-                        .buffer =
-                            RhiBufferBinding{
-                                .buffer = renderer->dynamicUniformBuffer[i],
-                                .size = kDynamicUniformBufferSize,
-                                .offset = 0,
-                                .range = sizeof(DrawData),
-                            },
-                    },
-                },
-        });
+        renderer->bindGroup[i] = RhiCreateDescriptorSet(renderer->bindGroupLayout);
+
+        const RhiDescriptorWriteDesc descriptorWrite{
+            .set = renderer->bindGroup[i],
+            .binding = 0,
+            .arrayIndex = 0,
+            .type = RhiBindingType::UniformBuffer,
+            .resourceBinding = {.buffer = RhiBufferBinding{.buffer = renderer->dynamicUniformBuffer[i],
+                                                           .size = kDynamicUniformBufferSize,
+                                                           .offset = 0,
+                                                           .range = sizeof(DrawData)}},
+        };
+        RhiWriteDescriptors(std::span{&descriptorWrite, 1});
     }
 
     return renderer;
