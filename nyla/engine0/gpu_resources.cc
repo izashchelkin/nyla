@@ -2,7 +2,9 @@
 #include "absl/log/check.h"
 #include "nyla/commons/containers/inline_vec.h"
 #include "nyla/engine0/staging_buffer.h"
+#include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_descriptor.h"
+#include "nyla/rhi/rhi_pipeline.h"
 #include "nyla/rhi/rhi_sampler.h"
 #include "nyla/rhi/rhi_shader.h"
 #include "nyla/rhi/rhi_texture.h"
@@ -15,12 +17,6 @@ namespace nyla
 
 namespace
 {
-
-RhiDescriptorSetLayout textureSetLayout;
-RhiDescriptorSetLayout samplerSetLayout;
-
-constexpr uint32_t kStagingBufferSize = 1 << 20;
-GpuStagingBuffer *stagingBuffer;
 
 struct GpuResourceSlot
 {
@@ -35,64 +31,45 @@ struct GpuResourceSlot
 template <uint32_t Size, typename HandleType, RhiBindingType BindingType, RhiShaderStage Stages, uint32_t Binding>
 struct GpuResourcePool
 {
+    using ResourceType = nyla::GpuResource<HandleType>;
+
     std::array<GpuResourceSlot, Size> slots;
 
-    RhiDescriptorSetLayout descriptorSetLayout;
-    RhiDescriptorSet descriptorSet;
-
-    constexpr auto size() -> uint32_t
+    [[nodiscard]]
+    constexpr auto size() const -> uint32_t
     {
         return Size;
     }
 
-    constexpr auto GetStages() -> RhiShaderStage
+    [[nodiscard]]
+    constexpr auto GetStages() const -> RhiShaderStage
     {
         return Stages;
     }
 
-    constexpr auto GetBindingType() -> RhiBindingType
+    [[nodiscard]]
+    constexpr auto GetBindingType() const -> RhiBindingType
     {
         return BindingType;
     }
 
-    constexpr auto GetBinding() -> uint32_t
+    [[nodiscard]]
+    constexpr auto GetBinding() const -> uint32_t
     {
         return Binding;
     }
-
-    struct GpuResource
-    {
-        uint32_t gen;
-        uint32_t index;
-        HandleType handle;
-    };
 };
 
-GpuResourcePool<1 << 8, RhiTexture, RhiBindingType::Texture, RhiShaderStage::Pixel, 0> texturesPool;
-GpuResourcePool<1 << 5, RhiSampler, RhiBindingType::Sampler, RhiShaderStage::Pixel, 0> samplersPool;
+RhiDescriptorSetLayout descriptorSetLayout;
+RhiDescriptorSet descriptorSet;
 
-template <uint32_t Size, typename HandleType, RhiBindingType BindingType, RhiShaderStage Stages, uint32_t Binding>
-void InitGpuResourcePool(GpuResourcePool<Size, HandleType, BindingType, Stages, Binding> &pool)
-{
-    const RhiDescriptorLayoutDesc descriptorLayout{
-        .binding = pool.GetBinding(),
-        .type = BindingType,
-        .flags = RhiDescriptorFlags::VariableCount | RhiDescriptorFlags::PartiallyBound |
-                 RhiDescriptorFlags::UpdateAfterBind,
-        .arraySize = pool.size(),
-        .stageFlags = pool.GetStages(),
-    };
-
-    pool.descriptorSetLayout = RhiCreateDescriptorSetLayout(RhiDescriptorSetLayoutDesc{
-        .descriptors = std::span{&descriptorLayout, 1},
-    });
-    pool.descriptorSet = RhiCreateDescriptorSet(pool.descriptorSetLayout);
-}
+GpuResourcePool<1 << 5, RhiSampler, RhiBindingType::Sampler, RhiShaderStage::Pixel, 0> samplerPool;
+GpuResourcePool<1 << 8, RhiTexture, RhiBindingType::Texture, RhiShaderStage::Pixel, 1> texturePool;
 
 template <uint32_t Size, typename HandleType, RhiBindingType BindingType, RhiShaderStage Stages, uint32_t Binding>
 auto AcquireGpuResourceSlot(GpuResourcePool<Size, HandleType, BindingType, Stages, Binding> &pool,
                             RhiDescriptorResourceBinding resourceBinding, HandleType handle)
-    -> std::remove_reference_t<decltype(pool)>::GpuResource
+    -> std::remove_reference_t<decltype(pool)>::ResourceType
 {
     for (uint32_t i = 0; i < pool.size(); ++i)
     {
@@ -116,16 +93,36 @@ auto AcquireGpuResourceSlot(GpuResourcePool<Size, HandleType, BindingType, Stage
 
 } // namespace
 
+auto GpuResourceGetDescriptorSetLayout() -> RhiDescriptorSetLayout
+{
+    return descriptorSetLayout;
+}
+
 void GpuResourcesInit()
 {
     static bool inited = false;
     CHECK(!inited);
     inited = true;
 
-    stagingBuffer = CreateStagingBuffer(kStagingBufferSize);
+    auto makeDescriptorLayout = [](const auto &pool) -> RhiDescriptorLayoutDesc {
+        return RhiDescriptorLayoutDesc{
+            .binding = pool.GetBinding(),
+            .type = pool.GetBindingType(),
+            .flags = RhiDescriptorFlags::PartiallyBound,
+            .arraySize = pool.size(),
+            .stageFlags = pool.GetStages(),
+        };
+    };
 
-    InitGpuResourcePool(texturesPool);
-    InitGpuResourcePool(samplersPool);
+    const std::array<RhiDescriptorLayoutDesc, 2> descriptorLayouts{
+        makeDescriptorLayout(samplerPool),
+        makeDescriptorLayout(texturePool),
+    };
+
+    descriptorSetLayout = RhiCreateDescriptorSetLayout(RhiDescriptorSetLayoutDesc{
+        .descriptors = descriptorLayouts,
+    });
+    descriptorSet = RhiCreateDescriptorSet(descriptorSetLayout);
 }
 
 #if 0
@@ -137,9 +134,14 @@ void GpuResourcesInit()
     free(texPixels);
 #endif
 
+void GpuResourcesBind(RhiCmdList cmd)
+{
+    RhiCmdBindGraphicsBindGroup(cmd, 1, descriptorSet, {});
+}
+
 void GpuResourcesWriteDescriptors()
 {
-    InlineVec<RhiDescriptorWriteDesc, (texturesPool.size() + samplersPool.size()) / 2> writes;
+    InlineVec<RhiDescriptorWriteDesc, (texturePool.size() + samplerPool.size()) / 2> writes;
 
     auto processPool = [&writes](auto &pool) -> void {
         for (uint32_t i = 0; i < pool.size(); ++i)
@@ -151,7 +153,7 @@ void GpuResourcesWriteDescriptors()
                 continue;
 
             writes.emplace_back(RhiDescriptorWriteDesc{
-                .set = pool.descriptorSet,
+                .set = descriptorSet,
                 .binding = pool.GetBinding(),
                 .arrayIndex = i,
                 .type = pool.GetBindingType(),
@@ -160,17 +162,16 @@ void GpuResourcesWriteDescriptors()
             slot.flags &= ~GpuResourceSlot::kFlagDirty;
         }
     };
-    processPool(texturesPool);
-    processPool(samplersPool);
+    processPool(texturePool);
+    processPool(samplerPool);
 
     if (!writes.empty())
         RhiWriteDescriptors(writes);
 }
 
-auto CreateSampledTextureResource(uint32_t width, uint32_t height, RhiTextureFormat format)
-    -> decltype(texturesPool)::GpuResource
+auto CreateTexture(uint32_t width, uint32_t height, RhiTextureFormat format) -> Texture
 {
-    RhiTexture texture = RhiCreateTexture({
+    const RhiTexture texture = RhiCreateTexture({
         .width = width,
         .height = height,
         .memoryUsage = RhiMemoryUsage::GpuOnly,
@@ -178,22 +179,32 @@ auto CreateSampledTextureResource(uint32_t width, uint32_t height, RhiTextureFor
         .format = format,
     });
 
-    RhiDescriptorResourceBinding resourceBinding{
+    const RhiDescriptorResourceBinding resourceBinding{
         .texture = {.texture = texture},
     };
 
-    return AcquireGpuResourceSlot(texturesPool, resourceBinding, texture);
+    return AcquireGpuResourceSlot(texturePool, resourceBinding, texture);
 }
 
-auto CreateSamplerResource() -> decltype(samplersPool)::GpuResource
+void UploadTexture(RhiCmdList cmd, GpuStagingBuffer *stagingBuffer, Texture &texture, std::span<const std::byte> pixels)
 {
-    RhiSampler sampler = RhiCreateSampler({});
+    RhiCmdTransitionTexture(cmd, texture.handle, RhiTextureState::TransferDst);
 
-    RhiDescriptorResourceBinding resourceBinding{
+    char *dst = StagingBufferCopyIntoTexture(cmd, stagingBuffer, texture.handle, pixels.size());
+    memcpy(dst, pixels.data(), pixels.size());
+
+    RhiCmdTransitionTexture(cmd, texture.handle, RhiTextureState::ShaderRead);
+}
+
+auto CreateSampler() -> Sampler
+{
+    const RhiSampler sampler = RhiCreateSampler({});
+
+    const RhiDescriptorResourceBinding resourceBinding{
         .sampler = {.sampler = sampler},
     };
 
-    return AcquireGpuResourceSlot(samplersPool, resourceBinding, sampler);
+    return AcquireGpuResourceSlot(samplerPool, resourceBinding, sampler);
 }
 
 } // namespace nyla

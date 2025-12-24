@@ -11,6 +11,8 @@ struct Entity
 {
     float4x4 model;
     float4 color;
+    uint32_t textureIndex;
+    uint32_t samplerIndex;
 };
 
 [[vk::binding(0, 0)]]

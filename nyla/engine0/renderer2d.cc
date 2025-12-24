@@ -4,13 +4,13 @@
 #include "nyla/commons/math/vec.h"
 #include "nyla/commons/memory/align.h"
 #include "nyla/engine0/engine0_internal.h"
+#include "nyla/engine0/gpu_resources.h"
 #include "nyla/engine0/staging_buffer.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_descriptor.h"
 #include "nyla/rhi/rhi_pipeline.h"
-#include "nyla/rhi/rhi_sampler.h"
 #include "nyla/rhi/rhi_shader.h"
 #include "nyla/rhi/rhi_texture.h"
 #include <cstdint>
@@ -35,6 +35,8 @@ struct EntityUbo
 {
     float4x4 model;
     float4 color;
+    uint32_t textureIndex;
+    uint32_t samplerIndex;
 };
 
 struct Scene
@@ -57,32 +59,20 @@ struct Renderer2D
     InlineVec<uint32_t, 256> pendingDraws;
 };
 
-auto CreateRenderer2D(RhiTexture texture, RhiSampler sampler) -> Renderer2D *
+auto CreateRenderer2D() -> Renderer2D *
 {
     const RhiShader vs = GetShader("renderer2d.vs", RhiShaderStage::Vertex);
     const RhiShader ps = GetShader("renderer2d.ps", RhiShaderStage::Pixel);
 
     auto *renderer = new Renderer2D{};
 
-    const std::array<RhiDescriptorLayoutDesc, 3> descriptorLayouts{
+    const std::array<RhiDescriptorLayoutDesc, 1> descriptorLayouts{
         RhiDescriptorLayoutDesc{
             .binding = 0,
             .type = RhiBindingType::UniformBuffer,
             .flags = RhiDescriptorFlags::Dynamic,
             .arraySize = 1,
             .stageFlags = RhiShaderStage::Vertex | RhiShaderStage::Pixel,
-        },
-        RhiDescriptorLayoutDesc{
-            .binding = 1,
-            .type = RhiBindingType::Texture,
-            .arraySize = 1,
-            .stageFlags = RhiShaderStage::Pixel,
-        },
-        RhiDescriptorLayoutDesc{
-            .binding = 2,
-            .type = RhiBindingType::Sampler,
-            .arraySize = 1,
-            .stageFlags = RhiShaderStage::Pixel,
         },
     };
     renderer->descriptorSetLayout = RhiCreateDescriptorSetLayout(RhiDescriptorSetLayoutDesc{
@@ -93,10 +83,11 @@ auto CreateRenderer2D(RhiTexture texture, RhiSampler sampler) -> Renderer2D *
         .debugName = "Renderer2D",
         .vs = vs,
         .ps = ps,
-        .bindGroupLayoutsCount = 1,
+        .bindGroupLayoutsCount = 2,
         .bindGroupLayouts =
             {
                 renderer->descriptorSetLayout,
+                GpuResourceGetDescriptorSetLayout(),
             },
         .vertexBindingsCount = 1,
         .vertexBindings =
@@ -153,7 +144,7 @@ auto CreateRenderer2D(RhiTexture texture, RhiSampler sampler) -> Renderer2D *
 
         renderer->descriptorSets[i] = RhiCreateDescriptorSet(renderer->descriptorSetLayout);
 
-        const std::array<RhiDescriptorWriteDesc, 3> descriptorWrites{
+        const std::array<RhiDescriptorWriteDesc, 1> descriptorWrites{
             RhiDescriptorWriteDesc{
                 .set = renderer->descriptorSets[i],
                 .binding = 0,
@@ -163,20 +154,6 @@ auto CreateRenderer2D(RhiTexture texture, RhiSampler sampler) -> Renderer2D *
                                                                .size = kDynamicUniformBufferSize,
                                                                .offset = 0,
                                                                .range = sizeof(EntityUbo)}},
-            },
-            RhiDescriptorWriteDesc{
-                .set = renderer->descriptorSets[i],
-                .binding = 1,
-                .arrayIndex = 0,
-                .type = RhiBindingType::Texture,
-                .resourceBinding = {.texture = {.texture = texture}},
-            },
-            RhiDescriptorWriteDesc{
-                .set = renderer->descriptorSets[i],
-                .binding = 2,
-                .arrayIndex = 0,
-                .type = RhiBindingType::Sampler,
-                .resourceBinding = {.sampler = {.sampler = sampler}},
             },
         };
         RhiWriteDescriptors(descriptorWrites);
@@ -233,9 +210,12 @@ void Renderer2DRect(RhiCmdList cmd, Renderer2D *renderer, float x, float y, floa
     const uint32_t frameIndex = RhiGetFrameIndex();
 
     AlignUp(renderer->dymamicUniformBufferWritten, RhiGetMinUniformBufferOffsetAlignment());
-    new (RhiMapBuffer(renderer->dynamicUniformBuffer[frameIndex]) + renderer->dymamicUniformBufferWritten) EntityUbo{
+    auto *p = RhiMapBuffer(renderer->dynamicUniformBuffer[frameIndex]) + renderer->dymamicUniformBufferWritten;
+    new (p) EntityUbo{
         .model = float4x4::Translate(float4{x, y, 0, 1}).Mult(float4x4::Scale(float4{width, height, 1, 1})),
         .color = color,
+        .textureIndex = 0,
+        .samplerIndex = 0,
     };
 
     uint32_t offset = renderer->dymamicUniformBufferWritten;
@@ -247,6 +227,8 @@ void Renderer2DRect(RhiCmdList cmd, Renderer2D *renderer, float x, float y, floa
 void Renderer2DDraw(RhiCmdList cmd, Renderer2D *renderer, uint32_t width, uint32_t height, float metersOnScreen)
 {
     RhiCmdBindGraphicsPipeline(cmd, renderer->pipeline);
+
+    GpuResourcesBind(cmd);
 
     float worldW;
     float worldH;
