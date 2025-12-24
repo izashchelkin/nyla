@@ -6,9 +6,9 @@
 #include "nyla/engine0/engine0_internal.h"
 #include "nyla/engine0/staging_buffer.h"
 #include "nyla/rhi/rhi.h"
-#include "nyla/rhi/rhi_bind_groups.h"
 #include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
+#include "nyla/rhi/rhi_descriptor.h"
 #include "nyla/rhi/rhi_pipeline.h"
 #include "nyla/rhi/rhi_sampler.h"
 #include "nyla/rhi/rhi_shader.h"
@@ -48,9 +48,9 @@ struct Scene
 struct Renderer2D
 {
     RhiGraphicsPipeline pipeline;
-    RhiBindGroupLayout bindGroupLayout;
+    RhiDescriptorSetLayout descriptorSetLayout;
     RhiBuffer vertexBuffer;
-    std::array<RhiBindGroup, kRhiMaxNumFramesInFlight> bindGroup;
+    std::array<RhiDescriptorSet, kRhiMaxNumFramesInFlight> descriptorSets;
     std::array<RhiBuffer, kRhiMaxNumFramesInFlight> dynamicUniformBuffer;
     uint32_t dymamicUniformBufferWritten;
 
@@ -64,30 +64,29 @@ auto CreateRenderer2D(RhiTexture texture, RhiSampler sampler) -> Renderer2D *
 
     auto *renderer = new Renderer2D{};
 
-    renderer->bindGroupLayout = RhiCreateBindGroupLayout(RhiBindGroupLayoutDesc{
-        .bindingCount = 3,
-        .bindings =
-            {
-                RhiBindingWriteDesc{
-                    .binding = 0,
-                    .type = RhiBindingType::UniformBuffer,
-                    .flags = RhiBindingFlags::Dynamic,
-                    .arraySize = 1,
-                    .stageFlags = RhiShaderStage::Vertex | RhiShaderStage::Pixel,
-                },
-                RhiBindingWriteDesc{
-                    .binding = 1,
-                    .type = RhiBindingType::Texture,
-                    .arraySize = 1,
-                    .stageFlags = RhiShaderStage::Pixel,
-                },
-                RhiBindingWriteDesc{
-                    .binding = 2,
-                    .type = RhiBindingType::Sampler,
-                    .arraySize = 1,
-                    .stageFlags = RhiShaderStage::Pixel,
-                },
-            },
+    const std::array<RhiDescriptorLayoutDesc, 3> descriptorLayouts{
+        RhiDescriptorLayoutDesc{
+            .binding = 0,
+            .type = RhiBindingType::UniformBuffer,
+            .flags = RhiDescriptorFlags::Dynamic,
+            .arraySize = 1,
+            .stageFlags = RhiShaderStage::Vertex | RhiShaderStage::Pixel,
+        },
+        RhiDescriptorLayoutDesc{
+            .binding = 1,
+            .type = RhiBindingType::Texture,
+            .arraySize = 1,
+            .stageFlags = RhiShaderStage::Pixel,
+        },
+        RhiDescriptorLayoutDesc{
+            .binding = 2,
+            .type = RhiBindingType::Sampler,
+            .arraySize = 1,
+            .stageFlags = RhiShaderStage::Pixel,
+        },
+    };
+    renderer->descriptorSetLayout = RhiCreateDescriptorSetLayout(RhiDescriptorSetLayoutDesc{
+        .descriptors = descriptorLayouts,
     });
 
     const RhiGraphicsPipelineDesc pipelineDesc{
@@ -97,7 +96,7 @@ auto CreateRenderer2D(RhiTexture texture, RhiSampler sampler) -> Renderer2D *
         .bindGroupLayoutsCount = 1,
         .bindGroupLayouts =
             {
-                renderer->bindGroupLayout,
+                renderer->descriptorSetLayout,
             },
         .vertexBindingsCount = 1,
         .vertexBindings =
@@ -152,40 +151,44 @@ auto CreateRenderer2D(RhiTexture texture, RhiSampler sampler) -> Renderer2D *
             .memoryUsage = RhiMemoryUsage::CpuToGpu,
         });
 
-        renderer->bindGroup[i] = RhiCreateBindGroup(RhiBindGroupWriteDesc{
-            .layout = renderer->bindGroupLayout,
-            .entriesCount = 3,
-            .entries =
-                {
-                    RhiBindGroupWriteEntry{
-                        .binding = 0,
-                        .arrayIndex = 0,
-                        .buffer =
-                            RhiBufferBinding{
-                                .buffer = renderer->dynamicUniformBuffer[i],
-                                .size = kDynamicUniformBufferSize,
-                                .offset = 0,
-                                .range = sizeof(EntityUbo),
-                            },
+        renderer->descriptorSets[i] = RhiCreateDescriptorSet(renderer->descriptorSetLayout);
+
+        const std::array<RhiDescriptorWriteDesc, 3> descriptorWrites{
+            RhiDescriptorWriteDesc{
+                .set = renderer->descriptorSets[i],
+                .binding = 0,
+                .arrayIndex = 0,
+                .type = RhiBindingType::UniformBuffer,
+                .buffer =
+                    RhiBufferBinding{
+                        .buffer = renderer->dynamicUniformBuffer[i],
+                        .size = kDynamicUniformBufferSize,
+                        .offset = 0,
+                        .range = sizeof(EntityUbo),
                     },
-                    RhiBindGroupWriteEntry{
-                        .binding = 1,
-                        .arrayIndex = 0,
-                        .texture =
-                            {
-                                .texture = texture,
-                            },
+            },
+            RhiDescriptorWriteDesc{
+                .set = renderer->descriptorSets[i],
+                .binding = 1,
+                .arrayIndex = 0,
+                .type = RhiBindingType::Texture,
+                .texture =
+                    {
+                        .texture = texture,
                     },
-                    RhiBindGroupWriteEntry{
-                        .binding = 2,
-                        .arrayIndex = 0,
-                        .sampler =
-                            {
-                                .sampler = sampler,
-                            },
+            },
+            RhiDescriptorWriteDesc{
+                .set = renderer->descriptorSets[i],
+                .binding = 2,
+                .arrayIndex = 0,
+                .type = RhiBindingType::Sampler,
+                .sampler =
+                    {
+                        .sampler = sampler,
                     },
-                },
-        });
+            },
+        };
+        RhiWriteDescriptors(descriptorWrites);
     }
 
     return renderer;
@@ -286,7 +289,7 @@ void Renderer2DDraw(RhiCmdList cmd, Renderer2D *renderer, uint32_t width, uint32
 
     for (uint32_t offset : renderer->pendingDraws)
     {
-        RhiCmdBindGraphicsBindGroup(cmd, 0, renderer->bindGroup[frameIndex], {&offset, 1});
+        RhiCmdBindGraphicsBindGroup(cmd, 0, renderer->descriptorSets[frameIndex], {&offset, 1});
         RhiCmdDraw(cmd, 6, 1, 0, 0);
     }
     renderer->pendingDraws.clear();

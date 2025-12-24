@@ -10,9 +10,7 @@
 namespace nyla
 {
 
-constexpr inline uint32_t kRhiMaxBindGroupLayouts = 4;
-
-struct RhiBindGroupLayout : Handle
+struct RhiDescriptorSetLayout : Handle
 {
 };
 
@@ -24,38 +22,42 @@ enum class RhiBindingType
     Sampler,
 };
 
-enum class RhiBindingFlags
+enum class RhiDescriptorFlags
 {
     Dynamic = 1 << 0,
     PartiallyBound = 1 << 1,
     UpdateAfterBind = 1 << 2,
     VariableCount = 1 << 3,
 };
-NYLA_BITENUM(RhiBindingFlags)
+NYLA_BITENUM(RhiDescriptorFlags)
 
-struct RhiBindGroupEntryLayoutDesc
+struct RhiDescriptorLayoutDesc
 {
     uint32_t binding;
     RhiBindingType type;
-    RhiBindingFlags flags;
+    RhiDescriptorFlags flags;
     uint32_t arraySize;
     RhiShaderStage stageFlags;
 };
 
-struct RhiBindGroupLayoutDesc
+struct RhiDescriptorSetLayoutDesc
 {
-    uint32_t entriesCount;
-    std::array<RhiBindGroupEntryLayoutDesc, 4> entries;
+    std::span<const RhiDescriptorLayoutDesc> descriptors;
 };
 
-auto RhiCreateBindGroupLayout(const RhiBindGroupLayoutDesc &) -> RhiBindGroupLayout;
-void RhiDestroyBindGroupLayout(RhiBindGroupLayout);
+auto RhiCreateDescriptorSetLayout(const RhiDescriptorSetLayoutDesc &) -> RhiDescriptorSetLayout;
+void RhiDestroyDescriptorSetLayout(RhiDescriptorSetLayout);
 
 //
 
-struct RhiBindGroup : Handle
+struct RhiDescriptorSet : Handle
 {
 };
+
+auto RhiCreateDescriptorSet(RhiDescriptorSetLayout) -> RhiDescriptorSet;
+void RhiDestroyDescriptorSet(RhiDescriptorSet);
+
+//
 
 struct RhiBufferBinding
 {
@@ -75,26 +77,19 @@ struct RhiTextureBinding
     RhiTexture texture;
 };
 
-struct RhiBindGroupWriteEntry
+struct RhiDescriptorWriteDesc
 {
+    RhiDescriptorSet set;
     uint32_t binding;
     uint32_t arrayIndex;
+    RhiBindingType type;
     union {
         RhiBufferBinding buffer;
-        RhiSamplerBinding sampler;
         RhiTextureBinding texture;
+        RhiSamplerBinding sampler;
     };
 };
 
-struct RhiBindGroupWriteDesc
-{
-    RhiBindGroupLayout layout;
-    uint32_t entriesCount;
-    std::array<RhiBindGroupWriteEntry, 4> entries;
-};
-
-auto RhiCreateBindGroup(RhiBindGroupLayout) -> RhiBindGroup;
-void RhiUpdateBindGroup(RhiBindGroup, const RhiBindGroupWriteDesc &);
-void RhiDestroyBindGroup(RhiBindGroup);
+void RhiWriteDescriptors(std::span<const RhiDescriptorWriteDesc>);
 
 } // namespace nyla

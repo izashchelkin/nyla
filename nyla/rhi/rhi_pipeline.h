@@ -5,8 +5,8 @@
 
 #include "nyla/commons/handle.h"
 #include "nyla/commons/memory/charview.h"
-#include "nyla/rhi/rhi_bind_groups.h"
 #include "nyla/rhi/rhi_cmdlist.h"
+#include "nyla/rhi/rhi_descriptor.h"
 #include "nyla/rhi/rhi_shader.h"
 #include "nyla/rhi/rhi_texture.h"
 
@@ -67,7 +67,7 @@ struct RhiGraphicsPipelineDesc
     RhiShader ps;
 
     uint32_t bindGroupLayoutsCount;
-    std::array<RhiBindGroupLayout, kRhiMaxBindGroupLayouts> bindGroupLayouts;
+    std::array<RhiDescriptorSetLayout, 4> bindGroupLayouts;
 
     uint32_t vertexBindingsCount;
     std::array<RhiVertexBindingDesc, 4> vertexBindings;
@@ -93,7 +93,7 @@ void RhiDestroyGraphicsPipeline(RhiGraphicsPipeline);
 void RhiCmdBindGraphicsPipeline(RhiCmdList, RhiGraphicsPipeline);
 void RhiCmdBindVertexBuffers(RhiCmdList cmd, uint32_t firstBinding, std::span<const RhiBuffer> buffers,
                              std::span<const uint32_t> offsets);
-void RhiCmdBindGraphicsBindGroup(RhiCmdList, uint32_t setIndex, RhiBindGroup bindGroup,
+void RhiCmdBindGraphicsBindGroup(RhiCmdList, uint32_t setIndex, RhiDescriptorSet bindGroup,
                                  std::span<const uint32_t> dynamicOffsets);
 void RhiCmdPushGraphicsConstants(RhiCmdList cmd, uint32_t offset, RhiShaderStage stage, ByteView data);
 void RhiCmdDraw(RhiCmdList cmd, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,

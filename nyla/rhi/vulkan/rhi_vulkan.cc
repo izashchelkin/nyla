@@ -386,6 +386,7 @@ void RhiInit(const RhiDesc &rhiDesc)
         .pNext = &v13,
         .descriptorIndexing = true,
         .shaderSampledImageArrayNonUniformIndexing = true,
+        .descriptorBindingSampledImageUpdateAfterBind = true,
         .descriptorBindingUpdateUnusedWhilePending = true,
         .descriptorBindingPartiallyBound = true,
         .descriptorBindingVariableDescriptorCount = true,
