@@ -1,5 +1,6 @@
 #include "nyla/engine0/gpu_resources.h"
 #include "absl/log/check.h"
+#include "nyla/commons/containers/inline_vec.h"
 #include "nyla/engine0/staging_buffer.h"
 #include "nyla/rhi/rhi_descriptor.h"
 #include "nyla/rhi/rhi_sampler.h"
@@ -138,11 +139,10 @@ void GpuResourcesInit()
 
 void GpuResourcesWriteDescriptors()
 {
-    std::array<RhiDescriptorWriteDesc, (texturesPool.size() + samplersPool.size()) / 2> writes;
-    uint32_t writesCount;
+    InlineVec<RhiDescriptorWriteDesc, (texturesPool.size() + samplersPool.size()) / 2> writes;
 
-    auto processPool = [&writes, &writesCount](auto pool) -> void {
-        for (uint32_t i = 0; i < texturesPool.size(); ++i)
+    auto processPool = [&writes](auto &pool) -> void {
+        for (uint32_t i = 0; i < pool.size(); ++i)
         {
             auto &slot = pool.slots[i];
             if (!(slot.flags & GpuResourceSlot::kFlagUsed))
@@ -150,18 +150,21 @@ void GpuResourcesWriteDescriptors()
             if (!(slot.flags & GpuResourceSlot::kFlagDirty))
                 continue;
 
-            writes[writesCount++] = RhiDescriptorWriteDesc{
+            writes.emplace_back(RhiDescriptorWriteDesc{
                 .set = pool.descriptorSet,
                 .binding = pool.GetBinding(),
                 .arrayIndex = i,
                 .type = pool.GetBindingType(),
                 .resourceBinding = slot.resourceBinding,
-            };
+            });
             slot.flags &= ~GpuResourceSlot::kFlagDirty;
         }
     };
     processPool(texturesPool);
     processPool(samplersPool);
+
+    if (!writes.empty())
+        RhiWriteDescriptors(writes);
 }
 
 auto CreateSampledTextureResource(uint32_t width, uint32_t height, RhiTextureFormat format)
