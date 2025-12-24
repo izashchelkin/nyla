@@ -95,13 +95,10 @@ auto CreateDebugTextRenderer() -> DebugTextRenderer *
             .binding = 0,
             .arrayIndex = 0,
             .type = RhiBindingType::UniformBuffer,
-            .buffer =
-                RhiBufferBinding{
-                    .buffer = renderer->dynamicUniformBuffer[i],
-                    .size = kDynamicUniformBufferSize,
-                    .offset = 0,
-                    .range = sizeof(DrawData),
-                },
+            .resourceBinding = {.buffer = RhiBufferBinding{.buffer = renderer->dynamicUniformBuffer[i],
+                                                           .size = kDynamicUniformBufferSize,
+                                                           .offset = 0,
+                                                           .range = sizeof(DrawData)}},
         };
         RhiWriteDescriptors(std::span{&descriptorWrite, 1});
     }

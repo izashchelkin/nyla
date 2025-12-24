@@ -159,33 +159,24 @@ auto CreateRenderer2D(RhiTexture texture, RhiSampler sampler) -> Renderer2D *
                 .binding = 0,
                 .arrayIndex = 0,
                 .type = RhiBindingType::UniformBuffer,
-                .buffer =
-                    RhiBufferBinding{
-                        .buffer = renderer->dynamicUniformBuffer[i],
-                        .size = kDynamicUniformBufferSize,
-                        .offset = 0,
-                        .range = sizeof(EntityUbo),
-                    },
+                .resourceBinding = {.buffer = RhiBufferBinding{.buffer = renderer->dynamicUniformBuffer[i],
+                                                               .size = kDynamicUniformBufferSize,
+                                                               .offset = 0,
+                                                               .range = sizeof(EntityUbo)}},
             },
             RhiDescriptorWriteDesc{
                 .set = renderer->descriptorSets[i],
                 .binding = 1,
                 .arrayIndex = 0,
                 .type = RhiBindingType::Texture,
-                .texture =
-                    {
-                        .texture = texture,
-                    },
+                .resourceBinding = {.texture = {.texture = texture}},
             },
             RhiDescriptorWriteDesc{
                 .set = renderer->descriptorSets[i],
                 .binding = 2,
                 .arrayIndex = 0,
                 .type = RhiBindingType::Sampler,
-                .sampler =
-                    {
-                        .sampler = sampler,
-                    },
+                .resourceBinding = {.sampler = {.sampler = sampler}},
             },
         };
         RhiWriteDescriptors(descriptorWrites);

@@ -158,21 +158,23 @@ void RhiWriteDescriptors(std::span<const RhiDescriptorWriteDesc> writes)
             .descriptorType = ConvertVulkanBindingType(bindingType, descriptorLayout.flags),
         });
 
+        const auto &resourceBinding = write.resourceBinding;
+
         switch (bindingType)
         {
         case RhiBindingType::UniformBuffer: {
-            const VulkanBufferData &bufferData = HandleGetData(rhiHandles.buffers, write.buffer.buffer);
+            const VulkanBufferData &bufferData = HandleGetData(rhiHandles.buffers, resourceBinding.buffer.buffer);
 
             vulkanSetWrite.pBufferInfo = &bufferInfos.emplace_back(VkDescriptorBufferInfo{
                 .buffer = bufferData.buffer,
-                .offset = write.buffer.offset,
-                .range = write.buffer.range,
+                .offset = resourceBinding.buffer.offset,
+                .range = resourceBinding.buffer.range,
             });
             break;
         }
 
         case RhiBindingType::Texture: {
-            const VulkanTextureData &textureData = HandleGetData(rhiHandles.textures, write.texture.texture);
+            const VulkanTextureData &textureData = HandleGetData(rhiHandles.textures, resourceBinding.texture.texture);
 
             vulkanSetWrite.pImageInfo = &imageInfos.emplace_back(VkDescriptorImageInfo{
                 .imageView = textureData.imageView,
@@ -183,7 +185,7 @@ void RhiWriteDescriptors(std::span<const RhiDescriptorWriteDesc> writes)
         }
 
         case RhiBindingType::Sampler: {
-            const VulkanSamplerData &samplerData = HandleGetData(rhiHandles.samplers, write.sampler.sampler);
+            const VulkanSamplerData &samplerData = HandleGetData(rhiHandles.samplers, resourceBinding.sampler.sampler);
 
             vulkanSetWrite.pImageInfo = &imageInfos.emplace_back(VkDescriptorImageInfo{
                 .sampler = samplerData.sampler,

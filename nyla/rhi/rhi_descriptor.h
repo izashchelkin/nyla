@@ -77,17 +77,19 @@ struct RhiTextureBinding
     RhiTexture texture;
 };
 
+union RhiDescriptorResourceBinding {
+    RhiBufferBinding buffer;
+    RhiTextureBinding texture;
+    RhiSamplerBinding sampler;
+};
+
 struct RhiDescriptorWriteDesc
 {
     RhiDescriptorSet set;
     uint32_t binding;
     uint32_t arrayIndex;
     RhiBindingType type;
-    union {
-        RhiBufferBinding buffer;
-        RhiTextureBinding texture;
-        RhiSamplerBinding sampler;
-    };
+    RhiDescriptorResourceBinding resourceBinding;
 };
 
 void RhiWriteDescriptors(std::span<const RhiDescriptorWriteDesc>);

@@ -1,6 +1,5 @@
 #include "nyla/engine0/gpu_resources.h"
 #include "absl/log/check.h"
-#include "absl/log/log.h"
 #include "nyla/engine0/staging_buffer.h"
 #include "nyla/rhi/rhi_descriptor.h"
 #include "nyla/rhi/rhi_sampler.h"
@@ -8,7 +7,6 @@
 #include "nyla/rhi/rhi_texture.h"
 #include "third_party/stb/stb_image.h"
 #include <cstdint>
-#include <initializer_list>
 #include <type_traits>
 
 namespace nyla
@@ -30,7 +28,7 @@ struct GpuResourceSlot
 
     uint32_t flags;
     uint32_t gen;
-    RhiDescriptorWriteDesc write;
+    RhiDescriptorResourceBinding resourceBinding;
 };
 
 template <uint32_t Size, typename HandleType, RhiBindingType BindingType, RhiShaderStage Stages, uint32_t Binding>
@@ -49,6 +47,11 @@ struct GpuResourcePool
     constexpr auto GetStages() -> RhiShaderStage
     {
         return Stages;
+    }
+
+    constexpr auto GetBindingType() -> RhiBindingType
+    {
+        return BindingType;
     }
 
     constexpr auto GetBinding() -> uint32_t
@@ -87,7 +90,7 @@ void InitGpuResourcePool(GpuResourcePool<Size, HandleType, BindingType, Stages, 
 
 template <uint32_t Size, typename HandleType, RhiBindingType BindingType, RhiShaderStage Stages, uint32_t Binding>
 auto AcquireGpuResourceSlot(GpuResourcePool<Size, HandleType, BindingType, Stages, Binding> &pool,
-                            RhiDescriptorWriteDesc descriptorWrite, HandleType handle)
+                            RhiDescriptorResourceBinding resourceBinding, HandleType handle)
     -> std::remove_reference_t<decltype(pool)>::GpuResource
 {
     for (uint32_t i = 0; i < pool.size(); ++i)
@@ -96,9 +99,7 @@ auto AcquireGpuResourceSlot(GpuResourcePool<Size, HandleType, BindingType, Stage
         if (slot.flags & GpuResourceSlot::kFlagUsed)
             continue;
 
-        slot.write = descriptorWrite;
-        slot.write.arrayIndex = i;
-        slot.write.binding = pool.GetBinding();
+        slot.resourceBinding = resourceBinding;
         slot.flags = GpuResourceSlot::kFlagUsed | GpuResourceSlot::kFlagDirty;
         ++slot.gen;
 
@@ -135,7 +136,7 @@ void GpuResourcesInit()
     free(texPixels);
 #endif
 
-void GpuResourcesUpdateDescriptors()
+void GpuResourcesWriteDescriptors()
 {
     std::array<RhiDescriptorWriteDesc, (texturesPool.size() + samplersPool.size()) / 2> writes;
     uint32_t writesCount;
@@ -149,7 +150,13 @@ void GpuResourcesUpdateDescriptors()
             if (!(slot.flags & GpuResourceSlot::kFlagDirty))
                 continue;
 
-            writes[writesCount++] = slot.write;
+            writes[writesCount++] = RhiDescriptorWriteDesc{
+                .set = pool.descriptorSet,
+                .binding = pool.GetBinding(),
+                .arrayIndex = i,
+                .type = pool.GetBindingType(),
+                .resourceBinding = slot.resourceBinding,
+            };
             slot.flags &= ~GpuResourceSlot::kFlagDirty;
         }
     };
@@ -168,22 +175,22 @@ auto CreateSampledTextureResource(uint32_t width, uint32_t height, RhiTextureFor
         .format = format,
     });
 
-    RhiDescriptorWriteDesc descriptorWrite{
+    RhiDescriptorResourceBinding resourceBinding{
         .texture = {.texture = texture},
     };
 
-    return AcquireGpuResourceSlot(texturesPool, descriptorWrite, texture);
+    return AcquireGpuResourceSlot(texturesPool, resourceBinding, texture);
 }
 
 auto CreateSamplerResource() -> decltype(samplersPool)::GpuResource
 {
     RhiSampler sampler = RhiCreateSampler({});
 
-    RhiDescriptorWriteDesc descriptorWrite{
+    RhiDescriptorResourceBinding resourceBinding{
         .sampler = {.sampler = sampler},
     };
 
-    return AcquireGpuResourceSlot(samplersPool, descriptorWrite, sampler);
+    return AcquireGpuResourceSlot(samplersPool, resourceBinding, sampler);
 }
 
 } // namespace nyla
