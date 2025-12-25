@@ -23,6 +23,7 @@ enum class RhiVertexFormat
 {
     None,
     R32G32B32A32Float,
+    R32G32Float,
 };
 
 enum class RhiInputRate

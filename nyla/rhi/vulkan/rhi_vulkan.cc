@@ -34,9 +34,10 @@ auto ConvertRhiVertexFormatIntoVkFormat(RhiVertexFormat format) -> VkFormat
     {
     case RhiVertexFormat::None:
         break;
-
     case RhiVertexFormat::R32G32B32A32Float:
         return VK_FORMAT_R32G32B32A32_SFLOAT;
+    case RhiVertexFormat::R32G32Float:
+        return VK_FORMAT_R32G32_SFLOAT;
     }
     CHECK(false);
     return static_cast<VkFormat>(0);

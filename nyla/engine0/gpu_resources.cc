@@ -1,6 +1,8 @@
 #include "nyla/engine0/gpu_resources.h"
 #include "absl/log/check.h"
+#include "absl/log/log.h"
 #include "nyla/commons/containers/inline_vec.h"
+#include "nyla/commons/handle_pool.h"
 #include "nyla/engine0/staging_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_descriptor.h"
@@ -10,201 +12,146 @@
 #include "nyla/rhi/rhi_texture.h"
 #include "third_party/stb/stb_image.h"
 #include <cstdint>
-#include <type_traits>
+#include <libintl.h>
 
 namespace nyla
 {
 
-namespace
-{
-
-struct GpuResourceSlot
-{
-    static constexpr uint32_t kFlagUsed = 1 << 0;
-    static constexpr uint32_t kFlagDirty = 1 << 1;
-
-    uint32_t flags;
-    uint32_t gen;
-    RhiDescriptorResourceBinding resourceBinding;
-};
-
-template <uint32_t Size, typename HandleType, RhiBindingType BindingType, RhiShaderStage Stages, uint32_t Binding>
-struct GpuResourcePool
-{
-    using ResourceType = nyla::GpuResource<HandleType>;
-
-    std::array<GpuResourceSlot, Size> slots;
-
-    [[nodiscard]]
-    constexpr auto size() const -> uint32_t
-    {
-        return Size;
-    }
-
-    [[nodiscard]]
-    constexpr auto GetStages() const -> RhiShaderStage
-    {
-        return Stages;
-    }
-
-    [[nodiscard]]
-    constexpr auto GetBindingType() const -> RhiBindingType
-    {
-        return BindingType;
-    }
-
-    [[nodiscard]]
-    constexpr auto GetBinding() const -> uint32_t
-    {
-        return Binding;
-    }
-};
-
-RhiDescriptorSetLayout descriptorSetLayout;
-RhiDescriptorSet descriptorSet;
-
-GpuResourcePool<1 << 5, RhiSampler, RhiBindingType::Sampler, RhiShaderStage::Pixel, 0> samplerPool;
-GpuResourcePool<1 << 8, RhiTexture, RhiBindingType::Texture, RhiShaderStage::Pixel, 1> texturePool;
-
-template <uint32_t Size, typename HandleType, RhiBindingType BindingType, RhiShaderStage Stages, uint32_t Binding>
-auto AcquireGpuResourceSlot(GpuResourcePool<Size, HandleType, BindingType, Stages, Binding> &pool,
-                            RhiDescriptorResourceBinding resourceBinding, HandleType handle)
-    -> std::remove_reference_t<decltype(pool)>::ResourceType
-{
-    for (uint32_t i = 0; i < pool.size(); ++i)
-    {
-        GpuResourceSlot &slot = pool.slots[i];
-        if (slot.flags & GpuResourceSlot::kFlagUsed)
-            continue;
-
-        slot.resourceBinding = resourceBinding;
-        slot.flags = GpuResourceSlot::kFlagUsed | GpuResourceSlot::kFlagDirty;
-        ++slot.gen;
-
-        return {
-            .gen = slot.gen,
-            .index = i,
-            .handle = handle,
-        };
-    }
-    CHECK(false);
-    return {};
-}
-
-} // namespace
-
-auto GpuResourceGetDescriptorSetLayout() -> RhiDescriptorSetLayout
-{
-    return descriptorSetLayout;
-}
-
-void GpuResourcesInit()
+void AssetManager::Init()
 {
     static bool inited = false;
     CHECK(!inited);
     inited = true;
 
-    auto makeDescriptorLayout = [](const auto &pool) -> RhiDescriptorLayoutDesc {
-        return RhiDescriptorLayoutDesc{
-            .binding = pool.GetBinding(),
-            .type = pool.GetBindingType(),
+    //
+
+    const std::array<RhiDescriptorLayoutDesc, 2> descriptors{
+        RhiDescriptorLayoutDesc{
+            .binding = 0,
+            .type = RhiBindingType::Sampler,
             .flags = RhiDescriptorFlags::PartiallyBound,
-            .arraySize = pool.size(),
-            .stageFlags = pool.GetStages(),
-        };
+            .arraySize = m_samplers.max_size(),
+            .stageFlags = RhiShaderStage::Pixel,
+        },
+        RhiDescriptorLayoutDesc{
+            .binding = 1,
+            .type = RhiBindingType::Texture,
+            .flags = RhiDescriptorFlags::PartiallyBound,
+            .arraySize = m_textures.max_size(),
+            .stageFlags = RhiShaderStage::Pixel,
+        },
     };
-
-    const std::array<RhiDescriptorLayoutDesc, 2> descriptorLayouts{
-        makeDescriptorLayout(samplerPool),
-        makeDescriptorLayout(texturePool),
-    };
-
-    descriptorSetLayout = RhiCreateDescriptorSetLayout(RhiDescriptorSetLayoutDesc{
-        .descriptors = descriptorLayouts,
-    });
-    descriptorSet = RhiCreateDescriptorSet(descriptorSetLayout);
-}
-
-#if 0
-    int texWidth = 0;
-    int texHeight = 0;
-    int texChannels = 0;
-    stbi_uc *texPixels = stbi_load("assets/BBreaker/Player.png", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
-
-    free(texPixels);
-#endif
-
-void GpuResourcesBind(RhiCmdList cmd)
-{
-    RhiCmdBindGraphicsBindGroup(cmd, 1, descriptorSet, {});
-}
-
-void GpuResourcesWriteDescriptors()
-{
-    InlineVec<RhiDescriptorWriteDesc, (texturePool.size() + samplerPool.size()) / 2> writes;
-
-    auto processPool = [&writes](auto &pool) -> void {
-        for (uint32_t i = 0; i < pool.size(); ++i)
-        {
-            auto &slot = pool.slots[i];
-            if (!(slot.flags & GpuResourceSlot::kFlagUsed))
-                continue;
-            if (!(slot.flags & GpuResourceSlot::kFlagDirty))
-                continue;
-
-            writes.emplace_back(RhiDescriptorWriteDesc{
-                .set = descriptorSet,
-                .binding = pool.GetBinding(),
-                .arrayIndex = i,
-                .type = pool.GetBindingType(),
-                .resourceBinding = slot.resourceBinding,
-            });
-            slot.flags &= ~GpuResourceSlot::kFlagDirty;
-        }
-    };
-    processPool(texturePool);
-    processPool(samplerPool);
-
-    if (!writes.empty())
-        RhiWriteDescriptors(writes);
-}
-
-auto CreateTexture(uint32_t width, uint32_t height, RhiTextureFormat format) -> Texture
-{
-    const RhiTexture texture = RhiCreateTexture({
-        .width = width,
-        .height = height,
-        .memoryUsage = RhiMemoryUsage::GpuOnly,
-        .usage = RhiTextureUsage::TransferDst | RhiTextureUsage::ShaderSampled,
-        .format = format,
+    m_descriptorSetLayout = RhiCreateDescriptorSetLayout(RhiDescriptorSetLayoutDesc{
+        .descriptors = descriptors,
     });
 
-    const RhiDescriptorResourceBinding resourceBinding{
-        .texture = {.texture = texture},
-    };
+    m_descriptorSet = RhiCreateDescriptorSet(m_descriptorSetLayout);
 
-    return AcquireGpuResourceSlot(texturePool, resourceBinding, texture);
+    //
+
+    m_samplers.resize(4);
+    InlineVec<RhiDescriptorWriteDesc, 4> descriptorWrites;
+
+    auto addSampler = [this, &descriptorWrites](SamplerType samplerType, RhiFilter filter,
+                                                RhiSamplerAddressMode addressMode) -> void {
+        RhiSampler sampler = RhiCreateSampler({
+            .minFilter = filter,
+            .magFilter = filter,
+            .addressModeU = addressMode,
+            .addressModeV = addressMode,
+            .addressModeW = addressMode,
+        });
+
+        auto index = static_cast<uint32_t>(samplerType);
+        m_samplers[index] = SamplerData{.sampler = sampler};
+
+        descriptorWrites.emplace_back(RhiDescriptorWriteDesc{
+            .set = m_descriptorSet,
+            .binding = kSamplersDescriptorBinding,
+            .arrayIndex = index,
+            .type = RhiBindingType::Sampler,
+            .resourceBinding = {.sampler = {.sampler = sampler}},
+        });
+    };
+    addSampler(SamplerType::LinearClamp, RhiFilter::Linear, RhiSamplerAddressMode::ClampToEdge);
+    addSampler(SamplerType::LinearRepeat, RhiFilter::Linear, RhiSamplerAddressMode::Repeat);
+    addSampler(SamplerType::NearestClamp, RhiFilter::Nearest, RhiSamplerAddressMode::ClampToEdge);
+    addSampler(SamplerType::NearestRepeat, RhiFilter::Nearest, RhiSamplerAddressMode::Repeat);
+
+    RhiWriteDescriptors(descriptorWrites);
 }
 
-void UploadTexture(RhiCmdList cmd, GpuStagingBuffer *stagingBuffer, Texture &texture, std::span<const std::byte> pixels)
+auto AssetManager::GetDescriptorSetLayout() -> RhiDescriptorSetLayout
 {
-    RhiCmdTransitionTexture(cmd, texture.handle, RhiTextureState::TransferDst);
-
-    char *dst = StagingBufferCopyIntoTexture(cmd, stagingBuffer, texture.handle, pixels.size());
-    memcpy(dst, pixels.data(), pixels.size());
-
-    RhiCmdTransitionTexture(cmd, texture.handle, RhiTextureState::ShaderRead);
+    return m_descriptorSetLayout;
 }
 
-auto CreateSampler() -> Sampler
+void AssetManager::BindDescriptorSet(RhiCmdList cmd)
 {
-    const RhiSampler sampler = RhiCreateSampler({});
+    RhiCmdBindGraphicsBindGroup(cmd, 1, m_descriptorSet, {});
+}
 
-    const RhiDescriptorResourceBinding resourceBinding{
-        .sampler = {.sampler = sampler},
-    };
+void AssetManager::Upload(RhiCmdList cmd)
+{
+    InlineVec<RhiDescriptorWriteDesc, 256> descriptorWrites;
 
-    return AcquireGpuResourceSlot(samplerPool, resourceBinding, sampler);
+    for (uint32_t i = 0; i < m_textures.slots.size(); ++i)
+    {
+        auto &slot = m_textures.slots[i];
+        if (!slot.used)
+            continue;
+
+        TextureData &textureData = slot.data;
+        if (!textureData.needsUpload)
+            continue;
+
+        void *data = stbi_load(textureData.path.c_str(), (int *)&textureData.width, (int *)&textureData.height,
+                               (int *)&textureData.channels, STBI_rgb_alpha);
+        CHECK(data) << "stbi_load failed for '" << textureData.path << "': " << stbi_failure_reason();
+
+        textureData.texture = RhiCreateTexture({
+            .width = textureData.width,
+            .height = textureData.height,
+            .memoryUsage = RhiMemoryUsage::GpuOnly,
+            .usage = RhiTextureUsage::TransferDst | RhiTextureUsage::ShaderSampled,
+            .format = RhiTextureFormat::R8G8B8A8_sRGB,
+        });
+        const RhiTexture texture = textureData.texture;
+
+        descriptorWrites.emplace_back(RhiDescriptorWriteDesc{
+            .set = m_descriptorSet,
+            .binding = kTexturesDescriptorBinding,
+            .arrayIndex = i,
+            .type = RhiBindingType::Texture,
+            .resourceBinding = {.texture = {.texture = texture}},
+        });
+
+        RhiCmdTransitionTexture(cmd, texture, RhiTextureState::TransferDst);
+
+        const uint32_t size = textureData.width * textureData.height * textureData.channels;
+        char *uploadMemory = StagingBufferCopyIntoTexture(cmd, m_stagingBuffer, texture, size);
+        memcpy(uploadMemory, data, size);
+
+        free(data);
+
+        // TODO: this barrier does not need to be here
+        RhiCmdTransitionTexture(cmd, texture, RhiTextureState::ShaderRead);
+
+        LOG(INFO) << "Uploading '" << textureData.path << "'";
+
+        textureData.needsUpload = false;
+    }
+
+    if (!descriptorWrites.empty())
+        RhiWriteDescriptors(descriptorWrites);
+}
+
+auto AssetManager::DeclareTexture(std::string_view path) -> Texture
+{
+    return HandleAcquire(m_textures, TextureData{
+                                         .path = std::string{path},
+                                         .needsUpload = true,
+                                     });
 }
 
 } // namespace nyla

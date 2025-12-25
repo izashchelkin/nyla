@@ -22,6 +22,7 @@ struct VSInput
 {
     float4 position : POSITION;
     float4 color : Color0;
+    float2 uv : TEXCOORD0;
 };
 
 struct VSOutput
@@ -38,7 +39,7 @@ VSOutput main(VSInput input)
     float4 worldPos = mul(entity.model, input.position);
     o.position = mul(scene.vp, worldPos);
     o.color = input.color;
-    o.uv = input.position.xy + 0.5;
+    o.uv = input.uv;
 
     return o;
 }

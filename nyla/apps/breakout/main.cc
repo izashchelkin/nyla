@@ -9,16 +9,9 @@
 #include "nyla/engine0/staging_buffer.h"
 #include "nyla/platform/key_physical.h"
 #include "nyla/platform/platform.h"
-#include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
-#include "nyla/rhi/rhi_descriptor.h"
 #include "nyla/rhi/rhi_pass.h"
-#include "nyla/rhi/rhi_sampler.h"
-#include "nyla/rhi/rhi_shader.h"
 #include "nyla/rhi/rhi_texture.h"
-#include "third_party/stb/stb_image.h"
-#include <cstdint>
-#include <sys/types.h>
 
 namespace nyla
 {
@@ -68,72 +61,48 @@ static auto Main() -> int
     RhiTexture offscreenTexture = offscreenTextures[RhiGetFrameIndex()];
 #endif
 
-    GpuResourcesInit();
+    GpuStagingBuffer *stagingBuffer = CreateStagingBuffer(1 << 22);
 
-    int texWidth = 0;
-    int texHeight = 0;
-    int texChannels = 0;
-    stbi_uc *texPixels = stbi_load("assets/BBreaker/Player.png", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+    auto *assetManager = new AssetManager{stagingBuffer};
+    assetManager->Init();
 
-    Texture texture = CreateTexture(texWidth, texHeight, RhiTextureFormat::R8G8B8A8_sRGB);
-    Sampler sampler = CreateSampler();
+    BreakoutAssets assets = InitBreakoutAssets(assetManager);
 
-    GpuStagingBuffer *stagingBuffer = CreateStagingBuffer(1 << 20);
-
-    Renderer2D *renderer2d = CreateRenderer2D();
+    Renderer2D *renderer2d = CreateRenderer2D(assetManager);
     DebugTextRenderer *debugTextRenderer = CreateDebugTextRenderer();
 
     while (!Engine0ShouldExit())
     {
+        StagingBufferReset(stagingBuffer);
+
         RhiCmdList cmd = Engine0FrameBegin();
+        DebugText(500, 10, std::format("fps={}", Engine0GetFps()));
 
-        static bool inited = false;
-        if (inited)
-        {
-            DebugText(500, 10, std::format("fps={}", Engine0GetFps()));
+        assetManager->Upload(cmd);
 
-            const float dt = Engine0GetDt();
-            BreakoutProcess(dt);
+        const float dt = Engine0GetDt();
+        BreakoutProcess(dt);
 
-            StagingBufferReset(stagingBuffer);
-            Renderer2DFrameBegin(cmd, renderer2d, stagingBuffer);
+        Renderer2DFrameBegin(cmd, renderer2d, stagingBuffer);
 
-            RhiTexture colorTarget = RhiGetBackbufferTexture();
-            RhiTextureInfo colorTargetInfo = RhiGetTextureInfo(colorTarget);
+        RhiTexture colorTarget = RhiGetBackbufferTexture();
+        RhiTextureInfo colorTargetInfo = RhiGetTextureInfo(colorTarget);
 
-            RhiPassBegin({
-                .colorTarget = RhiGetBackbufferTexture(),
-                .state = RhiTextureState::ColorTarget,
-            });
+        RhiPassBegin({
+            .colorTarget = RhiGetBackbufferTexture(),
+            .state = RhiTextureState::ColorTarget,
+        });
 
-            BreakoutRenderGame(cmd, renderer2d, colorTargetInfo);
+        BreakoutRenderGame(cmd, renderer2d, colorTargetInfo, assets);
 
-            Renderer2DDraw(cmd, renderer2d, colorTargetInfo.width, colorTargetInfo.height, 64);
-            DebugTextRendererDraw(cmd, debugTextRenderer);
+        Renderer2DDraw(cmd, renderer2d, colorTargetInfo.width, colorTargetInfo.height, 64);
+        DebugTextRendererDraw(cmd, debugTextRenderer);
 
-            RhiPassEnd({
-                .colorTarget = RhiGetBackbufferTexture(),
-                .state = RhiTextureState::Present,
-            });
-        }
-        else
-        {
-            UploadTexture(cmd, stagingBuffer, texture,
-                          std::span{reinterpret_cast<const std::byte *>(texPixels),
-                                    static_cast<size_t>(texWidth * texHeight * 4)});
-            inited = true;
+        RhiPassEnd({
+            .colorTarget = RhiGetBackbufferTexture(),
+            .state = RhiTextureState::Present,
+        });
 
-            RhiPassBegin({
-                .colorTarget = RhiGetBackbufferTexture(),
-                .state = RhiTextureState::ColorTarget,
-            });
-            RhiPassEnd({
-                .colorTarget = RhiGetBackbufferTexture(),
-                .state = RhiTextureState::Present,
-            });
-        }
-
-        GpuResourcesWriteDescriptors();
         Engine0FrameEnd();
     }
 

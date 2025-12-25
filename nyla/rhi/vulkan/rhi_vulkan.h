@@ -143,7 +143,7 @@ struct RhiHandles
     HandlePool<RhiCmdList, VulkanCmdListData, 16> cmdLists;
     HandlePool<RhiShader, VkShaderModule, 16> shaders;
     HandlePool<RhiGraphicsPipeline, VulkanPipelineData, 16> graphicsPipelines;
-    HandlePool<RhiTexture, VulkanTextureData, 16> textures;
+    HandlePool<RhiTexture, VulkanTextureData, 128> textures;
     HandlePool<RhiSampler, VulkanSamplerData, 16> samplers;
 };
 extern RhiHandles rhiHandles;

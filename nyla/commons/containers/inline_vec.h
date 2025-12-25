@@ -3,22 +3,22 @@
 #include "absl/log/check.h"
 #include <algorithm>
 #include <array>
-#include <cstddef>
+#include <cstdint>
 #include <span>
 
 namespace nyla
 {
 
-template <typename T, size_t N> class InlineVec
+template <typename T, uint32_t N> class InlineVec
 {
     static_assert(std::is_trivially_destructible_v<T>);
 
-    static constexpr size_t kCapacity = N;
+    static constexpr uint32_t kCapacity = N;
 
   public:
     using value_type = T;
-    using size_type = size_t;
-    using difference_type = std::ptrdiff_t;
+    using size_type = uint32_t;
+    using difference_type = int32_t;
     using reference = T &;
     using const_reference = const T &;
     using pointer = T *;
@@ -28,7 +28,7 @@ template <typename T, size_t N> class InlineVec
 
     InlineVec() = default;
 
-    InlineVec(std::span<const value_type> elems) : m_size{elems.size()}
+    InlineVec(std::span<const value_type> elems) : m_size{static_cast<size_type>(elems.size())}
     {
         CHECK_LE(elems.size(), kCapacity);
         std::copy_n(elems.begin(), elems.size(), m_data.begin());
@@ -59,20 +59,20 @@ template <typename T, size_t N> class InlineVec
     }
 
     [[nodiscard]]
-    constexpr auto max_size() const -> size_t
+    constexpr auto max_size() const -> size_type
     {
         return kCapacity;
     }
 
     [[nodiscard]]
-    auto operator[](std::size_t i) -> reference
+    auto operator[](size_type i) -> reference
     {
         CHECK_LT(i, m_size);
         return m_data[i];
     }
 
     [[nodiscard]]
-    auto operator[](std::size_t i) const -> const_reference
+    auto operator[](size_type i) const -> const_reference
     {
         CHECK_LT(i, m_size);
         return m_data[i];
@@ -137,9 +137,14 @@ template <typename T, size_t N> class InlineVec
         return (m_data[m_size++] = T(std::forward<Args>(args)...));
     }
 
+    void resize(size_type size)
+    {
+        m_size = size;
+    }
+
   private:
     std::array<T, N> m_data{};
-    std::size_t m_size = 0;
+    size_type m_size = 0;
 };
 
 } // namespace nyla

@@ -9,7 +9,7 @@
 namespace nyla
 {
 
-template <typename T, typename Data, size_t Size> struct HandlePool
+template <typename T, typename Data, uint32_t Size> struct HandlePool
 {
     struct Slot
     {
@@ -17,10 +17,16 @@ template <typename T, typename Data, size_t Size> struct HandlePool
         uint32_t gen;
         bool used;
     };
-    std::array<Slot, Size> slots;
+    std::array<Slot, static_cast<size_t>(Size)> slots;
+
+    [[nodiscard]]
+    constexpr auto max_size() const -> uint32_t
+    {
+        return Size;
+    }
 };
 
-template <typename T, typename Data, size_t Size>
+template <typename T, typename Data, uint32_t Size>
 inline auto HandleAcquire(HandlePool<T, Data, Size> &pool, Data data) -> T
 {
     T retHandle{};
@@ -51,7 +57,7 @@ inline auto HandleAcquire(HandlePool<T, Data, Size> &pool, Data data) -> T
     return retHandle;
 }
 
-template <typename T, typename Data, size_t Size>
+template <typename T, typename Data, uint32_t Size>
 inline auto HandleGetData(HandlePool<T, Data, Size> &pool, T handle) -> Data &
 {
     CHECK(handle.gen);
@@ -66,7 +72,7 @@ inline auto HandleGetData(HandlePool<T, Data, Size> &pool, T handle) -> Data &
     CHECK(false);
 }
 
-template <typename T, typename Data, size_t Size>
+template <typename T, typename Data, uint32_t Size>
 inline auto HandleRelease(HandlePool<T, Data, Size> &pool, T handle) -> Data
 {
     CHECK(handle.gen);
@@ -75,6 +81,8 @@ inline auto HandleRelease(HandlePool<T, Data, Size> &pool, T handle) -> Data
     auto &slot = pool.slots[handle.index];
     CHECK_EQ(handle.gen, slot.gen);
     CHECK(slot.used);
+
+    slot.data.~Data();
 
     slot.used = false;
     return slot.data;

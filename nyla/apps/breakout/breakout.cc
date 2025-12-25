@@ -67,8 +67,8 @@ constexpr float kBallRadius = .8f;
 
 static float playerPosX = 0.f;
 static const float kPlayerPosY = kWorldBoundaryY[0] + 1.6f;
-static float playerWidth = 3.f;
-static const float kPlayerHeight = .8f;
+static const float kPlayerHeight = 1.5f;
+static float playerWidth = (74.f / 26.f) * kPlayerHeight;
 
 static float2 ballPos = {};
 static float2 ballVel = {40.f, 40.f};
@@ -88,11 +88,11 @@ void BreakoutInit()
         for (size_t j = 0; j < 17; ++j)
         {
             level.bricks.emplace_back(Brick{
-                -28.f + j * 3.5f,
-                20.f - i * 1.5f,
-                3.f,
-                1.f,
-                color,
+                .x = -28.f + j * 3.5f,
+                .y = 20.f - i * 1.5f,
+                .width = 40.f / 15.f,
+                .height = 1.f,
+                .color = color,
             });
         }
     }
@@ -176,19 +176,45 @@ void BreakoutProcess(float dt)
     }
 }
 
-void BreakoutRenderGame(RhiCmdList cmd, Renderer2D *renderer, const RhiTextureInfo &colorTargetInfo)
+void BreakoutRenderGame(RhiCmdList cmd, Renderer2D *renderer, const RhiTextureInfo &colorTargetInfo,
+                        const BreakoutAssets &assets)
 {
+    uint32_t i = 0;
     for (Brick &brick : level.bricks)
     {
         if (brick.dead)
             continue;
 
         Renderer2DRect(cmd, renderer, brick.x, brick.y, brick.width, brick.height,
-                       float4{brick.color[0], brick.color[1], brick.color[2], 1.f});
+                       float4{brick.color[0], brick.color[1], brick.color[2], 1.f},
+                       assets.bricks[(i++) % assets.bricks.size()].index);
     }
 
-    Renderer2DRect(cmd, renderer, playerPosX, kPlayerPosY, playerWidth, kPlayerHeight, float4{1.f, 1.f, 1.f, 1});
-    Renderer2DRect(cmd, renderer, ballPos[0], ballPos[1], kBallRadius * 2, kBallRadius * 2, float4{1.f, 1.f, 1.f, 1});
+    Renderer2DRect(cmd, renderer, playerPosX, kPlayerPosY, playerWidth, kPlayerHeight, float4{1.f, 1.f, 1.f, 1},
+                   assets.player.index);
+    Renderer2DRect(cmd, renderer, ballPos[0], ballPos[1], kBallRadius * 2, kBallRadius * 2, float4{1.f, 1.f, 1.f, 1},
+                   assets.ball.index);
+}
+
+auto InitBreakoutAssets(AssetManager *assetManager) -> BreakoutAssets
+{
+    std::string basePath = "assets/BBreaker";
+
+    BreakoutAssets ret{
+        .background = assetManager->DeclareTexture(basePath + "/Background1.png"),
+        .player = assetManager->DeclareTexture(basePath + "/Player.png"),
+        .playerFlash = assetManager->DeclareTexture(basePath + "/Player_flash.png"),
+        .ball = assetManager->DeclareTexture(basePath + "/Ball_small-blue.png"),
+        .brickUnbreackable = assetManager->DeclareTexture(basePath + "/Brick_unbreakable2.png"),
+    };
+
+    for (uint32_t i = 0; i < ret.bricks.size(); ++i)
+    {
+        std::string path = std::format("{}/Brick{}_4.png", basePath, i + 1);
+        ret.bricks[i] = assetManager->DeclareTexture(path);
+    }
+
+    return ret;
 }
 
 } // namespace nyla

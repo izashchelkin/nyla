@@ -29,6 +29,7 @@ struct VSInput
 {
     float4 pos;
     float4 color;
+    float2 uv;
 };
 
 struct EntityUbo
@@ -49,6 +50,8 @@ struct Scene
 
 struct Renderer2D
 {
+    AssetManager *assetManager;
+
     RhiGraphicsPipeline pipeline;
     RhiDescriptorSetLayout descriptorSetLayout;
     RhiBuffer vertexBuffer;
@@ -59,12 +62,14 @@ struct Renderer2D
     InlineVec<uint32_t, 256> pendingDraws;
 };
 
-auto CreateRenderer2D() -> Renderer2D *
+auto CreateRenderer2D(AssetManager *assetManager) -> Renderer2D *
 {
     const RhiShader vs = GetShader("renderer2d.vs", RhiShaderStage::Vertex);
     const RhiShader ps = GetShader("renderer2d.ps", RhiShaderStage::Pixel);
 
-    auto *renderer = new Renderer2D{};
+    auto *renderer = new Renderer2D{
+        .assetManager = assetManager,
+    };
 
     const std::array<RhiDescriptorLayoutDesc, 1> descriptorLayouts{
         RhiDescriptorLayoutDesc{
@@ -87,7 +92,7 @@ auto CreateRenderer2D() -> Renderer2D *
         .bindGroupLayouts =
             {
                 renderer->descriptorSetLayout,
-                GpuResourceGetDescriptorSetLayout(),
+                assetManager->GetDescriptorSetLayout(),
             },
         .vertexBindingsCount = 1,
         .vertexBindings =
@@ -98,7 +103,7 @@ auto CreateRenderer2D() -> Renderer2D *
                     .inputRate = RhiInputRate::PerVertex,
                 },
             },
-        .vertexAttributeCount = 2,
+        .vertexAttributeCount = 3,
         .vertexAttributes =
             {
                 RhiVertexAttributeDesc{
@@ -112,6 +117,12 @@ auto CreateRenderer2D() -> Renderer2D *
                     .location = 1,
                     .format = RhiVertexFormat::R32G32B32A32Float,
                     .offset = offsetof(VSInput, color),
+                },
+                RhiVertexAttributeDesc{
+                    .binding = 0,
+                    .location = 2,
+                    .format = RhiVertexFormat::R32G32Float,
+                    .offset = offsetof(VSInput, uv),
                 },
             },
         .colorTargetFormatsCount = 1,
@@ -175,27 +186,32 @@ void Renderer2DFrameBegin(RhiCmdList cmd, Renderer2D *renderer, GpuStagingBuffer
             VSInput{
                 .pos = {-.5f, .5f, .0f, 1.f},
                 .color = {},
+                .uv = {1.f, 0.f},
             },
             VSInput{
                 .pos = {.5f, -.5f, .0f, 1.f},
                 .color = {},
+                .uv = {0.f, 1.f},
             },
             VSInput{
                 .pos = {.5f, .5f, .0f, 1.f},
-                .color = {},
+                .uv = {0.f, 0.f},
             },
 
             VSInput{
                 .pos = {-.5f, .5f, .0f, 1.f},
                 .color = {},
+                .uv = {1.f, 0.f},
             },
             VSInput{
                 .pos = {-.5f, -.5f, .0f, 1.f},
                 .color = {},
+                .uv = {1.f, 1.f},
             },
             VSInput{
                 .pos = {.5f, -.5f, .0f, 1.f},
                 .color = {},
+                .uv = {0.f, 1.f},
             },
         };
 
@@ -205,7 +221,8 @@ void Renderer2DFrameBegin(RhiCmdList cmd, Renderer2D *renderer, GpuStagingBuffer
     }
 }
 
-void Renderer2DRect(RhiCmdList cmd, Renderer2D *renderer, float x, float y, float width, float height, float4 color)
+void Renderer2DRect(RhiCmdList cmd, Renderer2D *renderer, float x, float y, float width, float height, float4 color,
+                    uint32_t textureIndex)
 {
     const uint32_t frameIndex = RhiGetFrameIndex();
 
@@ -214,8 +231,8 @@ void Renderer2DRect(RhiCmdList cmd, Renderer2D *renderer, float x, float y, floa
     new (p) EntityUbo{
         .model = float4x4::Translate(float4{x, y, 0, 1}).Mult(float4x4::Scale(float4{width, height, 1, 1})),
         .color = color,
-        .textureIndex = 0,
-        .samplerIndex = 0,
+        .textureIndex = textureIndex,
+        .samplerIndex = uint32_t(AssetManager::SamplerType::LinearClamp),
     };
 
     uint32_t offset = renderer->dymamicUniformBufferWritten;
@@ -228,7 +245,7 @@ void Renderer2DDraw(RhiCmdList cmd, Renderer2D *renderer, uint32_t width, uint32
 {
     RhiCmdBindGraphicsPipeline(cmd, renderer->pipeline);
 
-    GpuResourcesBind(cmd);
+    renderer->assetManager->BindDescriptorSet(cmd);
 
     float worldW;
     float worldH;

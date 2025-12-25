@@ -52,7 +52,7 @@ CheckOptions:
     value: k
  
   - key: readability-identifier-naming.MethodIgnoredRegexp
-    value: '^(data|size|begin|end|cbegin|cend|empty|max_size|clear|push_back|emplace_back)$'
+    value: '^(data|size|begin|end|cbegin|cend|empty|max_size|resize|clear|push_back|emplace_back)$'
 
 HeaderFilterRegex: 'nyla/nyla/.*'
 FormatStyle: none
