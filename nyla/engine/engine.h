@@ -28,9 +28,15 @@ struct EngineInitDesc
 
 void EngineInit(const EngineInitDesc &);
 auto EngineShouldExit() -> bool;
-auto EngineFrameBegin() -> RhiCmdList;
-auto EngineGetDt() -> float;
-auto EngineGetFps() -> uint32_t;
+
+struct EngineFrameBeginResult
+{
+    RhiCmdList cmd;
+    float dt;
+    uint32_t fps;
+};
+
+auto EngineFrameBegin() -> EngineFrameBeginResult;
 auto EngineFrameEnd() -> void;
 
 } // namespace nyla

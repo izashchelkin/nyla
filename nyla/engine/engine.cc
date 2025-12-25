@@ -60,7 +60,7 @@ auto EngineShouldExit() -> bool
     return PlatformShouldExit();
 }
 
-auto EngineFrameBegin() -> RhiCmdList
+auto EngineFrameBegin() -> EngineFrameBeginResult
 {
     RhiCmdList cmd = RhiFrameBegin();
 
@@ -91,6 +91,30 @@ auto EngineFrameBegin() -> RhiCmdList
     }
 
     PlatformProcessEvents();
+    tweenManager->Update(dt);
+    StagingBufferReset(stagingBuffer);
+    assetManager->Upload(cmd);
+
+    return {
+        .cmd = cmd,
+        .dt = dt,
+        .fps = fps,
+    };
+}
+
+auto EngineFrameEnd() -> void
+{
+    RhiFrameEnd();
+
+    uint64_t frameEnd = GetMonotonicTimeMicros();
+    uint64_t frameDurationUs = frameEnd - frameStart;
+
+    if (targetFrameDurationUs > frameDurationUs)
+    {
+        using namespace std::chrono_literals;
+        std::this_thread::sleep_for((targetFrameDurationUs - frameDurationUs) * 1us);
+    }
+}
 
 #if 0
     static bool spvChanged = true;
@@ -129,32 +153,5 @@ auto EngineFrameBegin() -> RhiCmdList
         return true;
     }
 #endif
-
-    return cmd;
-}
-
-auto EngineGetDt() -> float
-{
-    return dt;
-}
-
-auto EngineGetFps() -> uint32_t
-{
-    return fps;
-}
-
-auto EngineFrameEnd() -> void
-{
-    RhiFrameEnd();
-
-    uint64_t frameEnd = GetMonotonicTimeMicros();
-    uint64_t frameDurationUs = frameEnd - frameStart;
-
-    if (targetFrameDurationUs > frameDurationUs)
-    {
-        using namespace std::chrono_literals;
-        std::this_thread::sleep_for((targetFrameDurationUs - frameDurationUs) * 1us);
-    }
-}
 
 } // namespace nyla
