@@ -1,4 +1,4 @@
-#include "nyla/engine0/staging_buffer.h"
+#include "nyla/engine/staging_buffer.h"
 #include "absl/log/check.h"
 #include "nyla/commons/memory/align.h"
 #include "nyla/rhi/rhi.h"

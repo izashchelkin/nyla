@@ -1,5 +1,4 @@
-#include "nyla/engine0/tweenmanager.h"
-#include "absl/log/log.h"
+#include "nyla/engine/tween_manager.h"
 #include "nyla/commons/handle_pool.h"
 
 namespace nyla
@@ -7,7 +6,7 @@ namespace nyla
 
 void TweenManager::Update(float dt)
 {
-    m_time += dt;
+    m_now += dt;
 
     for (auto &slot : m_tweens)
     {
@@ -17,34 +16,38 @@ void TweenManager::Update(float dt)
         TweenData &tweenData = slot.data;
         CHECK_GT(tweenData.end, tweenData.begin);
 
-        if (m_time >= tweenData.end)
+        if (m_now >= tweenData.end)
         {
             *tweenData.value = tweenData.endValue;
-            slot.used = false;
+            slot.Free();
             continue;
         }
 
-        if (m_time >= tweenData.begin)
+        if (m_now >= tweenData.begin)
         {
             float duration = tweenData.end - tweenData.begin;
-            float passed = m_time - tweenData.begin;
+            float passed = m_now - tweenData.begin;
             float t = passed / duration;
-
-            LOG(INFO) << t;
 
             *tweenData.value = tweenData.endValue * t + tweenData.startValue * (1.f - t);
         }
     }
 }
 
-auto TweenManager::Lerp(float *value, float endValue, float begin, float end) -> Tween
+void TweenManager::Cancel(Tween tween)
+{
+    if (auto [ok, slot] = m_tweens.TryResolveSlot(tween); ok)
+        slot->Free();
+}
+
+auto TweenManager::Lerp(float &value, float endValue, float begin, float end) -> Tween
 {
     CHECK_GT(end, begin);
     return m_tweens.Acquire(TweenData{
-        .value = value,
+        .value = &value,
         .begin = begin,
         .end = end,
-        .startValue = *value,
+        .startValue = value,
         .endValue = endValue,
     });
 }

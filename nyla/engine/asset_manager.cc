@@ -1,9 +1,10 @@
-#include "nyla/engine0/asset_manager.h"
+#include "nyla/engine/asset_manager.h"
 #include "absl/log/check.h"
 #include "absl/log/log.h"
 #include "nyla/commons/containers/inline_vec.h"
 #include "nyla/commons/handle_pool.h"
-#include "nyla/engine0/staging_buffer.h"
+#include "nyla/engine/engine.h"
+#include "nyla/engine/staging_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_descriptor.h"
 #include "nyla/rhi/rhi_pipeline.h"
@@ -129,7 +130,7 @@ void AssetManager::Upload(RhiCmdList cmd)
         RhiCmdTransitionTexture(cmd, texture, RhiTextureState::TransferDst);
 
         const uint32_t size = textureData.width * textureData.height * textureData.channels;
-        char *uploadMemory = StagingBufferCopyIntoTexture(cmd, m_stagingBuffer, texture, size);
+        char *uploadMemory = StagingBufferCopyIntoTexture(cmd, stagingBuffer, texture, size);
         memcpy(uploadMemory, data, size);
 
         free(data);

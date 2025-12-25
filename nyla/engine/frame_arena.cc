@@ -1,4 +1,4 @@
-#include "nyla/engine0/frame_arena.h"
+#include "nyla/engine/frame_arena.h"
 
 #include <cstdint>
 #include <cstdlib>

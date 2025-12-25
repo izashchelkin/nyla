@@ -1,13 +1,12 @@
 #include "nyla/apps/breakout/breakout.h"
-#include "nyla/apps/breakout/world_renderer.h"
 #include "nyla/commons/logging/init.h"
 #include "nyla/commons/signal/signal.h"
-#include "nyla/engine0/asset_manager.h"
-#include "nyla/engine0/debug_text_renderer.h"
-#include "nyla/engine0/engine0.h"
-#include "nyla/engine0/renderer2d.h"
-#include "nyla/engine0/staging_buffer.h"
-#include "nyla/engine0/tweenmanager.h"
+#include "nyla/engine/asset_manager.h"
+#include "nyla/engine/debug_text_renderer.h"
+#include "nyla/engine/engine.h"
+#include "nyla/engine/renderer2d.h"
+#include "nyla/engine/staging_buffer.h"
+#include "nyla/engine/tween_manager.h"
 #include "nyla/platform/key_physical.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi_cmdlist.h"
@@ -28,7 +27,7 @@ static auto Main() -> int
     });
     PlatformWindow window = PlatformCreateWindow();
 
-    Engine0Init({.window = window});
+    EngineInit({.window = window});
 
     PlatformMapInputBegin();
     PlatformMapInput(kLeft, KeyPhysical::S);
@@ -37,53 +36,23 @@ static auto Main() -> int
     PlatformMapInput(kBoost, KeyPhysical::K);
     PlatformMapInputEnd();
 
-    BreakoutInit();
+    BreakoutAssets assets = InitBreakoutAssets();
 
-#if 0
-    std::array<RhiTexture, kRhiMaxNumFramesInFlight> offscreenTextures;
-    for (uint32_t i = 0; i < RhiGetNumFramesInFlight(); ++i)
-    {
-        offscreenTextures[i] = RhiCreateTexture(RhiTextureDesc{
-            .width = 1000,
-            .height = 1000,
-            .memoryUsage = RhiMemoryUsage::GpuOnly,
-            .usage = RhiTextureUsage::ColorTarget | RhiTextureUsage::ShaderSampled,
-            .format = RhiTextureFormat::B8G8R8A8_sRGB,
-        });
-    }
-
-    if (RecompileShadersIfNeeded())
-    {
-        RpInit(worldPipeline);
-        RpInit(guiPipeline);
-        RpInit(dbgTextPipeline);
-    }
-
-    RhiTexture offscreenTexture = offscreenTextures[RhiGetFrameIndex()];
-#endif
-
-    GpuStagingBuffer *stagingBuffer = CreateStagingBuffer(1 << 22);
-
-    auto *assetManager = new AssetManager{stagingBuffer};
-    assetManager->Init();
-
-    BreakoutAssets assets = InitBreakoutAssets(assetManager);
-
-    Renderer2D *renderer2d = CreateRenderer2D(assetManager);
+    Renderer2D *renderer2d = CreateRenderer2D();
     DebugTextRenderer *debugTextRenderer = CreateDebugTextRenderer();
 
-    auto *tweenManager = new TweenManager{};
+    BreakoutInit(tweenManager);
 
-    while (!Engine0ShouldExit())
+    while (!EngineShouldExit())
     {
         StagingBufferReset(stagingBuffer);
 
-        RhiCmdList cmd = Engine0FrameBegin();
-        DebugText(500, 10, std::format("fps={}", Engine0GetFps()));
+        RhiCmdList cmd = EngineFrameBegin();
+        DebugText(500, 10, std::format("fps={}", EngineGetFps()));
 
         assetManager->Upload(cmd);
 
-        const float dt = Engine0GetDt();
+        const float dt = EngineGetDt();
         tweenManager->Update(dt);
         BreakoutProcess(dt, tweenManager);
 
@@ -107,7 +76,7 @@ static auto Main() -> int
             .state = RhiTextureState::Present,
         });
 
-        Engine0FrameEnd();
+        EngineFrameEnd();
     }
 
     return 0;

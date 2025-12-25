@@ -1,7 +1,7 @@
-#include "nyla/engine0/debug_text_renderer.h"
+#include "nyla/engine/debug_text_renderer.h"
 #include "nyla/commons/containers/inline_vec.h"
 #include "nyla/commons/memory/align.h"
-#include "nyla/engine0/engine0_internal.h"
+#include "nyla/engine/engine0_internal.h"
 
 #include <cstdint>
 

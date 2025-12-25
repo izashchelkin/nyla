@@ -3,7 +3,6 @@
 #include "nyla/commons/containers/inline_vec.h"
 #include "nyla/commons/handle.h"
 #include "nyla/commons/handle_pool.h"
-#include "nyla/engine0/staging_buffer.h"
 #include "nyla/rhi/rhi_descriptor.h"
 #include "nyla/rhi/rhi_sampler.h"
 #include "nyla/rhi/rhi_texture.h"
@@ -18,7 +17,7 @@ class AssetManager
     constexpr static uint32_t kTexturesDescriptorBinding = 1;
 
   public:
-    AssetManager(GpuStagingBuffer *stagingBuffer) : m_stagingBuffer{stagingBuffer}, m_samplers{}, m_textures{}
+    AssetManager() : m_samplers{}, m_textures{}
     {
     }
 
@@ -59,8 +58,6 @@ class AssetManager
         RhiSampler sampler;
     };
     InlineVec<SamplerData, 4> m_samplers;
-
-    GpuStagingBuffer *m_stagingBuffer;
 
     RhiDescriptorSetLayout m_descriptorSetLayout;
     RhiDescriptorSet m_descriptorSet;

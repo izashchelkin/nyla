@@ -1,7 +1,8 @@
-#include "nyla/engine0/engine0.h"
+#include "nyla/engine/engine.h"
 #include "nyla/commons/bitenum.h"
 #include "nyla/commons/os/clock.h"
-#include "nyla/engine0/frame_arena.h"
+#include "nyla/engine/asset_manager.h"
+#include "nyla/engine/frame_arena.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_cmdlist.h"
@@ -11,6 +12,9 @@
 
 namespace nyla
 {
+#define X(x) x;
+NYLA_ENGINE_EXTERN_GLOBALS(X)
+#undef X
 
 using namespace engine0_internal;
 
@@ -26,7 +30,7 @@ uint64_t frameStart = 0;
 
 } // namespace
 
-auto Engine0Init(Engine0Desc desc) -> void
+void EngineInit(const EngineInitDesc &desc)
 {
     if (desc.maxFps > 0)
         maxFps = desc.maxFps;
@@ -43,14 +47,20 @@ auto Engine0Init(Engine0Desc desc) -> void
     });
 
     FrameArenaInit();
+
+    stagingBuffer = CreateStagingBuffer(1 << 22);
+    assetManager = new AssetManager();
+    tweenManager = new TweenManager{};
+
+    assetManager->Init();
 }
 
-auto Engine0ShouldExit() -> bool
+auto EngineShouldExit() -> bool
 {
     return PlatformShouldExit();
 }
 
-auto Engine0FrameBegin() -> RhiCmdList
+auto EngineFrameBegin() -> RhiCmdList
 {
     RhiCmdList cmd = RhiFrameBegin();
 
@@ -123,17 +133,17 @@ auto Engine0FrameBegin() -> RhiCmdList
     return cmd;
 }
 
-auto Engine0GetDt() -> float
+auto EngineGetDt() -> float
 {
     return dt;
 }
 
-auto Engine0GetFps() -> uint32_t
+auto EngineGetFps() -> uint32_t
 {
     return fps;
 }
 
-auto Engine0FrameEnd() -> void
+auto EngineFrameEnd() -> void
 {
     RhiFrameEnd();
 

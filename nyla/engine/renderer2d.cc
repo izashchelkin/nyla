@@ -1,11 +1,12 @@
-#include "nyla/engine0/renderer2d.h"
+#include "nyla/engine/renderer2d.h"
 #include "nyla/commons/containers/inline_vec.h"
 #include "nyla/commons/math/mat.h"
 #include "nyla/commons/math/vec.h"
 #include "nyla/commons/memory/align.h"
-#include "nyla/engine0/asset_manager.h"
-#include "nyla/engine0/engine0_internal.h"
-#include "nyla/engine0/staging_buffer.h"
+#include "nyla/engine/asset_manager.h"
+#include "nyla/engine/engine.h"
+#include "nyla/engine/engine0_internal.h"
+#include "nyla/engine/staging_buffer.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
@@ -50,8 +51,6 @@ struct Scene
 
 struct Renderer2D
 {
-    AssetManager *assetManager;
-
     RhiGraphicsPipeline pipeline;
     RhiDescriptorSetLayout descriptorSetLayout;
     RhiBuffer vertexBuffer;
@@ -62,14 +61,12 @@ struct Renderer2D
     InlineVec<uint32_t, 256> pendingDraws;
 };
 
-auto CreateRenderer2D(AssetManager *assetManager) -> Renderer2D *
+auto CreateRenderer2D() -> Renderer2D *
 {
     const RhiShader vs = GetShader("renderer2d.vs", RhiShaderStage::Vertex);
     const RhiShader ps = GetShader("renderer2d.ps", RhiShaderStage::Pixel);
 
-    auto *renderer = new Renderer2D{
-        .assetManager = assetManager,
-    };
+    auto *renderer = new Renderer2D{};
 
     const std::array<RhiDescriptorLayoutDesc, 1> descriptorLayouts{
         RhiDescriptorLayoutDesc{
@@ -245,7 +242,7 @@ void Renderer2DDraw(RhiCmdList cmd, Renderer2D *renderer, uint32_t width, uint32
 {
     RhiCmdBindGraphicsPipeline(cmd, renderer->pipeline);
 
-    renderer->assetManager->BindDescriptorSet(cmd);
+    assetManager->BindDescriptorSet(cmd);
 
     float worldW;
     float worldH;

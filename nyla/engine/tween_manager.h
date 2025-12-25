@@ -13,17 +13,18 @@ struct Tween : Handle
 class TweenManager
 {
   public:
-    void Update(float dt);
-
-    auto CurrentTime() -> float
+    auto Now() -> float
     {
-        return m_time;
+        return m_now;
     }
 
-    auto BeginOf(Tween tween) -> float;
-    auto EndOf(Tween tween) -> float;
+    void Update(float dt);
 
-    auto Lerp(float *value, float endValue, float begin, float end) -> Tween;
+    auto BeginOf(Tween) -> float;
+    auto EndOf(Tween) -> float;
+
+    void Cancel(Tween);
+    auto Lerp(float &value, float endValue, float begin, float end) -> Tween;
 
   private:
     struct TweenData
@@ -34,9 +35,9 @@ class TweenManager
         float startValue;
         float endValue;
     };
-    HandlePool<Tween, TweenData, 64> m_tweens;
+    HandlePool<Tween, TweenData, 1024> m_tweens;
 
-    float m_time;
+    float m_now;
 };
 
 } // namespace nyla

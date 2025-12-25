@@ -19,6 +19,12 @@ template <typename HandleType, typename DataType, uint32_t Size> class HandlePoo
         DataType data;
         uint32_t gen;
         bool used;
+
+        void Free()
+        {
+            this->~Slot();
+            used = false;
+        }
     };
 
     using value_type = Slot;
@@ -153,8 +159,7 @@ template <typename HandleType, typename DataType, uint32_t Size> class HandlePoo
     auto ReleaseData(HandleType handle) -> DataType
     {
         Slot &slot = ResolveSlot(handle);
-        slot.used = false;
-        slot.data.~DataType();
+        slot.Free();
         return slot.data;
     }
 

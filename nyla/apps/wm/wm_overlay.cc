@@ -22,9 +22,7 @@
 #include "xcb/xcb.h"
 #include "xcb/xproto.h"
 
-#include "nyla/apps/breakout/world_renderer.h"
-#include "nyla/engine0/debug_text_renderer.h"
-#include "nyla/engine0/engine0.h"
+#include "nyla/engine/debug_text_renderer.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_pass.h"

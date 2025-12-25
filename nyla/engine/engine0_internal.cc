@@ -1,4 +1,4 @@
-#include "nyla/engine0/engine0_internal.h"
+#include "nyla/engine/engine0_internal.h"
 
 #include "absl/log/check.h"
 #include "nyla/commons/os/readfile.h"
@@ -12,8 +12,6 @@
 
 namespace nyla::engine0_internal
 {
-
-Engine0Handles e0Handles;
 
 auto GetShader(const char *name, RhiShaderStage stage) -> RhiShader
 {

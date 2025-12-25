@@ -3,16 +3,14 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
-#include <cstring>
 #include <vector>
 
-#include "nyla/apps/breakout/unitshapes.h"
-#include "nyla/apps/breakout/world_renderer.h"
 #include "nyla/commons/color.h"
 #include "nyla/commons/math/vec.h"
 #include "nyla/commons/os/clock.h"
-#include "nyla/engine0/renderer2d.h"
-#include "nyla/engine0/tweenmanager.h"
+#include "nyla/engine/engine.h"
+#include "nyla/engine/renderer2d.h"
+#include "nyla/engine/tween_manager.h"
 #include "nyla/platform/abstract_input.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_cmdlist.h"
@@ -40,7 +38,7 @@ struct Brick
 
 struct Level
 {
-    std ::vector<Brick> bricks;
+    InlineVec<Brick, 256> bricks;
 };
 
 } // namespace
@@ -77,9 +75,9 @@ static float2 ballVel = {40.f, 40.f};
 
 static Level level;
 
-void BreakoutInit()
+void BreakoutInit(TweenManager *tweenManager)
 {
-    for (size_t i = 0; i < 12; ++i)
+    for (uint32_t i = 0; i < 12; ++i)
     {
         float h = std::fmod(static_cast<float>(i) + 825.f, 12.f) / 12.f;
         float s = .97f;
@@ -87,15 +85,21 @@ void BreakoutInit()
 
         float3 color = ConvertHsvToRgb({h, s, v});
 
-        for (size_t j = 0; j < 17; ++j)
+        for (uint32_t j = 0; j < 17; ++j)
         {
-            level.bricks.emplace_back(Brick{
-                .x = -28.f + j * 3.5f,
-                .y = 20.f - i * 1.5f,
+            float y = 20.f - i * 1.5f;
+            float x = -28.f + j * 3.5f;
+
+            Brick &brick = level.bricks.emplace_back(Brick{
+                .x = 50.f * (j % 2 ? 1 : -1),
+                .y = 50.f * (j % 3 ? -1 : 1),
                 .width = 40.f / 15.f,
                 .height = 1.f,
                 .color = color,
             });
+
+            tweenManager->Lerp(brick.x, x, tweenManager->Now(), tweenManager->Now() + 1);
+            tweenManager->Lerp(brick.y, y, tweenManager->Now(), tweenManager->Now() + 1);
         }
     }
 }
@@ -111,14 +115,6 @@ static auto IsInside(float pos, float size, float2 boundary) -> bool
 
 void BreakoutProcess(float dt, TweenManager *tweenManager)
 {
-    static bool b = true;
-    if (b)
-    {
-        tweenManager->Lerp(&playerWidth, playerWidth + 10, tweenManager->CurrentTime(),
-                           tweenManager->CurrentTime() + 10.f);
-        b = false;
-    }
-
     const int dx = Pressed(kRight) - Pressed(kLeft);
 
     static float dtAccumulator = 0.f;
@@ -219,7 +215,7 @@ void BreakoutRenderGame(RhiCmdList cmd, Renderer2D *renderer, const RhiTextureIn
                    assets.ball.index);
 }
 
-auto InitBreakoutAssets(AssetManager *assetManager) -> BreakoutAssets
+auto InitBreakoutAssets() -> BreakoutAssets
 {
     std::string basePath = "assets/BBreaker";
 

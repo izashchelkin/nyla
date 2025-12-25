@@ -1,8 +1,8 @@
 #pragma once
 
-#include "nyla/engine0/asset_manager.h"
-#include "nyla/engine0/renderer2d.h"
-#include "nyla/engine0/tweenmanager.h"
+#include "nyla/engine/asset_manager.h"
+#include "nyla/engine/renderer2d.h"
+#include "nyla/engine/tween_manager.h"
 #include "nyla/platform/abstract_input.h"
 #include "nyla/rhi/rhi_texture.h"
 
@@ -24,9 +24,9 @@ struct BreakoutAssets
     AssetManager::Texture brickUnbreackable;
     std::array<AssetManager::Texture, 9> bricks;
 };
-auto InitBreakoutAssets(AssetManager *assetManager) -> BreakoutAssets;
+auto InitBreakoutAssets() -> BreakoutAssets;
 
-void BreakoutInit();
+void BreakoutInit(TweenManager *tweenManager);
 void BreakoutProcess(float dt, TweenManager *tweenmanager);
 void BreakoutRenderGame(RhiCmdList cmd, Renderer2D *renderer, const RhiTextureInfo &colorTargetInfo,
                         const BreakoutAssets &assets);
