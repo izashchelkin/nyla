@@ -1,7 +1,7 @@
 #pragma once
 
 #include "nyla/commons/math/vec.h"
-#include "nyla/engine0/gpu_resources.h"
+#include "nyla/engine0/asset_manager.h"
 #include "nyla/engine0/staging_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include <cstdint>

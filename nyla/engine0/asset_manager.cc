@@ -1,4 +1,4 @@
-#include "nyla/engine0/gpu_resources.h"
+#include "nyla/engine0/asset_manager.h"
 #include "absl/log/check.h"
 #include "absl/log/log.h"
 #include "nyla/commons/containers/inline_vec.h"

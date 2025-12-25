@@ -3,8 +3,8 @@
 #include "nyla/commons/math/mat.h"
 #include "nyla/commons/math/vec.h"
 #include "nyla/commons/memory/align.h"
+#include "nyla/engine0/asset_manager.h"
 #include "nyla/engine0/engine0_internal.h"
-#include "nyla/engine0/gpu_resources.h"
 #include "nyla/engine0/staging_buffer.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_buffer.h"
@@ -232,7 +232,7 @@ void Renderer2DRect(RhiCmdList cmd, Renderer2D *renderer, float x, float y, floa
         .model = float4x4::Translate(float4{x, y, 0, 1}).Mult(float4x4::Scale(float4{width, height, 1, 1})),
         .color = color,
         .textureIndex = textureIndex,
-        .samplerIndex = uint32_t(AssetManager::SamplerType::LinearClamp),
+        .samplerIndex = uint32_t(AssetManager::SamplerType::NearestClamp),
     };
 
     uint32_t offset = renderer->dymamicUniformBufferWritten;

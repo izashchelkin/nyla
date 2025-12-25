@@ -10,6 +10,7 @@
 #include "nyla/apps/breakout/world_renderer.h"
 #include "nyla/commons/color.h"
 #include "nyla/commons/math/vec.h"
+#include "nyla/commons/os/clock.h"
 #include "nyla/engine0/renderer2d.h"
 #include "nyla/platform/abstract_input.h"
 #include "nyla/rhi/rhi.h"
@@ -67,7 +68,7 @@ constexpr float kBallRadius = .8f;
 
 static float playerPosX = 0.f;
 static const float kPlayerPosY = kWorldBoundaryY[0] + 1.6f;
-static const float kPlayerHeight = 1.5f;
+static const float kPlayerHeight = 2.5f;
 static float playerWidth = (74.f / 26.f) * kPlayerHeight;
 
 static float2 ballPos = {};
@@ -179,19 +180,32 @@ void BreakoutProcess(float dt)
 void BreakoutRenderGame(RhiCmdList cmd, Renderer2D *renderer, const RhiTextureInfo &colorTargetInfo,
                         const BreakoutAssets &assets)
 {
+    Renderer2DRect(cmd, renderer, 0, 0, 100, 70, float4{}, assets.background.index);
+
     uint32_t i = 0;
     for (Brick &brick : level.bricks)
     {
+        i++;
         if (brick.dead)
             continue;
 
         Renderer2DRect(cmd, renderer, brick.x, brick.y, brick.width, brick.height,
                        float4{brick.color[0], brick.color[1], brick.color[2], 1.f},
-                       assets.bricks[(i++) % assets.bricks.size()].index);
+                       assets.bricks[i % assets.bricks.size()].index);
     }
 
-    Renderer2DRect(cmd, renderer, playerPosX, kPlayerPosY, playerWidth, kPlayerHeight, float4{1.f, 1.f, 1.f, 1},
-                   assets.player.index);
+    uint64_t second = GetMonotonicTimeMillis() / 1000;
+    if (second % 2)
+    {
+        Renderer2DRect(cmd, renderer, playerPosX, kPlayerPosY, playerWidth, kPlayerHeight, float4{1.f, 1.f, 1.f, 1},
+                       assets.playerFlash.index);
+    }
+    else
+    {
+        Renderer2DRect(cmd, renderer, playerPosX, kPlayerPosY, playerWidth, kPlayerHeight, float4{1.f, 1.f, 1.f, 1},
+                       assets.player.index);
+    }
+
     Renderer2DRect(cmd, renderer, ballPos[0], ballPos[1], kBallRadius * 2, kBallRadius * 2, float4{1.f, 1.f, 1.f, 1},
                    assets.ball.index);
 }

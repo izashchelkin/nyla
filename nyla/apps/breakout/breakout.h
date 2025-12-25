@@ -1,6 +1,6 @@
 #pragma once
 
-#include "nyla/engine0/gpu_resources.h"
+#include "nyla/engine0/asset_manager.h"
 #include "nyla/engine0/renderer2d.h"
 #include "nyla/platform/abstract_input.h"
 #include "nyla/rhi/rhi_texture.h"
