@@ -59,12 +59,12 @@ auto RhiCreateSampler(const RhiSamplerDesc &desc) -> RhiSampler
     VulkanSamplerData samplerData;
     VK_CHECK(vkCreateSampler(vk.dev, &createInfo, vk.alloc, &samplerData.sampler));
 
-    return HandleAcquire(rhiHandles.samplers, samplerData);
+    return rhiHandles.samplers.Acquire(samplerData);
 }
 
 void RhiDestroySampler(RhiSampler sampler)
 {
-    VulkanSamplerData samplerData = HandleRelease(rhiHandles.samplers, sampler);
+    VulkanSamplerData samplerData = rhiHandles.samplers.ReleaseData(sampler);
     vkDestroySampler(vk.dev, samplerData.sampler, vk.alloc);
 }
 

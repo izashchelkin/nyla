@@ -94,18 +94,18 @@ auto RhiCreateDescriptorSetLayout(const RhiDescriptorSetLayoutDesc &desc) -> Rhi
 
     VK_CHECK(vkCreateDescriptorSetLayout(vk.dev, &descriptorSetLayoutCreateInfo, vk.alloc, &layoutData.layout));
 
-    return HandleAcquire(rhiHandles.descriptorSetLayouts, layoutData);
+    return rhiHandles.descriptorSetLayouts.Acquire(layoutData);
 }
 
 void RhiDestroyDescriptorSetLayout(RhiDescriptorSetLayout layout)
 {
-    VkDescriptorSetLayout descriptorSetLayout = HandleRelease(rhiHandles.descriptorSetLayouts, layout).layout;
+    VkDescriptorSetLayout descriptorSetLayout = rhiHandles.descriptorSetLayouts.ReleaseData(layout).layout;
     vkDestroyDescriptorSetLayout(vk.dev, descriptorSetLayout, vk.alloc);
 }
 
 auto RhiCreateDescriptorSet(RhiDescriptorSetLayout layout) -> RhiDescriptorSet
 {
-    const VkDescriptorSetLayout descriptorSetLayout = HandleGetData(rhiHandles.descriptorSetLayouts, layout).layout;
+    const VkDescriptorSetLayout descriptorSetLayout = rhiHandles.descriptorSetLayouts.ResolveData(layout).layout;
 
     const VkDescriptorSetAllocateInfo descriptorSetAllocInfo{
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
@@ -119,7 +119,7 @@ auto RhiCreateDescriptorSet(RhiDescriptorSetLayout layout) -> RhiDescriptorSet
     };
     VK_CHECK(vkAllocateDescriptorSets(vk.dev, &descriptorSetAllocInfo, &descriptorSetData.set));
 
-    return HandleAcquire(rhiHandles.descriptorSets, descriptorSetData);
+    return rhiHandles.descriptorSets.Acquire(descriptorSetData);
 }
 
 void RhiWriteDescriptors(std::span<const RhiDescriptorWriteDesc> writes)
@@ -132,12 +132,12 @@ void RhiWriteDescriptors(std::span<const RhiDescriptorWriteDesc> writes)
     {
         const uint32_t binding = write.binding;
 
-        const VulkanDescriptorSetData descriptorSetData = HandleGetData(rhiHandles.descriptorSets, write.set);
+        const VulkanDescriptorSetData descriptorSetData = rhiHandles.descriptorSets.ResolveData(write.set);
         const VkDescriptorSet vulkanDescriptorSet = descriptorSetData.set;
 
         const RhiDescriptorSetLayout descriptorSetLayout = descriptorSetData.layout;
         const VulkanDescriptorSetLayoutData layoutData =
-            HandleGetData(rhiHandles.descriptorSetLayouts, descriptorSetData.layout);
+            rhiHandles.descriptorSetLayouts.ResolveData(descriptorSetData.layout);
 
         const auto &descriptorLayout = [binding, &layoutData] -> const RhiDescriptorLayoutDesc & {
             auto it = std::ranges::lower_bound(layoutData.descriptors, binding, {}, &RhiDescriptorLayoutDesc::binding);
@@ -163,7 +163,7 @@ void RhiWriteDescriptors(std::span<const RhiDescriptorWriteDesc> writes)
         switch (bindingType)
         {
         case RhiBindingType::UniformBuffer: {
-            const VulkanBufferData &bufferData = HandleGetData(rhiHandles.buffers, resourceBinding.buffer.buffer);
+            const VulkanBufferData &bufferData = rhiHandles.buffers.ResolveData(resourceBinding.buffer.buffer);
 
             vulkanSetWrite.pBufferInfo = &bufferInfos.emplace_back(VkDescriptorBufferInfo{
                 .buffer = bufferData.buffer,
@@ -174,7 +174,7 @@ void RhiWriteDescriptors(std::span<const RhiDescriptorWriteDesc> writes)
         }
 
         case RhiBindingType::Texture: {
-            const VulkanTextureData &textureData = HandleGetData(rhiHandles.textures, resourceBinding.texture.texture);
+            const VulkanTextureData &textureData = rhiHandles.textures.ResolveData(resourceBinding.texture.texture);
 
             vulkanSetWrite.pImageInfo = &imageInfos.emplace_back(VkDescriptorImageInfo{
                 .imageView = textureData.imageView,
@@ -185,7 +185,7 @@ void RhiWriteDescriptors(std::span<const RhiDescriptorWriteDesc> writes)
         }
 
         case RhiBindingType::Sampler: {
-            const VulkanSamplerData &samplerData = HandleGetData(rhiHandles.samplers, resourceBinding.sampler.sampler);
+            const VulkanSamplerData &samplerData = rhiHandles.samplers.ResolveData(resourceBinding.sampler.sampler);
 
             vulkanSetWrite.pImageInfo = &imageInfos.emplace_back(VkDescriptorImageInfo{
                 .sampler = samplerData.sampler,
@@ -204,16 +204,16 @@ void RhiWriteDescriptors(std::span<const RhiDescriptorWriteDesc> writes)
 
 void RhiDestroyDescriptorSet(RhiDescriptorSet bindGroup)
 {
-    VkDescriptorSet descriptorSet = HandleRelease(rhiHandles.descriptorSets, bindGroup).set;
+    VkDescriptorSet descriptorSet = rhiHandles.descriptorSets.ReleaseData(bindGroup).set;
     vkFreeDescriptorSets(vk.dev, vk.descriptorPool, 1, &descriptorSet);
 }
 
 void RhiCmdBindGraphicsBindGroup(RhiCmdList cmd, uint32_t setIndex, RhiDescriptorSet bindGroup,
                                  std::span<const uint32_t> dynamicOffsets)
 { // TODO: validate dynamic offsets size !!!
-    const VulkanCmdListData &cmdData = HandleGetData(rhiHandles.cmdLists, cmd);
-    const VulkanPipelineData &pipelineData = HandleGetData(rhiHandles.graphicsPipelines, cmdData.boundGraphicsPipeline);
-    const VkDescriptorSet &descriptorSet = HandleGetData(rhiHandles.descriptorSets, bindGroup).set;
+    const VulkanCmdListData &cmdData = rhiHandles.cmdLists.ResolveData(cmd);
+    const VulkanPipelineData &pipelineData = rhiHandles.graphicsPipelines.ResolveData(cmdData.boundGraphicsPipeline);
+    const VkDescriptorSet &descriptorSet = rhiHandles.descriptorSets.ResolveData(bindGroup).set;
 
     vkCmdBindDescriptorSets(cmdData.cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineData.layout, setIndex, 1,
                             &descriptorSet, dynamicOffsets.size(), dynamicOffsets.data());

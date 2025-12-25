@@ -122,18 +122,18 @@ auto RhiCreateBuffer(const RhiBufferDesc &desc) -> RhiBuffer
     VK_CHECK(vkAllocateMemory(vk.dev, &memoryAllocInfo, nullptr, &bufferData.memory));
     VK_CHECK(vkBindBufferMemory(vk.dev, bufferData.buffer, bufferData.memory, 0));
 
-    return HandleAcquire(rhiHandles.buffers, bufferData);
+    return rhiHandles.buffers.Acquire(bufferData);
 }
 
 void RhiNameBuffer(RhiBuffer buf, std::string_view name)
 {
-    VulkanBufferData &bufferData = HandleGetData(rhiHandles.buffers, buf);
+    VulkanBufferData &bufferData = rhiHandles.buffers.ResolveData(buf);
     VulkanNameHandle(VK_OBJECT_TYPE_BUFFER, (uint64_t)bufferData.buffer, name);
 }
 
 void RhiDestroyBuffer(RhiBuffer buffer)
 {
-    VulkanBufferData bufferData = HandleRelease(rhiHandles.buffers, buffer);
+    VulkanBufferData bufferData = rhiHandles.buffers.ReleaseData(buffer);
 
     if (bufferData.mapped)
     {
@@ -145,12 +145,12 @@ void RhiDestroyBuffer(RhiBuffer buffer)
 
 auto RhiGetBufferSize(RhiBuffer buffer) -> uint32_t
 {
-    return HandleGetData(rhiHandles.buffers, buffer).size;
+    return rhiHandles.buffers.ResolveData(buffer).size;
 }
 
 auto RhiMapBuffer(RhiBuffer buffer) -> char *
 {
-    VulkanBufferData &bufferData = HandleGetData(rhiHandles.buffers, buffer);
+    VulkanBufferData &bufferData = rhiHandles.buffers.ResolveData(buffer);
     if (!bufferData.mapped)
     {
         vkMapMemory(vk.dev, bufferData.memory, 0, VK_WHOLE_SIZE, 0, (void **)&bufferData.mapped);
@@ -161,7 +161,7 @@ auto RhiMapBuffer(RhiBuffer buffer) -> char *
 
 void RhiUnmapBuffer(RhiBuffer buffer)
 {
-    VulkanBufferData &bufferData = HandleGetData(rhiHandles.buffers, buffer);
+    VulkanBufferData &bufferData = rhiHandles.buffers.ResolveData(buffer);
     if (bufferData.mapped)
     {
         vkUnmapMemory(vk.dev, bufferData.memory);
@@ -208,10 +208,10 @@ void EnsureHostWritesVisible(VkCommandBuffer cmdbuf, VulkanBufferData &bufferDat
 void RhiCmdCopyBuffer(RhiCmdList cmd, RhiBuffer dst, uint32_t dstOffset, RhiBuffer src, uint32_t srcOffset,
                       uint32_t size)
 {
-    VkCommandBuffer cmdbuf = HandleGetData(rhiHandles.cmdLists, cmd).cmdbuf;
+    VkCommandBuffer cmdbuf = rhiHandles.cmdLists.ResolveData(cmd).cmdbuf;
 
-    VulkanBufferData &dstBufferData = HandleGetData(rhiHandles.buffers, dst);
-    VulkanBufferData &srcBufferData = HandleGetData(rhiHandles.buffers, src);
+    VulkanBufferData &dstBufferData = rhiHandles.buffers.ResolveData(dst);
+    VulkanBufferData &srcBufferData = rhiHandles.buffers.ResolveData(src);
 
     EnsureHostWritesVisible(cmdbuf, srcBufferData);
 
@@ -225,10 +225,10 @@ void RhiCmdCopyBuffer(RhiCmdList cmd, RhiBuffer dst, uint32_t dstOffset, RhiBuff
 
 void RhiCmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, uint32_t srcOffset, uint32_t size)
 {
-    VkCommandBuffer cmdbuf = HandleGetData(rhiHandles.cmdLists, cmd).cmdbuf;
+    VkCommandBuffer cmdbuf = rhiHandles.cmdLists.ResolveData(cmd).cmdbuf;
 
-    VulkanTextureData &dstTextureData = HandleGetData(rhiHandles.textures, dst);
-    VulkanBufferData &srcBufferData = HandleGetData(rhiHandles.buffers, src);
+    VulkanTextureData &dstTextureData = rhiHandles.textures.ResolveData(dst);
+    VulkanBufferData &srcBufferData = rhiHandles.buffers.ResolveData(src);
 
     EnsureHostWritesVisible(cmdbuf, srcBufferData);
 
@@ -298,8 +298,8 @@ auto VulkanBufferStateGetSyncInfo(RhiBufferState state) -> VulkanBufferStateSync
 
 void RhiCmdTransitionBuffer(RhiCmdList cmd, RhiBuffer buffer, RhiBufferState newState)
 {
-    VkCommandBuffer cmdbuf = HandleGetData(rhiHandles.cmdLists, cmd).cmdbuf;
-    VulkanBufferData &bufferData = HandleGetData(rhiHandles.buffers, buffer);
+    VkCommandBuffer cmdbuf = rhiHandles.cmdLists.ResolveData(cmd).cmdbuf;
+    VulkanBufferData &bufferData = rhiHandles.buffers.ResolveData(buffer);
 
     VulkanBufferStateSyncInfo oldSync = VulkanBufferStateGetSyncInfo(bufferData.state);
     VulkanBufferStateSyncInfo newSync = VulkanBufferStateGetSyncInfo(newState);
@@ -327,8 +327,8 @@ void RhiCmdTransitionBuffer(RhiCmdList cmd, RhiBuffer buffer, RhiBufferState new
 
 void RhiCmdUavBarrierBuffer(RhiCmdList cmd, RhiBuffer buffer)
 {
-    VkCommandBuffer cmdbuf = HandleGetData(rhiHandles.cmdLists, cmd).cmdbuf;
-    VulkanBufferData &bufferData = HandleGetData(rhiHandles.buffers, buffer);
+    VkCommandBuffer cmdbuf = rhiHandles.cmdLists.ResolveData(cmd).cmdbuf;
+    VulkanBufferData &bufferData = rhiHandles.buffers.ResolveData(buffer);
 
     const VkBufferMemoryBarrier2 barrier{
         .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
@@ -354,7 +354,7 @@ void RhiCmdUavBarrierBuffer(RhiCmdList cmd, RhiBuffer buffer)
 
 void RhiBufferMarkWritten(RhiBuffer buffer, uint32_t offset, uint32_t size)
 {
-    VulkanBufferData &bufferData = HandleGetData(rhiHandles.buffers, buffer);
+    VulkanBufferData &bufferData = rhiHandles.buffers.ResolveData(buffer);
 
     if (bufferData.dirty)
     {

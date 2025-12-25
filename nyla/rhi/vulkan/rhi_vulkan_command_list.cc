@@ -43,19 +43,19 @@ auto RhiCreateCmdList(RhiQueueType queueType) -> RhiCmdList
         .queueType = queueType,
     };
 
-    RhiCmdList cmd = HandleAcquire(rhiHandles.cmdLists, cmdData);
+    RhiCmdList cmd = rhiHandles.cmdLists.Acquire(cmdData);
     return cmd;
 }
 
 void RhiNameCmdList(RhiCmdList cmd, std::string_view name)
 {
-    VulkanCmdListData cmdData = HandleGetData(rhiHandles.cmdLists, cmd);
+    VulkanCmdListData cmdData = rhiHandles.cmdLists.ResolveData(cmd);
     VulkanNameHandle(VK_OBJECT_TYPE_COMMAND_BUFFER, (uint64_t)cmdData.cmdbuf, name);
 }
 
 void RhiDestroyCmdList(RhiCmdList cmd)
 {
-    VulkanCmdListData cmdData = HandleRelease(rhiHandles.cmdLists, cmd);
+    VulkanCmdListData cmdData = rhiHandles.cmdLists.ReleaseData(cmd);
     VkCommandPool cmdPool = GetDeviceQueue(cmdData.queueType).cmdPool;
     vkFreeCommandBuffers(vk.dev, cmdPool, 1, &cmdData.cmdbuf);
 }
@@ -67,10 +67,10 @@ auto RhiCmdSetCheckpoint(RhiCmdList cmd, uint64_t data) -> uint64_t
         return data;
     }
 
-    VulkanCmdListData cmdData = HandleGetData(rhiHandles.cmdLists, cmd);
+    VulkanCmdListData cmdData = rhiHandles.cmdLists.ResolveData(cmd);
 
     static auto fn = VK_GET_INSTANCE_PROC_ADDR(vkCmdSetCheckpointNV);
-    fn(cmdData.cmdbuf, (void *)data);
+    fn(cmdData.cmdbuf, reinterpret_cast<void *>(data));
 
     return data;
 }

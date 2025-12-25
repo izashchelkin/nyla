@@ -205,12 +205,12 @@ auto RhiCreateTexture(RhiTextureDesc desc) -> RhiTexture
     };
     vkCreateImageView(vk.dev, &imageViewCreateInfo, vk.alloc, &textureData.imageView);
 
-    return HandleAcquire(rhiHandles.textures, textureData);
+    return rhiHandles.textures.Acquire(textureData);
 }
 
 auto RhiGetTextureInfo(RhiTexture texture) -> RhiTextureInfo
 {
-    const VulkanTextureData textureData = HandleGetData(rhiHandles.textures, texture);
+    const VulkanTextureData textureData = rhiHandles.textures.ResolveData(texture);
     return {
         .width = textureData.extent.width,
         .height = textureData.extent.height,
@@ -220,9 +220,9 @@ auto RhiGetTextureInfo(RhiTexture texture) -> RhiTextureInfo
 
 void RhiCmdTransitionTexture(RhiCmdList cmd, RhiTexture texture, RhiTextureState newState)
 {
-    VkCommandBuffer cmdbuf = HandleGetData(rhiHandles.cmdLists, cmd).cmdbuf;
+    VkCommandBuffer cmdbuf = rhiHandles.cmdLists.ResolveData(cmd).cmdbuf;
 
-    VulkanTextureData &textureData = HandleGetData(rhiHandles.textures, texture);
+    VulkanTextureData &textureData = rhiHandles.textures.ResolveData(texture);
 
     const VulkanTextureStateSyncInfo newSyncInfo = VulkanTextureStateGetSyncInfo(newState);
     if (newSyncInfo.layout == textureData.layout)
@@ -262,7 +262,7 @@ void RhiCmdTransitionTexture(RhiCmdList cmd, RhiTexture texture, RhiTextureState
 
 void RhiDestroyTexture(RhiTexture texture)
 {
-    VulkanTextureData textureData = HandleRelease(rhiHandles.textures, texture);
+    VulkanTextureData textureData = rhiHandles.textures.ReleaseData(texture);
     CHECK(!textureData.isSwapchain);
 
     CHECK(textureData.imageView);

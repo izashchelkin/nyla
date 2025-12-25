@@ -228,12 +228,12 @@ auto RhiCreateTextureFromSwapchainImage(VkImage image, VkSurfaceFormatKHR surfac
         .extent = {surfaceExtent.width, surfaceExtent.height, 1},
     };
 
-    return HandleAcquire(rhiHandles.textures, textureData);
+    return rhiHandles.textures.Acquire(textureData);
 }
 
 void RhiDestroySwapchainTexture(RhiTexture texture)
 {
-    VulkanTextureData textureData = HandleRelease(rhiHandles.textures, texture);
+    VulkanTextureData textureData = rhiHandles.textures.ReleaseData(texture);
     CHECK(textureData.isSwapchain);
 
     CHECK(textureData.imageView);

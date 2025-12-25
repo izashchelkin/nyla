@@ -12,6 +12,7 @@
 #include "nyla/commons/math/vec.h"
 #include "nyla/commons/os/clock.h"
 #include "nyla/engine0/renderer2d.h"
+#include "nyla/engine0/tweenmanager.h"
 #include "nyla/platform/abstract_input.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_cmdlist.h"
@@ -108,8 +109,16 @@ static auto IsInside(float pos, float size, float2 boundary) -> bool
     return false;
 }
 
-void BreakoutProcess(float dt)
+void BreakoutProcess(float dt, TweenManager *tweenManager)
 {
+    static bool b = true;
+    if (b)
+    {
+        tweenManager->Lerp(&playerWidth, playerWidth + 10, tweenManager->CurrentTime(),
+                           tweenManager->CurrentTime() + 10.f);
+        b = false;
+    }
+
     const int dx = Pressed(kRight) - Pressed(kLeft);
 
     static float dtAccumulator = 0.f;

@@ -9,83 +9,157 @@
 namespace nyla
 {
 
-template <typename T, typename Data, uint32_t Size> struct HandlePool
+template <typename HandleType, typename DataType, uint32_t Size> class HandlePool
 {
+  public:
+    static constexpr uint32_t kCapacity = Size;
+
     struct Slot
     {
-        Data data;
+        DataType data;
         uint32_t gen;
         bool used;
     };
-    std::array<Slot, static_cast<size_t>(Size)> slots;
+
+    using value_type = Slot;
+    using size_type = uint32_t;
+    using difference_type = int32_t;
+    using reference = Slot &;
+    using const_reference = const Slot &;
+    using pointer = Slot *;
+    using const_pointer = const Slot *;
+    using iterator = Slot *;
+    using const_iterator = const Slot *;
 
     [[nodiscard]]
-    constexpr auto max_size() const -> uint32_t
+    auto data() const -> const_pointer
+    {
+        return m_slots.data();
+    }
+
+    [[nodiscard]]
+    auto data() -> pointer
+    {
+        return m_slots.data();
+    }
+
+    [[nodiscard]]
+    constexpr auto size() const -> size_type
     {
         return Size;
     }
-};
 
-template <typename T, typename Data, uint32_t Size>
-inline auto HandleAcquire(HandlePool<T, Data, Size> &pool, Data data) -> T
-{
-    T retHandle{};
-
-    for (uint32_t i = 0; i < Size; ++i)
+    [[nodiscard]]
+    constexpr auto max_size() const -> size_type
     {
-        auto &slot = pool.slots[i];
-        if (slot.used)
-        {
-            CHECK(memcmp(&slot.data, &data, sizeof(slot.data)));
-            continue;
-        }
+        return Size;
+    }
 
-        if (!HandleIsSet(retHandle))
+    [[nodiscard]]
+    auto begin() -> iterator
+    {
+        return m_slots.data();
+    }
+
+    [[nodiscard]]
+    auto end() -> iterator
+    {
+        return m_slots.data() + kCapacity;
+    }
+
+    [[nodiscard]]
+    auto begin() const -> const_iterator
+    {
+        return m_slots.data();
+    }
+
+    [[nodiscard]]
+    auto end() const -> const_iterator
+    {
+        return m_slots.data() + kCapacity;
+    }
+
+    [[nodiscard]]
+    auto cbegin() const -> const_iterator
+    {
+        return m_slots.data();
+    }
+
+    [[nodiscard]]
+    auto cend() const -> const_iterator
+    {
+        return m_slots.data() + kCapacity;
+    }
+
+    //
+
+    auto Acquire(const DataType &data) -> HandleType
+    {
+        HandleType ret{};
+
+        for (uint32_t i = 0; i < Size; ++i)
         {
+            Slot &slot = m_slots[i];
+            if (slot.used)
+                continue;
+
             ++slot.gen;
             slot.used = true;
             slot.data = data;
 
-            retHandle = static_cast<T>(Handle{
+            return static_cast<HandleType>(Handle{
                 .gen = slot.gen,
                 .index = i,
             });
         }
+
+        CHECK(false);
+        return {};
     }
 
-    CHECK(HandleIsSet(retHandle));
-    return retHandle;
-}
-
-template <typename T, typename Data, uint32_t Size>
-inline auto HandleGetData(HandlePool<T, Data, Size> &pool, T handle) -> Data &
-{
-    CHECK(handle.gen);
-    CHECK_LT(handle.index, Size);
-
-    auto &slot = pool.slots[handle.index];
-    if (slot.used && handle.gen == slot.gen)
+    auto TryResolveSlot(HandleType handle) -> std::pair<bool, Slot *>
     {
+        CHECK_LT(handle.index, Size);
+
+        if (!handle.gen)
+            return {false, nullptr};
+
+        Slot *slot = &m_slots[handle.index];
+        if (!slot->used)
+            return {false, nullptr};
+        if (handle.gen != slot->gen)
+            return {false, nullptr};
+
+        return {true, slot};
+    }
+
+    auto ResolveSlot(HandleType handle) -> Slot &
+    {
+        auto [ok, slot] = TryResolveSlot(handle);
+        CHECK(ok);
+        return *slot;
+    }
+
+    auto ResolveData(HandleType handle) -> DataType &
+    {
+        return ResolveSlot(handle).data;
+    }
+
+    auto ResolveData(HandleType handle) const -> const DataType &
+    {
+        return ResolveSlot(handle).data;
+    }
+
+    auto ReleaseData(HandleType handle) -> DataType
+    {
+        Slot &slot = ResolveSlot(handle);
+        slot.used = false;
+        slot.data.~DataType();
         return slot.data;
     }
 
-    CHECK(false);
-}
-
-template <typename T, typename Data, uint32_t Size>
-inline auto HandleRelease(HandlePool<T, Data, Size> &pool, T handle) -> Data
-{
-    CHECK(handle.gen);
-    CHECK_LT(handle.index, Size);
-
-    auto &slot = pool.slots[handle.index];
-    CHECK_EQ(handle.gen, slot.gen);
-    CHECK(slot.used);
-
-    slot.data.~Data();
-
-    slot.used = false;
-    return slot.data;
-}
+  private:
+    std::array<Slot, static_cast<size_t>(Size)> m_slots;
+};
 
 } // namespace nyla

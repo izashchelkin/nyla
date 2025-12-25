@@ -1,7 +1,6 @@
 #pragma once
 
 #include "absl/log/check.h"
-#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <span>
@@ -26,7 +25,7 @@ template <typename T, uint32_t N> class InlineVec
     using iterator = T *;
     using const_iterator = const T *;
 
-    InlineVec() = default;
+    InlineVec() : m_size{0} {};
 
     InlineVec(std::span<const value_type> elems) : m_size{static_cast<size_type>(elems.size())}
     {
@@ -143,8 +142,8 @@ template <typename T, uint32_t N> class InlineVec
     }
 
   private:
-    std::array<T, N> m_data{};
-    size_type m_size = 0;
+    std::array<T, N> m_data;
+    size_type m_size;
 };
 
 } // namespace nyla

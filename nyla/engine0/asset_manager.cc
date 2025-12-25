@@ -95,9 +95,9 @@ void AssetManager::Upload(RhiCmdList cmd)
 {
     InlineVec<RhiDescriptorWriteDesc, 256> descriptorWrites;
 
-    for (uint32_t i = 0; i < m_textures.slots.size(); ++i)
+    for (uint32_t i = 0; i < m_textures.size(); ++i)
     {
-        auto &slot = m_textures.slots[i];
+        auto &slot = *(m_textures.begin() + i);
         if (!slot.used)
             continue;
 
@@ -148,10 +148,10 @@ void AssetManager::Upload(RhiCmdList cmd)
 
 auto AssetManager::DeclareTexture(std::string_view path) -> Texture
 {
-    return HandleAcquire(m_textures, TextureData{
-                                         .path = std::string{path},
-                                         .needsUpload = true,
-                                     });
+    return m_textures.Acquire(TextureData{
+        .path = std::string{path},
+        .needsUpload = true,
+    });
 }
 
 } // namespace nyla

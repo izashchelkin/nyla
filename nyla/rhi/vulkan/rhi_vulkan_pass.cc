@@ -11,11 +11,11 @@ using namespace rhi_vulkan_internal;
 void RhiPassBegin(RhiPassDesc desc)
 {
     RhiCmdList cmd = vk.graphicsQueueCmd[vk.frameIndex];
-    VkCommandBuffer cmdbuf = HandleGetData(rhiHandles.cmdLists, cmd).cmdbuf;
+    VkCommandBuffer cmdbuf = rhiHandles.cmdLists.ResolveData(cmd).cmdbuf;
 
     RhiCmdTransitionTexture(cmd, desc.colorTarget, desc.state);
 
-    const VulkanTextureData colorTargetData = HandleGetData(rhiHandles.textures, desc.colorTarget);
+    const VulkanTextureData colorTargetData = rhiHandles.textures.ResolveData(desc.colorTarget);
 
     const VkRenderingAttachmentInfo colorAttachmentInfo{
         .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
@@ -60,7 +60,7 @@ void RhiPassBegin(RhiPassDesc desc)
 void RhiPassEnd(RhiPassDesc desc)
 {
     RhiCmdList cmd = vk.graphicsQueueCmd[vk.frameIndex];
-    VkCommandBuffer cmdbuf = HandleGetData(rhiHandles.cmdLists, cmd).cmdbuf;
+    VkCommandBuffer cmdbuf = rhiHandles.cmdLists.ResolveData(cmd).cmdbuf;
     vkCmdEndRendering(cmdbuf);
 
     RhiCmdTransitionTexture(cmd, desc.colorTarget, desc.state);

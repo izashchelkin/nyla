@@ -30,7 +30,7 @@ auto RhiFrameBegin() -> RhiCmdList
     }
 
     RhiCmdList cmd = vk.graphicsQueueCmd[vk.frameIndex];
-    VkCommandBuffer cmdbuf = HandleGetData(rhiHandles.cmdLists, cmd).cmdbuf;
+    VkCommandBuffer cmdbuf = rhiHandles.cmdLists.ResolveData(cmd).cmdbuf;
 
     VK_CHECK(vkResetCommandBuffer(cmdbuf, 0));
 
@@ -45,7 +45,7 @@ auto RhiFrameBegin() -> RhiCmdList
 void RhiFrameEnd()
 {
     RhiCmdList cmd = vk.graphicsQueueCmd[vk.frameIndex];
-    VkCommandBuffer cmdbuf = HandleGetData(rhiHandles.cmdLists, cmd).cmdbuf;
+    VkCommandBuffer cmdbuf = rhiHandles.cmdLists.ResolveData(cmd).cmdbuf;
 
     VK_CHECK(vkEndCommandBuffer(cmdbuf));
 

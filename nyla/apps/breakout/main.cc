@@ -7,6 +7,7 @@
 #include "nyla/engine0/engine0.h"
 #include "nyla/engine0/renderer2d.h"
 #include "nyla/engine0/staging_buffer.h"
+#include "nyla/engine0/tweenmanager.h"
 #include "nyla/platform/key_physical.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi_cmdlist.h"
@@ -71,6 +72,8 @@ static auto Main() -> int
     Renderer2D *renderer2d = CreateRenderer2D(assetManager);
     DebugTextRenderer *debugTextRenderer = CreateDebugTextRenderer();
 
+    auto *tweenManager = new TweenManager{};
+
     while (!Engine0ShouldExit())
     {
         StagingBufferReset(stagingBuffer);
@@ -81,7 +84,8 @@ static auto Main() -> int
         assetManager->Upload(cmd);
 
         const float dt = Engine0GetDt();
-        BreakoutProcess(dt);
+        tweenManager->Update(dt);
+        BreakoutProcess(dt, tweenManager);
 
         Renderer2DFrameBegin(cmd, renderer2d, stagingBuffer);
 
