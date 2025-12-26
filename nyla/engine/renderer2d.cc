@@ -89,7 +89,7 @@ auto CreateRenderer2D() -> Renderer2D *
         .bindGroupLayouts =
             {
                 renderer->descriptorSetLayout,
-                assetManager->GetDescriptorSetLayout(),
+                g_AssetManager->GetDescriptorSetLayout(),
             },
         .vertexBindingsCount = 1,
         .vertexBindings =
@@ -242,7 +242,7 @@ void Renderer2DDraw(RhiCmdList cmd, Renderer2D *renderer, uint32_t width, uint32
 {
     RhiCmdBindGraphicsPipeline(cmd, renderer->pipeline);
 
-    assetManager->BindDescriptorSet(cmd);
+    g_AssetManager->BindDescriptorSet(cmd);
 
     float worldW;
     float worldH;

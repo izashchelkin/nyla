@@ -1,5 +1,6 @@
 #include "nyla/apps/wm/wm_overlay.h"
 #include "absl/log/log.h"
+#include "absl/time/clock.h"
 #include "nyla/commons/logging/init.h"
 #include "nyla/commons/os/clock.h"
 #include "nyla/commons/signal/signal.h"
@@ -10,7 +11,6 @@
 #include <sys/poll.h>
 #include <sys/time.h>
 #include <sys/types.h>
-#include <thread>
 #include <unistd.h>
 
 #include <cstdint>
@@ -58,7 +58,7 @@ auto Main() -> int
     {
         RhiCmdList cmd = RhiFrameBegin();
 
-        auto ret = PlatformProcessEvents();
+        auto ret = PlatformProcessEvents({}, nullptr);
 
         static uint64_t prevUs = GetMonotonicTimeMicros();
         if (!ret.shouldRedraw)
@@ -82,7 +82,7 @@ auto Main() -> int
                 LOG(INFO) << pollRes;
                 if (pollRes > 0)
                 {
-                    auto ret = PlatformProcessEvents();
+                    auto ret = PlatformProcessEvents({}, nullptr);
                     if (ret.shouldRedraw)
                         break;
                 }

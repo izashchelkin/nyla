@@ -3,6 +3,7 @@
 #include "nyla/commons/os/clock.h"
 #include "nyla/engine/asset_manager.h"
 #include "nyla/engine/frame_arena.h"
+#include "nyla/engine/input_manager.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_cmdlist.h"
@@ -48,11 +49,12 @@ void EngineInit(const EngineInitDesc &desc)
 
     FrameArenaInit();
 
-    stagingBuffer = CreateStagingBuffer(1 << 22);
-    assetManager = new AssetManager();
-    tweenManager = new TweenManager{};
+    g_StagingBuffer = CreateStagingBuffer(1 << 22);
+    g_AssetManager = new AssetManager();
+    g_TweenManager = new TweenManager{};
+    g_InputManager = new InputManager{};
 
-    assetManager->Init();
+    g_AssetManager->Init();
 }
 
 auto EngineShouldExit() -> bool
@@ -90,10 +92,30 @@ auto EngineFrameBegin() -> EngineFrameBeginResult
         numFramesCounted = 0;
     }
 
-    PlatformProcessEvents();
-    tweenManager->Update(dt);
-    StagingBufferReset(stagingBuffer);
-    assetManager->Upload(cmd);
+    PlatformProcessEvents(PlatformProcessEventsCallbacks{
+                              .handleKeyPress = [](void *user, uint32_t code) -> void {
+                                  auto inputManager = (InputManager *)user;
+                                  inputManager->HandlePressed(1, code, frameStart);
+                              },
+                              .handleKeyRelease = [](void *user, uint32_t code) -> void {
+                                  auto inputManager = (InputManager *)user;
+                                  inputManager->HandleReleased(1, code, frameStart);
+                              },
+                              .handleMousePress = [](void *user, uint32_t code) -> void {
+                                  auto inputManager = (InputManager *)user;
+                                  inputManager->HandlePressed(2, code, frameStart);
+                              },
+                              .handleMouseRelease = [](void *user, uint32_t code) -> void {
+                                  auto inputManager = (InputManager *)user;
+                                  inputManager->HandleReleased(2, code, frameStart);
+                              },
+                          },
+                          g_InputManager);
+    g_InputManager->Update();
+
+    g_TweenManager->Update(dt);
+    StagingBufferReset(g_StagingBuffer);
+    g_AssetManager->Upload(cmd);
 
     return {
         .cmd = cmd,

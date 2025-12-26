@@ -36,8 +36,9 @@ CheckOptions:
 
   - key: readability-identifier-naming.PublicMemberCase
     value: camelBack
+
   - key: readability-identifier-naming.PrivateMemberCase
-    value: camelBack
+    value: CamelCase
   - key: readability-identifier-naming.PrivateMemberPrefix
     value: m_
 
@@ -45,6 +46,11 @@ CheckOptions:
     value: CamelCase
   - key: readability-identifier-naming.GlobalConstantPrefix
     value: k
+
+  - key: readability-identifier-naming.GlobalVariableCase
+    value: CamelCase
+  - key: readability-identifier-naming.GlobalVariablePrefix
+    value: g_
 
   - key: readability-identifier-naming.ConstexprVariableCase
     value: CamelCase

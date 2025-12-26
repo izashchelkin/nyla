@@ -20,7 +20,7 @@ static auto Main() -> int
 {
     Engine0Init(true);
 
-    PlatformMapInputBegin();
+    PlatformInputResolverBegin();
     PlatformMapInput(kUp, KeyPhysical::E);
     PlatformMapInput(kLeft, KeyPhysical::S);
     PlatformMapInput(kDown, KeyPhysical::D);
@@ -30,7 +30,7 @@ static auto Main() -> int
     PlatformMapInput(kBrake, KeyPhysical::Space);
     PlatformMapInput(kZoomMore, KeyPhysical::U);
     PlatformMapInput(kZoomLess, KeyPhysical::I);
-    PlatformMapInputEnd();
+    PlatformInputResolverEnd();
 
     ShipgameInit();
 

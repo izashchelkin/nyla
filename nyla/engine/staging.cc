@@ -6,6 +6,7 @@
 namespace nyla
 {
 
+#if 0
 auto RecompileShadersIfNeeded() -> bool
 {
     static bool b = false;
@@ -59,6 +60,7 @@ auto RecompileShadersIfNeeded() -> bool
 
     return false;
 }
+#endif
 
 void UpdateDtFps(uint64_t nowUs, uint32_t &fps, float &dt)
 {

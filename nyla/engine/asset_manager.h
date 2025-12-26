@@ -17,7 +17,7 @@ class AssetManager
     constexpr static uint32_t kTexturesDescriptorBinding = 1;
 
   public:
-    AssetManager() : m_samplers{}, m_textures{}
+    AssetManager() : m_Samplers{}, m_Textures{}
     {
     }
 
@@ -51,16 +51,16 @@ class AssetManager
         uint32_t channels = 0;
         bool needsUpload;
     };
-    HandlePool<Texture, TextureData, 128> m_textures;
+    HandlePool<Texture, TextureData, 128> m_Textures;
 
     struct SamplerData
     {
         RhiSampler sampler;
     };
-    InlineVec<SamplerData, 4> m_samplers;
+    InlineVec<SamplerData, 4> m_Samplers;
 
-    RhiDescriptorSetLayout m_descriptorSetLayout;
-    RhiDescriptorSet m_descriptorSet;
+    RhiDescriptorSetLayout m_DescriptorSetLayout;
+    RhiDescriptorSet m_DescriptorSet;
 };
 
 } // namespace nyla

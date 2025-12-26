@@ -31,26 +31,26 @@ void AssetManager::Init()
             .binding = 0,
             .type = RhiBindingType::Sampler,
             .flags = RhiDescriptorFlags::PartiallyBound,
-            .arraySize = m_samplers.max_size(),
+            .arraySize = m_Samplers.max_size(),
             .stageFlags = RhiShaderStage::Pixel,
         },
         RhiDescriptorLayoutDesc{
             .binding = 1,
             .type = RhiBindingType::Texture,
             .flags = RhiDescriptorFlags::PartiallyBound,
-            .arraySize = m_textures.max_size(),
+            .arraySize = m_Textures.max_size(),
             .stageFlags = RhiShaderStage::Pixel,
         },
     };
-    m_descriptorSetLayout = RhiCreateDescriptorSetLayout(RhiDescriptorSetLayoutDesc{
+    m_DescriptorSetLayout = RhiCreateDescriptorSetLayout(RhiDescriptorSetLayoutDesc{
         .descriptors = descriptors,
     });
 
-    m_descriptorSet = RhiCreateDescriptorSet(m_descriptorSetLayout);
+    m_DescriptorSet = RhiCreateDescriptorSet(m_DescriptorSetLayout);
 
     //
 
-    m_samplers.resize(4);
+    m_Samplers.resize(4);
     InlineVec<RhiDescriptorWriteDesc, 4> descriptorWrites;
 
     auto addSampler = [this, &descriptorWrites](SamplerType samplerType, RhiFilter filter,
@@ -64,10 +64,10 @@ void AssetManager::Init()
         });
 
         auto index = static_cast<uint32_t>(samplerType);
-        m_samplers[index] = SamplerData{.sampler = sampler};
+        m_Samplers[index] = SamplerData{.sampler = sampler};
 
         descriptorWrites.emplace_back(RhiDescriptorWriteDesc{
-            .set = m_descriptorSet,
+            .set = m_DescriptorSet,
             .binding = kSamplersDescriptorBinding,
             .arrayIndex = index,
             .type = RhiBindingType::Sampler,
@@ -84,21 +84,21 @@ void AssetManager::Init()
 
 auto AssetManager::GetDescriptorSetLayout() -> RhiDescriptorSetLayout
 {
-    return m_descriptorSetLayout;
+    return m_DescriptorSetLayout;
 }
 
 void AssetManager::BindDescriptorSet(RhiCmdList cmd)
 {
-    RhiCmdBindGraphicsBindGroup(cmd, 1, m_descriptorSet, {});
+    RhiCmdBindGraphicsBindGroup(cmd, 1, m_DescriptorSet, {});
 }
 
 void AssetManager::Upload(RhiCmdList cmd)
 {
     InlineVec<RhiDescriptorWriteDesc, 256> descriptorWrites;
 
-    for (uint32_t i = 0; i < m_textures.size(); ++i)
+    for (uint32_t i = 0; i < m_Textures.size(); ++i)
     {
-        auto &slot = *(m_textures.begin() + i);
+        auto &slot = *(m_Textures.begin() + i);
         if (!slot.used)
             continue;
 
@@ -120,7 +120,7 @@ void AssetManager::Upload(RhiCmdList cmd)
         const RhiTexture texture = textureData.texture;
 
         descriptorWrites.emplace_back(RhiDescriptorWriteDesc{
-            .set = m_descriptorSet,
+            .set = m_DescriptorSet,
             .binding = kTexturesDescriptorBinding,
             .arrayIndex = i,
             .type = RhiBindingType::Texture,
@@ -130,7 +130,7 @@ void AssetManager::Upload(RhiCmdList cmd)
         RhiCmdTransitionTexture(cmd, texture, RhiTextureState::TransferDst);
 
         const uint32_t size = textureData.width * textureData.height * textureData.channels;
-        char *uploadMemory = StagingBufferCopyIntoTexture(cmd, stagingBuffer, texture, size);
+        char *uploadMemory = StagingBufferCopyIntoTexture(cmd, g_StagingBuffer, texture, size);
         memcpy(uploadMemory, data, size);
 
         free(data);
@@ -149,7 +149,7 @@ void AssetManager::Upload(RhiCmdList cmd)
 
 auto AssetManager::DeclareTexture(std::string_view path) -> Texture
 {
-    return m_textures.Acquire(TextureData{
+    return m_Textures.Acquire(TextureData{
         .path = std::string{path},
         .needsUpload = true,
     });

@@ -1,9 +1,9 @@
 #pragma once
 
 #include <cstdint>
+#include <span>
 #include <string>
 
-#include "nyla/platform/abstract_input.h"
 #include "nyla/platform/key_physical.h"
 
 namespace nyla
@@ -16,9 +16,9 @@ struct PlatformInitDesc
 };
 void PlatformInit(PlatformInitDesc);
 
-void PlatformMapInputBegin();
-void PlatformMapInput(AbstractInputMapping mapping, KeyPhysical key);
-void PlatformMapInputEnd();
+void PlatformInputResolverBegin();
+auto PlatformInputResolve(KeyPhysical key) -> uint32_t;
+void PlatformInputResolverEnd();
 
 struct PlatformWindow
 {
@@ -42,11 +42,19 @@ struct PlatformFileChanged
 void PlatformFsWatchFile(const std::string &path);
 auto PlatformFsGetFileChanges() -> std::span<PlatformFileChanged>;
 
+struct PlatformProcessEventsCallbacks
+{
+    void (*handleKeyPress)(void *user, uint32_t code);
+    void (*handleKeyRelease)(void *user, uint32_t code);
+    void (*handleMousePress)(void *user, uint32_t code);
+    void (*handleMouseRelease)(void *user, uint32_t code);
+};
+
 struct PlatformProcessEventsResult
 {
     bool shouldRedraw;
 };
-auto PlatformProcessEvents() -> PlatformProcessEventsResult;
+auto PlatformProcessEvents(const PlatformProcessEventsCallbacks &callbacks, void *user) -> PlatformProcessEventsResult;
 
 auto PlatformShouldExit() -> bool;
 

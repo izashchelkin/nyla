@@ -12,7 +12,7 @@
 #include "nyla/engine/engine.h"
 #include "nyla/engine/renderer2d.h"
 #include "nyla/engine/tween_manager.h"
-#include "nyla/platform/abstract_input.h"
+#include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_pass.h"
@@ -21,11 +21,7 @@
 namespace nyla
 {
 
-#define X(key) const AbstractInputMapping k##key;
-NYLA_INPUT_MAPPING(X)
-#undef X
-
-BreakoutAssets assets;
+GameState *g_State;
 
 namespace
 {
@@ -84,33 +80,34 @@ static Level level;
 
 void BreakoutInit()
 {
+    g_State = new GameState{};
+    g_State->input.moveLeft = g_InputManager->NewId();
+    g_State->input.moveRight = g_InputManager->NewId();
+
     renderer2d = CreateRenderer2D();
     debugTextRenderer = CreateDebugTextRenderer();
 
     //
 
-    PlatformMapInputBegin();
-    PlatformMapInput(kLeft, KeyPhysical::S);
-    PlatformMapInput(kRight, KeyPhysical::F);
-    PlatformMapInput(kFire, KeyPhysical::J);
-    PlatformMapInput(kBoost, KeyPhysical::K);
-    PlatformMapInputEnd();
+    PlatformInputResolverBegin();
+    g_InputManager->Map(g_State->input.moveLeft, 1, PlatformInputResolve(KeyPhysical::S));
+    g_InputManager->Map(g_State->input.moveRight, 1, PlatformInputResolve(KeyPhysical::F));
+    PlatformInputResolverEnd();
 
     //
 
     {
-        std::string basePath = "assets/BBreaker";
+        std::string assetsBasePath = "assets/BBreaker";
+        g_State->assets.background = g_AssetManager->DeclareTexture(assetsBasePath + "/Background1.png");
+        g_State->assets.player = g_AssetManager->DeclareTexture(assetsBasePath + "/Player.png");
+        g_State->assets.playerFlash = g_AssetManager->DeclareTexture(assetsBasePath + "/Player_flash.png");
+        g_State->assets.ball = g_AssetManager->DeclareTexture(assetsBasePath + "/Ball_small-blue.png");
+        g_State->assets.brickUnbreackable = g_AssetManager->DeclareTexture(assetsBasePath + "/Brick_unbreakable2.png");
 
-        assets.background = assetManager->DeclareTexture(basePath + "/Background1.png");
-        assets.player = assetManager->DeclareTexture(basePath + "/Player.png");
-        assets.playerFlash = assetManager->DeclareTexture(basePath + "/Player_flash.png");
-        assets.ball = assetManager->DeclareTexture(basePath + "/Ball_small-blue.png");
-        assets.brickUnbreackable = assetManager->DeclareTexture(basePath + "/Brick_unbreakable2.png");
-
-        for (uint32_t i = 0; i < assets.bricks.size(); ++i)
+        for (uint32_t i = 0; i < g_State->assets.bricks.size(); ++i)
         {
-            std::string path = std::format("{}/Brick{}_4.png", basePath, i + 1);
-            assets.bricks[i] = assetManager->DeclareTexture(path);
+            std::string path = std::format("{}/Brick{}_4.png", assetsBasePath, i + 1);
+            g_State->assets.bricks[i] = g_AssetManager->DeclareTexture(path);
         }
     }
 
@@ -137,8 +134,8 @@ void BreakoutInit()
                 .color = color,
             });
 
-            tweenManager->Lerp(brick.x, x, tweenManager->Now(), tweenManager->Now() + 1);
-            tweenManager->Lerp(brick.y, y, tweenManager->Now(), tweenManager->Now() + 1);
+            g_TweenManager->Lerp(brick.x, x, g_TweenManager->Now(), g_TweenManager->Now() + 1);
+            g_TweenManager->Lerp(brick.y, y, g_TweenManager->Now(), g_TweenManager->Now() + 1);
         }
     }
 }
@@ -154,9 +151,10 @@ static auto IsInside(float pos, float size, float2 boundary) -> bool
 
 void BreakoutProcess(RhiCmdList cmd, float dt)
 {
-    Renderer2DFrameBegin(cmd, renderer2d, stagingBuffer);
+    Renderer2DFrameBegin(cmd, renderer2d, g_StagingBuffer);
 
-    const int dx = Pressed(kRight) - Pressed(kLeft);
+    const int dx =
+        g_InputManager->IsPressed(g_State->input.moveRight) - g_InputManager->IsPressed(g_State->input.moveLeft);
 
     static float dtAccumulator = 0.f;
     dtAccumulator += dt;
@@ -231,6 +229,8 @@ void BreakoutRenderGame(RhiCmdList cmd, RhiTexture colorTarget)
         .colorTarget = RhiGetBackbufferTexture(),
         .state = RhiTextureState::ColorTarget,
     });
+
+    const auto &assets = g_State->assets;
 
     Renderer2DRect(cmd, renderer2d, 0, 0, 100, 70, float4{}, assets.background.index);
 

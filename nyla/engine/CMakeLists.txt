@@ -13,6 +13,7 @@ target_sources(${TARGET}
         staging.cc
         staging_buffer.cc
         tween_manager.cc
+        input_manager.cc
 )
 
 target_include_directories(${TARGET}

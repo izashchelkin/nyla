@@ -1,6 +1,7 @@
 #pragma once
 
 #include "nyla/engine/asset_manager.h"
+#include "nyla/engine/input_manager.h"
 #include "nyla/engine/staging_buffer.h"
 #include "nyla/engine/tween_manager.h"
 #include "nyla/platform/platform.h"
@@ -11,9 +12,10 @@ namespace nyla
 {
 
 #define NYLA_ENGINE_EXTERN_GLOBALS(X)                                                                                  \
-    X(AssetManager *assetManager)                                                                                      \
-    X(GpuStagingBuffer *stagingBuffer)                                                                                 \
-    X(TweenManager *tweenManager)
+    X(AssetManager *g_AssetManager)                                                                                    \
+    X(GpuStagingBuffer *g_StagingBuffer)                                                                               \
+    X(TweenManager *g_TweenManager)                                                                                    \
+    X(InputManager *g_InputManager)
 
 #define X(x) extern x;
 NYLA_ENGINE_EXTERN_GLOBALS(X)

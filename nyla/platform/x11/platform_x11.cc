@@ -14,7 +14,6 @@
 #include "nyla/commons/containers/set.h"
 #include "nyla/commons/memory/optional.h"
 #include "nyla/commons/os/clock.h"
-#include "nyla/platform/abstract_input.h"
 #include "nyla/platform/key_physical.h"
 #include "nyla/platform/platform.h"
 #include "xcb/xcb.h"
@@ -58,25 +57,25 @@ void PlatformInit(PlatformInitDesc desc)
     X11Initialize(desc.keyboardInput, desc.mouseInput);
 }
 
-static X11KeyResolver keyResolver;
+static X11KeyResolver g_KeyResolver;
 
-void PlatformMapInputBegin()
+void PlatformInputResolverBegin()
 {
-    keyResolver = {};
-    X11InitializeKeyResolver(keyResolver);
+    g_KeyResolver = {};
+    X11InitializeKeyResolver(g_KeyResolver);
 }
 
-void PlatformMapInput(AbstractInputMapping mapping, KeyPhysical key)
+auto PlatformInputResolve(KeyPhysical key) -> uint32_t
 {
     const char *xkbName = ConvertKeyPhysicalIntoXkbName(key);
-    const uint32_t keycode = X11ResolveKeyCode(keyResolver, xkbName);
-    AbstractInputMapId(mapping, {1, keycode});
+    const uint32_t keycode = X11ResolveKeyCode(g_KeyResolver, xkbName);
+    return keycode;
 }
 
-void PlatformMapInputEnd()
+void PlatformInputResolverEnd()
 {
-    X11FreeKeyResolver(keyResolver);
-    keyResolver = {};
+    X11FreeKeyResolver(g_KeyResolver);
+    g_KeyResolver = {};
 }
 
 auto PlatformCreateWindow() -> PlatformWindow
@@ -134,10 +133,8 @@ auto PlatformFsGetFileChanges() -> std::span<PlatformFileChanged>
     return fileChanges;
 }
 
-PlatformProcessEventsResult PlatformProcessEvents()
+auto PlatformProcessEvents(const PlatformProcessEventsCallbacks &callbacks, void *user) -> PlatformProcessEventsResult
 {
-    AbstractInputProcessFrame();
-
     if (fsNotifyFd)
     {
         char buf[4096] __attribute__((aligned(__alignof__(struct inotify_event))));
@@ -186,31 +183,33 @@ PlatformProcessEventsResult PlatformProcessEvents()
         absl::Cleanup eventFreer = [=]() -> void { free(event); };
         const uint8_t eventType = event->response_type & 0x7F;
 
-        uint64_t now = GetMonotonicTimeMicros();
-
         switch (eventType)
         {
         case XCB_KEY_PRESS: {
             auto keypress = reinterpret_cast<xcb_key_press_event_t *>(event);
-            AbstractInputHandlePressed({1, keypress->detail}, now);
+            if (callbacks.handleKeyPress)
+                callbacks.handleKeyPress(user, keypress->detail);
             break;
         }
 
         case XCB_KEY_RELEASE: {
             auto keyrelease = reinterpret_cast<xcb_key_release_event_t *>(event);
-            AbstractInputHandleReleased({1, keyrelease->detail});
+            if (callbacks.handleKeyRelease)
+                callbacks.handleKeyRelease(user, keyrelease->detail);
             break;
         }
 
         case XCB_BUTTON_PRESS: {
             auto buttonpress = reinterpret_cast<xcb_button_press_event_t *>(event);
-            AbstractInputHandlePressed({2, buttonpress->detail}, now);
+            if (callbacks.handleMousePress)
+                callbacks.handleMousePress(user, buttonpress->detail);
             break;
         }
 
         case XCB_BUTTON_RELEASE: {
             auto buttonrelease = reinterpret_cast<xcb_button_release_event_t *>(event);
-            AbstractInputHandleReleased({2, buttonrelease->detail});
+            if (callbacks.handleMouseRelease)
+                callbacks.handleMouseRelease(user, buttonrelease->detail);
             break;
         }
 
