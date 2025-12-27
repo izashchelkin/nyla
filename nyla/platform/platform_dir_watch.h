@@ -1,7 +1,6 @@
 #pragma once
 
 #include "nyla/commons/bitenum.h"
-#include <string>
 #include <string_view>
 
 namespace nyla
@@ -19,23 +18,17 @@ struct PlatformDirWatchEvent
     PlatformDirWatchEventType mask;
 };
 
-struct PlatformDirWatchState;
-
 class PlatformDirWatch
 {
   public:
-    PlatformDirWatch(std::string directoryPath) : m_DirectoryPath{std::move(directoryPath)}
-    {
-    }
-
-    void Init();
+    void Init(const char* path);
     void Destroy();
 
-    auto PollChange(PlatformDirWatchEvent &outChange) -> bool;
+    auto Poll(PlatformDirWatchEvent &outChange) -> bool;
 
   private:
-    std::string m_DirectoryPath;
-    PlatformDirWatchState *m_State{};
+    class Impl;
+    Impl *m_Impl{};
 };
 
 } // namespace nyla

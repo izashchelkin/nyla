@@ -21,7 +21,7 @@ target_link_libraries(wm
     PRIVATE
         nyla::dbus
         nyla::debugfs
-        nyla::platform
+        nyla::platform::linux
         xcb-screensaver
 )
 

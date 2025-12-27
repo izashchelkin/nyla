@@ -58,43 +58,17 @@ struct PlatformInitDesc
     PlatformFeature enabledFeatures;
 };
 
-class PlatformImpl
-{
-    void *data;
-    void (*init)(void *data, const PlatformInitDesc &);
-    PlatformWindow (*createWindow)(void *data);
-    PlatformWindowSize (*getWindowSize)(void *data, PlatformWindow);
-    bool (*pollEvent)(void *data, PlatformEvent &outEvent);
-};
-extern PlatformImpl *g_PlatformImpl;
-
 class Platform
 {
   public:
-    Platform(PlatformImpl *impl) : m_Impl{impl} {};
-
-    void Init(const PlatformInitDesc &desc)
-    {
-        m_Impl->init(m_Impl->data, desc);
-    }
-
-    auto CreateWindow()
-    {
-        return m_Impl->createWindow(m_Impl->data);
-    }
-
-    auto GetWindowSize(PlatformWindow window)
-    {
-        return m_Impl->getWindowSize(m_Impl->data, window);
-    }
-
-    auto PollEvent(PlatformEvent &outEvent)
-    {
-        return m_Impl->pollEvent(m_Impl->data, outEvent);
-    }
+    void Init(const PlatformInitDesc &desc);
+    auto CreateWindow() -> PlatformWindow;
+    auto GetWindowSize(PlatformWindow window) -> PlatformWindowSize;
+    auto PollEvent(PlatformEvent &outEvent) -> bool;
 
   private:
-    PlatformImpl *m_Impl;
+    class Impl;
+    Impl *m_Impl;
 };
 extern Platform *g_Platform;
 

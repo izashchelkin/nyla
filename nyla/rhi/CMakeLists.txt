@@ -27,7 +27,6 @@ target_include_directories(${TARGET}
 target_link_libraries(${TARGET}
     PUBLIC
         nyla::commons
-        nyla::platform
         Vulkan::Vulkan        
 )
 
@@ -50,7 +49,6 @@ target_include_directories(${TARGET_NDEBUG}
 target_link_libraries(${TARGET_NDEBUG}
     PUBLIC
         nyla::commons
-        nyla::platform
         Vulkan::Vulkan
 )
 

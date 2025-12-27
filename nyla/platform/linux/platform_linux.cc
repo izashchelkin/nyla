@@ -1,4 +1,5 @@
 #include "nyla/platform/linux/platform_linux.h"
+#include "nyla/platform/platform.h"
 
 #include "absl/cleanup/cleanup.h"
 #include "absl/log/check.h"
@@ -26,20 +27,7 @@
 namespace nyla
 {
 
-namespace platform_linux
-{
-
-// NOLINTBEGIN
-#define NYLA_X11_ATOMS(X)                                                                                              \
-    X(compound_text)                                                                                                   \
-    X(wm_delete_window)                                                                                                \
-    X(wm_protocols)                                                                                                    \
-    X(wm_name)                                                                                                         \
-    X(wm_state)                                                                                                        \
-    X(wm_take_focus)
-// NOLINTEND
-
-auto LinuxPlatform::InternAtom(std::string_view name, bool onlyIfExists) -> xcb_atom_t
+auto Platform::Impl::InternAtom(std::string_view name, bool onlyIfExists) -> xcb_atom_t
 {
     xcb_intern_atom_reply_t *reply =
         xcb_intern_atom_reply(m_Conn, xcb_intern_atom(m_Conn, onlyIfExists, name.size(), name.data()), nullptr);
@@ -51,7 +39,7 @@ auto LinuxPlatform::InternAtom(std::string_view name, bool onlyIfExists) -> xcb_
     return ret;
 }
 
-void LinuxPlatform::Init(const PlatformInitDesc &desc)
+void Platform::Impl::Init(const PlatformInitDesc &desc)
 {
     m_Conn = xcb_connect(nullptr, &m_ScreenIndex);
     if (xcb_connection_has_error(m_Conn))
@@ -109,7 +97,7 @@ void LinuxPlatform::Init(const PlatformInitDesc &desc)
     }
 }
 
-auto LinuxPlatform::CreateWindow() -> PlatformWindow
+auto Platform::Impl::CreateWindow() -> PlatformWindow
 {
     xcb_window_t window =
         CreateWindow(m_Screen->width_in_pixels, m_Screen->height_in_pixels, false,
@@ -118,7 +106,7 @@ auto LinuxPlatform::CreateWindow() -> PlatformWindow
     return {window};
 }
 
-auto LinuxPlatform::CreateWindow(uint32_t width, uint32_t height, bool overrideRedirect, xcb_event_mask_t eventMask)
+auto Platform::Impl::CreateWindow(uint32_t width, uint32_t height, bool overrideRedirect, xcb_event_mask_t eventMask)
     -> xcb_window_t
 {
     const xcb_window_t window = xcb_generate_id(m_Conn);
@@ -134,7 +122,7 @@ auto LinuxPlatform::CreateWindow(uint32_t width, uint32_t height, bool overrideR
     return window;
 }
 
-auto LinuxPlatform::GetWindowSize(PlatformWindow platformWindow) -> PlatformWindowSize
+auto Platform::Impl::GetWindowSize(PlatformWindow platformWindow) -> PlatformWindowSize
 {
     const xcb_window_t window = platformWindow.handle;
     const xcb_get_geometry_reply_t *windowGeometry =
@@ -145,7 +133,7 @@ auto LinuxPlatform::GetWindowSize(PlatformWindow platformWindow) -> PlatformWind
     };
 }
 
-auto LinuxPlatform::PollEvent(PlatformEvent &outEvent) -> bool
+auto Platform::Impl::PollEvent(PlatformEvent &outEvent) -> bool
 {
     for (;;)
     {
@@ -224,8 +212,30 @@ auto LinuxPlatform::PollEvent(PlatformEvent &outEvent) -> bool
     }
 }
 
-} // namespace platform_linux
+//
 
-PlatformImpl *g_PlatformImpl = &(new platform_linux::LinuxPlatform())->platformImpl;
+void Platform::Init(const PlatformInitDesc &desc)
+{
+    CHECK(!m_Impl);
+    m_Impl = new Impl();
+    m_Impl->Init(desc);
+}
+
+auto Platform::CreateWindow() -> PlatformWindow
+{
+    return m_Impl->CreateWindow();
+}
+
+auto Platform::GetWindowSize(PlatformWindow window) -> PlatformWindowSize
+{
+    return m_Impl->GetWindowSize(window);
+}
+
+auto Platform::PollEvent(PlatformEvent &outEvent) -> bool
+{
+    return m_Impl->PollEvent(outEvent);
+}
+
+Platform *g_Platform = new Platform();
 
 } // namespace nyla

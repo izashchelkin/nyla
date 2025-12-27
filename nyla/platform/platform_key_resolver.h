@@ -6,8 +6,6 @@ namespace nyla
 
 enum class KeyPhysical;
 
-struct PlatformKeyResolverState;
-
 class PlatformKeyResolver
 {
   public:
@@ -17,7 +15,8 @@ class PlatformKeyResolver
     auto ResolveKeyCode(KeyPhysical) -> uint32_t;
 
   private:
-    PlatformKeyResolverState *m_State{};
+    class Impl;
+    Impl *m_Impl{};
 };
 
 //

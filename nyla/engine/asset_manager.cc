@@ -155,4 +155,6 @@ auto AssetManager::DeclareTexture(std::string_view path) -> Texture
     });
 }
 
+AssetManager* g_AssetManager = new AssetManager{};
+
 } // namespace nyla

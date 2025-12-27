@@ -18,7 +18,7 @@
 
 #undef explicit
 
-namespace nyla::platform_linux
+namespace nyla
 {
 
 // NOLINTBEGIN
@@ -31,29 +31,9 @@ namespace nyla::platform_linux
     X(wm_take_focus)
 // NOLINTEND
 
-class LinuxPlatform
+class Platform::Impl
 {
   public:
-    PlatformImpl platformImpl = PlatformImpl{
-        .data = this,
-        .init = [](void *data, const PlatformInitDesc &desc) -> void {
-            auto *platform = (LinuxPlatform *)(data);
-            platform->Init(desc);
-        },
-        .createWindow = [](void *data) -> PlatformWindow {
-            auto *platform = (LinuxPlatform *)(data);
-            return platform->CreateWindow();
-        },
-        .getWindowSize = [](void *data, PlatformWindow window) -> PlatformWindowSize {
-            auto *platform = (LinuxPlatform *)(data);
-            return platform->GetWindowSize(window);
-        },
-        .pollEvent = [](void *data, PlatformEvent &outEvent) -> bool {
-            auto *platform = (LinuxPlatform *)(data);
-            return platform->PollEvent(outEvent);
-        },
-    };
-
     auto InternAtom(std::string_view name, bool onlyIfExists) -> xcb_atom_t;
     void Init(const PlatformInitDesc &desc);
     auto CreateWindow() -> PlatformWindow;
@@ -68,17 +48,17 @@ class LinuxPlatform
         return m_ScreenIndex;
     }
 
-    auto GetScreen() -> auto*
+    auto GetScreen() -> auto *
     {
         return m_Screen;
     }
 
-    auto GetConn() -> auto*
+    auto GetConn() -> auto *
     {
         return m_Conn;
     }
 
-    auto GetAtoms() -> auto&
+    auto GetAtoms() -> auto &
     {
         return m_Atoms;
     }
@@ -96,4 +76,5 @@ class LinuxPlatform
     } m_Atoms;
 };
 
-} // namespace nyla::platform_linux
+//
+} // namespace nyla

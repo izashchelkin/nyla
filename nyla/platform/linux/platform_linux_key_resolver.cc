@@ -7,46 +7,42 @@
 namespace nyla
 {
 
-struct PlatformKeyResolverState
+class PlatformKeyResolver::Impl
 {
-    xcb_connection_t *conn;
-    xkb_context *ctx;
-    xkb_keymap *keymap;
+  public:
+    void Init();
+    void Destroy();
+    auto ResolveKeyCode(KeyPhysical key) -> uint32_t;
+
+  private:
+    xcb_connection_t *m_Conn;
+    xkb_context *m_Ctx;
+    xkb_keymap *m_Keymap;
 };
 
-void PlatformKeyResolver::Init()
+void PlatformKeyResolver::Impl::Init()
 {
-    CHECK(!m_State);
-    m_State = new PlatformKeyResolverState{};
+    m_Conn = xcb_connect(nullptr, nullptr);
+    CHECK(!xcb_connection_has_error(m_Conn));
 
-    auto &conn = m_State->conn;
-    auto &ctx = m_State->ctx;
-    auto &keymap = m_State->keymap;
+    m_Ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
+    CHECK(m_Ctx);
 
-    conn = xcb_connect(nullptr, nullptr);
-    CHECK(!xcb_connection_has_error(conn));
-
-    ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
-    CHECK(ctx);
-
-    const int32_t deviceId = xkb_x11_get_core_keyboard_device_id(conn);
+    const int32_t deviceId = xkb_x11_get_core_keyboard_device_id(m_Conn);
     CHECK_NE(deviceId, -1);
 
-    keymap = xkb_x11_keymap_new_from_device(ctx, conn, deviceId, XKB_KEYMAP_COMPILE_NO_FLAGS);
-    CHECK(keymap);
+    m_Keymap = xkb_x11_keymap_new_from_device(m_Ctx, m_Conn, deviceId, XKB_KEYMAP_COMPILE_NO_FLAGS);
+    CHECK(m_Keymap);
 }
 
-void PlatformKeyResolver::Destroy()
+void PlatformKeyResolver::Impl::Destroy()
 {
-    if (m_State->keymap)
-        xkb_keymap_unref(m_State->keymap);
-    if (m_State->ctx)
-        xkb_context_unref(m_State->ctx);
-    if (m_State->conn)
-        xcb_disconnect(m_State->conn);
-
-    free(m_State);
-    m_State = nullptr;
+    if (m_Keymap)
+        xkb_keymap_unref(m_Keymap);
+    if (m_Ctx)
+        xkb_context_unref(m_Ctx);
+    if (m_Conn)
+        xcb_disconnect(m_Conn);
 }
 
 namespace
@@ -54,13 +50,38 @@ namespace
 auto ConvertKeyPhysicalIntoXkbName(KeyPhysical key) -> const char *;
 }
 
-auto PlatformKeyResolver::ResolveKeyCode(KeyPhysical key) -> uint32_t
+auto PlatformKeyResolver::Impl::ResolveKeyCode(KeyPhysical key) -> uint32_t
 {
     const char *xkbKeyname = ConvertKeyPhysicalIntoXkbName(key);
-    const xkb_keycode_t keycode = xkb_keymap_key_by_name(m_State->keymap, xkbKeyname);
+    const xkb_keycode_t keycode = xkb_keymap_key_by_name(m_Keymap, xkbKeyname);
     CHECK(xkb_keycode_is_legal_x11(keycode));
     return keycode;
 }
+
+//
+
+void PlatformKeyResolver::Init()
+{
+    CHECK(!m_Impl);
+    m_Impl = new Impl{};
+    m_Impl->Init();
+}
+
+void PlatformKeyResolver::Destroy()
+{
+    if (m_Impl)
+    {
+        m_Impl->Destroy();
+        delete m_Impl;
+    }
+}
+
+auto PlatformKeyResolver::ResolveKeyCode(KeyPhysical key) -> uint32_t
+{
+    return m_Impl->ResolveKeyCode(key);
+}
+
+//
 
 namespace
 {

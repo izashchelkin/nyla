@@ -4,6 +4,7 @@
 #include <array>
 #include <cstdint>
 #include <linux/limits.h>
+#include <string_view>
 #include <sys/inotify.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -11,56 +12,55 @@
 namespace nyla
 {
 
-struct PlatformDirWatchState
+class PlatformDirWatch::Impl
 {
     static constexpr uint32_t kBufSize = sizeof(inotify_event) + NAME_MAX + 1;
 
-    alignas(inotify_event) std::array<std::byte, kBufSize> buf;
-    uint32_t bufPos;
-    uint32_t bufLen;
-    int inotifyFd;
+  public:
+    void Init(const char *path);
+    void Destroy();
+    auto Poll(PlatformDirWatchEvent &outChange) -> bool;
+
+  private:
+    alignas(inotify_event) std::array<std::byte, kBufSize> m_Buf;
+    uint32_t m_BufPos;
+    uint32_t m_BufLen;
+    int m_InotifyFd;
 };
 
-void PlatformDirWatch::Init()
+void PlatformDirWatch::Impl::Init(const char *path)
 {
-    CHECK(!m_State);
-    m_State = new PlatformDirWatchState();
+    m_InotifyFd = inotify_init1(IN_NONBLOCK);
+    CHECK_GT(m_InotifyFd, 0);
 
-    m_State->inotifyFd = inotify_init1(IN_NONBLOCK);
-    CHECK_GT(m_State->inotifyFd, 0);
+    int wd = inotify_add_watch(m_InotifyFd, path, IN_MODIFY | IN_DELETE | IN_MOVED_FROM | IN_MOVED_TO);
+    CHECK_NE(wd, -1);
 }
 
-void PlatformDirWatch::Destroy()
+void PlatformDirWatch::Impl::Destroy()
 {
-    if (m_State)
-    {
-        close(m_State->inotifyFd);
-        delete m_State;
-    }
+    if (m_InotifyFd)
+        close(m_InotifyFd);
 }
 
-auto PlatformDirWatch::PollChange(PlatformDirWatchEvent &outChange) -> bool
+auto PlatformDirWatch::Impl::Poll(PlatformDirWatchEvent &outChange) -> bool
 {
-    auto &buf = m_State->buf;
-    auto &bufPos = m_State->bufPos;
-    auto &bufLen = m_State->bufLen;
-
     for (;;)
     {
-        CHECK_LE(bufPos, bufLen);
-        if (!bufPos || bufPos == bufLen)
+        CHECK_LE(m_BufPos, m_BufLen);
+        if (!m_BufPos || m_BufPos == m_BufLen)
         {
-            bufLen = read(m_State->inotifyFd, buf.data(), buf.size());
-            if (bufLen <= 0)
+            m_BufLen = read(m_InotifyFd, m_Buf.data(), m_Buf.size());
+            if (m_BufLen <= 0)
                 return false;
         }
 
-        const auto *event = reinterpret_cast<inotify_event *>(buf.data() + bufPos);
-        bufPos += sizeof(inotify_event);
+        const auto *event = reinterpret_cast<inotify_event *>(m_Buf.data() + m_BufPos);
+        m_BufPos += sizeof(inotify_event);
 
         if (event->mask & IN_ISDIR)
         {
-            bufPos += outChange.name.size();
+            m_BufPos += outChange.name.size();
             continue;
         }
 
@@ -74,11 +74,34 @@ auto PlatformDirWatch::PollChange(PlatformDirWatchEvent &outChange) -> bool
         if (event->mask & IN_MOVED_TO)
             outChange.mask |= PlatformDirWatchEventType::MovedTo;
 
-        outChange.name = (const char *)(buf.data() + bufPos);
-        bufPos += outChange.name.size();
+        outChange.name = (const char *)(m_Buf.data() + m_BufPos);
+        m_BufPos += outChange.name.size();
 
         return true;
     }
+}
+
+//
+
+void PlatformDirWatch::Init(const char *path)
+{
+    CHECK(!m_Impl);
+    m_Impl = new PlatformDirWatch::Impl{};
+    m_Impl->Init(path);
+}
+
+void PlatformDirWatch::Destroy()
+{
+    if (m_Impl)
+    {
+        m_Impl->Destroy();
+        delete m_Impl;
+    }
+}
+
+auto PlatformDirWatch::Poll(PlatformDirWatchEvent &outChange) -> bool
+{
+    return m_Impl->Poll(outChange);
 }
 
 } // namespace nyla

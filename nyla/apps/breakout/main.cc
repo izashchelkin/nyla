@@ -20,13 +20,13 @@ static auto Main() -> int
     });
     PlatformWindow window = g_Platform->CreateWindow();
 
-    EngineInit({.window = window});
+    g_Engine->Init({.window = window});
 
     GameInit();
 
-    while (!EngineShouldExit())
+    while (!g_Engine->ShouldExit())
     {
-        const auto [cmd, dt, fps] = EngineFrameBegin();
+        const auto [cmd, dt, fps] = g_Engine->FrameBegin();
         DebugText(500, 10, std::format("fps={}", fps));
 
         GameProcess(cmd, dt);
@@ -34,7 +34,7 @@ static auto Main() -> int
         RhiTexture colorTarget = RhiGetBackbufferTexture();
         GameRender(cmd, colorTarget);
 
-        EngineFrameEnd();
+        g_Engine->FrameEnd();
     }
 
     return 0;

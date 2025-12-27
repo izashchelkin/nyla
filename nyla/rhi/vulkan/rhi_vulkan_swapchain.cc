@@ -3,6 +3,7 @@
 #include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/vulkan_core.h>
 
+#include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_texture.h"
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
@@ -90,7 +91,7 @@ void CreateSwapchain()
         if (surfaceCapabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
             return surfaceCapabilities.currentExtent;
 
-        const PlatformWindowSize windowSize = PlatformGetWindowSize(vk.window);
+        const PlatformWindowSize windowSize = g_Platform->GetWindowSize(vk.window);
         return VkExtent2D{
             .width = std::clamp(windowSize.width, surfaceCapabilities.minImageExtent.width,
                                 surfaceCapabilities.maxImageExtent.width),

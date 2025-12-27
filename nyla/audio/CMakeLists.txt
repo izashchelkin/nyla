@@ -18,7 +18,6 @@ target_include_directories(${TARGET}
 target_link_libraries(${TARGET}
     PUBLIC
         nyla::commons
-        nyla::platform
 )
 
 #
@@ -41,6 +40,5 @@ target_link_libraries(${TARGET_EXEC}
     PUBLIC
         nyla::audio::wave
         nyla::commons
-        nyla::platform
         ${ALSA_LIBRARIES}
 )

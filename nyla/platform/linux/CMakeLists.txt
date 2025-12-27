@@ -15,7 +15,6 @@ target_include_directories(${TARGET_PLATFORM}
 target_link_libraries(${TARGET_PLATFORM}
     PUBLIC
         nyla::commons
-        nyla::platform
 
         xcb
         xcb-util
@@ -29,7 +28,7 @@ target_link_libraries(${TARGET_PLATFORM}
 
 set(TARGET_PLATFORM_DIR_WATCH nyla_platform_linux_dir_watch)
 add_library(${TARGET_PLATFORM_DIR_WATCH})
-add_library(nyla::platform::linux_dir_watch ALIAS ${TARGET_PLATFORM_DIR_WATCH})
+add_library(nyla::platform::linux::dir_watch ALIAS ${TARGET_PLATFORM_DIR_WATCH})
 
 target_sources(${TARGET_PLATFORM_DIR_WATCH}
     PRIVATE
@@ -42,6 +41,27 @@ target_include_directories(${TARGET_PLATFORM_DIR_WATCH}
 )
 
 target_link_libraries(${TARGET_PLATFORM_DIR_WATCH}
+    PUBLIC
+        nyla::commons
+)
+
+#
+
+set(target_key_resolver nyla_platform_linux_keyresolver)
+add_library(${target_key_resolver})
+add_library(nyla::platform::linux::key_resolver ALIAS ${target_key_resolver})
+
+target_sources(${target_key_resolver}
+    PRIVATE
+        platform_linux_key_resolver.cc
+)
+
+target_include_directories(${target_key_resolver}
+    PUBLIC
+        ${PROJECT_SOURCE_DIR}
+)
+
+target_link_libraries(${target_key_resolver}
     PUBLIC
         nyla::commons
 )

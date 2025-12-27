@@ -63,4 +63,6 @@ class AssetManager
     RhiDescriptorSet m_DescriptorSet;
 };
 
+extern AssetManager *g_AssetManager;
+
 } // namespace nyla
