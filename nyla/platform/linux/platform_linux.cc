@@ -95,6 +95,8 @@ void Platform::Impl::Init(const PlatformInitDesc &desc)
 
         if (xcb_request_check(m_Conn, xcb_input_xi_select_events_checked(m_Conn, m_Screen->root, 1, &mask.eventMask)))
             LOG(QFATAL) << "could not setup XI2 extension";
+
+        m_ExtensionXInput2MajorOpCode = ext->major_opcode;
     }
 }
 

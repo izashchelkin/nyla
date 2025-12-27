@@ -13,12 +13,9 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/log/check.h"
 #include "absl/log/log.h"
-#include "absl/strings/str_join.h"
 #include "nyla/apps/wm/layout.h"
 #include "nyla/apps/wm/palette.h"
-#include "nyla/apps/wm/screen_saver_inhibitor.h"
 #include "nyla/commons/containers/map.h"
-#include "nyla/debugfs/debugfs.h"
 #include "nyla/platform/linux/platform_linux.h"
 #include "nyla/platform/linux/platform_x11_error.h"
 #include "nyla/platform/linux/platform_x11_wm_hints.h"
@@ -68,8 +65,6 @@ template <typename Sink> void AbslStringify(Sink &sink, const Client &c)
 
 namespace
 {
-
-auto DumpClients() -> std::string;
 
 uint32_t wmBarHeight = 20;
 
@@ -414,13 +409,6 @@ void InitializeWM()
     wmPropertyChangeHandlers.try_emplace(XCB_ATOM_WM_NAME, HandleWmName);
     wmPropertyChangeHandlers.try_emplace(x11->GetAtoms().wm_protocols, HandleWmProtocols);
     wmPropertyChangeHandlers.try_emplace(XCB_ATOM_WM_TRANSIENT_FOR, HandleWmTransientFor);
-
-    DebugFsRegister(
-        "windows", nullptr,                                       //
-        [](auto &file) -> auto { file.content = DumpClients(); }, //
-        nullptr);
-
-    ScreenSaverInhibitorInit();
 }
 
 void ManageClient(xcb_window_t clientWindow)
@@ -1066,19 +1054,11 @@ void ProcessWMEvents(const bool &isRunning, uint16_t modifier, std::vector<Keybi
                 CheckFocusTheft();
             break;
         }
-        case XCB_EXPOSE: {
-#if 0
-            auto expose = reinterpret_cast<xcb_expose_event_t *>(event);
-            if (expose->window == backgroundWindow)
-                wmBackgroundDirty = true;
-#endif
-            break;
-        }
 
         case XCB_GE_GENERIC: {
             auto ge = reinterpret_cast<xcb_ge_generic_event_t *>(event);
 
-            if (ge->extension == XCB_INPUT_XI_SELECT_EVENTS)
+            if (ge->extension == x11->GetXInputExtensionMajorOpCode())
             {
                 switch (ge->event_type)
                 {
@@ -1110,57 +1090,5 @@ void ProcessWMEvents(const bool &isRunning, uint16_t modifier, std::vector<Keybi
         }
     }
 }
-
-namespace
-{
-auto DumpClients() -> std::string
-{
-    std::string out;
-
-    const WindowStack &stack = GetActiveStack();
-
-    absl::StrAppendFormat(&out, "active window = %x\n\n", stack.activeWindow);
-
-    for (const auto &[client_window, client] : wmClients)
-    {
-        std::string_view indent = [&client]() -> const char * {
-            if (client.transientFor)
-                return "  T  ";
-            if (!client.subwindows.empty())
-                return "  S  ";
-            return "";
-        }();
-
-        std::string transientForName;
-        if (client.transientFor)
-        {
-            auto it = wmClients.find(client.transientFor);
-            if (it == wmClients.end())
-            {
-                transientForName = "invalid " + std::to_string(client.transientFor);
-            }
-            else
-            {
-                transientForName = it->second.name + " " + std::to_string(client.transientFor);
-            }
-        }
-        else
-        {
-            transientForName = "none";
-        }
-
-        absl::StrAppendFormat(&out,
-                              "%swindow=%x\n%sname=%v\n%srect=%v\n%swm_"
-                              "transient_for=%v\n%sinput=%v\n"
-                              "%swm_take_focus=%v\n%swm_delete_window=%v\n%"
-                              "ssubwindows=%v\n%smax_dimensions=%vx%v\n\n",
-                              indent, client_window, indent, client.name, indent, client.rect, indent, transientForName,
-                              indent, client.wmHintsInput, indent, client.wmTakeFocus, indent, client.wmDeleteWindow,
-                              indent, absl::StrJoin(client.subwindows, ", "), indent, client.maxWidth,
-                              client.maxHeight);
-    }
-    return out;
-}
-} // namespace
 
 } // namespace nyla

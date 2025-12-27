@@ -3,6 +3,7 @@
 #include "nyla/platform/platform.h"
 #include "xcb/xcb.h"
 #include "xcb/xproto.h"
+#include <cstdint>
 #include <string_view>
 #include <xkbcommon/xkbcommon-x11.h>
 
@@ -69,15 +70,20 @@ class Platform::Impl
         return m_Atoms;
     }
 
+    auto GetXInputExtensionMajorOpCode() {
+        return m_ExtensionXInput2MajorOpCode;
+    }
+
     void Flush()
     {
         xcb_flush(m_Conn);
     }
 
   private:
-    int m_ScreenIndex;
-    xcb_connection_t *m_Conn;
-    xcb_screen_t *m_Screen;
+    int m_ScreenIndex{};
+    xcb_connection_t *m_Conn{};
+    xcb_screen_t *m_Screen{};
+    uint32_t m_ExtensionXInput2MajorOpCode{};
 
     struct
     {

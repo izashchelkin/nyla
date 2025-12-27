@@ -2,20 +2,15 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-#include <chrono>
 #include <cstdint>
 #include <initializer_list>
 
-#include "absl/cleanup/cleanup.h"
 #include "absl/log/check.h"
 #include "absl/log/log.h"
 #include "nyla/apps/wm/window_manager.h"
 #include "nyla/commons/logging/init.h"
 #include "nyla/commons/os/spawn.h"
-#include "nyla/commons/os/timerfd.h"
 #include "nyla/commons/signal/signal.h"
-#include "nyla/dbus/dbus.h"
-#include "nyla/debugfs/debugfs.h"
 #include "nyla/platform/linux/platform_linux.h"
 #include "nyla/platform/platform.h"
 #include "nyla/platform/platform_key_resolver.h"
@@ -51,8 +46,6 @@ auto Main(int argc, char **argv) -> int
         LOG(QFATAL) << "another wm is already running";
     }
 
-    DBusInitialize();
-    DebugFsInitialize(argv[0] + std::string("-debugfs"));
     InitializeWM();
 
     uint16_t modifier = XCB_MOD_MASK_4;
@@ -94,44 +87,24 @@ auto Main(int argc, char **argv) -> int
         keyResolver.Destroy();
     }
 
-    using namespace std::chrono_literals;
-    int tfd = MakeTimerFd(501ms);
-
     ManageClientsStartup();
-
-    std::vector<pollfd> fds;
-    fds.emplace_back(pollfd{
-        .fd = xcb_get_file_descriptor(x11->GetConn()),
-        .events = POLLIN,
-    });
-    fds.emplace_back(pollfd{
-        .fd = debugfs.fd,
-        .events = POLLIN,
-    });
-
-    if (!tfd)
-        LOG(QFATAL) << "MakeTimerFdMillis";
-    absl::Cleanup tfdCloser = [tfd] -> void { close(tfd); };
-    fds.emplace_back(pollfd{
-        .fd = tfd,
-        .events = POLLIN,
-    });
-
-    DebugFsRegister(
-        "quit", &isRunning, //
-        [](auto &file) -> auto { file.content = "quit\n"; },
-        [](auto &file) -> auto {
-            *reinterpret_cast<bool *>(file.data) = false;
-            LOG(INFO) << "exit requested";
-        });
 
     x11->Flush();
     xcb_ungrab_server(x11->GetConn());
 
     while (isRunning && !xcb_connection_has_error(x11->GetConn()))
     {
+        std::array<pollfd, 1> fds{
+            pollfd{
+                .fd = xcb_get_file_descriptor(x11->GetConn()),
+                .events = POLLIN,
+            },
+        };
         if (poll(fds.data(), fds.size(), -1) == -1)
+        {
+            LOG(INFO) << "poll(): " << strerror(errno);
             continue;
+        }
 
         if (fds[0].revents & POLLIN)
         {
@@ -139,13 +112,9 @@ auto Main(int argc, char **argv) -> int
             ProcessWM();
             x11->Flush();
         }
-
-        if (fds[1].revents & POLLIN)
-            DebugFsProcess();
-
-        DBusProcess();
     }
 
+    LOG(INFO) << "exiting";
     return 0;
 }
 
