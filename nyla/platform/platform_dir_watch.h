@@ -8,7 +8,10 @@ namespace nyla
 
 enum class PlatformDirWatchEventType
 {
-    Modified, Deleted, MovedFrom, MovedTo
+    Modified,
+    Deleted,
+    MovedFrom,
+    MovedTo
 };
 NYLA_BITENUM(PlatformDirWatchEventType);
 
@@ -21,7 +24,7 @@ struct PlatformDirWatchEvent
 class PlatformDirWatch
 {
   public:
-    void Init(const char* path);
+    void Init(const char *path);
     void Destroy();
 
     auto Poll(PlatformDirWatchEvent &outChange) -> bool;

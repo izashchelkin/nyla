@@ -36,6 +36,6 @@ class Engine
     class Impl;
     Impl *m_Impl{};
 };
-extern Engine* g_Engine;
+extern Engine *g_Engine;
 
 } // namespace nyla

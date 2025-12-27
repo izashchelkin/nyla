@@ -141,7 +141,6 @@ auto PlatformProcessEvents(const PlatformProcessEventsCallbacks &callbacks, void
 
     for (;;)
     {
-
     }
 
     return ret;
@@ -154,7 +153,6 @@ auto PlatformShouldExit() -> bool
 
 namespace platform_x11_internal
 {
-
 
 X11State x11;
 

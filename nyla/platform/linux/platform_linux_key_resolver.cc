@@ -1,6 +1,6 @@
 #include "absl/log/check.h"
-#include "nyla/platform/platform.h"
 #include "nyla/platform/linux/platform_linux.h"
+#include "nyla/platform/platform.h"
 #include "nyla/platform/platform_key_resolver.h"
 #include "xcb/xcb.h"
 #include <xkbcommon/xkbcommon-x11.h>
@@ -26,7 +26,7 @@ void PlatformKeyResolver::Impl::Init()
     m_Ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
     CHECK(m_Ctx);
 
-    xcb_connection_t* conn = g_Platform->GetImpl()->GetConn();
+    xcb_connection_t *conn = g_Platform->GetImpl()->GetConn();
 
     const int32_t deviceId = xkb_x11_get_core_keyboard_device_id(conn);
     CHECK_NE(deviceId, -1);

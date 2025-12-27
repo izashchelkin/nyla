@@ -14,7 +14,7 @@ namespace nyla::engine0_internal
 
 auto GetShader(const char *name, RhiShaderStage stage) -> RhiShader
 {
-    const std::string path = std::format("/home/izashchelkin/nyla/nyla/shaders/build/{}.hlsl.spv", name); 
+    const std::string path = std::format("/home/izashchelkin/nyla/nyla/shaders/build/{}.hlsl.spv", name);
     // TODO: directory watch
     // PlatformFsWatchFile(path);
 
