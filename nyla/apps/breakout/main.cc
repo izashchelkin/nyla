@@ -22,17 +22,17 @@ static auto Main() -> int
 
     EngineInit({.window = window});
 
-    BreakoutInit();
+    GameInit();
 
     while (!EngineShouldExit())
     {
         const auto [cmd, dt, fps] = EngineFrameBegin();
         DebugText(500, 10, std::format("fps={}", fps));
 
-        BreakoutProcess(cmd, dt);
+        GameProcess(cmd, dt);
 
         RhiTexture colorTarget = RhiGetBackbufferTexture();
-        BreakoutRenderGame(cmd, colorTarget);
+        GameRender(cmd, colorTarget);
 
         EngineFrameEnd();
     }

@@ -2,7 +2,6 @@
 
 #include "absl/log/check.h"
 #include "nyla/commons/os/readfile.h"
-#include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi_shader.h"
 #include "nyla/spirview/spirview.h"
 #include <cstdint>
@@ -15,8 +14,9 @@ namespace nyla::engine0_internal
 
 auto GetShader(const char *name, RhiShaderStage stage) -> RhiShader
 {
-    const std::string path = std::format("/home/izashchelkin/nyla/nyla/shaders/build/{}.hlsl.spv", name);
-    PlatformFsWatchFile(path);
+    const std::string path = std::format("/home/izashchelkin/nyla/nyla/shaders/build/{}.hlsl.spv", name); 
+    // TODO: directory watch
+    // PlatformFsWatchFile(path);
 
     const std::vector<std::byte> code = ReadFile(path);
     const auto spirv = std::span{reinterpret_cast<const uint32_t *>(code.data()), code.size() / 4};

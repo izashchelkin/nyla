@@ -13,6 +13,7 @@
 #include "nyla/engine/renderer2d.h"
 #include "nyla/engine/tween_manager.h"
 #include "nyla/platform/platform.h"
+#include "nyla/platform/platform_key_resolver.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_pass.h"
 #include "nyla/rhi/rhi_texture.h"
@@ -56,7 +57,7 @@ static float2 ballVel = {40.f, 40.f};
 
 static Level level;
 
-void BreakoutInit()
+void GameInit()
 {
     g_State = new GameState{};
     g_State->input.moveLeft = g_InputManager->NewId();
@@ -67,10 +68,11 @@ void BreakoutInit()
 
     //
 
-    PlatformInputResolverBegin();
-    g_InputManager->Map(g_State->input.moveLeft, 1, PlatformInputResolve(KeyPhysical::S));
-    g_InputManager->Map(g_State->input.moveRight, 1, PlatformInputResolve(KeyPhysical::F));
-    PlatformInputResolverEnd();
+    PlatformKeyResolver keyResolver{};
+    keyResolver.Init();
+    g_InputManager->Map(g_State->input.moveLeft, 1, keyResolver.ResolveKeyCode(KeyPhysical::S));
+    g_InputManager->Map(g_State->input.moveRight, 1, keyResolver.ResolveKeyCode(KeyPhysical::F));
+    keyResolver.Destroy();
 
     //
 
@@ -124,7 +126,7 @@ static auto IsInside(float pos, float size, float2 boundary) -> bool
     return false;
 }
 
-void BreakoutProcess(RhiCmdList cmd, float dt)
+void GameProcess(RhiCmdList cmd, float dt)
 {
     Renderer2DFrameBegin(cmd, renderer2d, g_StagingBuffer);
 
@@ -196,7 +198,7 @@ void BreakoutProcess(RhiCmdList cmd, float dt)
     }
 }
 
-void BreakoutRenderGame(RhiCmdList cmd, RhiTexture colorTarget)
+void GameRender(RhiCmdList cmd, RhiTexture colorTarget)
 {
     RhiTextureInfo colorTargetInfo = RhiGetTextureInfo(colorTarget);
 

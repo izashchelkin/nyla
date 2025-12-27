@@ -11,7 +11,10 @@
 namespace nyla
 {
 
+class Engine;
+
 #define NYLA_ENGINE_EXTERN_GLOBALS(X)                                                                                  \
+    X(Engine *g_Engine)                                                                                                \
     X(AssetManager *g_AssetManager)                                                                                    \
     X(GpuStagingBuffer *g_StagingBuffer)                                                                               \
     X(TweenManager *g_TweenManager)                                                                                    \
@@ -28,9 +31,6 @@ struct EngineInitDesc
     bool vsync;
 };
 
-void EngineInit(const EngineInitDesc &);
-auto EngineShouldExit() -> bool;
-
 struct EngineFrameBeginResult
 {
     RhiCmdList cmd;
@@ -38,7 +38,19 @@ struct EngineFrameBeginResult
     uint32_t fps;
 };
 
-auto EngineFrameBegin() -> EngineFrameBeginResult;
-auto EngineFrameEnd() -> void;
+struct EngineState;
+
+class Engine
+{
+  public:
+    void Init(const EngineInitDesc &);
+    auto ShouldExit() -> bool;
+
+    auto FrameBegin() -> EngineFrameBeginResult;
+    auto FrameEnd() -> void;
+
+  private:
+    EngineState *m_State{};
+};
 
 } // namespace nyla

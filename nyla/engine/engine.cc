@@ -22,16 +22,18 @@ using namespace engine0_internal;
 namespace
 {
 
-uint32_t maxFps = 144;
-uint32_t fps = 0;
-float dt = 0;
-uint64_t targetFrameDurationUs;
-
-uint64_t frameStart = 0;
-
 } // namespace
 
-void EngineInit(const EngineInitDesc &desc)
+struct EngineState
+{
+    uint32_t maxFps = 144;
+    uint32_t fps = 0;
+    float dt = 0;
+    uint64_t targetFrameDurationUs;
+    uint64_t frameStart = 0;
+};
+
+void Engine::Init(const EngineInitDesc &desc)
 {
     if (desc.maxFps > 0)
         maxFps = desc.maxFps;
@@ -57,12 +59,12 @@ void EngineInit(const EngineInitDesc &desc)
     g_AssetManager->Init();
 }
 
-auto EngineShouldExit() -> bool
+auto Engine::ShouldExit() -> bool
 {
     return PlatformShouldExit();
 }
 
-auto EngineFrameBegin() -> EngineFrameBeginResult
+auto Engine::FrameBegin() -> EngineFrameBeginResult
 {
     RhiCmdList cmd = RhiFrameBegin();
 
@@ -124,7 +126,7 @@ auto EngineFrameBegin() -> EngineFrameBeginResult
     };
 }
 
-auto EngineFrameEnd() -> void
+auto Engine::FrameEnd() -> void
 {
     RhiFrameEnd();
 
@@ -137,43 +139,5 @@ auto EngineFrameEnd() -> void
         std::this_thread::sleep_for((targetFrameDurationUs - frameDurationUs) * 1us);
     }
 }
-
-#if 0
-    static bool spvChanged = true;
-    static bool srcChanged = true;
-
-    for (PlatformFileChanged change : PlatformFsGetFileChanges())
-    {
-        if (change.seen)
-            continue;
-        change.seen = true;
-
-        const auto &path = change.path;
-        if (path.ends_with(".spv"))
-        {
-            spvChanged = true;
-        }
-        else if (path.ends_with(".hlsl"))
-        {
-            srcChanged = true;
-        }
-    }
-
-    if (srcChanged)
-    {
-        LOG(INFO) << "shaders recompiling";
-        system("python3 /home/izashchelkin/nyla/scripts/shaders.py");
-        usleep(1e6);
-        PlatformProcessEvents();
-
-        srcChanged = false;
-    }
-
-    if (spvChanged)
-    {
-        spvChanged = false;
-        return true;
-    }
-#endif
 
 } // namespace nyla

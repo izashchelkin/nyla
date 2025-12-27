@@ -54,8 +54,8 @@ struct GameLevel
     InlineVec<Brick, 512> bricks;
 };
 
-void BreakoutInit();
-void BreakoutProcess(RhiCmdList cmd, float dt);
-void BreakoutRenderGame(RhiCmdList cmd, RhiTexture colorTarget);
+void GameInit();
+void GameProcess(RhiCmdList cmd, float dt);
+void GameRender(RhiCmdList cmd, RhiTexture colorTarget);
 
 } // namespace nyla
