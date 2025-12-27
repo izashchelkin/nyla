@@ -2,6 +2,7 @@
 
 #include "nyla/platform/platform.h"
 #include "xcb/xcb.h"
+#include "xcb/xproto.h"
 #include <string_view>
 #include <xkbcommon/xkbcommon-x11.h>
 
@@ -53,6 +54,11 @@ class Platform::Impl
         return m_Screen;
     }
 
+    auto GetRoot() -> xcb_window_t
+    {
+        return m_Screen->root;
+    }
+
     auto GetConn() -> auto *
     {
         return m_Conn;
@@ -61,6 +67,11 @@ class Platform::Impl
     auto GetAtoms() -> auto &
     {
         return m_Atoms;
+    }
+
+    void Flush()
+    {
+        xcb_flush(m_Conn);
     }
 
   private:

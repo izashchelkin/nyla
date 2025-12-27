@@ -8,10 +8,7 @@
 namespace nyla
 {
 
-namespace platform_x11_internal
-{
-
-struct WmHints
+struct X11WmHints
 {
     static constexpr uint32_t kInputHint = 1;
     static constexpr uint32_t kStateHint = 1 << 1;
@@ -34,14 +31,14 @@ struct WmHints
 
     auto Urgent() const -> bool
     {
-        return flags & WmHints::kUrgencyHint;
+        return flags & X11WmHints::kUrgencyHint;
     }
 };
-static_assert(sizeof(WmHints) == 9 * 4);
+static_assert(sizeof(X11WmHints) == 9 * 4);
 
-void Initialize(WmHints &h);
+void Initialize(X11WmHints &h);
 
-template <typename Sink> void AbslStringify(Sink &sink, const WmHints &h)
+template <typename Sink> void AbslStringify(Sink &sink, const X11WmHints &h)
 {
     absl::Format(&sink,
                  "WM_Hints {flags=%v input=%v initial_state=%v icon_pixmap=%v "
@@ -50,7 +47,7 @@ template <typename Sink> void AbslStringify(Sink &sink, const WmHints &h)
                  h.windowGroup);
 }
 
-struct WmNormalHints
+struct X11WmNormalHints
 {
     static constexpr uint32_t kPMinSize = 1 << 4;
     static constexpr uint32_t kPMaxSize = 1 << 5;
@@ -72,11 +69,11 @@ struct WmNormalHints
     int32_t baseWidth, baseHeight;
     xcb_gravity_t winGravity;
 };
-static_assert(sizeof(WmNormalHints) == 18 * 4);
+static_assert(sizeof(X11WmNormalHints) == 18 * 4);
 
-void Initialize(WmNormalHints &h);
+void Initialize(X11WmNormalHints &h);
 
-template <typename Sink> void AbslStringify(Sink &sink, const WmNormalHints &h)
+template <typename Sink> void AbslStringify(Sink &sink, const X11WmNormalHints &h)
 {
     absl::Format(&sink,
                  "WM_Normal_Hints {flags=%v min_width=%v min_height=%v "
@@ -88,6 +85,76 @@ template <typename Sink> void AbslStringify(Sink &sink, const WmNormalHints &h)
                  h.minAspect.den, h.maxAspect.num, h.maxAspect.den, h.baseWidth, h.baseHeight, h.winGravity);
 }
 
-} // namespace platform_x11_internal
+inline void Initialize(X11WmHints &h)
+{
+    if (!(h.flags & X11WmHints::kInputHint))
+    {
+        h.input = true;
+    }
+
+    if (!(h.flags & X11WmHints::kStateHint))
+    {
+        h.initialState = 0;
+    }
+
+    if (!(h.flags & X11WmHints::kIconPixmapHint))
+    {
+        h.iconPixmap = 0;
+    }
+
+    if (!(h.flags & X11WmHints::kIconWindowHint))
+    {
+        h.iconWindow = 0;
+    }
+
+    if (!(h.iconX & X11WmHints::kIconPositionHint))
+    {
+        h.iconX = 0;
+        h.iconY = 0;
+    }
+
+    if (!(h.iconX & X11WmHints::kIconMaskHint))
+    {
+        h.iconMask = 0;
+    }
+}
+
+inline void Initialize(X11WmNormalHints &h)
+{
+    if (!(h.flags & X11WmNormalHints::kPMinSize))
+    {
+        h.minWidth = 0;
+        h.minHeight = 0;
+    }
+
+    if (!(h.flags & X11WmNormalHints::kPMaxSize))
+    {
+        h.maxWidth = 0;
+        h.maxHeight = 0;
+    }
+
+    if (!(h.flags & X11WmNormalHints::kPResizeInc))
+    {
+        h.widthInc = 0;
+        h.heightInc = 0;
+    }
+
+    if (!(h.flags & X11WmNormalHints::kPAspect))
+    {
+        h.minAspect = {};
+        h.maxAspect = {};
+    }
+
+    if (!(h.flags & X11WmNormalHints::kPBaseSize))
+    {
+        h.baseWidth = 0;
+        h.baseHeight = 0;
+    }
+
+    if (!(h.flags & X11WmNormalHints::kPWinGravity))
+    {
+        h.winGravity = {};
+    }
+}
 
 } // namespace nyla

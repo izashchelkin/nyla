@@ -9,8 +9,6 @@
 namespace nyla
 {
 
-extern bool wmBackgroundDirty;
-
 using KeybindHandler = std::variant<void (*)(xcb_timestamp_t timestamp), void (*)()>;
 using Keybind = std::tuple<xcb_keycode_t, int, KeybindHandler>;
 

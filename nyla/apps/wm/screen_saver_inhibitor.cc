@@ -9,14 +9,13 @@
 #include "nyla/commons/containers/map.h"
 #include "nyla/dbus/dbus.h"
 #include "nyla/debugfs/debugfs.h"
-#include "nyla/platform/x11/platform_x11.h"
+#include "nyla/platform/linux/platform_linux.h"
 #include "xcb/screensaver.h"
 
 namespace nyla
 {
 
-using namespace platform_x11_internal;
-
+static Platform::Impl *x11 = g_Platform->GetImpl();
 static uint32_t nextInhibitCookie = 1;
 static Map<uint32_t, std::string> inhibitCookies;
 
@@ -59,7 +58,7 @@ static void HandleMessage(DBusMessage *msg)
 
         if (inhibitCookies.size() == 1)
         {
-            xcb_screensaver_suspend(x11.conn, true);
+            xcb_screensaver_suspend(x11->GetConn(), true);
         }
         return;
     }
@@ -87,7 +86,7 @@ static void HandleMessage(DBusMessage *msg)
 
         if (inhibitCookies.empty())
         {
-            xcb_screensaver_suspend(x11.conn, false);
+            xcb_screensaver_suspend(x11->GetConn(), false);
         }
         return;
     }

@@ -22,6 +22,7 @@ target_link_libraries(wm
         nyla::dbus
         nyla::debugfs
         nyla::platform::linux
+        nyla::platform::linux::key_resolver
         xcb-screensaver
 )
 
@@ -37,4 +38,5 @@ target_link_libraries(wm_overlay
     PRIVATE
         nyla::debug_text_renderer
         nyla::rhi_ndebug
+        nyla::platform::linux
 )

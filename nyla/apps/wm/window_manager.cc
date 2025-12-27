@@ -19,19 +19,16 @@
 #include "nyla/apps/wm/screen_saver_inhibitor.h"
 #include "nyla/commons/containers/map.h"
 #include "nyla/debugfs/debugfs.h"
-#include "nyla/platform/x11/platform_x11.h"
-#include "nyla/platform/x11/platform_x11_error.h"
-#include "nyla/platform/x11/platform_x11_wm_hints.h"
+#include "nyla/platform/linux/platform_linux.h"
+#include "nyla/platform/linux/platform_x11_error.h"
+#include "nyla/platform/linux/platform_x11_wm_hints.h"
+#include "nyla/platform/platform.h"
 #include "xcb/xcb.h"
 #include "xcb/xinput.h"
 #include "xcb/xproto.h"
 
 namespace nyla
 {
-
-using namespace platform_x11_internal;
-
-static auto DumpClients() -> std::string;
 
 struct WindowStack
 {
@@ -69,39 +66,89 @@ template <typename Sink> void AbslStringify(Sink &sink, const Client &c)
     absl::Format(&sink, "Window{ rect=%v, input=%v, take_focus=%v }", c.rect, c.wmHintsInput, c.wmTakeFocus);
 }
 
-static uint32_t wmBarHeight = 20;
-bool wmBackgroundDirty;
+namespace
+{
 
-static bool wmLayoutDirty;
-static bool wmFollow;
-static bool wmBorderDirty;
+auto DumpClients() -> std::string;
 
-static Map<xcb_window_t, Client> wmClients;
-static std::vector<xcb_window_t> wmPendingClients;
+uint32_t wmBarHeight = 20;
 
-static Map<xcb_atom_t, void (*)(xcb_window_t, Client &, xcb_get_property_reply_t *)> wmPropertyChangeHandlers;
+bool wmLayoutDirty;
+bool wmFollow;
+bool wmBorderDirty;
 
-static std::vector<WindowStack> wmStacks;
-static uint64_t wmActiveStackIdx;
+Map<xcb_window_t, Client> wmClients;
+std::vector<xcb_window_t> wmPendingClients;
 
-static xcb_timestamp_t lastRawmotionTs = 0;
-static xcb_window_t lastEnteredWindow = 0;
+Map<xcb_atom_t, void (*)(xcb_window_t, Client &, xcb_get_property_reply_t *)> wmPropertyChangeHandlers;
+
+std::vector<WindowStack> wmStacks;
+uint64_t wmActiveStackIdx;
+
+xcb_timestamp_t lastRawmotionTs = 0;
+xcb_window_t lastEnteredWindow = 0;
+
+Platform::Impl *x11 = g_Platform->GetImpl();
+
+// TODO: this stuff can be moved into platform impl
+
+void X11SendConfigureNotify(xcb_window_t window, xcb_window_t parent, int16_t x, int16_t y, uint16_t width,
+                            uint16_t height, uint16_t borderWidth)
+{
+    xcb_configure_notify_event_t event = {
+        .response_type = XCB_CONFIGURE_NOTIFY,
+        .window = window,
+        .x = x,
+        .y = y,
+        .width = width,
+        .height = height,
+        .border_width = borderWidth,
+    };
+
+    xcb_send_event(x11->GetConn(), false, window, XCB_EVENT_MASK_STRUCTURE_NOTIFY,
+                   reinterpret_cast<const char *>(&event));
+}
+
+void X11SendClientMessage32(xcb_window_t window, xcb_atom_t type, xcb_atom_t arg1, uint32_t arg2, uint32_t arg3,
+                            uint32_t arg4)
+{
+    xcb_client_message_event_t event = {
+        .response_type = XCB_CLIENT_MESSAGE,
+        .format = 32,
+        .window = window,
+        .type = type,
+        .data = {.data32 = {arg1, arg2, arg3, arg4}},
+    };
+
+    xcb_send_event(x11->GetConn(), false, window, XCB_EVENT_MASK_NO_EVENT, reinterpret_cast<const char *>(&event));
+}
+
+void X11SendWmTakeFocus(xcb_window_t window, uint32_t time)
+{
+    X11SendClientMessage32(window, x11->GetAtoms().wm_protocols, x11->GetAtoms().wm_take_focus, time, 0, 0);
+}
+
+void X11SendWmDeleteWindow(xcb_window_t window)
+{
+    X11SendClientMessage32(window, x11->GetAtoms().wm_protocols, x11->GetAtoms().wm_delete_window, XCB_CURRENT_TIME, 0,
+                           0);
+}
 
 //
 
-static auto GetActiveStack() -> WindowStack &
+auto GetActiveStack() -> WindowStack &
 {
     CHECK_LT(wmActiveStackIdx & 0xFF, wmStacks.size());
     return wmStacks.at(wmActiveStackIdx & 0xFF);
 }
 
-static void HandleWmHints(xcb_window_t clientWindow, Client &client, xcb_get_property_reply_t *reply)
+void HandleWmHints(xcb_window_t clientWindow, Client &client, xcb_get_property_reply_t *reply)
 {
-    WmHints wmHints = [&reply] -> WmHints {
-        if (!reply || xcb_get_property_value_length(reply) != sizeof(WmHints))
-            return WmHints{};
+    X11WmHints wmHints = [&reply] -> X11WmHints {
+        if (!reply || xcb_get_property_value_length(reply) != sizeof(X11WmHints))
+            return X11WmHints{};
 
-        return *static_cast<WmHints *>(xcb_get_property_value(reply));
+        return *static_cast<X11WmHints *>(xcb_get_property_value(reply));
     }();
 
     Initialize(wmHints);
@@ -112,13 +159,13 @@ static void HandleWmHints(xcb_window_t clientWindow, Client &client, xcb_get_pro
     client.urgent = wmHints.Urgent();
 }
 
-static void HandleWmNormalHints(xcb_window_t clientWindow, Client &client, xcb_get_property_reply_t *reply)
+void HandleWmNormalHints(xcb_window_t clientWindow, Client &client, xcb_get_property_reply_t *reply)
 {
-    WmNormalHints wmNormalHints = [&reply] -> WmNormalHints {
-        if (!reply || xcb_get_property_value_length(reply) != sizeof(WmNormalHints))
-            return WmNormalHints{};
+    X11WmNormalHints wmNormalHints = [&reply] -> X11WmNormalHints {
+        if (!reply || xcb_get_property_value_length(reply) != sizeof(X11WmNormalHints))
+            return X11WmNormalHints{};
 
-        return *static_cast<WmNormalHints *>(xcb_get_property_value(reply));
+        return *static_cast<X11WmNormalHints *>(xcb_get_property_value(reply));
     }();
 
     Initialize(wmNormalHints);
@@ -128,7 +175,7 @@ static void HandleWmNormalHints(xcb_window_t clientWindow, Client &client, xcb_g
     client.maxHeight = wmNormalHints.maxHeight;
 }
 
-static void HandleWmName(xcb_window_t clientWindow, Client &client, xcb_get_property_reply_t *reply)
+void HandleWmName(xcb_window_t clientWindow, Client &client, xcb_get_property_reply_t *reply)
 {
     if (!reply)
     {
@@ -141,7 +188,7 @@ static void HandleWmName(xcb_window_t clientWindow, Client &client, xcb_get_prop
     // LOG(INFO) << client_window << " name=" << client.name;
 }
 
-static void HandleWmProtocols(xcb_window_t clientWindow, Client &client, xcb_get_property_reply_t *reply)
+void HandleWmProtocols(xcb_window_t clientWindow, Client &client, xcb_get_property_reply_t *reply)
 {
     if (!reply)
         return;
@@ -159,12 +206,12 @@ static void HandleWmProtocols(xcb_window_t clientWindow, Client &client, xcb_get
 
     for (xcb_atom_t atom : wmProtocols)
     {
-        if (atom == x11.atoms.wm_delete_window)
+        if (atom == x11->GetAtoms().wm_delete_window)
         {
             client.wmDeleteWindow = true;
             continue;
         }
-        if (atom == x11.atoms.wm_take_focus)
+        if (atom == x11->GetAtoms().wm_take_focus)
         {
             client.wmTakeFocus = true;
             continue;
@@ -172,7 +219,7 @@ static void HandleWmProtocols(xcb_window_t clientWindow, Client &client, xcb_get
     }
 }
 
-static void HandleWmTransientFor(xcb_window_t clientWindow, Client &client, xcb_get_property_reply_t *reply)
+void HandleWmTransientFor(xcb_window_t clientWindow, Client &client, xcb_get_property_reply_t *reply)
 {
     if (!reply || !reply->length)
         return;
@@ -185,25 +232,7 @@ static void HandleWmTransientFor(xcb_window_t clientWindow, Client &client, xcb_
     client.transientFor = *reinterpret_cast<xcb_window_t *>(xcb_get_property_value(reply));
 }
 
-void InitializeWM()
-{
-    wmStacks.resize(9);
-
-    wmPropertyChangeHandlers.try_emplace(XCB_ATOM_WM_HINTS, HandleWmHints);
-    wmPropertyChangeHandlers.try_emplace(XCB_ATOM_WM_NORMAL_HINTS, HandleWmNormalHints);
-    wmPropertyChangeHandlers.try_emplace(XCB_ATOM_WM_NAME, HandleWmName);
-    wmPropertyChangeHandlers.try_emplace(x11.atoms.wm_protocols, HandleWmProtocols);
-    wmPropertyChangeHandlers.try_emplace(XCB_ATOM_WM_TRANSIENT_FOR, HandleWmTransientFor);
-
-    DebugFsRegister(
-        "windows", nullptr,                                       //
-        [](auto &file) -> auto { file.content = DumpClients(); }, //
-        nullptr);
-
-    ScreenSaverInhibitorInit();
-}
-
-static void ClearZoom(WindowStack &stack)
+void ClearZoom(WindowStack &stack)
 {
     if (!stack.zoom)
         return;
@@ -212,14 +241,14 @@ static void ClearZoom(WindowStack &stack)
     wmLayoutDirty = true;
 }
 
-static void ApplyBorder(xcb_connection_t *conn, xcb_window_t window, Color color)
+void ApplyBorder(xcb_connection_t *conn, xcb_window_t window, Color color)
 {
     if (!window)
         return;
     xcb_change_window_attributes(conn, window, XCB_CW_BORDER_PIXEL, &color);
 }
 
-static void Activate(const WindowStack &stack, xcb_timestamp_t time)
+void Activate(const WindowStack &stack, xcb_timestamp_t time)
 {
     if (!stack.activeWindow)
     {
@@ -232,9 +261,9 @@ static void Activate(const WindowStack &stack, xcb_timestamp_t time)
 
         const auto &client = it->second;
 
-        xcb_window_t immediateFocus = client.wmHintsInput ? stack.activeWindow : x11.screen->root;
+        xcb_window_t immediateFocus = client.wmHintsInput ? stack.activeWindow : x11->GetRoot();
 
-        xcb_set_input_focus(x11.conn, XCB_INPUT_FOCUS_NONE, immediateFocus, time);
+        xcb_set_input_focus(x11->GetConn(), XCB_INPUT_FOCUS_NONE, immediateFocus, time);
 
         if (client.wmTakeFocus)
         {
@@ -245,23 +274,23 @@ static void Activate(const WindowStack &stack, xcb_timestamp_t time)
     }
 
 revert_to_root:
-    xcb_set_input_focus(x11.conn, XCB_INPUT_FOCUS_NONE, x11.screen->root, time);
+    xcb_set_input_focus(x11->GetConn(), XCB_INPUT_FOCUS_NONE, x11->GetRoot(), time);
     lastEnteredWindow = 0;
 }
 
-static void Activate(WindowStack &stack, xcb_window_t clientWindow, xcb_timestamp_t time)
+void Activate(WindowStack &stack, xcb_window_t clientWindow, xcb_timestamp_t time)
 {
     if (stack.activeWindow != clientWindow)
     {
-        ApplyBorder(x11.conn, stack.activeWindow, Color::KNone);
+        ApplyBorder(x11->GetConn(), stack.activeWindow, Color::KNone);
         stack.activeWindow = clientWindow;
-        wmBackgroundDirty = true;
+        // wmBackgroundDirty = true;
     }
 
     Activate(stack, time);
 }
 
-static void MaybeActivateUnderPointer(WindowStack &stack, xcb_timestamp_t ts)
+void MaybeActivateUnderPointer(WindowStack &stack, xcb_timestamp_t ts)
 {
     if (stack.zoom)
         return;
@@ -272,7 +301,7 @@ static void MaybeActivateUnderPointer(WindowStack &stack, xcb_timestamp_t ts)
     {
         return;
     }
-    if (lastEnteredWindow == x11.screen->root)
+    if (lastEnteredWindow == x11->GetRoot())
     {
         return;
     }
@@ -292,9 +321,9 @@ static void MaybeActivateUnderPointer(WindowStack &stack, xcb_timestamp_t ts)
     }
 }
 
-static void CheckFocusTheft()
+void CheckFocusTheft()
 {
-    auto reply = xcb_get_input_focus_reply(x11.conn, xcb_get_input_focus(x11.conn), nullptr);
+    auto reply = xcb_get_input_focus_reply(x11->GetConn(), xcb_get_input_focus(x11->GetConn()), nullptr);
     xcb_window_t focusedWindow = reply->focus;
     free(reply);
 
@@ -302,7 +331,7 @@ static void CheckFocusTheft()
     if (stack.activeWindow == focusedWindow)
         return;
 
-    if (focusedWindow == x11.screen->root)
+    if (focusedWindow == x11->GetRoot())
         return;
     if (!focusedWindow)
         return;
@@ -312,7 +341,7 @@ static void CheckFocusTheft()
         for (;;)
         {
             xcb_query_tree_reply_t *reply =
-                xcb_query_tree_reply(x11.conn, xcb_query_tree(x11.conn, focusedWindow), nullptr);
+                xcb_query_tree_reply(x11->GetConn(), xcb_query_tree(x11->GetConn(), focusedWindow), nullptr);
 
             if (!reply)
             {
@@ -323,7 +352,7 @@ static void CheckFocusTheft()
             xcb_window_t parent = reply->parent;
             free(reply);
 
-            if (!parent || parent == x11.screen->root)
+            if (!parent || parent == x11->GetRoot())
                 break;
             focusedWindow = parent;
         }
@@ -357,12 +386,12 @@ static void CheckFocusTheft()
     Activate(stack, XCB_CURRENT_TIME);
 }
 
-static void FetchClientProperty(xcb_window_t clientWindow, Client &client, xcb_atom_t property)
+void FetchClientProperty(xcb_window_t clientWindow, Client &client, xcb_atom_t property)
 {
     if (!wmPropertyChangeHandlers.contains(property))
         return;
 
-    auto cookie = xcb_get_property_unchecked(x11.conn, false, clientWindow, property, XCB_ATOM_ANY, 0,
+    auto cookie = xcb_get_property_unchecked(x11->GetConn(), false, clientWindow, property, XCB_ATOM_ANY, 0,
                                              std::numeric_limits<uint32_t>::max());
 
     auto it = client.propertyCookies.find(property);
@@ -372,12 +401,32 @@ static void FetchClientProperty(xcb_window_t clientWindow, Client &client, xcb_a
     }
 }
 
+} // namespace
+
+void InitializeWM()
+{
+    wmStacks.resize(9);
+
+    wmPropertyChangeHandlers.try_emplace(XCB_ATOM_WM_HINTS, HandleWmHints);
+    wmPropertyChangeHandlers.try_emplace(XCB_ATOM_WM_NORMAL_HINTS, HandleWmNormalHints);
+    wmPropertyChangeHandlers.try_emplace(XCB_ATOM_WM_NAME, HandleWmName);
+    wmPropertyChangeHandlers.try_emplace(x11->GetAtoms().wm_protocols, HandleWmProtocols);
+    wmPropertyChangeHandlers.try_emplace(XCB_ATOM_WM_TRANSIENT_FOR, HandleWmTransientFor);
+
+    DebugFsRegister(
+        "windows", nullptr,                                       //
+        [](auto &file) -> auto { file.content = DumpClients(); }, //
+        nullptr);
+
+    ScreenSaverInhibitorInit();
+}
+
 void ManageClient(xcb_window_t clientWindow)
 {
     if (auto [it, inserted] = wmClients.try_emplace(clientWindow, Client{}); inserted)
     {
         xcb_change_window_attributes(
-            x11.conn, clientWindow, XCB_CW_EVENT_MASK,
+            x11->GetConn(), clientWindow, XCB_CW_EVENT_MASK,
             (uint32_t[]){
                 XCB_EVENT_MASK_PROPERTY_CHANGE | XCB_EVENT_MASK_FOCUS_CHANGE | XCB_EVENT_MASK_ENTER_WINDOW,
             });
@@ -394,7 +443,7 @@ void ManageClient(xcb_window_t clientWindow)
 void ManageClientsStartup()
 {
     xcb_query_tree_reply_t *treeReply =
-        xcb_query_tree_reply(x11.conn, xcb_query_tree(x11.conn, x11.screen->root), nullptr);
+        xcb_query_tree_reply(x11->GetConn(), xcb_query_tree(x11->GetConn(), x11->GetRoot()), nullptr);
     if (!treeReply)
         return;
 
@@ -403,8 +452,8 @@ void ManageClientsStartup()
 
     for (xcb_window_t clientWindow : children)
     {
-        xcb_get_window_attributes_reply_t *attrReply =
-            xcb_get_window_attributes_reply(x11.conn, xcb_get_window_attributes(x11.conn, clientWindow), nullptr);
+        xcb_get_window_attributes_reply_t *attrReply = xcb_get_window_attributes_reply(
+            x11->GetConn(), xcb_get_window_attributes(x11->GetConn(), clientWindow), nullptr);
         if (!attrReply)
             continue;
         absl::Cleanup attrReplyFreer = [attrReply] -> void { free(attrReply); };
@@ -430,7 +479,7 @@ void UnmanageClient(xcb_window_t window)
 
     for (auto &[_, cookie] : client.propertyCookies)
     {
-        xcb_discard_reply(x11.conn, cookie.sequence);
+        xcb_discard_reply(x11->GetConn(), cookie.sequence);
     }
 
     if (client.transientFor)
@@ -553,7 +602,7 @@ static void MoveStack(xcb_timestamp_t time, auto computeIdx)
     if (iold == inew)
         return;
 
-    wmBackgroundDirty = true;
+    // wmBackgroundDirty = true;
 
     WindowStack &oldstack = GetActiveStack();
     wmActiveStackIdx = inew;
@@ -581,7 +630,7 @@ static void MoveStack(xcb_timestamp_t time, auto computeIdx)
     }
     else
     {
-        ApplyBorder(x11.conn, oldstack.activeWindow, Color::KNone);
+        ApplyBorder(x11->GetConn(), oldstack.activeWindow, Color::KNone);
         Activate(newstack, newstack.activeWindow, time);
     }
 
@@ -688,7 +737,7 @@ void ToggleZoom()
 {
     WindowStack &stack = GetActiveStack();
     stack.zoom ^= 1;
-    wmBackgroundDirty = true;
+    // wmBackgroundDirty = true;
     wmLayoutDirty = true;
     wmBorderDirty = true;
 }
@@ -726,7 +775,7 @@ void ProcessWM()
     {
         for (auto &[property, cookie] : client.propertyCookies)
         {
-            xcb_get_property_reply_t *reply = xcb_get_property_reply(x11.conn, cookie, nullptr);
+            xcb_get_property_reply_t *reply = xcb_get_property_reply(x11->GetConn(), cookie, nullptr);
             if (!reply)
                 continue;
 
@@ -814,21 +863,21 @@ void ProcessWM()
                 return Color::KNone;
             return Color::KActive;
         }();
-        ApplyBorder(x11.conn, stack.activeWindow, color);
+        ApplyBorder(x11->GetConn(), stack.activeWindow, color);
 
         wmBorderDirty = false;
     }
 
     if (wmLayoutDirty)
     {
-        Rect screenRect = Rect(x11.screen->width_in_pixels, x11.screen->height_in_pixels);
+        Rect screenRect = Rect(x11->GetScreen()->width_in_pixels, x11->GetScreen()->height_in_pixels);
         if (!stack.zoom)
             screenRect = TryApplyMarginTop(screenRect, wmBarHeight);
 
         auto hide = [](xcb_window_t clientWindow, Client &client) -> void {
-            ConfigureClientIfNeeded(x11.conn, clientWindow, client,
-                                    Rect{x11.screen->width_in_pixels, x11.screen->height_in_pixels, client.rect.Width(),
-                                         client.rect.Height()},
+            ConfigureClientIfNeeded(x11->GetConn(), clientWindow, client,
+                                    Rect{x11->GetScreen()->width_in_pixels, x11->GetScreen()->height_in_pixels,
+                                         client.rect.Width(), client.rect.Height()},
                                     client.borderWidth);
         };
 
@@ -858,7 +907,7 @@ void ProcessWM()
                 center(client.maxWidth, rect.Width(), rect.X());
                 center(client.maxHeight, rect.Height(), rect.Y());
 
-                ConfigureClientIfNeeded(x11.conn, client_window, client, rect, 2);
+                ConfigureClientIfNeeded(x11->GetConn(), client_window, client, rect, 2);
 
                 visitor(client);
             }
@@ -881,7 +930,7 @@ void ProcessWM()
                 }
                 else
                 {
-                    ConfigureClientIfNeeded(x11.conn, clientWindow, client, screenRect, wmFollow ? 2 : 0);
+                    ConfigureClientIfNeeded(x11->GetConn(), clientWindow, client, screenRect, wmFollow ? 2 : 0);
 
                     configureSubwindows(client);
                 }
@@ -908,8 +957,8 @@ void ProcessWM()
     {
         if (client.wantsConfigureNotify)
         {
-            X11SendConfigureNotify(client_window, x11.screen->root, client.rect.X(), client.rect.Y(),
-                                   client.rect.Width(), client.rect.Height(), 2);
+            X11SendConfigureNotify(client_window, x11->GetRoot(), client.rect.X(), client.rect.Y(), client.rect.Width(),
+                                   client.rect.Height(), 2);
             client.wantsConfigureNotify = false;
         }
     }
@@ -919,7 +968,7 @@ void ProcessWMEvents(const bool &isRunning, uint16_t modifier, std::vector<Keybi
 {
     while (isRunning)
     {
-        xcb_generic_event_t *event = xcb_poll_for_event(x11.conn);
+        xcb_generic_event_t *event = xcb_poll_for_event(x11->GetConn());
         if (!event)
             break;
         absl::Cleanup eventFreer = [event] -> void { free(event); };
@@ -983,7 +1032,7 @@ void ProcessWMEvents(const bool &isRunning, uint16_t modifier, std::vector<Keybi
             break;
         }
         case XCB_MAP_REQUEST: {
-            xcb_map_window(x11.conn, reinterpret_cast<xcb_map_request_event_t *>(event)->window);
+            xcb_map_window(x11->GetConn(), reinterpret_cast<xcb_map_request_event_t *>(event)->window);
             break;
         }
         case XCB_MAP_NOTIFY: {
@@ -1027,7 +1076,7 @@ void ProcessWMEvents(const bool &isRunning, uint16_t modifier, std::vector<Keybi
         case XCB_GE_GENERIC: {
             auto ge = reinterpret_cast<xcb_ge_generic_event_t *>(event);
 
-            if (ge->extension == x11.extXi2->major_opcode)
+            if (ge->extension == XCB_INPUT_XI_SELECT_EVENTS)
             {
                 switch (ge->event_type)
                 {
@@ -1060,48 +1109,9 @@ void ProcessWMEvents(const bool &isRunning, uint16_t modifier, std::vector<Keybi
     }
 }
 
-void UpdateBackground()
+namespace
 {
-#if 0
-    const WindowStack &stack = GetActiveStack();
-
-    std::string activeClientName;
-
-    if (stack.activeWindow)
-    {
-        auto it = wmClients.find(stack.activeWindow);
-        if (it == wmClients.end())
-            activeClientName = absl::StrFormat("invalid %v", stack.activeWindow);
-        else
-        {
-            activeClientName = it->second.name;
-            std::erase_if(activeClientName, [](char ch) -> bool { return ch < 0x20 || ch > 0x7F; });
-        }
-    }
-    else
-    {
-        activeClientName = absl::StrFormat("nylawm %v", wmActiveStackIdx & 0xFF);
-    }
-
-    double loadAvg[3];
-    getloadavg(loadAvg, std::size(loadAvg));
-
-    std::string barText =
-        absl::StrFormat("%.2f, %.2f, %.2f %s %v", loadAvg[0], loadAvg[1], loadAvg[2],
-                        absl::FormatTime("%H:%M:%S %d.%m.%Y", absl::Now(), absl::LocalTimeZone()), activeClientName);
-
-    static std::future<void> fut;
-    if (IsFutureReady(fut))
-    {
-        wmBackgroundDirty = false;
-        fut = std::async(std::launch::async, [wmClientSize = wmClients.size(), barText = std::move(barText)] -> void {
-            DrawBackground(wmClientSize, barText);
-        });
-    }
-#endif
-}
-
-static auto DumpClients() -> std::string
+auto DumpClients() -> std::string
 {
     std::string out;
 
@@ -1149,5 +1159,6 @@ static auto DumpClients() -> std::string
     }
     return out;
 }
+} // namespace
 
 } // namespace nyla
