@@ -68,7 +68,7 @@ auto ParseWavFile(std::span<const std::byte> bytes) -> ParseWavFileResult
         //     break;
         // }
         case Word32("data"): {
-            result.data = {(int16_t *)(p + sizeof(header)), header.chunkSize};
+            result.data = {p + sizeof(header), header.chunkSize};
             return result;
         }
         default: {

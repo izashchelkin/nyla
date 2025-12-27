@@ -30,9 +30,9 @@ struct WaveFmtChunk
 struct ParseWavFileResult
 {
     WaveFmtChunk *fmt;
-    std::span<const int16_t> data;
+    std::span<const std::byte> data;
 
-    auto GetNumSamplesPerSecond()
+    auto GetSampleRate()
     {
         return fmt->numSamplesPerSec;
     }

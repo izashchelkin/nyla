@@ -38,6 +38,7 @@ target_include_directories(${TARGET_EXEC}
 
 target_link_libraries(${TARGET_EXEC}
     PUBLIC
+        nyla::platform::linux::audio
         nyla::audio::wave
         nyla::commons
         ${ALSA_LIBRARIES}

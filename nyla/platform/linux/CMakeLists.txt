@@ -66,3 +66,24 @@ target_link_libraries(${target_key_resolver}
         nyla::commons
         nyla::platform::linux
 )
+
+#
+
+set(target_audio nyla_platform_linux_audio)
+add_library(${target_audio})
+add_library(nyla::platform::linux::audio ALIAS ${target_audio})
+
+target_sources(${target_audio}
+    PRIVATE
+        platform_linux_audio.cc
+)
+
+target_include_directories(${target_audio}
+    PUBLIC
+        ${PROJECT_SOURCE_DIR}
+)
+
+target_link_libraries(${target_audio}
+    PUBLIC
+        nyla::commons
+)
