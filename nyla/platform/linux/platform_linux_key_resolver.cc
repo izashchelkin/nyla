@@ -1,4 +1,6 @@
 #include "absl/log/check.h"
+#include "nyla/platform/platform.h"
+#include "nyla/platform/linux/platform_linux.h"
 #include "nyla/platform/platform_key_resolver.h"
 #include "xcb/xcb.h"
 #include <xkbcommon/xkbcommon-x11.h>
@@ -15,23 +17,21 @@ class PlatformKeyResolver::Impl
     auto ResolveKeyCode(KeyPhysical key) -> uint32_t;
 
   private:
-    xcb_connection_t *m_Conn;
     xkb_context *m_Ctx;
     xkb_keymap *m_Keymap;
 };
 
 void PlatformKeyResolver::Impl::Init()
 {
-    m_Conn = xcb_connect(nullptr, nullptr);
-    CHECK(!xcb_connection_has_error(m_Conn));
-
     m_Ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
     CHECK(m_Ctx);
 
-    const int32_t deviceId = xkb_x11_get_core_keyboard_device_id(m_Conn);
+    xcb_connection_t* conn = g_Platform->GetImpl()->GetConn();
+
+    const int32_t deviceId = xkb_x11_get_core_keyboard_device_id(conn);
     CHECK_NE(deviceId, -1);
 
-    m_Keymap = xkb_x11_keymap_new_from_device(m_Ctx, m_Conn, deviceId, XKB_KEYMAP_COMPILE_NO_FLAGS);
+    m_Keymap = xkb_x11_keymap_new_from_device(m_Ctx, conn, deviceId, XKB_KEYMAP_COMPILE_NO_FLAGS);
     CHECK(m_Keymap);
 }
 
@@ -41,8 +41,6 @@ void PlatformKeyResolver::Impl::Destroy()
         xkb_keymap_unref(m_Keymap);
     if (m_Ctx)
         xkb_context_unref(m_Ctx);
-    if (m_Conn)
-        xcb_disconnect(m_Conn);
 }
 
 namespace

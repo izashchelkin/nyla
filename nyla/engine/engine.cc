@@ -56,6 +56,8 @@ void Engine::Impl::Init(const EngineInitDesc &desc)
 
     g_StagingBuffer = CreateStagingBuffer(1 << 22);
     g_AssetManager->Init();
+
+    m_LastFrameStart = GetMonotonicTimeMicros();
 }
 
 auto Engine::Impl::ShouldExit() -> bool
@@ -104,11 +106,11 @@ auto Engine::Impl::FrameBegin() -> EngineFrameBeginResult
         }
 
         case PlatformEventType::MousePress: {
-            g_InputManager->HandlePressed(2, event.key.code, frameStart);
+            g_InputManager->HandlePressed(2, event.mouse.code, frameStart);
             break;
         }
         case PlatformEventType::MouseRelease: {
-            g_InputManager->HandleReleased(2, event.key.code, frameStart);
+            g_InputManager->HandleReleased(2, event.mouse.code, frameStart);
             break;
         }
 
@@ -122,8 +124,8 @@ auto Engine::Impl::FrameBegin() -> EngineFrameBeginResult
             break;
         }
     }
-
     g_InputManager->Update();
+
     g_TweenManager->Update(dt);
     StagingBufferReset(g_StagingBuffer);
     g_AssetManager->Upload(cmd);
@@ -173,7 +175,7 @@ auto Engine::FrameEnd() -> void
     return m_Impl->FrameEnd();
 }
 
-GpuStagingBuffer* g_StagingBuffer;
+GpuStagingBuffer *g_StagingBuffer;
 Engine *g_Engine = new Engine{};
 
 } // namespace nyla

@@ -9,6 +9,7 @@
 #include "xcb/xcb.h"
 #include "xcb/xcb_aux.h"
 #include "xcb/xinput.h"
+#include <cstdint>
 #include <xkbcommon/xkbcommon-x11.h>
 
 #ifdef __clang__
@@ -167,7 +168,7 @@ auto Platform::Impl::PollEvent(PlatformEvent &outEvent) -> bool
         case XCB_KEY_RELEASE: {
             auto keyrelease = reinterpret_cast<xcb_key_release_event_t *>(event);
             outEvent = {
-                .type = PlatformEventType::KeyPress,
+                .type = PlatformEventType::KeyRelease,
                 .key = {.code = keyrelease->detail},
             };
             return true;
@@ -185,7 +186,7 @@ auto Platform::Impl::PollEvent(PlatformEvent &outEvent) -> bool
         case XCB_BUTTON_RELEASE: {
             auto buttonrelease = reinterpret_cast<xcb_button_release_event_t *>(event);
             outEvent = {
-                .type = PlatformEventType::MousePress,
+                .type = PlatformEventType::MouseRelease,
                 .key = {.code = buttonrelease->detail},
             };
             return true;

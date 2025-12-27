@@ -64,4 +64,5 @@ target_include_directories(${target_key_resolver}
 target_link_libraries(${target_key_resolver}
     PUBLIC
         nyla::commons
+        nyla::platform::linux
 )

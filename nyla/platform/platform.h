@@ -8,8 +8,8 @@ namespace nyla
 
 enum class PlatformFeature
 {
-    KeyboardInput,
-    MouseInput,
+    KeyboardInput = 1 << 0,
+    MouseInput = 1 << 1,
 };
 NYLA_BITENUM(PlatformFeature);
 
@@ -66,8 +66,13 @@ class Platform
     auto GetWindowSize(PlatformWindow window) -> PlatformWindowSize;
     auto PollEvent(PlatformEvent &outEvent) -> bool;
 
-  private:
     class Impl;
+    auto GetImpl() -> auto *
+    {
+        return m_Impl;
+    }
+
+  private:
     Impl *m_Impl;
 };
 extern Platform *g_Platform;
