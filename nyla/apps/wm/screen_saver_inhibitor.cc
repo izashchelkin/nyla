@@ -15,7 +15,6 @@
 namespace nyla
 {
 
-static Platform::Impl *x11 = g_Platform->GetImpl();
 static uint32_t nextInhibitCookie = 1;
 static Map<uint32_t, std::string> inhibitCookies;
 
@@ -32,6 +31,8 @@ static void HandleNameOwnerChange(const char *name, const char *oldOwner, const 
 
 static void HandleMessage(DBusMessage *msg)
 {
+    Platform::Impl *x11 = g_Platform->GetImpl();
+
     if (dbus_message_is_method_call(msg, "org.freedesktop.ScreenSaver", "Inhibit"))
     {
         const char *inName;

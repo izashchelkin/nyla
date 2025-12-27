@@ -88,7 +88,7 @@ uint64_t wmActiveStackIdx;
 xcb_timestamp_t lastRawmotionTs = 0;
 xcb_window_t lastEnteredWindow = 0;
 
-Platform::Impl *x11 = g_Platform->GetImpl();
+Platform::Impl *x11;
 
 // TODO: this stuff can be moved into platform impl
 
@@ -405,6 +405,8 @@ void FetchClientProperty(xcb_window_t clientWindow, Client &client, xcb_atom_t p
 
 void InitializeWM()
 {
+    x11 = g_Platform->GetImpl();
+
     wmStacks.resize(9);
 
     wmPropertyChangeHandlers.try_emplace(XCB_ATOM_WM_HINTS, HandleWmHints);
