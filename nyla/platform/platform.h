@@ -1,30 +1,22 @@
 #pragma once
 
+#include "nyla/commons/bitenum.h"
 #include <cstdint>
-#include <span>
-#include <string>
-
-#include "nyla/platform/key_physical.h"
 
 namespace nyla
 {
 
-struct PlatformInitDesc
+enum class PlatformFeature
 {
-    bool keyboardInput;
-    bool mouseInput;
+    KeyboardInput = 1 << 0,
+    MouseInput = 1 << 1,
 };
-void PlatformInit(PlatformInitDesc);
-
-void PlatformInputResolverBegin();
-auto PlatformInputResolve(KeyPhysical key) -> uint32_t;
-void PlatformInputResolverEnd();
+NYLA_BITENUM(PlatformFeature);
 
 struct PlatformWindow
 {
     uint32_t handle;
 };
-auto PlatformCreateWindow() -> PlatformWindow;
 
 struct PlatformWindowSize
 {
@@ -32,30 +24,57 @@ struct PlatformWindowSize
     uint32_t height;
 };
 
-auto PlatformGetWindowSize(PlatformWindow window) -> PlatformWindowSize;
-
-struct PlatformFileChanged
+enum class PlatformEventType
 {
-    bool seen;
-    std::string path;
-};
-void PlatformFsWatchFile(const std::string &path);
-auto PlatformFsGetFileChanges() -> std::span<PlatformFileChanged>;
+    None,
 
-struct PlatformProcessEventsCallbacks
-{
-    void (*handleKeyPress)(void *user, uint32_t code);
-    void (*handleKeyRelease)(void *user, uint32_t code);
-    void (*handleMousePress)(void *user, uint32_t code);
-    void (*handleMouseRelease)(void *user, uint32_t code);
+    KeyPress,
+    KeyRelease,
+    MousePress,
+    MouseRelease,
+
+    ShouldRedraw,
+    ShouldExit
 };
 
-struct PlatformProcessEventsResult
+struct PlatformEvent
 {
-    bool shouldRedraw;
-};
-auto PlatformProcessEvents(const PlatformProcessEventsCallbacks &callbacks, void *user) -> PlatformProcessEventsResult;
+    PlatformEventType type;
+    union {
+        struct
+        {
+            uint32_t code;
+        } key;
 
-auto PlatformShouldExit() -> bool;
+        struct
+        {
+            uint32_t code;
+        } mouse;
+    };
+};
+
+struct PlatformInitDesc
+{
+    PlatformFeature enabledFeatures;
+};
+
+class Platform
+{
+  public:
+    void Init(const PlatformInitDesc &desc);
+    auto CreateWindow() -> PlatformWindow;
+    auto GetWindowSize(PlatformWindow window) -> PlatformWindowSize;
+    auto PollEvent(PlatformEvent &outEvent) -> bool;
+
+    class Impl;
+    auto GetImpl() -> auto *
+    {
+        return m_Impl;
+    }
+
+  private:
+    Impl *m_Impl;
+};
+extern Platform *g_Platform;
 
 } // namespace nyla

@@ -15,27 +15,26 @@ static auto Main() -> int
     LoggingInit();
     SigIntCoreDump();
 
-    PlatformInit({
-        .keyboardInput = true,
-        .mouseInput = false,
+    g_Platform->Init({
+        .enabledFeatures = PlatformFeature::KeyboardInput,
     });
-    PlatformWindow window = PlatformCreateWindow();
+    PlatformWindow window = g_Platform->CreateWindow();
 
-    EngineInit({.window = window});
+    g_Engine->Init({.window = window});
 
-    BreakoutInit();
+    GameInit();
 
-    while (!EngineShouldExit())
+    while (!g_Engine->ShouldExit())
     {
-        const auto [cmd, dt, fps] = EngineFrameBegin();
+        const auto [cmd, dt, fps] = g_Engine->FrameBegin();
         DebugText(500, 10, std::format("fps={}", fps));
 
-        BreakoutProcess(cmd, dt);
+        GameProcess(cmd, dt);
 
         RhiTexture colorTarget = RhiGetBackbufferTexture();
-        BreakoutRenderGame(cmd, colorTarget);
+        GameRender(cmd, colorTarget);
 
-        EngineFrameEnd();
+        g_Engine->FrameEnd();
     }
 
     return 0;

@@ -1,9 +1,5 @@
 #pragma once
 
-#include "nyla/engine/asset_manager.h"
-#include "nyla/engine/input_manager.h"
-#include "nyla/engine/staging_buffer.h"
-#include "nyla/engine/tween_manager.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include <cstdint>
@@ -11,15 +7,7 @@
 namespace nyla
 {
 
-#define NYLA_ENGINE_EXTERN_GLOBALS(X)                                                                                  \
-    X(AssetManager *g_AssetManager)                                                                                    \
-    X(GpuStagingBuffer *g_StagingBuffer)                                                                               \
-    X(TweenManager *g_TweenManager)                                                                                    \
-    X(InputManager *g_InputManager)
-
-#define X(x) extern x;
-NYLA_ENGINE_EXTERN_GLOBALS(X)
-#undef X
+class Engine;
 
 struct EngineInitDesc
 {
@@ -28,9 +16,6 @@ struct EngineInitDesc
     bool vsync;
 };
 
-void EngineInit(const EngineInitDesc &);
-auto EngineShouldExit() -> bool;
-
 struct EngineFrameBeginResult
 {
     RhiCmdList cmd;
@@ -38,7 +23,19 @@ struct EngineFrameBeginResult
     uint32_t fps;
 };
 
-auto EngineFrameBegin() -> EngineFrameBeginResult;
-auto EngineFrameEnd() -> void;
+class Engine
+{
+  public:
+    void Init(const EngineInitDesc &);
+    auto ShouldExit() -> bool;
+
+    auto FrameBegin() -> EngineFrameBeginResult;
+    auto FrameEnd() -> void;
+
+  private:
+    class Impl;
+    Impl *m_Impl{};
+};
+extern Engine *g_Engine;
 
 } // namespace nyla

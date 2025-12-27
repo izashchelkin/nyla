@@ -13,7 +13,7 @@
 #include "nyla/engine/renderer2d.h"
 #include "nyla/engine/tween_manager.h"
 #include "nyla/platform/platform.h"
-#include "nyla/rhi/rhi.h"
+#include "nyla/platform/platform_key_resolver.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_pass.h"
 #include "nyla/rhi/rhi_texture.h"
@@ -29,16 +29,6 @@ namespace
 Renderer2D *renderer2d;
 DebugTextRenderer *debugTextRenderer;
 
-struct Brick
-{
-    float x;
-    float y;
-    float width;
-    float height;
-    float3 color;
-    bool dead;
-};
-
 struct Level
 {
     InlineVec<Brick, 256> bricks;
@@ -52,17 +42,6 @@ enum class GameStage
     KGame,
 };
 static GameStage stage = GameStage::KGame;
-
-template <typename T> static auto FrameLocal(std::vector<T> &vec, auto create) -> T &
-{
-    vec.reserve(RhiGetNumFramesInFlight());
-    uint32_t frameIndex = RhiGetFrameIndex();
-    if (frameIndex >= vec.size())
-    {
-        vec.emplace_back(create());
-    }
-    return vec.at(frameIndex);
-}
 
 constexpr float2 kWorldBoundaryX{-35.f, 35.f};
 constexpr float2 kWorldBoundaryY{-30.f, 30.f};
@@ -78,7 +57,7 @@ static float2 ballVel = {40.f, 40.f};
 
 static Level level;
 
-void BreakoutInit()
+void GameInit()
 {
     g_State = new GameState{};
     g_State->input.moveLeft = g_InputManager->NewId();
@@ -89,10 +68,11 @@ void BreakoutInit()
 
     //
 
-    PlatformInputResolverBegin();
-    g_InputManager->Map(g_State->input.moveLeft, 1, PlatformInputResolve(KeyPhysical::S));
-    g_InputManager->Map(g_State->input.moveRight, 1, PlatformInputResolve(KeyPhysical::F));
-    PlatformInputResolverEnd();
+    PlatformKeyResolver keyResolver{};
+    keyResolver.Init();
+    g_InputManager->Map(g_State->input.moveLeft, 1, keyResolver.ResolveKeyCode(KeyPhysical::S));
+    g_InputManager->Map(g_State->input.moveRight, 1, keyResolver.ResolveKeyCode(KeyPhysical::F));
+    keyResolver.Destroy();
 
     //
 
@@ -127,15 +107,12 @@ void BreakoutInit()
             float x = -28.f + j * 3.5f;
 
             Brick &brick = level.bricks.emplace_back(Brick{
-                .x = 50.f * (j % 2 ? 1 : -1),
-                .y = 50.f * (j % 3 ? -1 : 1),
-                .width = 40.f / 15.f,
-                .height = 1.f,
-                .color = color,
+                .pos = {50.f * (j % 2 ? 1 : -1), 50.f * (j % 3 ? -1 : 1)},
+                .size = {40.f / 15.f, 1.f},
             });
 
-            g_TweenManager->Lerp(brick.x, x, g_TweenManager->Now(), g_TweenManager->Now() + 1);
-            g_TweenManager->Lerp(brick.y, y, g_TweenManager->Now(), g_TweenManager->Now() + 1);
+            g_TweenManager->Lerp(brick.pos[0], x, g_TweenManager->Now(), g_TweenManager->Now() + 1);
+            g_TweenManager->Lerp(brick.pos[1], y, g_TweenManager->Now(), g_TweenManager->Now() + 1);
         }
     }
 }
@@ -149,7 +126,7 @@ static auto IsInside(float pos, float size, float2 boundary) -> bool
     return false;
 }
 
-void BreakoutProcess(RhiCmdList cmd, float dt)
+void GameProcess(RhiCmdList cmd, float dt)
 {
     Renderer2DFrameBegin(cmd, renderer2d, g_StagingBuffer);
 
@@ -184,21 +161,21 @@ void BreakoutProcess(RhiCmdList cmd, float dt)
 
         for (auto &brick : level.bricks)
         {
-            if (brick.dead)
+            if (brick.flags & Brick::kFlagDead)
                 continue;
 
             bool hit = false;
 
             if (IsInside(ballPos[0], kBallRadius * 2.f,
-                         float2{brick.x - brick.width / 2.f, brick.x + brick.width / 2.f}))
+                         float2{brick.pos[0] - brick.size[0] / 2.f, brick.pos[0] + brick.size[0] / 2.f}))
             {
                 if (IsInside(ballPos[1], kBallRadius * 2.f,
-                             float2{brick.y - brick.height / 2.f, brick.y + brick.height / 2.f}))
+                             float2{brick.pos[1] - brick.size[1] / 2.f, brick.pos[1] + brick.size[1] / 2.f}))
                 {
                     ballVel[1] = -ballVel[1];
                     ballVel[0] = -ballVel[0];
                     hit = true;
-                    brick.dead = true;
+                    brick.flags |= Brick::kFlagDead;
                 }
             }
 
@@ -221,7 +198,7 @@ void BreakoutProcess(RhiCmdList cmd, float dt)
     }
 }
 
-void BreakoutRenderGame(RhiCmdList cmd, RhiTexture colorTarget)
+void GameRender(RhiCmdList cmd, RhiTexture colorTarget)
 {
     RhiTextureInfo colorTargetInfo = RhiGetTextureInfo(colorTarget);
 
@@ -238,11 +215,10 @@ void BreakoutRenderGame(RhiCmdList cmd, RhiTexture colorTarget)
     for (Brick &brick : level.bricks)
     {
         i++;
-        if (brick.dead)
+        if (brick.flags & Brick::kFlagDead)
             continue;
 
-        Renderer2DRect(cmd, renderer2d, brick.x, brick.y, brick.width, brick.height,
-                       float4{brick.color[0], brick.color[1], brick.color[2], 1.f},
+        Renderer2DRect(cmd, renderer2d, brick.pos[0], brick.pos[1], brick.size[0], brick.size[1], float4{},
                        assets.bricks[i % assets.bricks.size()].index);
     }
 

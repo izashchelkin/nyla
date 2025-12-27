@@ -3,6 +3,17 @@
 	"tasks": [
 		{
 			"type": "cmake",
+			"label": "audio_main build",
+			"command": "build",
+			"targets": [
+				"nyla_audio_main"
+			],
+			"preset": "debug",
+			"group": "build",
+			"problemMatcher": [],
+		},
+		{
+			"type": "cmake",
 			"label": "wm_overlay build",
 			"command": "build",
 			"targets": [

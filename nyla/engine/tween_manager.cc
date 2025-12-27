@@ -68,4 +68,6 @@ auto TweenManager::EndOf(Tween tween) -> float
         return 0.f;
 }
 
+TweenManager *g_TweenManager = new TweenManager{};
+
 } // namespace nyla

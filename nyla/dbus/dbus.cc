@@ -47,7 +47,7 @@ void DBusProcess()
     if (!dbus.conn)
         return;
 
-    dbus_connection_read_write(dbus.conn, 0);
+    dbus_connection_read_write(dbus.conn, 1);
 
     for (;;)
     {

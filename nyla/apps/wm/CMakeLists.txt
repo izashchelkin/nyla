@@ -6,8 +6,6 @@ target_sources(wm
         layout.h
         main.cc
         palette.h
-        screen_saver_inhibitor.cc
-        screen_saver_inhibitor.h
         window_manager.cc
         window_manager.h
 )
@@ -19,9 +17,8 @@ target_include_directories(wm
 
 target_link_libraries(wm
     PRIVATE
-        nyla::dbus
-        nyla::debugfs
-        nyla::platform
+        nyla::platform::linux
+        nyla::platform::linux::key_resolver
         xcb-screensaver
 )
 
@@ -37,4 +34,5 @@ target_link_libraries(wm_overlay
     PRIVATE
         nyla::debug_text_renderer
         nyla::rhi_ndebug
+        nyla::platform::linux
 )

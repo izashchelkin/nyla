@@ -2,29 +2,23 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-#include <chrono>
 #include <cstdint>
 #include <initializer_list>
 
-#include "absl/cleanup/cleanup.h"
 #include "absl/log/check.h"
 #include "absl/log/log.h"
 #include "nyla/apps/wm/window_manager.h"
 #include "nyla/commons/logging/init.h"
 #include "nyla/commons/os/spawn.h"
-#include "nyla/commons/os/timerfd.h"
 #include "nyla/commons/signal/signal.h"
-#include "nyla/dbus/dbus.h"
-#include "nyla/debugfs/debugfs.h"
-#include "nyla/platform/key_physical.h"
-#include "nyla/platform/x11/platform_x11.h"
+#include "nyla/platform/linux/platform_linux.h"
+#include "nyla/platform/platform.h"
+#include "nyla/platform/platform_key_resolver.h"
 #include "xcb/xcb.h"
 #include "xcb/xproto.h"
 
 namespace nyla
 {
-
-using namespace platform_x11_internal;
 
 auto Main(int argc, char **argv) -> int
 {
@@ -34,13 +28,16 @@ auto Main(int argc, char **argv) -> int
 
     bool isRunning = true;
 
-    X11Initialize(true, true);
+    g_Platform->Init({
+        .enabledFeatures = PlatformFeature::KeyboardInput | PlatformFeature::MouseInput,
+    });
+    Platform::Impl *x11 = g_Platform->GetImpl();
 
-    xcb_grab_server(x11.conn);
+    xcb_grab_server(x11->GetConn());
 
-    if (xcb_request_check(x11.conn,
+    if (xcb_request_check(x11->GetConn(),
                           xcb_change_window_attributes_checked(
-                              x11.conn, x11.screen->root, XCB_CW_EVENT_MASK,
+                              x11->GetConn(), x11->GetRoot(), XCB_CW_EVENT_MASK,
                               (uint32_t[]){XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT | XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY |
                                            XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_KEY_RELEASE |
                                            XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE |
@@ -49,16 +46,14 @@ auto Main(int argc, char **argv) -> int
         LOG(QFATAL) << "another wm is already running";
     }
 
-    DBusInitialize();
-    DebugFsInitialize(argv[0] + std::string("-debugfs"));
     InitializeWM();
 
     uint16_t modifier = XCB_MOD_MASK_4;
     std::vector<Keybind> keybinds;
 
     {
-        X11KeyResolver keyResolver;
-        X11InitializeKeyResolver(keyResolver);
+        PlatformKeyResolver keyResolver;
+        keyResolver.Init();
 
         auto spawnTerminal = [] -> void { Spawn({{"ghostty", nullptr}}); };
         auto spawnLauncher = [] -> void { Spawn({{"dmenu_run", nullptr}}); };
@@ -81,115 +76,45 @@ auto Main(int argc, char **argv) -> int
                  {KeyPhysical::S, 0, spawnLauncher},
              })
         {
-            const char *xkbName = ConvertKeyPhysicalIntoXkbName(key);
-            xcb_keycode_t keycode = X11ResolveKeyCode(keyResolver, xkbName);
+            xcb_keycode_t keycode = keyResolver.ResolveKeyCode(key);
 
             mod |= XCB_MOD_MASK_4;
             keybinds.emplace_back(keycode, mod, handler);
 
-            xcb_grab_key(x11.conn, false, x11.screen->root, mod, keycode, XCB_GRAB_MODE_ASYNC, XCB_GRAB_MODE_ASYNC);
+            xcb_grab_key(x11->GetConn(), false, x11->GetRoot(), mod, keycode, XCB_GRAB_MODE_ASYNC, XCB_GRAB_MODE_ASYNC);
         }
 
-        X11FreeKeyResolver(keyResolver);
+        keyResolver.Destroy();
     }
-
-    using namespace std::chrono_literals;
-    int tfd = MakeTimerFd(501ms);
 
     ManageClientsStartup();
 
-    std::vector<pollfd> fds;
-    fds.emplace_back(pollfd{
-        .fd = xcb_get_file_descriptor(x11.conn),
-        .events = POLLIN,
-    });
-    fds.emplace_back(pollfd{
-        .fd = debugfs.fd,
-        .events = POLLIN,
-    });
+    x11->Flush();
+    xcb_ungrab_server(x11->GetConn());
 
-    if (!tfd)
-        LOG(QFATAL) << "MakeTimerFdMillis";
-    absl::Cleanup tfdCloser = [tfd] -> void { close(tfd); };
-    fds.emplace_back(pollfd{
-        .fd = tfd,
-        .events = POLLIN,
-    });
-
-    DebugFsRegister(
-        "quit", &isRunning, //
-        [](auto &file) -> auto { file.content = "quit\n"; },
-        [](auto &file) -> auto {
-            *reinterpret_cast<bool *>(file.data) = false;
-            LOG(INFO) << "exit requested";
-        });
-
-    xcb_flush(x11.conn);
-    xcb_ungrab_server(x11.conn);
-
-    //
-
-#if 0
+    while (isRunning && !xcb_connection_has_error(x11->GetConn()))
     {
-        std::future<void> fut = InitWMBackground();
-        while (!IsFutureReady(fut) && isRunning && !xcb_connection_has_error(x11.conn))
+        std::array<pollfd, 1> fds{
+            pollfd{
+                .fd = xcb_get_file_descriptor(x11->GetConn()),
+                .events = POLLIN,
+            },
+        };
+        if (poll(fds.data(), fds.size(), -1) == -1)
         {
-            if (poll(fds.data(), fds.size(), -1) == -1)
-            {
-                continue;
-            }
-
-            if (fds[0].revents & POLLIN)
-            {
-                ProcessWMEvents(isRunning, modifier, keybinds);
-                ProcessWM();
-                xcb_flush(x11.conn);
-            }
+            LOG(INFO) << "poll(): " << strerror(errno);
+            continue;
         }
-    }
-#endif
 
-    {
-        while (isRunning && !xcb_connection_has_error(x11.conn))
+        if (fds[0].revents & POLLIN)
         {
-            if (poll(fds.data(), fds.size(), -1) == -1)
-            {
-                continue;
-            }
-
-            if (fds[0].revents & POLLIN)
-            {
-                ProcessWMEvents(isRunning, modifier, keybinds);
-                ProcessWM();
-                xcb_flush(x11.conn);
-            }
-
-            if (fds[1].revents & POLLIN)
-            {
-                DebugFsProcess();
-            }
-
-            if (fds[2].revents & POLLIN)
-            {
-                uint64_t expirations = 0;
-                if (read(tfd, &expirations, sizeof(expirations)) > 0 && expirations > 0)
-                {
-                    wmBackgroundDirty = true;
-                }
-            }
-
-            if (wmBackgroundDirty)
-            {
-                UpdateBackground();
-                wmBackgroundDirty = false;
-            }
-
-            DBusProcess();
+            ProcessWMEvents(isRunning, modifier, keybinds);
+            ProcessWM();
+            x11->Flush();
         }
     }
 
-    //
-
+    LOG(INFO) << "exiting";
     return 0;
 }
 
