@@ -9,17 +9,6 @@
 
 namespace nyla::platform_x11_internal
 {
-
-// NOLINTBEGIN
-#define Nyla_X11_Atoms(X)                                                                                              \
-    X(compound_text)                                                                                                   \
-    X(wm_delete_window)                                                                                                \
-    X(wm_protocols)                                                                                                    \
-    X(wm_name)                                                                                                         \
-    X(wm_state)                                                                                                        \
-    X(wm_take_focus)
-// NOLINTEND
-
 struct X11State
 {
     xcb_connection_t *conn;

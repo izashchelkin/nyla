@@ -15,11 +15,10 @@ static auto Main() -> int
     LoggingInit();
     SigIntCoreDump();
 
-    PlatformInit({
-        .keyboardInput = true,
-        .mouseInput = false,
+    g_Platform->Init({
+        .enabledFeatures = PlatformFeature::KeyboardInput,
     });
-    PlatformWindow window = PlatformCreateWindow();
+    PlatformWindow window = g_Platform->CreateWindow();
 
     EngineInit({.window = window});
 
