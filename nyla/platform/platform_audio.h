@@ -10,6 +10,7 @@ struct PlatformAudioInitDesc
 {
     uint32_t sampleRate;
     uint32_t channels;
+    uint32_t latencyUs;
 };
 
 class PlatformAudio

@@ -191,4 +191,6 @@ using float2 = Vec<float, 2>;
 
 using uint4 = Vec<uint32_t, 4>;
 
+using short2 = Vec<int16_t, 2>;
+
 } // namespace nyla

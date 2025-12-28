@@ -31,8 +31,9 @@ void PlatformAudio::Impl::Init(const PlatformAudioInitDesc &desc)
     m_Channels = desc.channels;
     m_BytesPerChannel = 2;
 
-    snd_pcm_set_params(m_Pcm, SND_PCM_FORMAT_S16_LE, SND_PCM_ACCESS_RW_INTERLEAVED, m_Channels, m_SampleRate, 1,
-                       500000);
+    const bool softResample = true; // TODO:
+    snd_pcm_set_params(m_Pcm, SND_PCM_FORMAT_S16_LE, SND_PCM_ACCESS_RW_INTERLEAVED, m_Channels, m_SampleRate,
+                       softResample, desc.latencyUs);
 }
 
 void PlatformAudio::Impl::Destroy()
