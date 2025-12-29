@@ -1,44 +1,33 @@
 {
   "version": 6,
-  "cmakeMinimumRequired": {
-    "major": 3,
-    "minor": 25
-  },
+  "cmakeMinimumRequired": { "major": 3, "minor": 25 },
 
   "configurePresets": [
     {
-      "name": "windows-vs-base",
-      "hidden": true,
+      "name": "windows-vs",
+      "displayName": "Windows (Visual Studio)",
       "generator": "Visual Studio 18 2026",
       "architecture": "x64",
       "binaryDir": "${sourceDir}/build/windows-vs",
       "cacheVariables": {
-        "CMAKE_TOOLCHAIN_FILE": "C:/vcpkg/scripts/buildsystems/vcpkg.cmake",
-        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+        "CMAKE_TOOLCHAIN_FILE": "C:/vcpkg/scripts/buildsystems/vcpkg.cmake"
       }
-    },
-
-    {
-      "name": "windows-vs",
-      "inherits": "windows-vs-base",
-      "displayName": "Windows (VS, x64)"
     },
 
     {
       "name": "linux-debug",
-      "displayName": "Debug (Linux)",
+      "displayName": "Linux (Ninja Debug)",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/linux-debug",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_CXX_COMPILER": "clang++",
-        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CMAKE_CXX_COMPILER": "clang++"
       }
     },
-
     {
       "name": "linux-release",
-      "displayName": "Release (Linux)",
+      "displayName": "Linux (Ninja Release)",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/linux-release",
       "cacheVariables": {
@@ -51,16 +40,24 @@
   "buildPresets": [
     {
       "name": "windows-debug",
+      "displayName": "Windows Debug (VS)",
       "configurePreset": "windows-vs",
       "configuration": "Debug"
     },
     {
       "name": "windows-release",
+      "displayName": "Windows Release (VS)",
       "configurePreset": "windows-vs",
       "configuration": "Release"
     },
 
-    { "name": "linux-debug", "configurePreset": "linux-debug" },
-    { "name": "linux-release", "configurePreset": "linux-release" }
+    {
+      "name": "linux-debug",
+      "configurePreset": "linux-debug"
+    },
+    {
+      "name": "linux-release",
+      "configurePreset": "linux-release"
+    }
   ]
 }

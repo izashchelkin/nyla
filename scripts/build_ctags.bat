@@ -1,0 +1,1 @@
+ctags -R --languages=C,C++ --extras=+q --fields=+iaS nyla third_party
