@@ -25,36 +25,36 @@ template <typename T, uint32_t N> class InlineVec
     using iterator = T *;
     using const_iterator = const T *;
 
-    InlineVec() : m_size{0} {};
+    InlineVec() : m_Size{0} {};
 
-    InlineVec(std::span<const value_type> elems) : m_size{static_cast<size_type>(elems.size())}
+    InlineVec(std::span<const value_type> elems) : m_Size{static_cast<size_type>(elems.size())}
     {
         CHECK_LE(elems.size(), kCapacity);
-        std::copy_n(elems.begin(), elems.size(), m_data.begin());
+        std::copy_n(elems.begin(), elems.size(), m_Data.begin());
     }
 
     [[nodiscard]]
     auto data() const -> const_pointer
     {
-        return m_data.data();
+        return m_Data.data();
     }
 
     [[nodiscard]]
     auto data() -> pointer
     {
-        return m_data.data();
+        return m_Data.data();
     }
 
     [[nodiscard]]
     auto size() const -> size_type
     {
-        return m_size;
+        return m_Size;
     }
 
     [[nodiscard]]
     auto empty() const -> bool
     {
-        return m_size == 0;
+        return m_Size == 0;
     }
 
     [[nodiscard]]
@@ -66,84 +66,117 @@ template <typename T, uint32_t N> class InlineVec
     [[nodiscard]]
     auto operator[](size_type i) -> reference
     {
-        CHECK_LT(i, m_size);
-        return m_data[i];
+        CHECK_LT(i, m_Size);
+        return m_Data[i];
     }
 
     [[nodiscard]]
     auto operator[](size_type i) const -> const_reference
     {
-        CHECK_LT(i, m_size);
-        return m_data[i];
+        CHECK_LT(i, m_Size);
+        return m_Data[i];
     }
 
     [[nodiscard]]
     auto begin() -> iterator
     {
-        return m_data.data();
+        return m_Data.data();
     }
 
     [[nodiscard]]
     auto end() -> iterator
     {
-        return m_data.data() + m_size;
+        return m_Data.data() + m_Size;
     }
 
     [[nodiscard]]
     auto begin() const -> const_iterator
     {
-        return m_data.data();
+        return m_Data.data();
     }
 
     [[nodiscard]]
     auto end() const -> const_iterator
     {
-        return m_data.data() + m_size;
+        return m_Data.data() + m_Size;
     }
 
     [[nodiscard]]
     auto cbegin() const -> const_iterator
     {
-        return m_data.data();
+        return m_Data.data();
     }
 
     [[nodiscard]]
     auto cend() const -> const_iterator
     {
-        return m_data.data() + m_size;
+        return m_Data.data() + m_Size;
     }
 
     void clear()
     {
-        m_size = 0;
+        m_Size = 0;
     }
 
     void push_back(const_reference v)
     {
-        CHECK_LT(m_size, kCapacity);
-        m_data[m_size++] = v;
+        CHECK_LT(m_Size, kCapacity);
+        m_Data[m_Size++] = v;
     }
 
     void push_back(T &&v)
     {
-        CHECK_LT(m_size, kCapacity);
-        m_data[m_size++] = std::move(v);
+        CHECK_LT(m_Size, kCapacity);
+        m_Data[m_Size++] = std::move(v);
     }
 
     template <class... Args> auto emplace_back(Args &&...args) -> T &
     {
-        CHECK_LT(m_size, kCapacity);
-        return (m_data[m_size++] = T(std::forward<Args>(args)...));
+        CHECK_LT(m_Size, kCapacity);
+        return (m_Data[m_Size++] = T(std::forward<Args>(args)...));
+    }
+
+    auto front() -> reference
+    {
+        CHECK(m_Size);
+        return m_Data[0];
+    }
+
+    auto front() const -> const_reference
+    {
+        CHECK(m_Size);
+        return m_Data[0];
+    }
+
+    auto back() -> reference
+    {
+        CHECK(m_Size);
+        return m_Data[m_Size - 1];
+    }
+
+    auto back() const -> const_reference
+    {
+        CHECK(m_Size);
+        return m_Data[m_Size - 1];
+    }
+
+    auto pop_back() -> value_type
+    {
+        CHECK(m_Size);
+        auto tmp = m_Data[m_Size - 1];
+        --m_Size;
+        return tmp;
     }
 
     void resize(size_type size)
     {
-        m_size = size;
+        CHECK_LT(size, m_Data.size());
+        m_Size = size;
     }
 
   private:
-    std::array<T, N> m_data;
-    size_type m_size;
+    std::array<T, N> m_Data;
+    size_type m_Size;
 };
 
 } // namespace nyla

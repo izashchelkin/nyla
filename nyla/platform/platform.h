@@ -15,7 +15,7 @@ NYLA_BITENUM(PlatformFeature);
 
 struct PlatformWindow
 {
-    uint32_t handle;
+    uint64_t handle;
 };
 
 struct PlatformWindowSize
@@ -62,7 +62,7 @@ class Platform
 {
   public:
     void Init(const PlatformInitDesc &desc);
-    auto CreateWindow() -> PlatformWindow;
+    auto CreateWin() -> PlatformWindow;
     auto GetWindowSize(PlatformWindow window) -> PlatformWindowSize;
     auto PollEvent(PlatformEvent &outEvent) -> bool;
 
@@ -76,5 +76,7 @@ class Platform
     Impl *m_Impl;
 };
 extern Platform *g_Platform;
+
+int PlatformMain();
 
 } // namespace nyla

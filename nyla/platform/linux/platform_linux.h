@@ -38,11 +38,11 @@ class Platform::Impl
   public:
     auto InternAtom(std::string_view name, bool onlyIfExists) -> xcb_atom_t;
     void Init(const PlatformInitDesc &desc);
-    auto CreateWindow() -> PlatformWindow;
+    auto CreateWin() -> PlatformWindow;
     auto GetWindowSize(PlatformWindow platformWindow) -> PlatformWindowSize;
     auto PollEvent(PlatformEvent &outEvent) -> bool;
 
-    auto CreateWindow(uint32_t width, uint32_t height, bool overrideRedirect, xcb_event_mask_t eventMask)
+    auto CreateWin(uint32_t width, uint32_t height, bool overrideRedirect, xcb_event_mask_t eventMask)
         -> xcb_window_t;
 
     auto GetScreenIndex() -> auto

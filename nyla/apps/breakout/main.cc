@@ -18,7 +18,7 @@ static auto Main() -> int
     g_Platform->Init({
         .enabledFeatures = PlatformFeature::KeyboardInput,
     });
-    PlatformWindow window = g_Platform->CreateWindow();
+    PlatformWindow window = g_Platform->CreateWin();
 
     g_Engine->Init({.window = window});
 

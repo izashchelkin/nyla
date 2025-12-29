@@ -25,6 +25,12 @@
 
 #undef explicit
 
+int main (int argc, char *argv[])
+{
+    nyla::PlatformMain();
+    return 0;
+}
+
 namespace nyla
 {
 
@@ -100,16 +106,18 @@ void Platform::Impl::Init(const PlatformInitDesc &desc)
     }
 }
 
-auto Platform::Impl::CreateWindow() -> PlatformWindow
+auto Platform::Impl::CreateWin() -> PlatformWindow
 {
     xcb_window_t window =
-        CreateWindow(m_Screen->width_in_pixels, m_Screen->height_in_pixels, false,
+        CreateWin(m_Screen->width_in_pixels, m_Screen->height_in_pixels, false,
                      static_cast<xcb_event_mask_t>(XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_KEY_RELEASE |
                                                    XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE));
-    return {window};
+    return {
+        .window = static_cast<uint64_t>(window)
+    };
 }
 
-auto Platform::Impl::CreateWindow(uint32_t width, uint32_t height, bool overrideRedirect, xcb_event_mask_t eventMask)
+auto Platform::Impl::CreateWin(uint32_t width, uint32_t height, bool overrideRedirect, xcb_event_mask_t eventMask)
     -> xcb_window_t
 {
     const xcb_window_t window = xcb_generate_id(m_Conn);
@@ -127,7 +135,7 @@ auto Platform::Impl::CreateWindow(uint32_t width, uint32_t height, bool override
 
 auto Platform::Impl::GetWindowSize(PlatformWindow platformWindow) -> PlatformWindowSize
 {
-    const xcb_window_t window = platformWindow.handle;
+    const auto window = static_cast<xcb_window_t>(platformWindow.handle);
     const xcb_get_geometry_reply_t *windowGeometry =
         xcb_get_geometry_reply(m_Conn, xcb_get_geometry(m_Conn, window), nullptr);
     return {
@@ -224,9 +232,9 @@ void Platform::Init(const PlatformInitDesc &desc)
     m_Impl->Init(desc);
 }
 
-auto Platform::CreateWindow() -> PlatformWindow
+auto Platform::CreateWin() -> PlatformWindow
 {
-    return m_Impl->CreateWindow();
+    return m_Impl->CreateWin();
 }
 
 auto Platform::GetWindowSize(PlatformWindow window) -> PlatformWindowSize
