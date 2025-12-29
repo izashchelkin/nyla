@@ -39,19 +39,19 @@ if (WIN32)
 elseif (UNIX AND NOT APPLE)
     add_subdirectory(linux)
     target_link_libraries(${target}
-        PUBLIC
+        INTERFACE
             nyla::platform::linux
     )
     target_link_libraries(${target_key_resolver}
-        PUBLIC
+        INTERFACE
             nyla::platform::linux::key_resolver
     )
     target_link_libraries(${target_dir_watch}
-        PUBLIC
-        nyla::platform::linux::dir_watch
+        INTERFACE
+            nyla::platform::linux::dir_watch
     )
     target_link_libraries(${target_audio}
-        PUBLIC
+        INTERFACE
             nyla::platform::linux::audio
     )
 endif()

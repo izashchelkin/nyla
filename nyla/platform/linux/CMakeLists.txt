@@ -69,6 +69,9 @@ target_link_libraries(${target_key_resolver}
 
 #
 
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(ALSA REQUIRED IMPORTED_TARGET alsa)
+
 set(target_audio nyla_platform_linux_audio)
 add_library(${target_audio})
 add_library(nyla::platform::linux::audio ALIAS ${target_audio})
@@ -81,9 +84,11 @@ target_sources(${target_audio}
 target_include_directories(${target_audio}
     PUBLIC
         ${PROJECT_SOURCE_DIR}
+        ${ALSA_INCLUDE_DIRS}
 )
 
 target_link_libraries(${target_audio}
     PUBLIC
         nyla::commons
+        ${ALSA_LIBRARIES}
 )

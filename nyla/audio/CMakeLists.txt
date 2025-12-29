@@ -30,7 +30,6 @@ target_sources(${TARGET_EXEC}
 target_include_directories(${TARGET_EXEC}
     PUBLIC
         ${PROJECT_SOURCE_DIR}
-        ${ALSA_INCLUDE_DIRS}
 )
 
 target_link_libraries(${TARGET_EXEC}
@@ -38,5 +37,4 @@ target_link_libraries(${TARGET_EXEC}
         nyla::platform::audio
         nyla::audio::wave
         nyla::commons
-        ${ALSA_LIBRARIES}
 )

@@ -8,7 +8,6 @@
 			"targets": [
 				"nyla_audio_main"
 			],
-			"preset": "debug",
 			"group": "build",
 			"problemMatcher": [],
 		},
@@ -19,7 +18,6 @@
 			"targets": [
 				"wm_overlay"
 			],
-			"preset": "debug",
 			"group": "build",
 			"problemMatcher": [],
 		},
@@ -30,7 +28,6 @@
 			"targets": [
 				"nyla_spirview_bin"
 			],
-			"preset": "debug",
 			"group": "build",
 			"problemMatcher": [],
 		},
@@ -41,7 +38,6 @@
 			"targets": [
 				"breakout"
 			],
-			"preset": "debug",
 			"group": "build",
 			"problemMatcher": [],
 		},
@@ -52,7 +48,6 @@
 			"targets": [
 				"shipgame"
 			],
-			"preset": "debug",
 			"group": "build",
 			"problemMatcher": [],
 		}
