@@ -1,6 +1,3 @@
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(ALSA REQUIRED alsa)
-
 set(TARGET nyla_audio_wave)
 add_library(${TARGET})
 add_library(nyla::audio::wave ALIAS ${TARGET})
@@ -38,7 +35,7 @@ target_include_directories(${TARGET_EXEC}
 
 target_link_libraries(${TARGET_EXEC}
     PUBLIC
-        nyla::platform::linux::audio
+        nyla::platform::audio
         nyla::audio::wave
         nyla::commons
         ${ALSA_LIBRARIES}

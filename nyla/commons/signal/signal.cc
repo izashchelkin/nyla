@@ -1,5 +1,6 @@
-
 #include "nyla/commons/signal/signal.h"
+
+#if defined(__linux__) // TODO: what here?
 
 #include <unistd.h>
 
@@ -33,3 +34,10 @@ void SigSegvExitZero()
 }
 
 } // namespace nyla
+
+#else
+
+void SigIntCoreDump() {}
+void SigSegvExitZero() {}
+
+#endif

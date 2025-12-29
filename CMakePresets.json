@@ -1,41 +1,66 @@
 {
-  "version": 3,
+  "version": 6,
   "cmakeMinimumRequired": {
-    "major": 4,
-    "minor": 2
+    "major": 3,
+    "minor": 25
   },
+
   "configurePresets": [
     {
-      "name": "debug",
-      "displayName": "Debug (Ninja)",
-      "generator": "Ninja",
-      "binaryDir": "build/debug",
+      "name": "windows-vs-base",
+      "hidden": true,
+      "generator": "Visual Studio 18 2026",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/build/windows-vs",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-        "CMAKE_CXX_COMPILER": "clang++"
+        "CMAKE_TOOLCHAIN_FILE": "C:/vcpkg/scripts/buildsystems/vcpkg.cmake",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
       }
     },
+
     {
-      "name": "release",
-      "displayName": "Release (Ninja)",
+      "name": "windows-vs",
+      "inherits": "windows-vs-base",
+      "displayName": "Windows (VS, x64)"
+    },
+
+    {
+      "name": "linux-debug",
+      "displayName": "Debug (Linux)",
       "generator": "Ninja",
-      "binaryDir": "build/release",
+      "binaryDir": "${sourceDir}/build/linux-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+
+    {
+      "name": "linux-release",
+      "displayName": "Release (Linux)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/linux-release",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_EXPORT_COMPILE_COMMANDS": "OFF",
         "CMAKE_CXX_COMPILER": "clang++"
       }
     }
   ],
+
   "buildPresets": [
     {
-      "name": "debug",
-      "configurePreset": "debug"
+      "name": "windows-debug",
+      "configurePreset": "windows-vs",
+      "configuration": "Debug"
     },
     {
-      "name": "release",
-      "configurePreset": "release"
-    }
+      "name": "windows-release",
+      "configurePreset": "windows-vs",
+      "configuration": "Release"
+    },
+
+    { "name": "linux-debug", "configurePreset": "linux-debug" },
+    { "name": "linux-release", "configurePreset": "linux-release" }
   ]
 }

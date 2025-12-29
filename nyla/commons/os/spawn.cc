@@ -1,5 +1,7 @@
 #include "nyla/commons/os/spawn.h"
 
+#if defined(__linux__) // TODO: move to platform
+
 #include <fcntl.h>
 #include <linux/close_range.h>
 #include <sys/signal.h>
@@ -75,3 +77,15 @@ failure:
 }
 
 } // namespace nyla
+
+#else
+
+#include "absl/log/check.h"
+
+auto Spawn(std::span<const char *const> cmd) -> bool
+{
+    CHECK(false);
+    return false;
+}
+
+#endif

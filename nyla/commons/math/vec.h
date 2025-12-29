@@ -2,6 +2,7 @@
 
 #include "absl/log/check.h"
 #include <algorithm>
+#include <complex>
 #include <array>
 #include <cstddef>
 #include <cstdint>

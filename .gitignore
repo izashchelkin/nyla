@@ -3,3 +3,5 @@
 *.spv
 
 /build
+/.vs
+/vcpkg_installed

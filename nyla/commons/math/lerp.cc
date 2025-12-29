@@ -1,7 +1,9 @@
 #include "nyla/commons/math/lerp.h"
 
+#include <numbers>
 #include <algorithm>
 #include <span>
+#include <cmath>
 
 #include "absl/log/check.h"
 

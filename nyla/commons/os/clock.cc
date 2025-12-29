@@ -1,12 +1,19 @@
 #include "nyla/commons/os/clock.h"
 
 #include <cstdint>
+
+#if defined(__linux__)
 #include <ctime>
+#else
+#include <chrono>
+#endif
 
 #include "absl/log/check.h"
 
 namespace nyla
 {
+
+#if defined(__linux__) // TODO: move this into platform layer maybe?
 
 auto GetMonotonicTimeMillis() -> uint64_t
 {
@@ -28,5 +35,35 @@ auto GetMonotonicTimeNanos() -> uint64_t
     CHECK_EQ(clock_gettime(CLOCK_MONOTONIC_RAW, &ts), 0);
     return ts.tv_sec * 1e9 + ts.tv_nsec;
 }
+
+#else
+
+namespace
+{
+inline auto SteadyNow() noexcept
+{
+    return std::chrono::steady_clock::now().time_since_epoch();
+}
+} // namespace
+
+auto GetMonotonicTimeMillis() -> std::uint64_t
+{
+    using namespace std::chrono;
+    return (std::uint64_t)duration_cast<milliseconds>(SteadyNow()).count();
+}
+
+auto GetMonotonicTimeMicros() -> std::uint64_t
+{
+    using namespace std::chrono;
+    return (std::uint64_t)duration_cast<microseconds>(SteadyNow()).count();
+}
+
+auto GetMonotonicTimeNanos() -> std::uint64_t
+{
+    using namespace std::chrono;
+    return (std::uint64_t)duration_cast<nanoseconds>(SteadyNow()).count();
+}
+
+#endif
 
 } // namespace nyla
