@@ -37,7 +37,7 @@ auto ConvertVulkanBindingType(RhiBindingType bindingType, RhiDescriptorFlags bin
     case RhiBindingType::Sampler:
         return VK_DESCRIPTOR_TYPE_SAMPLER;
     }
-    CHECK(false);
+    NYLA_ASSERT(false);
     return static_cast<VkDescriptorType>(0);
 }
 
@@ -56,7 +56,7 @@ auto RhiCreateDescriptorSetLayout(const RhiDescriptorSetLayoutDesc &desc) -> Rhi
 
     for (const RhiDescriptorLayoutDesc &bindingDesc : layoutData.descriptors)
     {
-        CHECK(bindingDesc.arraySize);
+        NYLA_ASSERT(bindingDesc.arraySize);
 
         descriptorLayoutBindings.emplace_back(VkDescriptorSetLayoutBinding{
             .binding = bindingDesc.binding,
@@ -76,7 +76,7 @@ auto RhiCreateDescriptorSetLayout(const RhiDescriptorSetLayoutDesc &desc) -> Rhi
         descriptorLayoutBindingFlags.emplace_back(flags);
     }
 
-    CHECK_EQ(descriptorLayoutBindings.size(), descriptorLayoutBindingFlags.size());
+    NYLA_ASSERT(descriptorLayoutBindings.size() == descriptorLayoutBindingFlags.size());
     uint32_t bindingCount = descriptorLayoutBindings.size();
 
     const VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsCreateInfo{
@@ -141,12 +141,12 @@ void RhiWriteDescriptors(std::span<const RhiDescriptorWriteDesc> writes)
 
         const auto &descriptorLayout = [binding, &layoutData] -> const RhiDescriptorLayoutDesc & {
             auto it = std::ranges::lower_bound(layoutData.descriptors, binding, {}, &RhiDescriptorLayoutDesc::binding);
-            CHECK_NE(it, layoutData.descriptors.end());
-            CHECK_EQ(it->binding, binding);
+            NYLA_ASSERT(it != layoutData.descriptors.end());
+            NYLA_ASSERT(it->binding == binding);
             return *it;
         }();
 
-        CHECK(descriptorLayout.type == write.type);
+        NYLA_ASSERT(descriptorLayout.type == write.type);
         const RhiBindingType bindingType = descriptorLayout.type;
 
         VkWriteDescriptorSet &vulkanSetWrite = descriptorWrites.emplace_back(VkWriteDescriptorSet{
@@ -194,7 +194,7 @@ void RhiWriteDescriptors(std::span<const RhiDescriptorWriteDesc> writes)
         }
 
         default: {
-            CHECK(false);
+            NYLA_ASSERT(false);
         }
         }
     }

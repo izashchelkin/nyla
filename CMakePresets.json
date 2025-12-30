@@ -5,13 +5,24 @@
   "configurePresets": [
     {
       "name": "windows-vs",
+      "hidden": true,
       "displayName": "Windows (Visual Studio)",
       "generator": "Visual Studio 18 2026",
       "architecture": "x64",
       "binaryDir": "${sourceDir}/build/windows-vs",
       "cacheVariables": {
-        "CMAKE_TOOLCHAIN_FILE": "C:/vcpkg/scripts/buildsystems/vcpkg.cmake",
-        "VCPKG_TARGET_TRIPLET": "x64-windows"
+      }
+    },
+
+    {
+      "name": "windows-ninja-debug",
+      "displayName": "Windows (Ninja + MSVC Debug)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/windows-ninja-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_COMPILER": "cl",
+        "CMAKE_CXX_COMPILER": "cl"
       }
     },
 
@@ -40,16 +51,8 @@
 
   "buildPresets": [
     {
-      "name": "windows-debug",
-      "displayName": "Windows Debug (VS)",
-      "configurePreset": "windows-vs",
-      "configuration": "Debug"
-    },
-    {
-      "name": "windows-release",
-      "displayName": "Windows Release (VS)",
-      "configurePreset": "windows-vs",
-      "configuration": "Release"
+      "name": "windows-ninja-debug",
+      "configurePreset": "windows-ninja-debug"
     },
 
     {

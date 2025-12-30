@@ -7,7 +7,6 @@
 #include <csignal>
 #include <cstdlib>
 
-#include "absl/log/check.h"
 
 namespace nyla
 {
@@ -18,7 +17,7 @@ void SigIntCoreDump()
     sa.sa_handler = [](int signum) -> void { std::abort(); };
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = SA_RESTART;
-    CHECK(sigaction(SIGINT, &sa, NULL) != -1);
+    NYLA_ASSERT(sigaction(SIGINT, &sa, NULL) != -1);
 }
 
 void SigSegvExitZero()
@@ -30,7 +29,7 @@ void SigSegvExitZero()
     };
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = SA_RESTART;
-    CHECK(sigaction(SIGSEGV, &sa, NULL) != -1);
+    NYLA_ASSERT(sigaction(SIGSEGV, &sa, NULL) != -1);
 }
 
 } // namespace nyla

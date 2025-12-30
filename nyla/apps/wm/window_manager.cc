@@ -9,12 +9,9 @@
 #include <span>
 #include <vector>
 
-#include "absl/cleanup/cleanup.h"
-#include "absl/container/flat_hash_map.h"
-#include "absl/log/check.h"
-#include "absl/log/log.h"
 #include "nyla/apps/wm/layout.h"
 #include "nyla/apps/wm/palette.h"
+#include "nyla/commons/cleanup.h"
 #include "nyla/commons/containers/map.h"
 #include "nyla/platform/linux/platform_linux.h"
 #include "nyla/platform/linux/x11_error.h"
@@ -57,11 +54,6 @@ struct Client
 
     Map<xcb_atom_t, xcb_get_property_cookie_t> propertyCookies;
 };
-
-template <typename Sink> void AbslStringify(Sink &sink, const Client &c)
-{
-    absl::Format(&sink, "Window{ rect=%v, input=%v, take_focus=%v }", c.rect, c.wmHintsInput, c.wmTakeFocus);
-}
 
 namespace
 {
@@ -133,7 +125,7 @@ void X11SendWmDeleteWindow(xcb_window_t window)
 
 auto GetActiveStack() -> WindowStack &
 {
-    CHECK_LT(wmActiveStackIdx & 0xFF, wmStacks.size());
+    NYLA_ASSERT(wmActiveStackIdx & 0xFF < wmStacks.size());
     return wmStacks.at(wmActiveStackIdx & 0xFF);
 }
 
@@ -164,7 +156,6 @@ void HandleWmNormalHints(xcb_window_t clientWindow, Client &client, xcb_get_prop
     }();
 
     Initialize(wmNormalHints);
-    // LOG(INFO) << client_window << " " << wm_normal_hints;
 
     client.maxWidth = wmNormalHints.maxWidth;
     client.maxHeight = wmNormalHints.maxHeight;
@@ -174,13 +165,12 @@ void HandleWmName(xcb_window_t clientWindow, Client &client, xcb_get_property_re
 {
     if (!reply)
     {
-        LOG(ERROR) << "property fetch error";
+        NYLA_LOG("property fetch error");
         return;
     }
 
     client.name = {static_cast<char *>(xcb_get_property_value(reply)),
                    static_cast<size_t>(xcb_get_property_value_length(reply))};
-    // LOG(INFO) << client_window << " name=" << client.name;
 }
 
 void HandleWmProtocols(xcb_window_t clientWindow, Client &client, xcb_get_property_reply_t *reply)
@@ -197,7 +187,6 @@ void HandleWmProtocols(xcb_window_t clientWindow, Client &client, xcb_get_proper
         static_cast<xcb_atom_t *>(xcb_get_property_value(reply)),
         xcb_get_property_value_length(reply) / sizeof(xcb_atom_t),
     };
-    // LOG(INFO) << client_window << " " << absl::StrJoin(wm_protocols, ", ");
 
     for (xcb_atom_t atom : wmProtocols)
     {
@@ -446,7 +435,7 @@ void ManageClientsStartup()
             x11->GetConn(), xcb_get_window_attributes(x11->GetConn(), clientWindow), nullptr);
         if (!attrReply)
             continue;
-        absl::Cleanup attrReplyFreer = [attrReply] -> void { free(attrReply); };
+        Cleanup attrReplyFreer([attrReply] -> void { free(attrReply); });
 
         if (attrReply->override_redirect)
             continue;
@@ -474,10 +463,10 @@ void UnmanageClient(xcb_window_t window)
 
     if (client.transientFor)
     {
-        CHECK(client.subwindows.empty());
+        NYLA_ASSERT(client.subwindows.empty());
         auto &subwindows = wmClients.at(client.transientFor).subwindows;
         auto it = std::ranges::find(subwindows, window);
-        CHECK(it != subwindows.end());
+        NYLA_ASSERT(it != subwindows.end());
         subwindows.erase(it);
     }
     else
@@ -609,7 +598,7 @@ static void MoveStack(xcb_timestamp_t time, auto computeIdx)
             oldstack.zoom = false;
 
             auto it = std::ranges::find(oldstack.windows, oldstack.activeWindow);
-            CHECK_NE(it, oldstack.windows.end());
+            NYLA_ASSERT(it != oldstack.windows.end());
             oldstack.windows.erase(it);
 
             if (oldstack.windows.empty())
@@ -715,12 +704,13 @@ void CloseActive()
     if (!stack.activeWindow)
         return;
 
-    static absl::Time last = absl::InfinitePast();
-    if (absl::Now() - last >= absl::Milliseconds(100))
+    static uint64_t last = 0;
+    uint64_t now = GetMonotonicTimeMillis();
+    if (now - last >= 100)
     {
         X11SendWmDeleteWindow(stack.activeWindow);
     }
-    last = absl::Now();
+    last = now;
 }
 
 void ToggleZoom()
@@ -772,7 +762,7 @@ void ProcessWM()
             auto handlerIt = wmPropertyChangeHandlers.find(property);
             if (handlerIt == wmPropertyChangeHandlers.end())
             {
-                LOG(ERROR) << "missing property change handler " << property;
+                NYLA_LOG("missing property change handler %d", property);
                 continue;
             }
 
@@ -880,7 +870,7 @@ void ProcessWM()
         auto configureWindows = [](Rect boundingRect, std::span<const xcb_window_t> windows, LayoutType layoutType,
                                    auto visitor) -> auto {
             std::vector<Rect> layout = ComputeLayout(boundingRect, windows.size(), 2, layoutType);
-            CHECK_EQ(layout.size(), windows.size());
+            NYLA_ASSERT(layout.size() == windows.size());
 
             for (auto [rect, client_window] : std::ranges::views::zip(layout, windows))
             {
@@ -961,7 +951,7 @@ void ProcessWMEvents(const bool &isRunning, uint16_t modifier, std::vector<Keybi
         xcb_generic_event_t *event = xcb_poll_for_event(x11->GetConn());
         if (!event)
             break;
-        absl::Cleanup eventFreer = [event] -> void { free(event); };
+        Cleanup eventFreer([event] -> void { free(event); });
 
         bool isSynthethic = event->response_type & 0x80;
         uint8_t eventType = event->response_type & 0x7F;
@@ -993,7 +983,7 @@ void ProcessWMEvents(const bool &isRunning, uint16_t modifier, std::vector<Keybi
                         }
                         else
                         {
-                            CHECK(false);
+                            NYLA_ASSERT(false);
                         }
                         break;
                     }
@@ -1037,7 +1027,7 @@ void ProcessWMEvents(const bool &isRunning, uint16_t modifier, std::vector<Keybi
         case XCB_MAPPING_NOTIFY: {
             // auto mappingnotify =
             //     reinterpret_cast<xcb_mapping_notify_event_t*>(event);
-            LOG(INFO) << "mapping notify";
+            NYLA_LOG("mapping notify");
             break;
         }
         case XCB_UNMAP_NOTIFY: {
@@ -1083,8 +1073,7 @@ void ProcessWMEvents(const bool &isRunning, uint16_t modifier, std::vector<Keybi
 
         case 0: {
             auto error = reinterpret_cast<xcb_generic_error_t *>(event);
-            LOG(ERROR) << "xcb error: " << static_cast<X11ErrorCode>(error->error_code)
-                       << " sequence: " << error->sequence;
+            NYLA_LOG("xcb error: %d, sequence: ", error->error_code, error->sequence);
             break;
         }
         }

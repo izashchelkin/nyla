@@ -1,4 +1,3 @@
-#include "absl/log/check.h"
 #include "nyla/commons/bitenum.h"
 #include "nyla/platform/platform_dir_watch.h"
 #include <array>
@@ -34,7 +33,7 @@ void PlatformDirWatch::Impl::Init(const char *path)
     CHECK_GT(m_InotifyFd, 0);
 
     int wd = inotify_add_watch(m_InotifyFd, path, IN_MODIFY | IN_DELETE | IN_MOVED_FROM | IN_MOVED_TO);
-    CHECK_NE(wd, -1);
+    NYLA_ASSERT(wd != -1);
 }
 
 void PlatformDirWatch::Impl::Destroy()
@@ -47,7 +46,7 @@ auto PlatformDirWatch::Impl::Poll(PlatformDirWatchEvent &outChange) -> bool
 {
     for (;;)
     {
-        CHECK_LE(m_BufPos, m_BufLen);
+        NYLA_ASSERT(m_BufPos <= m_BufLen);
         if (!m_BufPos || m_BufPos == m_BufLen)
         {
             m_BufLen = read(m_InotifyFd, m_Buf.data(), m_Buf.size());
@@ -85,7 +84,7 @@ auto PlatformDirWatch::Impl::Poll(PlatformDirWatchEvent &outChange) -> bool
 
 void PlatformDirWatch::Init(const char *path)
 {
-    CHECK(!m_Impl);
+    NYLA_ASSERT(!m_Impl);
     m_Impl = new PlatformDirWatch::Impl{};
     m_Impl->Init(path);
 }

@@ -155,7 +155,7 @@ auto Engine::Impl::FrameEnd() -> void
 
 void Engine::Init(const EngineInitDesc &desc)
 {
-    CHECK(!m_Impl);
+    NYLA_ASSERT(!m_Impl);
     m_Impl = new Impl{};
     m_Impl->Init(desc);
 }

@@ -20,7 +20,7 @@ auto GetDeviceQueue(RhiQueueType queueType) -> DeviceQueue &
     case RhiQueueType::Transfer:
         return vk.transferQueue;
     }
-    CHECK(false);
+    NYLA_ASSERT(false);
     return vk.graphicsQueue;
 }
 

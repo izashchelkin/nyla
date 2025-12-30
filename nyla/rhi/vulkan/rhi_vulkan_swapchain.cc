@@ -1,4 +1,3 @@
-#include "absl/log/log.h"
 #include <cstdint>
 #include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/vulkan_core.h>
@@ -36,7 +35,7 @@ void CreateSwapchain()
         for (VkPresentModeKHR presentMode : presentModes)
         {
             if (logPresentModes)
-                LOG(INFO) << "Present Mode available: " << string_VkPresentModeKHR(presentMode);
+                NYLA_LOG("Present Mode available: %s", string_VkPresentModeKHR(presentMode));
 
             bool better;
             switch (presentMode)
@@ -62,7 +61,9 @@ void CreateSwapchain()
         }
 
         if (logPresentModes)
-            LOG(INFO) << "Chose " << string_VkPresentModeKHR(bestMode);
+        {
+            NYLA_LOG("Chose %s", string_VkPresentModeKHR(bestMode));
+        }
 
         logPresentModes = false;
 
@@ -83,7 +84,7 @@ void CreateSwapchain()
             return surfaceFormat.format == VK_FORMAT_B8G8R8A8_SRGB &&
                    surfaceFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
         });
-        CHECK(it != surfaceFormats.end());
+        NYLA_ASSERT(it != surfaceFormats.end());
         return *it;
     }();
 
@@ -125,7 +126,7 @@ void CreateSwapchain()
 
     vkGetSwapchainImagesKHR(vk.dev, vk.swapchain, &vk.swapchainTexturesCount, nullptr);
 
-    CHECK_LE(vk.swapchainTexturesCount, kRhiMaxNumSwapchainTextures);
+    NYLA_ASSERT(vk.swapchainTexturesCount <= kRhiMaxNumSwapchainTextures);
     std::array<VkImage, kRhiMaxNumSwapchainTextures> swapchainImages;
 
     vkGetSwapchainImagesKHR(vk.dev, vk.swapchain, &vk.swapchainTexturesCount, swapchainImages.data());
@@ -235,12 +236,12 @@ auto RhiCreateTextureFromSwapchainImage(VkImage image, VkSurfaceFormatKHR surfac
 void RhiDestroySwapchainTexture(RhiTexture texture)
 {
     VulkanTextureData textureData = rhiHandles.textures.ReleaseData(texture);
-    CHECK(textureData.isSwapchain);
+    NYLA_ASSERT(textureData.isSwapchain);
 
-    CHECK(textureData.imageView);
+    NYLA_ASSERT(textureData.imageView);
     vkDestroyImageView(vk.dev, textureData.imageView, vk.alloc);
 
-    CHECK(textureData.image);
+    NYLA_ASSERT(textureData.image);
 }
 
 } // namespace rhi_vulkan_internal

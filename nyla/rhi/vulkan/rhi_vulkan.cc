@@ -4,11 +4,10 @@
 #include <cstring>
 #include <vector>
 
-#include "absl/log/check.h"
-#include "absl/log/log.h"
+#include "nyla/commons/assert.h"
 #include "nyla/commons/bitenum.h"
 #include "nyla/commons/containers/inline_vec.h"
-#include "nyla/commons/debug/debugger.h"
+#include "nyla/commons/log.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_pipeline.h"
@@ -52,7 +51,7 @@ auto ConvertRhiVertexFormatIntoVkFormat(RhiVertexFormat format) -> VkFormat
     case RhiVertexFormat::R32G32Float:
         return VK_FORMAT_R32G32_SFLOAT;
     }
-    CHECK(false);
+    NYLA_ASSERT(false);
     return static_cast<VkFormat>(0);
 }
 
@@ -77,14 +76,17 @@ auto DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeveri
     switch (messageSeverity)
     {
     case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT: {
-        LOG(ERROR) << callbackData->pMessage;
+        NYLA_LOG("%s", callbackData->pMessage);
         DebugBreak();
+        break;
     }
     case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT: {
-        LOG(WARNING) << callbackData->pMessage;
+        NYLA_LOG("%s", callbackData->pMessage);
+        break;
     }
     default: {
-        LOG(INFO) << callbackData->pMessage;
+        NYLA_LOG("%s", callbackData->pMessage);
+        break;
     }
     }
     return VK_FALSE;
@@ -110,7 +112,7 @@ void RhiInit(const RhiDesc &rhiDesc)
 {
     constexpr uint32_t kInvalidIndex = std::numeric_limits<uint32_t>::max();
 
-    CHECK_LE(rhiDesc.numFramesInFlight, kRhiMaxNumFramesInFlight);
+    NYLA_ASSERT(rhiDesc.numFramesInFlight <= kRhiMaxNumFramesInFlight);
     if (rhiDesc.numFramesInFlight)
     {
         vk.numFramesInFlight = rhiDesc.numFramesInFlight;
@@ -182,21 +184,21 @@ void RhiInit(const RhiDesc &rhiDesc)
         instanceExtensions.resize(instanceExtensionsCount);
         vkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionsCount, instanceExtensions.data());
 
-        LOG(INFO);
-        LOG(INFO) << instanceExtensionsCount << " Instance Extensions available";
+        NYLA_LOG("");
+        NYLA_LOG("%d Instance Extensions available", instanceExtensionsCount);
         for (uint32_t i = 0; i < instanceExtensionsCount; ++i)
         {
             const auto &extension = instanceExtensions[i];
-            LOG(INFO) << "" << extension.extensionName;
+            NYLA_LOG("%s", extension.extensionName);
         }
     }
 
-    LOG(INFO);
-    LOG(INFO) << layers.size() << " Layers available";
+    NYLA_LOG("");
+    NYLA_LOG("%zd Layers available", layers.size());
     for (uint32_t i = 0; i < layerCount; ++i)
     {
         const auto &layer = layers[i];
-        LOG(INFO) << "    " << layer.layerName;
+        NYLA_LOG("    %s", layer.layerName);
 
         std::vector<VkExtensionProperties> layerExtensions;
         uint32_t layerExtensionProperties;
@@ -208,7 +210,7 @@ void RhiInit(const RhiDesc &rhiDesc)
         for (uint32_t i = 0; i < layerExtensionProperties; ++i)
         {
             const auto &extension = layerExtensions[i];
-            LOG(INFO) << "        " << extension.extensionName;
+            NYLA_LOG("        %s", extension.extensionName);
         }
     }
 
@@ -280,7 +282,7 @@ void RhiInit(const RhiDesc &rhiDesc)
             {
                 if (strcmp(extensions[i].extensionName, deviceExtension) == 0)
                 {
-                    LOG(INFO) << "Found device extension: " << deviceExtension;
+                    NYLA_LOG("Found device extension: %s", deviceExtension);
                     --missingExtensions;
                     break;
                 }
@@ -289,7 +291,7 @@ void RhiInit(const RhiDesc &rhiDesc)
 
         if (missingExtensions)
         {
-            LOG(WARNING) << "Missing " << missingExtensions << " extensions";
+            NYLA_LOG("Missing %d extensions", missingExtensions);
             continue;
         }
 
@@ -355,7 +357,7 @@ void RhiInit(const RhiDesc &rhiDesc)
         break;
     }
 
-    CHECK(vk.physDev);
+    NYLA_ASSERT(vk.physDev);
 
     const float queuePriority = 1.0f;
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;

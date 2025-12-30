@@ -26,7 +26,7 @@ auto ConvertVulkanCullMode(RhiCullMode cullMode) -> VkCullModeFlags
     case RhiCullMode::Front:
         return VK_CULL_MODE_FRONT_BIT;
     }
-    CHECK(false);
+    NYLA_ASSERT(false);
     return static_cast<VkCullModeFlags>(0);
 }
 
@@ -40,7 +40,7 @@ auto ConvertVulkanFrontFace(RhiFrontFace frontFace) -> VkFrontFace
     case RhiFrontFace::CW:
         return VK_FRONT_FACE_CLOCKWISE;
     }
-    CHECK(false);
+    NYLA_ASSERT(false);
     return static_cast<VkFrontFace>(0);
 }
 
@@ -53,7 +53,7 @@ auto ConvertVulkanInputRate(RhiInputRate inputRate) -> VkVertexInputRate
     case RhiInputRate::PerVertex:
         return VK_VERTEX_INPUT_RATE_VERTEX;
     }
-    CHECK(false);
+    NYLA_ASSERT(false);
     return static_cast<VkVertexInputRate>(0);
 }
 
@@ -86,7 +86,7 @@ auto RhiCreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGraphi
     };
 
     std::array<VkVertexInputBindingDescription, std::size(desc.vertexBindings)> vertexBindings;
-    CHECK_LE(desc.vertexBindingsCount, std::size(desc.vertexBindings));
+    NYLA_ASSERT(desc.vertexBindingsCount <= std::size(desc.vertexBindings));
     for (uint32_t i = 0; i < desc.vertexBindingsCount; ++i)
     {
         const auto &binding = desc.vertexBindings[i];
@@ -98,7 +98,7 @@ auto RhiCreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGraphi
     }
 
     std::array<VkVertexInputAttributeDescription, std::size(desc.vertexAttributes)> vertexAttributes;
-    CHECK_LE(desc.vertexAttributeCount, std::size(desc.vertexAttributes));
+    NYLA_ASSERT(desc.vertexAttributeCount <= std::size(desc.vertexAttributes));
     for (uint32_t i = 0; i < desc.vertexAttributeCount; ++i)
     {
         const auto &attribute = desc.vertexAttributes[i];
@@ -182,7 +182,7 @@ auto RhiCreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGraphi
 
     std::array<VkFormat, std::size(desc.colorTargetFormats)> colorTargetFormats;
 
-    CHECK_LE(desc.colorTargetFormatsCount, std::size(desc.colorTargetFormats));
+    NYLA_ASSERT(desc.colorTargetFormatsCount <= std::size(desc.colorTargetFormats));
     for (uint32_t i = 0; i < desc.colorTargetFormatsCount; ++i)
     {
         colorTargetFormats[i] = ConvertRhiTextureFormatIntoVkFormat(desc.colorTargetFormats[i]);
@@ -209,11 +209,11 @@ auto RhiCreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGraphi
         },
     };
 
-    CHECK_LE(desc.bindGroupLayoutsCount, std::size(desc.bindGroupLayouts));
+    NYLA_ASSERT(desc.bindGroupLayoutsCount <= std::size(desc.bindGroupLayouts));
     pipelineData.bindGroupLayoutCount = desc.bindGroupLayoutsCount;
     pipelineData.bindGroupLayouts = desc.bindGroupLayouts;
 
-    CHECK_LE(desc.pushConstantSize, kRhiMaxPushConstantSize);
+    NYLA_ASSERT(desc.pushConstantSize <= kRhiMaxPushConstantSize);
     const VkPushConstantRange pushConstantRange{
         .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT,
         .offset = 0,
@@ -303,8 +303,8 @@ void RhiCmdPushGraphicsConstants(RhiCmdList cmd, uint32_t offset, RhiShaderStage
 void RhiCmdBindVertexBuffers(RhiCmdList cmd, uint32_t firstBinding, std::span<const RhiBuffer> buffers,
                              std::span<const uint32_t> offsets)
 {
-    CHECK_EQ(buffers.size(), offsets.size());
-    CHECK_LE(buffers.size(), 4U);
+    NYLA_ASSERT(buffers.size() == offsets.size());
+    NYLA_ASSERT(buffers.size() <= 4U);
 
     std::array<VkBuffer, 4> vkBufs;
     std::array<VkDeviceSize, 4> vkOffsets;
@@ -335,7 +335,7 @@ auto RhiGetVertexFormatSize(RhiVertexFormat format) -> uint32_t
     case RhiVertexFormat::R32G32B32A32Float:
         return 16;
     }
-    CHECK(false);
+    NYLA_ASSERT(false);
     return 0;
 }
 

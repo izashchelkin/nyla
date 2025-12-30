@@ -6,7 +6,6 @@
 #include <iostream>
 #include <vector>
 
-#include "absl/log/log.h"
 #include "nyla/commons/logging/init.h"
 
 namespace nyla
@@ -44,7 +43,7 @@ int Main()
     }
     if (buf.size() < 32)
     {
-        LOG(QFATAL) << "File too small";
+        NYLA_ASSERT(false && "File too small");
     }
 
     const uint8_t *p = buf.data();
@@ -59,11 +58,11 @@ int Main()
 
     if (magic != 0x864ab572u)
     {
-        LOG(QFATAL) << "Not PSF2";
+        NYLA_ASSERT(false && "Not PSF2");
     }
     if (header_size < 32 || buf.size() < header_size)
     {
-        LOG(QFATAL) << "Bad/truncated header";
+        NYLA_ASSERT(false && "Bad/truncated header");
     }
 
     const uint8_t *glyphs = p + header_size;
@@ -71,12 +70,12 @@ int Main()
     const uint64_t expect_glyph = uint64_t(height) * row_bytes;
     if (glyph_size != expect_glyph)
     {
-        LOG(WARNING) << "glyph_size mismatch header=" << glyph_size << " computed=" << expect_glyph << " (continuing)";
+        NYLA_LOG("glyph_size mismatch header=%d computed=%d (continuing)", glyph_size, expect_glyph);
     }
     const uint64_t glyph_table_bytes = uint64_t(length) * glyph_size;
     if (buf.data() + buf.size() < glyphs + glyph_table_bytes)
     {
-        LOG(QFATAL) << "Truncated glyph table";
+        NYLA_ASSERT(false && "Truncated glyph table");
     }
 
     std::unordered_map<uint32_t, uint32_t> cp_to_glyph;
@@ -103,7 +102,7 @@ int Main()
 
     if (row_bytes != 1 || height > 32)
     {
-        LOG(QFATAL) << "This generator targets up to 8x32 fonts, but got width= " << width << ", height=" << height;
+        NYLA_ASSERT(false && "This generator targets up to 8x32 fonts");
         return 2;
     }
 
@@ -143,7 +142,7 @@ int Main()
         }
         else
         {
-            LOG(WARNING) << "Note: codepoint U+" << std::hex << std::uppercase << c
+            NYLA_LOG() << "Note: codepoint U+" << std::hex << std::uppercase << c
                          << " not mapped; emitting blank glyph.\n"
                          << std::dec;
         }

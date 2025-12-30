@@ -70,7 +70,7 @@ auto VulkanTextureStateGetSyncInfo(RhiTextureState state) -> VulkanTextureStateS
             .layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
         };
     }
-    CHECK(false);
+    NYLA_ASSERT(false);
     return {};
 }
 
@@ -94,7 +94,7 @@ auto ConvertRhiTextureFormatIntoVkFormat(RhiTextureFormat format) -> VkFormat
     case RhiTextureFormat::D32_Float_S8_UINT:
         return VK_FORMAT_D32_SFLOAT_S8_UINT;
     }
-    CHECK(false);
+    NYLA_ASSERT(false);
     return static_cast<VkFormat>(0);
 }
 
@@ -113,7 +113,7 @@ auto ConvertVkFormatIntoRhiTextureFormat(VkFormat format) -> RhiTextureFormat
     default:
         break;
     }
-    CHECK(false);
+    NYLA_ASSERT(false);
     return static_cast<RhiTextureFormat>(0);
 }
 
@@ -263,15 +263,15 @@ void RhiCmdTransitionTexture(RhiCmdList cmd, RhiTexture texture, RhiTextureState
 void RhiDestroyTexture(RhiTexture texture)
 {
     VulkanTextureData textureData = rhiHandles.textures.ReleaseData(texture);
-    CHECK(!textureData.isSwapchain);
+    NYLA_ASSERT(!textureData.isSwapchain);
 
-    CHECK(textureData.imageView);
+    NYLA_ASSERT(textureData.imageView);
     vkDestroyImageView(vk.dev, textureData.imageView, vk.alloc);
 
-    CHECK(textureData.image);
+    NYLA_ASSERT(textureData.image);
     vkDestroyImage(vk.dev, textureData.image, vk.alloc);
 
-    CHECK(textureData.memory);
+    NYLA_ASSERT(textureData.memory);
     vkFreeMemory(vk.dev, textureData.memory, vk.alloc);
 }
 

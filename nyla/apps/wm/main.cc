@@ -5,8 +5,6 @@
 #include <cstdint>
 #include <initializer_list>
 
-#include "absl/log/check.h"
-#include "absl/log/log.h"
 #include "nyla/apps/wm/window_manager.h"
 #include "nyla/commons/logging/init.h"
 #include "nyla/commons/os/spawn.h"
@@ -43,7 +41,7 @@ auto PlatformMain() -> int
                                            XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE |
                                            XCB_EVENT_MASK_FOCUS_CHANGE | XCB_EVENT_MASK_POINTER_MOTION})))
     {
-        LOG(QFATAL) << "another wm is already running";
+        NYLA_ASSERT(false && "another wm is already running");
     }
 
     InitializeWM();
@@ -102,7 +100,7 @@ auto PlatformMain() -> int
         };
         if (poll(fds.data(), fds.size(), -1) == -1)
         {
-            LOG(INFO) << "poll(): " << strerror(errno);
+            NYLA_LOG("poll(): %s", strerror(errno));
             continue;
         }
 
@@ -114,7 +112,7 @@ auto PlatformMain() -> int
         }
     }
 
-    LOG(INFO) << "exiting";
+    NYLA_LOG("exiting");
     return 0;
 }
 

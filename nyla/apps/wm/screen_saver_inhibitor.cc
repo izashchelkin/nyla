@@ -1,11 +1,9 @@
 #include "nyla/apps/wm/screen_saver_inhibitor.h"
 
 #include <cstdint>
+#include <unordered_map>
 #include <string_view>
 
-#include "absl/log/check.h"
-#include "absl/log/log.h"
-#include "absl/strings/str_format.h"
 #include "nyla/commons/containers/map.h"
 #include "nyla/dbus/dbus.h"
 #include "nyla/debugfs/debugfs.h"
@@ -16,13 +14,13 @@ namespace nyla
 {
 
 static uint32_t nextInhibitCookie = 1;
-static Map<uint32_t, std::string> inhibitCookies;
+static std::unordered_map<uint32_t, std::string> inhibitCookies;
 
 static void HandleNameOwnerChange(const char *name, const char *oldOwner, const char *newOwner)
 {
     if (newOwner && *newOwner == '\0' && oldOwner && *oldOwner != '\0')
     {
-        absl::erase_if(inhibitCookies, [oldOwner](auto &ent) -> auto {
+        std::erase_if(inhibitCookies, [oldOwner](auto &ent) -> auto {
             const auto &[cookie, owner] = ent;
             return owner == oldOwner;
         });
@@ -97,11 +95,7 @@ static void HandleMessage(DBusMessage *msg)
         DBusReplyNone(msg);
         return;
     }
-
-    LOG(INFO) << "inhibit count: " << inhibitCookies.size();
 }
-
-static auto DumpInhibitors() -> std::string;
 
 void ScreenSaverInhibitorInit()
 {
@@ -132,23 +126,6 @@ void ScreenSaverInhibitorInit()
 
     DBusRegisterHandler("org.freedesktop.ScreenSaver", "/org/freedesktop/ScreenSaver", handler);
     DBusRegisterHandler("org.freedesktop.ScreenSaver", "/ScreenSaver", handler);
-
-    DebugFsRegister(
-        "screensaver_inhibitors", nullptr,                           //
-        [](auto &file) -> auto { file.content = DumpInhibitors(); }, //
-        nullptr);
-}
-
-static auto DumpInhibitors() -> std::string
-{
-    std::string out;
-
-    for (auto &[cookie, owner] : inhibitCookies)
-    {
-        absl::StrAppendFormat(&out, "%v: %v\n", cookie, owner);
-    }
-
-    return out;
 }
 
 } // namespace nyla

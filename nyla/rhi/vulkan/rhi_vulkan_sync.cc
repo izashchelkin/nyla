@@ -1,6 +1,6 @@
 #include <cstdint>
 
-#include "nyla/commons/debug/debugger.h"
+#include "nyla/commons/assert.h"
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
 
 namespace nyla

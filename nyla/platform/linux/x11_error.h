@@ -2,8 +2,6 @@
 
 #include <cstdint>
 
-#include "absl/strings/str_format.h"
-
 namespace nyla
 {
 
@@ -36,68 +34,5 @@ enum class X11ErrorCode : uint8_t
     BadLength = 16,        /* Request length incorrect */
     BadImplementation = 17 /* server is defective */
 };
-
-template <typename Sink> void AbslStringify(Sink &sink, X11ErrorCode errorCode)
-{
-    switch (errorCode)
-    {
-    case X11ErrorCode::Success:
-        absl::Format(&sink, "Success");
-        return;
-    case X11ErrorCode::BadRequest:
-        absl::Format(&sink, "BadRequest");
-        return;
-    case X11ErrorCode::BadValue:
-        absl::Format(&sink, "BadValue");
-        return;
-    case X11ErrorCode::BadWindow:
-        absl::Format(&sink, "BadWindow");
-        return;
-    case X11ErrorCode::BadPixmap:
-        absl::Format(&sink, "BadPixmap");
-        return;
-    case X11ErrorCode::BadAtom:
-        absl::Format(&sink, "BadAtom");
-        return;
-    case X11ErrorCode::BadCursor:
-        absl::Format(&sink, "BadCursor");
-        return;
-    case X11ErrorCode::BadFont:
-        absl::Format(&sink, "BadFont");
-        return;
-    case X11ErrorCode::BadMatch:
-        absl::Format(&sink, "BadMatch");
-        return;
-    case X11ErrorCode::BadDrawable:
-        absl::Format(&sink, "BadDrawable");
-        return;
-    case X11ErrorCode::BadAccess:
-        absl::Format(&sink, "BadAccess");
-        return;
-    case X11ErrorCode::BadAlloc:
-        absl::Format(&sink, "BadAlloc");
-        return;
-    case X11ErrorCode::BadColor:
-        absl::Format(&sink, "BadColor");
-        return;
-    case X11ErrorCode::BadGc:
-        absl::Format(&sink, "BadGC");
-        return;
-    case X11ErrorCode::BadIdChoice:
-        absl::Format(&sink, "BadIDChoice");
-        return;
-    case X11ErrorCode::BadName:
-        absl::Format(&sink, "BadName");
-        return;
-    case X11ErrorCode::BadLength:
-        absl::Format(&sink, "BadLength");
-        return;
-    case X11ErrorCode::BadImplementation:
-        absl::Format(&sink, "BadImplementation");
-        return;
-    }
-
-    absl::Format(&sink, "bad error code");
-}
 
 } // namespace nyla

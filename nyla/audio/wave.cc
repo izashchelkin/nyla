@@ -1,5 +1,4 @@
 #include "nyla/audio/wave.h"
-#include "absl/log/check.h"
 
 #include <cstdint>
 #include <cstring>
@@ -46,8 +45,8 @@ auto ParseWavFile(std::span<const std::byte> bytes) -> ParseWavFileResult
         memcpy(&masterChunk, p, sizeof(masterChunk));
         p += sizeof(masterChunk);
 
-        CHECK_EQ(masterChunk.chunkId, Word32("RIFF"));
-        CHECK_EQ(masterChunk.waveId, Word32("WAVE"));
+        NYLA_ASSERT(masterChunk.chunkId == Word32("RIFF"));
+        NYLA_ASSERT(masterChunk.waveId == Word32("WAVE"));
     }
 
     while (p != bytes.data() + bytes.size())
@@ -60,7 +59,7 @@ auto ParseWavFile(std::span<const std::byte> bytes) -> ParseWavFileResult
         case Word32("fmt "): {
             result.fmt = (WaveFmtChunk *)p;
 
-            CHECK_EQ(result.fmt->bitsPerSample, 16);
+            NYLA_ASSERT(result.fmt->bitsPerSample == 16);
 
             break;
         }
@@ -72,7 +71,7 @@ auto ParseWavFile(std::span<const std::byte> bytes) -> ParseWavFileResult
             return result;
         }
         default: {
-            CHECK(false);
+            NYLA_ASSERT(false);
             break;
         }
         }
@@ -80,7 +79,7 @@ auto ParseWavFile(std::span<const std::byte> bytes) -> ParseWavFileResult
         p += header.chunkSize + sizeof(header);
     }
 
-    CHECK(false);
+    NYLA_ASSERT(false);
     return {};
 }
 

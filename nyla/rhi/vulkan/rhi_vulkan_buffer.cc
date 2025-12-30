@@ -59,7 +59,7 @@ auto ConvertRhiMemoryUsageIntoVkMemoryPropertyFlags(RhiMemoryUsage usage) -> VkM
         return VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT |
                VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
     }
-    CHECK(false);
+    NYLA_ASSERT(false);
     return 0;
 }
 
@@ -88,7 +88,7 @@ auto FindMemoryTypeIndex(VkMemoryRequirements memRequirements, VkMemoryPropertyF
         return i;
     }
 
-    CHECK(false);
+    NYLA_ASSERT(false);
     return 0;
 }
 
@@ -291,7 +291,7 @@ auto VulkanBufferStateGetSyncInfo(RhiBufferState state) -> VulkanBufferStateSync
         return {.stage = VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT, .access = VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT};
     }
     }
-    CHECK(false);
+    NYLA_ASSERT(false);
     return {};
 }
 

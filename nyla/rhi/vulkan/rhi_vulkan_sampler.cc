@@ -20,7 +20,7 @@ auto ConvertFilter(RhiFilter filter) -> VkFilter
     case RhiFilter::Nearest:
         return VK_FILTER_NEAREST;
     }
-    CHECK(false);
+    NYLA_ASSERT(false);
     return {};
 }
 
@@ -33,7 +33,7 @@ auto ConvertSamplerAddressMode(RhiSamplerAddressMode addressMode) -> VkSamplerAd
     case RhiSamplerAddressMode::ClampToEdge:
         return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
     }
-    CHECK(false);
+    NYLA_ASSERT(false);
     return {};
 }
 

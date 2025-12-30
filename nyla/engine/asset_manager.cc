@@ -1,6 +1,4 @@
 #include "nyla/engine/asset_manager.h"
-#include "absl/log/check.h"
-#include "absl/log/log.h"
 #include "nyla/commons/containers/inline_vec.h"
 #include "nyla/commons/handle_pool.h"
 #include "nyla/engine/engine.h"
@@ -20,7 +18,7 @@ namespace nyla
 void AssetManager::Init()
 {
     static bool inited = false;
-    CHECK(!inited);
+    NYLA_ASSERT(!inited);
     inited = true;
 
     //
@@ -107,7 +105,7 @@ void AssetManager::Upload(RhiCmdList cmd)
 
         void *data = stbi_load(textureData.path.c_str(), (int *)&textureData.width, (int *)&textureData.height,
                                (int *)&textureData.channels, STBI_rgb_alpha);
-        CHECK(data) << "stbi_load failed for '" << textureData.path << "': " << stbi_failure_reason();
+        NYLA_ASSERT(data) << "stbi_load failed for '" << textureData.path << "': " << stbi_failure_reason();
 
         textureData.texture = RhiCreateTexture({
             .width = textureData.width,
@@ -137,7 +135,7 @@ void AssetManager::Upload(RhiCmdList cmd)
         // TODO: this barrier does not need to be here
         RhiCmdTransitionTexture(cmd, texture, RhiTextureState::ShaderRead);
 
-        LOG(INFO) << "Uploading '" << textureData.path << "'";
+        NYLA_LOG("Uploading '%s'", textureData.path);
 
         textureData.needsUpload = false;
     }

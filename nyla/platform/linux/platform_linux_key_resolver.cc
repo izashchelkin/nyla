@@ -1,4 +1,3 @@
-#include "absl/log/check.h"
 #include "nyla/platform/linux/platform_linux.h"
 #include "nyla/platform/platform.h"
 #include "nyla/platform/platform_key_resolver.h"
@@ -24,15 +23,15 @@ class PlatformKeyResolver::Impl
 void PlatformKeyResolver::Impl::Init()
 {
     m_Ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
-    CHECK(m_Ctx);
+    NYLA_ASSERT(m_Ctx);
 
     xcb_connection_t *conn = g_Platform->GetImpl()->GetConn();
 
     const int32_t deviceId = xkb_x11_get_core_keyboard_device_id(conn);
-    CHECK_NE(deviceId, -1);
+    NYLA_ASSERT(deviceId != -1);
 
     m_Keymap = xkb_x11_keymap_new_from_device(m_Ctx, conn, deviceId, XKB_KEYMAP_COMPILE_NO_FLAGS);
-    CHECK(m_Keymap);
+    NYLA_ASSERT(m_Keymap);
 }
 
 void PlatformKeyResolver::Impl::Destroy()
@@ -52,7 +51,7 @@ auto PlatformKeyResolver::Impl::ResolveKeyCode(KeyPhysical key) -> uint32_t
 {
     const char *xkbKeyname = ConvertKeyPhysicalIntoXkbName(key);
     const xkb_keycode_t keycode = xkb_keymap_key_by_name(m_Keymap, xkbKeyname);
-    CHECK(xkb_keycode_is_legal_x11(keycode));
+    NYLA_ASSERT(xkb_keycode_is_legal_x11(keycode));
     return keycode;
 }
 
@@ -60,7 +59,7 @@ auto PlatformKeyResolver::Impl::ResolveKeyCode(KeyPhysical key) -> uint32_t
 
 void PlatformKeyResolver::Init()
 {
-    CHECK(!m_Impl);
+    NYLA_ASSERT(!m_Impl);
     m_Impl = new Impl{};
     m_Impl->Init();
 }

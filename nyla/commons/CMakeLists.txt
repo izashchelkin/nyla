@@ -21,12 +21,3 @@ target_include_directories(${TARGET}
     PUBLIC
         ${PROJECT_SOURCE_DIR}
 )
-
-target_link_libraries(${TARGET}
-    PUBLIC
-        absl::log
-        absl::check
-        absl::log_initialize
-        absl::flat_hash_set
-        absl::flat_hash_map
-)

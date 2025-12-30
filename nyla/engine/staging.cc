@@ -1,4 +1,3 @@
-#include "absl/log/log.h"
 #include "nyla/platform/platform.h"
 #include <cmath>
 #include <cstdint>
@@ -38,13 +37,11 @@ auto RecompileShadersIfNeeded() -> bool
         }
         else
         {
-            LOG(INFO) << "ignoring " << path;
         }
     }
 
     if (srcChanged)
     {
-        LOG(INFO) << "shaders recompiling";
         system("python3 /home/izashchelkin/nyla/scripts/shaders.py");
         usleep(1e6);
         PlatformProcessEvents();

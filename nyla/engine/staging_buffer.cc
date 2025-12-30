@@ -1,5 +1,4 @@
 #include "nyla/engine/staging_buffer.h"
-#include "absl/log/check.h"
 #include "nyla/commons/memory/align.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_buffer.h"
@@ -36,7 +35,7 @@ auto BeforeCopy(GpuStagingBuffer *stagingBuffer, uint32_t copySize) -> char *
 {
     AlignUp(stagingBuffer->written, RhiGetOptimalBufferCopyOffsetAlignment());
 
-    CHECK_LE(stagingBuffer->written + copySize, RhiGetBufferSize(stagingBuffer->buffer));
+    NYLA_ASSERT(stagingBuffer->written + copySize <= RhiGetBufferSize(stagingBuffer->buffer));
     char *ret = RhiMapBuffer(stagingBuffer->buffer) + stagingBuffer->written;
 
     RhiBufferMarkWritten(stagingBuffer->buffer, stagingBuffer->written, copySize);

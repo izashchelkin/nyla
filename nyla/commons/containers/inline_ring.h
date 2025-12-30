@@ -1,6 +1,5 @@
 #pragma once
 
-#include "absl/log/check.h"
 #include <array>
 #include <cstdint>
 #include <span>
@@ -18,7 +17,7 @@ template <typename T, uint32_t N> class InlineRing
     void AdvanceWrite()
     {
         m_Write = (m_Write + 1) % kCapacity;
-        CHECK_NE(m_Write, m_Read);
+        NYLA_ASSERT(m_Write != m_Read);
     }
 
     void AdvanceRead()

@@ -2,10 +2,10 @@
 
 #include <cstdint>
 
-#include "absl/log/check.h"
-#include "absl/log/log.h"
+#include "nyla/commons/assert.h"
 #include "nyla/commons/containers/inline_vec.h"
 #include "nyla/commons/handle_pool.h"
+#include "nyla/commons/log.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
@@ -23,10 +23,20 @@ namespace nyla::rhi_vulkan_internal
 
 inline auto VkCheckImpl(VkResult res)
 {
-    if (res == VK_ERROR_DEVICE_LOST)
-        LOG(ERROR) << "Last checkpoint: " << RhiGetLastCheckpointData(RhiQueueType::Graphics);
+    switch (res)
+    {
+    case VK_SUCCESS:
+        break;
 
-    CHECK_EQ(res, VK_SUCCESS) << "Vulkan error: " << string_VkResult(res);
+    case VK_ERROR_DEVICE_LOST:
+        NYLA_LOG("Last checkpoint: %I64d", RhiGetLastCheckpointData(RhiQueueType::Graphics));
+        // FALLTHROUGH
+
+    default: {
+        NYLA_LOG("Vulkan error: %s", string_VkResult(res));
+        NYLA_ASSERT(false);
+    }
+    }
 };
 #define VK_CHECK(res) VkCheckImpl(res)
 

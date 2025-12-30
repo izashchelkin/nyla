@@ -1,9 +1,10 @@
 #pragma once
 
-#include "absl/log/check.h"
 #include <array>
 #include <cstdint>
 #include <span>
+
+#include "nyla/commons/assert.h"
 
 namespace nyla
 {
@@ -29,7 +30,7 @@ template <typename T, uint32_t N> class InlineVec
 
     InlineVec(std::span<const value_type> elems) : m_Size{static_cast<size_type>(elems.size())}
     {
-        CHECK_LE(elems.size(), kCapacity);
+        NYLA_ASSERT(elems.size() <= kCapacity);
         std::copy_n(elems.begin(), elems.size(), m_Data.begin());
     }
 
@@ -66,14 +67,14 @@ template <typename T, uint32_t N> class InlineVec
     [[nodiscard]]
     auto operator[](size_type i) -> reference
     {
-        CHECK_LT(i, m_Size);
+        NYLA_ASSERT(i < m_Size);
         return m_Data[i];
     }
 
     [[nodiscard]]
     auto operator[](size_type i) const -> const_reference
     {
-        CHECK_LT(i, m_Size);
+        NYLA_ASSERT(i < m_Size);
         return m_Data[i];
     }
 
@@ -120,49 +121,49 @@ template <typename T, uint32_t N> class InlineVec
 
     void push_back(const_reference v)
     {
-        CHECK_LT(m_Size, kCapacity);
+        NYLA_ASSERT(m_Size < kCapacity);
         m_Data[m_Size++] = v;
     }
 
     void push_back(T &&v)
     {
-        CHECK_LT(m_Size, kCapacity);
+        NYLA_ASSERT(m_Size < kCapacity);
         m_Data[m_Size++] = std::move(v);
     }
 
     template <class... Args> auto emplace_back(Args &&...args) -> T &
     {
-        CHECK_LT(m_Size, kCapacity);
+        NYLA_ASSERT(m_Size < kCapacity);
         return (m_Data[m_Size++] = T(std::forward<Args>(args)...));
     }
 
     auto front() -> reference
     {
-        CHECK(m_Size);
+        NYLA_ASSERT(m_Size);
         return m_Data[0];
     }
 
     auto front() const -> const_reference
     {
-        CHECK(m_Size);
+        NYLA_ASSERT(m_Size);
         return m_Data[0];
     }
 
     auto back() -> reference
     {
-        CHECK(m_Size);
+        NYLA_ASSERT(m_Size);
         return m_Data[m_Size - 1];
     }
 
     auto back() const -> const_reference
     {
-        CHECK(m_Size);
+        NYLA_ASSERT(m_Size);
         return m_Data[m_Size - 1];
     }
 
     auto pop_back() -> value_type
     {
-        CHECK(m_Size);
+        NYLA_ASSERT(m_Size);
         --m_Size;
         auto tmp = m_Data[m_Size];
         m_Data[m_Size] = {};
@@ -171,7 +172,7 @@ template <typename T, uint32_t N> class InlineVec
 
     void resize(size_type size)
     {
-        CHECK_LE(size, m_Data.size());
+        NYLA_ASSERT(size <= m_Data.size());
         m_Size = size;
     }
 

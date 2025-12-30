@@ -5,8 +5,6 @@
 #include <numbers>
 #include <span>
 
-#include "absl/log/check.h"
-
 namespace nyla
 {
 

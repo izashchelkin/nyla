@@ -3,8 +3,8 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "absl/log/check.h"
 #include "nyla/commons/handle.h"
+#include "nyla/commons/assert.h"
 
 namespace nyla
 {
@@ -119,13 +119,13 @@ template <typename HandleType, typename DataType, uint32_t Size> class HandlePoo
             });
         }
 
-        CHECK(false);
+        NYLA_ASSERT(false);
         return {};
     }
 
     auto TryResolveSlot(HandleType handle) -> std::pair<bool, Slot *>
     {
-        CHECK_LT(handle.index, Size);
+        NYLA_ASSERT(handle.index < Size);
 
         if (!handle.gen)
             return {false, nullptr};
@@ -142,7 +142,7 @@ template <typename HandleType, typename DataType, uint32_t Size> class HandlePoo
     auto ResolveSlot(HandleType handle) -> Slot &
     {
         auto [ok, slot] = TryResolveSlot(handle);
-        CHECK(ok);
+        NYLA_ASSERT(ok);
         return *slot;
     }
 

@@ -1,4 +1,3 @@
-#include "absl/log/check.h"
 #include "nyla/platform/platform_audio.h"
 #include <alsa/asoundlib.h>
 #include <cerrno>
@@ -25,7 +24,11 @@ class PlatformAudio::Impl
 void PlatformAudio::Impl::Init(const PlatformAudioInitDesc &desc)
 {
     int res = snd_pcm_open(&m_Pcm, "default", SND_PCM_STREAM_PLAYBACK, 0);
-    CHECK_EQ(res, 0) << snd_strerror(res);
+    if (res != 0)
+    {
+        NYLA_LOG(snd_strerror(res));
+        NYLA_ASSERT(false);
+    }
 
     m_SampleRate = desc.sampleRate;
     m_Channels = desc.channels;
@@ -48,7 +51,7 @@ void PlatformAudio::Impl::Destroy()
 void PlatformAudio::Impl::Write(std::span<const std::byte> data)
 {
     const uint32_t frameSize = m_Channels * m_BytesPerChannel;
-    CHECK_EQ(data.size() % frameSize, 0);
+    NYLA_ASSERT(data.size() % frameSize == 0);
 
     auto *p = data.data();
 
@@ -75,7 +78,7 @@ void PlatformAudio::Impl::Write(std::span<const std::byte> data)
 
 void PlatformAudio::Init(const PlatformAudioInitDesc &desc)
 {
-    CHECK(!m_Impl);
+    NYLA_ASSERT(!m_Impl);
     m_Impl = new Impl{};
     m_Impl->Init(desc);
 }

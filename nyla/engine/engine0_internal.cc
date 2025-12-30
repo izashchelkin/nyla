@@ -1,6 +1,5 @@
 #include "nyla/engine/engine0_internal.h"
 
-#include "absl/log/check.h"
 #include "nyla/commons/os/readfile.h"
 #include "nyla/rhi/rhi_shader.h"
 #include "nyla/spirview/spirview.h"
@@ -30,15 +29,15 @@ auto GetShader(const char *name, RhiShaderStage stage) -> RhiShader
     switch (result.stage)
     {
     case SpirviewShaderStage::Vertex: {
-        CHECK(stage == RhiShaderStage::Vertex);
+        NYLA_ASSERT(stage == RhiShaderStage::Vertex);
         break;
     }
     case SpirviewShaderStage::Fragment: {
-        CHECK(stage == RhiShaderStage::Pixel);
+        NYLA_ASSERT(stage == RhiShaderStage::Pixel);
         break;
     }
     default: {
-        CHECK(false);
+        NYLA_ASSERT(false);
     }
     }
 

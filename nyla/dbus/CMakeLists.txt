@@ -29,6 +29,5 @@ target_include_directories(${TARGET}
 target_link_libraries(${TARGET}
     PUBLIC
         nyla::commons
-        absl::log
         ${DBUS_LIBRARIES}
 )

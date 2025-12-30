@@ -2,8 +2,7 @@
 #define NOMINMAX
 #include <windows.h>
 
-#include "absl/log/check.h"
-#include "absl/log/log.h"
+#include "nyla/commons/assert.h"
 #include "nyla/commons/containers/inline_ring.h"
 #include "nyla/platform/platform.h"
 #include "nyla/platform/windows/platform_windows.h"
@@ -65,7 +64,7 @@ auto Platform::Impl::CreateWin() -> PlatformWindow
 
     HWND hWnd = CreateWindowEx(0, CLASS_NAME, TEXT("nyla"), WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
                                CW_USEDEFAULT, CW_USEDEFAULT, nullptr, nullptr, m_HInstance, nullptr);
-    CHECK(hWnd);
+    NYLA_ASSERT(hWnd);
     ShowWindow(hWnd, true);
     UpdateWindow(hWnd);
 
@@ -80,7 +79,7 @@ auto Platform::Impl::GetWindowSize(PlatformWindow window) -> PlatformWindowSize
     auto hWnd = reinterpret_cast<HWND>(window.handle);
 
     RECT rect{};
-    CHECK(GetWindowRect(hWnd, &rect));
+    NYLA_ASSERT(GetWindowRect(hWnd, &rect));
 
     return {
         .width = static_cast<uint32_t>(rect.right - rect.left),
@@ -102,7 +101,7 @@ void Platform::Impl::SetHInstance(HINSTANCE hInstance)
 
 void Platform::Init(const PlatformInitDesc &desc)
 {
-    CHECK(m_Impl);
+    NYLA_ASSERT(m_Impl);
     m_Impl->Init(desc);
 }
 

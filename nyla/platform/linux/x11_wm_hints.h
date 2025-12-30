@@ -2,7 +2,6 @@
 
 #include <cstdint>
 
-#include "absl/strings/str_format.h"
 #include "xcb/xproto.h"
 
 namespace nyla
@@ -38,15 +37,6 @@ static_assert(sizeof(X11WmHints) == 9 * 4);
 
 void Initialize(X11WmHints &h);
 
-template <typename Sink> void AbslStringify(Sink &sink, const X11WmHints &h)
-{
-    absl::Format(&sink,
-                 "WM_Hints {flags=%v input=%v initial_state=%v icon_pixmap=%v "
-                 "icon_window=%v icon_x=%v icon_y=%v icon_mask=%v window_group=%v}",
-                 h.flags, h.input, h.initialState, h.iconPixmap, h.iconWindow, h.iconX, h.iconY, h.iconMask,
-                 h.windowGroup);
-}
-
 struct X11WmNormalHints
 {
     static constexpr uint32_t kPMinSize = 1 << 4;
@@ -72,18 +62,6 @@ struct X11WmNormalHints
 static_assert(sizeof(X11WmNormalHints) == 18 * 4);
 
 void Initialize(X11WmNormalHints &h);
-
-template <typename Sink> void AbslStringify(Sink &sink, const X11WmNormalHints &h)
-{
-    absl::Format(&sink,
-                 "WM_Normal_Hints {flags=%v min_width=%v min_height=%v "
-                 "max_width=%v max_height=%v width_inc=%v "
-                 "height_inc=%v min_aspect=%v/%v max_aspect=%v/%v base_width=%v "
-                 "base_height=%v "
-                 "win_gravity=%v}",
-                 h.flags, h.minWidth, h.minHeight, h.maxWidth, h.maxHeight, h.widthInc, h.heightInc, h.minAspect.num,
-                 h.minAspect.den, h.maxAspect.num, h.maxAspect.den, h.baseWidth, h.baseHeight, h.winGravity);
-}
 
 inline void Initialize(X11WmHints &h)
 {

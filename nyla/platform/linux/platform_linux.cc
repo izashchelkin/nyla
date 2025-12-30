@@ -1,10 +1,7 @@
 #include "nyla/platform/linux/platform_linux.h"
 #include "nyla/platform/platform.h"
 
-#include "absl/cleanup/cleanup.h"
-#include "absl/log/check.h"
-#include "absl/log/log.h"
-#include "absl/strings/ascii.h"
+#include "nyla/commons/string.h"
 #include "nyla/platform/platform.h"
 #include "xcb/xcb.h"
 #include "xcb/xcb_aux.h"
@@ -42,7 +39,7 @@ auto Platform::Impl::InternAtom(std::string_view name, bool onlyIfExists) -> xcb
     xcb_intern_atom_reply_t *reply =
         xcb_intern_atom_reply(m_Conn, xcb_intern_atom(m_Conn, onlyIfExists, name.size(), name.data()), nullptr);
     if (!reply || !reply->atom)
-        LOG(FATAL) << "could not intern atom " << name;
+        NYLA_LOG("could not intern atom %s", name);
 
     auto ret = reply->atom;
     free(reply);
@@ -53,12 +50,12 @@ void Platform::Impl::Init(const PlatformInitDesc &desc)
 {
     m_Conn = xcb_connect(nullptr, &m_ScreenIndex);
     if (xcb_connection_has_error(m_Conn))
-        LOG(QFATAL) << "could not connect to X server";
+        NYLA_ASSERT(false && "could not connect to X server");
 
     m_Screen = xcb_aux_get_screen(m_Conn, m_ScreenIndex);
-    CHECK(m_Screen);
+    NYLA_ASSERT(m_Screen);
 
-#define X(name) m_Atoms.name = InternAtom(absl::AsciiStrToUpper(#name), false);
+#define X(name) m_Atoms.name = InternAtom(AsciiStrToUpper(#name), false);
     NYLA_X11_ATOMS(X)
 #undef X
 
@@ -70,11 +67,11 @@ void Platform::Impl::Init(const PlatformInitDesc &desc)
         if (!xkb_x11_setup_xkb_extension(m_Conn, XKB_X11_MIN_MAJOR_XKB_VERSION, XKB_X11_MIN_MINOR_XKB_VERSION,
                                          XKB_X11_SETUP_XKB_EXTENSION_NO_FLAGS, &majorXkbVersionOut, &minorXkbVersionOut,
                                          &baseEventOut, &baseErrorOut))
-            LOG(QFATAL) << "could not set up xkb extension";
+            NYLA_ASSERT(false && "could not set up xkb extension");
 
         if (majorXkbVersionOut < XKB_X11_MIN_MAJOR_XKB_VERSION ||
             (majorXkbVersionOut == XKB_X11_MIN_MAJOR_XKB_VERSION && minorXkbVersionOut < XKB_X11_MIN_MINOR_XKB_VERSION))
-            LOG(QFATAL) << "could not set up xkb extension";
+            NYLA_ASSERT(false && "could not set up xkb extension");
 
         xcb_generic_error_t *err = nullptr;
         xcb_xkb_per_client_flags_reply_t *reply = xcb_xkb_per_client_flags_reply(
@@ -83,14 +80,14 @@ void Platform::Impl::Init(const PlatformInitDesc &desc)
                                      XCB_XKB_PER_CLIENT_FLAG_DETECTABLE_AUTO_REPEAT, 0, 0, 0),
             &err);
         if (!reply || err)
-            LOG(QFATAL) << "could not set up detectable autorepeat";
-    }
+            NYLA_ASSERT(false && "could not set up detectable autorepeat");
+    }<< 
 
     if (Any(desc.enabledFeatures & PlatformFeature::MouseInput))
     {
         const xcb_query_extension_reply_t *ext = xcb_get_extension_data(m_Conn, &xcb_input_id);
         if (!ext || !ext->present)
-            LOG(QFATAL) << "could nolt set up XI2 extension";
+            NYLA_ASSERT(false && "could nolt set up XI2 extension");
 
         struct
         {
@@ -103,7 +100,7 @@ void Platform::Impl::Init(const PlatformInitDesc &desc)
         mask.maskBits = XCB_INPUT_XI_EVENT_MASK_RAW_MOTION;
 
         if (xcb_request_check(m_Conn, xcb_input_xi_select_events_checked(m_Conn, m_Screen->root, 1, &mask.eventMask)))
-            LOG(QFATAL) << "could not setup XI2 extension";
+            NYLA_ASSERT(false && "could not setup XI2 extension");
 
         m_ExtensionXInput2MajorOpCode = ext->major_opcode;
     }
@@ -159,7 +156,7 @@ auto Platform::Impl::PollEvent(PlatformEvent &outEvent) -> bool
         if (!event)
             return false;
 
-        absl::Cleanup eventFreer = [=]() -> void { free(event); };
+        Cleanup eventFreer([=]() -> void { free(event); });
         const uint8_t eventType = event->response_type & 0x7F;
 
         switch (eventType)
@@ -228,7 +225,7 @@ auto Platform::Impl::PollEvent(PlatformEvent &outEvent) -> bool
 
 void Platform::Init(const PlatformInitDesc &desc)
 {
-    CHECK(!m_Impl);
+    NYLA_ASSERT(!m_Impl);
     m_Impl = new Impl();
     m_Impl->Init(desc);
 }
