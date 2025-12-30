@@ -22,8 +22,8 @@ class Platform::Impl
     void SetHInstance(HINSTANCE hInstance);
 
   private:
-    InlineRing<PlatformEvent, 8> m_EventsRing;
-    void *m_HInstance;
+    InlineRing<PlatformEvent, 8> m_EventsRing{};
+    HINSTANCE m_HInstance{};
 };
 
 } // namespace nyla

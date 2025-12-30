@@ -7,7 +7,6 @@
 #include <cstdint>
 #include <format>
 #include <sys/types.h>
-#include <unistd.h>
 
 namespace nyla::engine0_internal
 {
@@ -27,11 +26,11 @@ auto GetShader(const char *name, RhiShaderStage stage) -> RhiShader
     switch (result.stage)
     {
     case SpirviewShaderStage::Vertex: {
-        CHECK_EQ(stage, RhiShaderStage::Vertex);
+        CHECK(stage == RhiShaderStage::Vertex);
         break;
     }
     case SpirviewShaderStage::Fragment: {
-        CHECK_EQ(stage, RhiShaderStage::Pixel);
+        CHECK(stage == RhiShaderStage::Pixel);
         break;
     }
     default: {

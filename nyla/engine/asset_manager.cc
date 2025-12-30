@@ -13,7 +13,6 @@
 #include "nyla/rhi/rhi_texture.h"
 #include "third_party/stb/stb_image.h"
 #include <cstdint>
-#include <libintl.h>
 
 namespace nyla
 {

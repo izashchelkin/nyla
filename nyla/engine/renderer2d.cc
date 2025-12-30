@@ -15,8 +15,6 @@
 #include "nyla/rhi/rhi_shader.h"
 #include "nyla/rhi/rhi_texture.h"
 #include <cstdint>
-#include <sys/types.h>
-#include <unistd.h>
 
 namespace nyla
 {

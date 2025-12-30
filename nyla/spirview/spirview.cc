@@ -3,10 +3,15 @@
 #include "nyla/rhi/rhi_shader.h"
 #include <cstdint>
 #include <span>
+#include <array>
 #include <variant>
 
-#define SPV_ENABLE_UTILITY_CODE
+#define spv_enable_utility_code
+#if defined(__linux__)
 #include <spirv/unified1/spirv.hpp>
+#else
+#include <spirv-headers/spirv.hpp>
+#endif
 
 namespace nyla
 {
@@ -16,18 +21,18 @@ namespace spirview_internal
 
 struct SpirvTypeIdState
 {
-    uint32_t typeWidth = -1;
-    uint32_t typeSignedness = -1;
-    uint32_t block = -1;
+    uint32_t typeWidth = (uint32_t)-1;
+    uint32_t typeSignedness = (uint32_t)-1;
+    uint32_t block = (uint32_t)-1;
 };
 
 struct SpirvVarIdState
 {
-    uint32_t varType = -1;
+    uint32_t varType = (uint32_t)-1;
     spv::StorageClass storageClass = spv::StorageClass::StorageClassMax;
-    uint32_t set = -1;
-    uint32_t binding = -1;
-    uint32_t location = -1;
+    uint32_t set = (uint32_t)-1;
+    uint32_t binding = (uint32_t)-1;
+    uint32_t location = (uint32_t)-1;
 };
 
 using SpirvIdState = std::variant<std::monostate, SpirvTypeIdState, SpirvVarIdState>;

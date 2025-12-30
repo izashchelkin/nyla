@@ -12,6 +12,8 @@ target_sources(${TARGET}
 target_include_directories(${TARGET}
     PUBLIC
         ${PROJECT_SOURCE_DIR}  
+    PRIVATE
+        $ENV{VULKAN_SDK}/Include
 )
 
 target_link_libraries(${TARGET}
