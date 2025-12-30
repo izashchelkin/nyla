@@ -115,7 +115,7 @@ auto Platform::Impl::CreateWin() -> PlatformWindow
         CreateWin(m_Screen->width_in_pixels, m_Screen->height_in_pixels, false,
                   static_cast<xcb_event_mask_t>(XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_KEY_RELEASE |
                                                 XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE));
-    return {.window = static_cast<uint64_t>(window)};
+    return {.handle = static_cast<uint64_t>(window)};
 }
 
 auto Platform::Impl::CreateWin(uint32_t width, uint32_t height, bool overrideRedirect, xcb_event_mask_t eventMask)

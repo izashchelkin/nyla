@@ -1,5 +1,3 @@
-find_package(Vulkan REQUIRED)
-
 set(TARGET nyla_rhi_vulkan)
 add_library(${TARGET})
 add_library(nyla::rhi::vulkan ALIAS ${TARGET})
@@ -21,8 +19,10 @@ target_sources(${TARGET}
 
 target_include_directories(${TARGET}
     PUBLIC
-        ${PROJECT_SOURCE_DIR}  
+        ${PROJECT_SOURCE_DIR}
 )
+
+find_package(Vulkan REQUIRED)
 
 target_link_libraries(${TARGET}
     PUBLIC

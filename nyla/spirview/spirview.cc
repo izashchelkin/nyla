@@ -1,9 +1,9 @@
 #include "nyla/spirview/spirview.h"
 #include "absl/log/check.h"
 #include "nyla/rhi/rhi_shader.h"
+#include <array>
 #include <cstdint>
 #include <span>
-#include <array>
 #include <variant>
 
 #define spv_enable_utility_code

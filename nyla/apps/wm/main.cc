@@ -20,7 +20,7 @@
 namespace nyla
 {
 
-auto Main(int argc, char **argv) -> int
+auto PlatformMain() -> int
 {
     LoggingInit();
     SigIntCoreDump();
@@ -119,8 +119,3 @@ auto Main(int argc, char **argv) -> int
 }
 
 } // namespace nyla
-
-auto main(int argc, char **argv) -> int
-{
-    return nyla::Main(argc, argv);
-}

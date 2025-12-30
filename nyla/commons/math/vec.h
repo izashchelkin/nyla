@@ -2,8 +2,8 @@
 
 #include "absl/log/check.h"
 #include <algorithm>
-#include <complex>
 #include <array>
+#include <complex>
 #include <cstddef>
 #include <cstdint>
 #include <initializer_list>

@@ -15,7 +15,7 @@ NYLA_BITENUM(PlatformFeature);
 
 struct PlatformWindow
 {
-    uint64_t handle;
+    std::uintptr_t handle;
 };
 
 struct PlatformWindowSize

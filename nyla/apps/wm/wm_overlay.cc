@@ -30,10 +30,7 @@
 namespace nyla
 {
 
-namespace
-{
-
-auto Main() -> int
+auto PlatformMain() -> int
 {
     LoggingInit();
     SigIntCoreDump();
@@ -42,7 +39,7 @@ auto Main() -> int
     Platform::Impl *x11 = g_Platform->GetImpl();
 
     const xcb_window_t window = x11->CreateWin(x11->GetScreen()->width_in_pixels, x11->GetScreen()->height_in_pixels,
-                                                  true, XCB_EVENT_MASK_EXPOSURE);
+                                               true, XCB_EVENT_MASK_EXPOSURE);
     xcb_configure_window(x11->GetConn(), window, XCB_CONFIG_WINDOW_STACK_MODE, (uint32_t[]){XCB_STACK_MODE_BELOW});
     x11->Flush();
 
@@ -123,11 +120,4 @@ auto Main() -> int
     return 0;
 }
 
-} // namespace
-
 } // namespace nyla
-
-auto main() -> int
-{
-    return nyla::Main();
-}

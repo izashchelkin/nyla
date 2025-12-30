@@ -37,11 +37,16 @@ void SigSegvExitZero()
 
 #else
 
-namespace nyla {
+namespace nyla
+{
 
-void SigIntCoreDump() {}
-void SigSegvExitZero() {}
-
+void SigIntCoreDump()
+{
 }
+void SigSegvExitZero()
+{
+}
+
+} // namespace nyla
 
 #endif

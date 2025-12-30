@@ -33,6 +33,6 @@ target_sources(wm_overlay
 target_link_libraries(wm_overlay
     PRIVATE
         nyla::debug_text_renderer
-        nyla::rhi_ndebug
+        nyla::rhi
         nyla::platform::linux
 )

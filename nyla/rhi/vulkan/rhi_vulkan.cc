@@ -7,14 +7,12 @@
 #include "absl/log/check.h"
 #include "absl/log/log.h"
 #include "nyla/commons/bitenum.h"
-#include "nyla/commons/debug/debugger.h"
 #include "nyla/commons/containers/inline_vec.h"
 #include "nyla/commons/debug/debugger.h"
+#include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_pipeline.h"
 #include "vulkan/vulkan_core.h"
-#include "nyla/platform/platform.h"
-#include "nyla/commons/debug/debugger.h"
 
 #if defined(__linux__)
 // clang-format off
@@ -505,7 +503,7 @@ void RhiInit(const RhiDesc &rhiDesc)
     const VkXcbSurfaceCreateInfoKHR surfaceCreateInfo{
         .sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR,
         .connection = xcb_connect(nullptr, nullptr),
-        .window = vk.window.handle,
+        .window = static_cast<xcb_window_t>(vk.window.handle),
     };
     VK_CHECK(vkCreateXcbSurfaceKHR(vk.instance, &surfaceCreateInfo, vk.alloc, &vk.surface));
 #else

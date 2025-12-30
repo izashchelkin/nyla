@@ -9,12 +9,16 @@ target_sources(${TARGET_PLATFORM}
 
 target_include_directories(${TARGET_PLATFORM}
     PUBLIC
-        ${PROJECT_SOURCE_DIR}
+        ${VULKAN_INCLUDE_DIRS}
 )
+
+find_package(Vulkan REQUIRED) # TODO: make this a separate target?
 
 target_link_libraries(${TARGET_PLATFORM}
     PUBLIC
         nyla::commons
+
+        Vulkan::Vulkan
 
         xcb
         xcb-util

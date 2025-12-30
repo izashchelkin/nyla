@@ -42,6 +42,6 @@ auto MakeTimerFd(std::chrono::duration<double> interval) -> int
     return -1;
 }
 
-}
+} // namespace nyla
 
 #endif
