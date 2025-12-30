@@ -77,7 +77,12 @@ void GameInit()
     //
 
     {
+#if defined(__linux__) // TODO: deal with this
         std::string assetsBasePath = "assets/BBreaker";
+#else
+        std::string assetsBasePath = "C:\\nyla\\assets\\BBreaker";
+#endif
+
         g_State->assets.background = g_AssetManager->DeclareTexture(assetsBasePath + "/Background1.png");
         g_State->assets.player = g_AssetManager->DeclareTexture(assetsBasePath + "/Player.png");
         g_State->assets.playerFlash = g_AssetManager->DeclareTexture(assetsBasePath + "/Player_flash.png");

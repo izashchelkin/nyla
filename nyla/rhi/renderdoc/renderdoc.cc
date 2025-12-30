@@ -2,8 +2,6 @@
 
 #if !defined(NDEBUG)
 
-#include <dlfcn.h>
-
 #include "absl/log/log.h"
 #include "nyla/commons/debug/debugger.h"
 #include "nyla/rhi/renderdoc/renderdoc_app.h"

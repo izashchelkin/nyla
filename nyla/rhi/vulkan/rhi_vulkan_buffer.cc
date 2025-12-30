@@ -89,6 +89,7 @@ auto FindMemoryTypeIndex(VkMemoryRequirements memRequirements, VkMemoryPropertyF
     }
 
     CHECK(false);
+    return 0;
 }
 
 } // namespace rhi_vulkan_internal

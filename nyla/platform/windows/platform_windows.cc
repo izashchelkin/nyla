@@ -63,12 +63,14 @@ auto Platform::Impl::CreateWin() -> PlatformWindow
 
     RegisterClass(&wc);
 
-    HWND hwnd = CreateWindowEx(0, CLASS_NAME, TEXT("nyla"), WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
+    HWND hWnd = CreateWindowEx(0, CLASS_NAME, TEXT("nyla"), WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
                                CW_USEDEFAULT, CW_USEDEFAULT, nullptr, nullptr, m_HInstance, nullptr);
-    CHECK(hwnd);
+    CHECK(hWnd);
+    ShowWindow(hWnd, true);
+    UpdateWindow(hWnd);
 
     PlatformWindow ret{
-        .handle = reinterpret_cast<uint64_t>(hwnd),
+        .handle = reinterpret_cast<uint64_t>(hWnd),
     };
     return ret;
 }
@@ -98,12 +100,36 @@ void Platform::Impl::SetHInstance(HINSTANCE hInstance)
 
 //
 
+void Platform::Init(const PlatformInitDesc &desc)
+{
+    CHECK(m_Impl);
+    m_Impl->Init(desc);
+}
+
+auto Platform::CreateWin() -> PlatformWindow
+{
+    return m_Impl->CreateWin();
+}
+
+auto Platform::GetWindowSize(PlatformWindow window) -> PlatformWindowSize
+{
+    return m_Impl->GetWindowSize(window);
+}
+
+auto Platform::PollEvent(PlatformEvent &outEvent) -> bool
+{
+    return m_Impl->PollEvent(outEvent);
+}
+
+Platform *g_Platform = new Platform();
+
 } // namespace nyla
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, int nCmdShow)
 {
     using namespace nyla;
 
+    g_Platform->SetImpl(new Platform::Impl{});
     g_Platform->GetImpl()->SetHInstance(hInstance);
 
     return PlatformMain();
@@ -117,12 +143,18 @@ LRESULT CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     switch (uMsg)
     {
     case WM_PAINT:
+        PAINTSTRUCT ps;
+        BeginPaint(hwnd, &ps);
+        EndPaint(hwnd, &ps);
+
         impl->EnqueueEvent({
             .type = PlatformEventType::ShouldRedraw,
         });
         return 0;
 
     case WM_DESTROY: {
+        PostQuitMessage(0);
+
         impl->EnqueueEvent({
             .type = PlatformEventType::ShouldExit,
         });

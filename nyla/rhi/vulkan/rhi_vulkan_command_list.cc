@@ -21,6 +21,7 @@ auto GetDeviceQueue(RhiQueueType queueType) -> DeviceQueue &
         return vk.transferQueue;
     }
     CHECK(false);
+    return vk.graphicsQueue;
 }
 
 } // namespace

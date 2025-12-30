@@ -163,14 +163,15 @@ template <typename T, uint32_t N> class InlineVec
     auto pop_back() -> value_type
     {
         CHECK(m_Size);
-        auto tmp = m_Data[m_Size - 1];
         --m_Size;
+        auto tmp = m_Data[m_Size];
+        m_Data[m_Size] = {};
         return tmp;
     }
 
     void resize(size_type size)
     {
-        CHECK_LT(size, m_Data.size());
+        CHECK_LE(size, m_Data.size());
         m_Size = size;
     }
 

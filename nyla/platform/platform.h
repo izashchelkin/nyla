@@ -67,6 +67,12 @@ class Platform
     auto PollEvent(PlatformEvent &outEvent) -> bool;
 
     class Impl;
+
+    void SetImpl(Impl *impl)
+    {
+        m_Impl = impl;
+    }
+
     auto GetImpl() -> auto *
     {
         return m_Impl;

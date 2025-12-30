@@ -125,7 +125,7 @@ auto Main() -> int
     ParseWavFileResult wav = ParseWavFile(bytes);
 
     AudioMixer mixer{};
-    std::thread thread ([&mixer] -> void { mixer.RunThread(); });
+    std::thread thread([&mixer] -> void { mixer.RunThread(); });
 
     return 0;
 }

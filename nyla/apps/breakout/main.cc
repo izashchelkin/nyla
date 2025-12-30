@@ -10,7 +10,7 @@
 namespace nyla
 {
 
-static auto Main() -> int
+auto PlatformMain() -> int
 {
     LoggingInit();
     SigIntCoreDump();
@@ -41,8 +41,3 @@ static auto Main() -> int
 }
 
 } // namespace nyla
-
-auto main() -> int
-{
-    return nyla::Main();
-}
