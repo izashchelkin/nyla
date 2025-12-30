@@ -6,6 +6,7 @@
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_texture.h"
+#include <format>
 
 namespace nyla
 {

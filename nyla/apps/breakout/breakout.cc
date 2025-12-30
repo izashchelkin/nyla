@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <format>
 #include <vector>
 
 #include "nyla/commons/color.h"
