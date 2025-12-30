@@ -1,3 +1,5 @@
+#pragma once
+
 #include "nyla/platform/platform.h"
 
 #include "nyla/commons/containers/inline_ring.h"

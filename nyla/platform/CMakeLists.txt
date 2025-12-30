@@ -40,6 +40,10 @@ if (WIN32)
         INTERFACE
             nyla::platform::windows
     )
+    target_link_libraries(${target_key_resolver}
+        INTERFACE
+            nyla::platform::windows::key_resolver
+    )
 elseif (UNIX AND NOT APPLE)
     add_subdirectory(linux)
     target_link_libraries(${target_platform}
