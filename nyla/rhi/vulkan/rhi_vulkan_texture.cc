@@ -76,10 +76,7 @@ auto VulkanTextureStateGetSyncInfo(RhiTextureState state) -> VulkanTextureStateS
 
 } // namespace
 
-namespace rhi_vulkan_internal
-{
-
-auto ConvertRhiTextureFormatIntoVkFormat(RhiTextureFormat format) -> VkFormat
+auto Rhi::Impl::ConvertTextureFormatIntoVkFormat(RhiTextureFormat format) -> VkFormat
 {
     switch (format)
     {
@@ -98,7 +95,7 @@ auto ConvertRhiTextureFormatIntoVkFormat(RhiTextureFormat format) -> VkFormat
     return static_cast<VkFormat>(0);
 }
 
-auto ConvertVkFormatIntoRhiTextureFormat(VkFormat format) -> RhiTextureFormat
+auto Rhi::Impl::ConvertVkFormatIntoTextureFormat(VkFormat format) -> RhiTextureFormat
 {
     switch (format)
     {
@@ -117,7 +114,7 @@ auto ConvertVkFormatIntoRhiTextureFormat(VkFormat format) -> RhiTextureFormat
     return static_cast<RhiTextureFormat>(0);
 }
 
-auto ConvertRhiTextureUsageToVkImageUsageFlags(RhiTextureUsage usage) -> VkImageUsageFlags
+auto Rhi::Impl::ConvertTextureUsageToVkImageUsageFlags(RhiTextureUsage usage) -> VkImageUsageFlags
 {
     VkImageUsageFlags flags = 0;
 
@@ -152,16 +149,14 @@ auto ConvertRhiTextureUsageToVkImageUsageFlags(RhiTextureUsage usage) -> VkImage
     return flags;
 }
 
-} // namespace rhi_vulkan_internal
-
-auto RhiCreateTexture(RhiTextureDesc desc) -> RhiTexture
+auto Rhi::Impl::CreateTexture(RhiTextureDesc desc) -> RhiTexture
 {
     VulkanTextureData textureData{
-        .format = ConvertRhiTextureFormatIntoVkFormat(desc.format),
+        .format = ConvertTextureFormatIntoVkFormat(desc.format),
         .extent = {desc.width, desc.height, 1},
     };
 
-    VkMemoryPropertyFlags memoryPropertyFlags = ConvertRhiMemoryUsageIntoVkMemoryPropertyFlags(desc.memoryUsage);
+    VkMemoryPropertyFlags memoryPropertyFlags = ConvertMemoryUsageIntoVkMemoryPropertyFlags(desc.memoryUsage);
 
     const VkImageCreateInfo imageCreateInfo{
         .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
@@ -172,22 +167,22 @@ auto RhiCreateTexture(RhiTextureDesc desc) -> RhiTexture
         .arrayLayers = 1,
         .samples = VK_SAMPLE_COUNT_1_BIT,
         .tiling = VK_IMAGE_TILING_OPTIMAL,
-        .usage = ConvertRhiTextureUsageToVkImageUsageFlags(desc.usage),
+        .usage = ConvertTextureUsageToVkImageUsageFlags(desc.usage),
         .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
         .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
     };
-    VK_CHECK(vkCreateImage(vk.dev, &imageCreateInfo, vk.alloc, &textureData.image));
+    VK_CHECK(vkCreateImage(m_Dev, &imageCreateInfo, m_Alloc, &textureData.image));
 
     VkMemoryRequirements memoryRequirements;
-    vkGetImageMemoryRequirements(vk.dev, textureData.image, &memoryRequirements);
+    vkGetImageMemoryRequirements(m_Dev, textureData.image, &memoryRequirements);
 
     const VkMemoryAllocateInfo memoryAllocInfo{
         .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
         .allocationSize = memoryRequirements.size,
         .memoryTypeIndex = FindMemoryTypeIndex(memoryRequirements, memoryPropertyFlags),
     };
-    vkAllocateMemory(vk.dev, &memoryAllocInfo, vk.alloc, &textureData.memory);
-    vkBindImageMemory(vk.dev, textureData.image, textureData.memory, 0);
+    vkAllocateMemory(m_Dev, &memoryAllocInfo, m_Alloc, &textureData.memory);
+    vkBindImageMemory(m_Dev, textureData.image, textureData.memory, 0);
 
     const VkImageViewCreateInfo imageViewCreateInfo{
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -203,26 +198,26 @@ auto RhiCreateTexture(RhiTextureDesc desc) -> RhiTexture
                 .layerCount = 1,
             },
     };
-    vkCreateImageView(vk.dev, &imageViewCreateInfo, vk.alloc, &textureData.imageView);
+    vkCreateImageView(m_Dev, &imageViewCreateInfo, m_Alloc, &textureData.imageView);
 
-    return rhiHandles.textures.Acquire(textureData);
+    return m_Textures.Acquire(textureData);
 }
 
-auto RhiGetTextureInfo(RhiTexture texture) -> RhiTextureInfo
+auto Rhi::Impl::GetTextureInfo(RhiTexture texture) -> RhiTextureInfo
 {
-    const VulkanTextureData textureData = rhiHandles.textures.ResolveData(texture);
+    const VulkanTextureData textureData = m_Textures.ResolveData(texture);
     return {
         .width = textureData.extent.width,
         .height = textureData.extent.height,
-        .format = ConvertVkFormatIntoRhiTextureFormat(textureData.format),
+        .format = ConvertVkFormatIntoTextureFormat(textureData.format),
     };
 }
 
-void RhiCmdTransitionTexture(RhiCmdList cmd, RhiTexture texture, RhiTextureState newState)
+void Rhi::Impl::CmdTransitionTexture(RhiCmdList cmd, RhiTexture texture, RhiTextureState newState)
 {
-    VkCommandBuffer cmdbuf = rhiHandles.cmdLists.ResolveData(cmd).cmdbuf;
+    VkCommandBuffer cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
 
-    VulkanTextureData &textureData = rhiHandles.textures.ResolveData(texture);
+    VulkanTextureData &textureData = m_Textures.ResolveData(texture);
 
     const VulkanTextureStateSyncInfo newSyncInfo = VulkanTextureStateGetSyncInfo(newState);
     if (newSyncInfo.layout == textureData.layout)
@@ -260,19 +255,44 @@ void RhiCmdTransitionTexture(RhiCmdList cmd, RhiTexture texture, RhiTextureState
     textureData.layout = newSyncInfo.layout;
 }
 
-void RhiDestroyTexture(RhiTexture texture)
+void Rhi::Impl::RhiDestroyTexture(RhiTexture texture)
 {
-    VulkanTextureData textureData = rhiHandles.textures.ReleaseData(texture);
+    VulkanTextureData textureData = m_Textures.ReleaseData(texture);
     NYLA_ASSERT(!textureData.isSwapchain);
 
     NYLA_ASSERT(textureData.imageView);
-    vkDestroyImageView(vk.dev, textureData.imageView, vk.alloc);
+    vkDestroyImageView(m_Dev, textureData.imageView, m_Alloc);
 
     NYLA_ASSERT(textureData.image);
-    vkDestroyImage(vk.dev, textureData.image, vk.alloc);
+    vkDestroyImage(m_Dev, textureData.image, m_Alloc);
 
     NYLA_ASSERT(textureData.memory);
-    vkFreeMemory(vk.dev, textureData.memory, vk.alloc);
+    vkFreeMemory(m_Dev, textureData.memory, m_Alloc);
+}
+
+void Rhi::Impl::CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, uint32_t srcOffset, uint32_t size)
+{
+    VkCommandBuffer cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
+
+    VulkanTextureData &dstTextureData = m_Textures.ResolveData(dst);
+    VulkanBufferData &srcBufferData = m_Buffers.ResolveData(src);
+
+    EnsureHostWritesVisible(cmdbuf, srcBufferData);
+
+    const VkBufferImageCopy region{
+        .bufferOffset = srcOffset,
+        .bufferRowLength = 0,
+        .bufferImageHeight = 0,
+        .imageSubresource =
+            {
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .layerCount = 1,
+            },
+        .imageOffset = {0, 0, 0},
+        .imageExtent = dstTextureData.extent,
+    };
+
+    vkCmdCopyBufferToImage(cmdbuf, srcBufferData.buffer, dstTextureData.image, dstTextureData.layout, 1, &region);
 }
 
 } // namespace nyla

@@ -25,12 +25,9 @@ enum class RhiFlags : uint32_t
 {
     VSync = 1 << 0,
 };
+NYLA_BITENUM(RhiFlags);
 
-template <> struct EnableBitMaskOps<RhiFlags> : std::true_type
-{
-};
-
-struct RhiDesc
+struct RhiInitDesc
 {
     RhiFlags flags;
 
@@ -38,10 +35,18 @@ struct RhiDesc
     uint32_t numFramesInFlight;
 };
 
-void RhiInit(const RhiDesc &);
-auto RhiGetNumFramesInFlight() -> uint32_t;
-auto RhiGetFrameIndex() -> uint32_t;
-auto RhiGetMinUniformBufferOffsetAlignment() -> uint32_t;
-auto RhiGetOptimalBufferCopyOffsetAlignment() -> uint32_t;
+class Rhi
+{
+  public:
+    void Init(const RhiInitDesc &);
+    auto GetNumFramesInFlight() -> uint32_t;
+    auto GetFrameIndex() -> uint32_t;
+    auto GetMinUniformBufferOffsetAlignment() -> uint32_t;
+    auto GetOptimalBufferCopyOffsetAlignment() -> uint32_t;
+
+  private:
+    class Impl;
+    Impl *impl;
+};
 
 } // namespace nyla

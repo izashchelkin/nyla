@@ -8,25 +8,20 @@ namespace nyla
 
 using namespace rhi_vulkan_internal;
 
-namespace
-{
-
-auto GetDeviceQueue(RhiQueueType queueType) -> DeviceQueue &
+auto Rhi::Impl::GetDeviceQueue(RhiQueueType queueType) -> DeviceQueue &
 {
     switch (queueType)
     {
     case RhiQueueType::Graphics:
-        return vk.graphicsQueue;
+        return m_GraphicsQueue;
     case RhiQueueType::Transfer:
-        return vk.transferQueue;
+        return m_TransferQueue;
     }
     NYLA_ASSERT(false);
-    return vk.graphicsQueue;
+    return m_GraphicsQueue;
 }
 
-} // namespace
-
-auto RhiCreateCmdList(RhiQueueType queueType) -> RhiCmdList
+auto Rhi::Impl::CreateCmdList(RhiQueueType queueType) -> RhiCmdList
 {
     VkCommandPool cmdPool = GetDeviceQueue(queueType).cmdPool;
     const VkCommandBufferAllocateInfo allocInfo{
@@ -37,38 +32,38 @@ auto RhiCreateCmdList(RhiQueueType queueType) -> RhiCmdList
     };
 
     VkCommandBuffer commandBuffer;
-    VK_CHECK(vkAllocateCommandBuffers(vk.dev, &allocInfo, &commandBuffer));
+    VK_CHECK(vkAllocateCommandBuffers(m_Dev, &allocInfo, &commandBuffer));
 
     const VulkanCmdListData cmdData{
         .cmdbuf = commandBuffer,
         .queueType = queueType,
     };
 
-    RhiCmdList cmd = rhiHandles.cmdLists.Acquire(cmdData);
+    RhiCmdList cmd = m_CmdLists.Acquire(cmdData);
     return cmd;
 }
 
-void RhiNameCmdList(RhiCmdList cmd, std::string_view name)
+void Rhi::Impl::NameCmdList(RhiCmdList cmd, std::string_view name)
 {
-    VulkanCmdListData cmdData = rhiHandles.cmdLists.ResolveData(cmd);
+    VulkanCmdListData cmdData = m_CmdLists.ResolveData(cmd);
     VulkanNameHandle(VK_OBJECT_TYPE_COMMAND_BUFFER, (uint64_t)cmdData.cmdbuf, name);
 }
 
-void RhiDestroyCmdList(RhiCmdList cmd)
+void Rhi::Impl::DestroyCmdList(RhiCmdList cmd)
 {
-    VulkanCmdListData cmdData = rhiHandles.cmdLists.ReleaseData(cmd);
+    VulkanCmdListData cmdData = m_CmdLists.ReleaseData(cmd);
     VkCommandPool cmdPool = GetDeviceQueue(cmdData.queueType).cmdPool;
-    vkFreeCommandBuffers(vk.dev, cmdPool, 1, &cmdData.cmdbuf);
+    vkFreeCommandBuffers(m_Dev, cmdPool, 1, &cmdData.cmdbuf);
 }
 
-auto RhiCmdSetCheckpoint(RhiCmdList cmd, uint64_t data) -> uint64_t
+auto Rhi::Impl::CmdSetCheckpoint(RhiCmdList cmd, uint64_t data) -> uint64_t
 {
     if constexpr (!kRhiCheckpoints)
     {
         return data;
     }
 
-    VulkanCmdListData cmdData = rhiHandles.cmdLists.ResolveData(cmd);
+    VulkanCmdListData cmdData = m_CmdLists.ResolveData(cmd);
 
     static auto fn = VK_GET_INSTANCE_PROC_ADDR(vkCmdSetCheckpointNV);
     fn(cmdData.cmdbuf, reinterpret_cast<void *>(data));
@@ -76,7 +71,7 @@ auto RhiCmdSetCheckpoint(RhiCmdList cmd, uint64_t data) -> uint64_t
     return data;
 }
 
-auto RhiGetLastCheckpointData(RhiQueueType queueType) -> uint64_t
+auto Rhi::Impl::GetLastCheckpointData(RhiQueueType queueType) -> uint64_t
 {
     if constexpr (!kRhiCheckpoints)
     {

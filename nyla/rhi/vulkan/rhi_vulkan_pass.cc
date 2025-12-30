@@ -8,14 +8,14 @@ namespace nyla
 
 using namespace rhi_vulkan_internal;
 
-void RhiPassBegin(RhiPassDesc desc)
+void Rhi::Impl::PassBegin(RhiPassDesc desc)
 {
-    RhiCmdList cmd = vk.graphicsQueueCmd[vk.frameIndex];
-    VkCommandBuffer cmdbuf = rhiHandles.cmdLists.ResolveData(cmd).cmdbuf;
+    RhiCmdList cmd = m_GraphicsQueueCmd[m_FrameIndex];
+    VkCommandBuffer cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
 
     RhiCmdTransitionTexture(cmd, desc.colorTarget, desc.state);
 
-    const VulkanTextureData colorTargetData = rhiHandles.textures.ResolveData(desc.colorTarget);
+    const VulkanTextureData colorTargetData = m_Textures.ResolveData(desc.colorTarget);
 
     const VkRenderingAttachmentInfo colorAttachmentInfo{
         .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
@@ -57,10 +57,10 @@ void RhiPassBegin(RhiPassDesc desc)
     vkCmdSetScissor(cmdbuf, 0, 1, &scissor);
 }
 
-void RhiPassEnd(RhiPassDesc desc)
+void Rhi::Impl::PassEnd(RhiPassDesc desc)
 {
-    RhiCmdList cmd = vk.graphicsQueueCmd[vk.frameIndex];
-    VkCommandBuffer cmdbuf = rhiHandles.cmdLists.ResolveData(cmd).cmdbuf;
+    RhiCmdList cmd = m_GraphicsQueueCmd[m_FrameIndex];
+    VkCommandBuffer cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
     vkCmdEndRendering(cmdbuf);
 
     RhiCmdTransitionTexture(cmd, desc.colorTarget, desc.state);

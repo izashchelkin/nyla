@@ -6,18 +6,18 @@ namespace nyla
 
 using namespace rhi_vulkan_internal;
 
-auto RhiFrameBegin() -> RhiCmdList
+auto Rhi::Impl::FrameBegin() -> RhiCmdList
 {
-    WaitTimeline(vk.graphicsQueue.timeline, vk.graphicsQueueCmdDone[vk.frameIndex]);
+    WaitTimeline(m_GraphicsQueue.timeline, m_GraphicsQueueCmdDone[m_FrameIndex]);
 
     VkResult acquireResult =
-        vkAcquireNextImageKHR(vk.dev, vk.swapchain, std::numeric_limits<uint64_t>::max(),
-                              vk.swapchainAcquireSemaphores[vk.frameIndex], VK_NULL_HANDLE, &vk.swapchainTextureIndex);
+        vkAcquireNextImageKHR(m_Dev, m_Swapchain, std::numeric_limits<uint64_t>::max(),
+                              m_SwapchainAcquireSemaphores[m_FrameIndex], VK_NULL_HANDLE, &m_SwapchainTextureIndex);
     switch (acquireResult)
     { // TODO: is drag a problem?
     case VK_ERROR_OUT_OF_DATE_KHR:
     case VK_SUBOPTIMAL_KHR: {
-        vkDeviceWaitIdle(vk.dev);
+        vkDeviceWaitIdle(m_Dev);
         CreateSwapchain();
 
         return RhiFrameBegin();
@@ -29,8 +29,8 @@ auto RhiFrameBegin() -> RhiCmdList
     }
     }
 
-    RhiCmdList cmd = vk.graphicsQueueCmd[vk.frameIndex];
-    VkCommandBuffer cmdbuf = rhiHandles.cmdLists.ResolveData(cmd).cmdbuf;
+    RhiCmdList cmd = m_GraphicsQueueCmd[m_FrameIndex];
+    VkCommandBuffer cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
 
     VK_CHECK(vkResetCommandBuffer(cmdbuf, 0));
 
@@ -42,10 +42,10 @@ auto RhiFrameBegin() -> RhiCmdList
     return cmd;
 }
 
-void RhiFrameEnd()
+void Rhi::Impl::FrameEnd()
 {
-    RhiCmdList cmd = vk.graphicsQueueCmd[vk.frameIndex];
-    VkCommandBuffer cmdbuf = rhiHandles.cmdLists.ResolveData(cmd).cmdbuf;
+    RhiCmdList cmd = m_GraphicsQueueCmd[m_FrameIndex];
+    VkCommandBuffer cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
 
     VK_CHECK(vkEndCommandBuffer(cmdbuf));
 
@@ -53,20 +53,20 @@ void RhiFrameEnd()
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
     };
 
-    const VkSemaphore acquireSemaphore = vk.swapchainAcquireSemaphores[vk.frameIndex];
-    const VkSemaphore renderFinishedSemaphore = vk.renderFinishedSemaphores[vk.swapchainTextureIndex];
+    const VkSemaphore acquireSemaphore = m_SwapchainAcquireSemaphores[m_FrameIndex];
+    const VkSemaphore renderFinishedSemaphore = m_RenderFinishedSemaphores[m_SwapchainTextureIndex];
 
     const std::array<VkSemaphore, 2> signalSemaphores{
-        vk.graphicsQueue.timeline,
+        m_GraphicsQueue.timeline,
         renderFinishedSemaphore,
     };
 
-    vk.graphicsQueueCmdDone[vk.frameIndex] = vk.graphicsQueue.timelineNext++;
+    m_GraphicsQueueCmdDone[m_FrameIndex] = m_GraphicsQueue.timelineNext++;
 
     const VkTimelineSemaphoreSubmitInfo timelineSubmitInfo{
         .sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
         .signalSemaphoreValueCount = signalSemaphores.size(),
-        .pSignalSemaphoreValues = &vk.graphicsQueueCmdDone[vk.frameIndex],
+        .pSignalSemaphoreValues = &m_GraphicsQueueCmdDone[m_FrameIndex],
     };
 
     const VkSubmitInfo submitInfo{
@@ -80,23 +80,23 @@ void RhiFrameEnd()
         .signalSemaphoreCount = std::size(signalSemaphores),
         .pSignalSemaphores = signalSemaphores.data(),
     };
-    VK_CHECK(vkQueueSubmit(vk.graphicsQueue.queue, 1, &submitInfo, VK_NULL_HANDLE));
+    VK_CHECK(vkQueueSubmit(m_GraphicsQueue.queue, 1, &submitInfo, VK_NULL_HANDLE));
 
     const VkPresentInfoKHR presentInfo{
         .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
         .waitSemaphoreCount = 1,
         .pWaitSemaphores = &renderFinishedSemaphore,
         .swapchainCount = 1,
-        .pSwapchains = &vk.swapchain,
-        .pImageIndices = &vk.swapchainTextureIndex,
+        .pSwapchains = &m_Swapchain,
+        .pImageIndices = &m_SwapchainTextureIndex,
     };
 
-    const VkResult presentResult = vkQueuePresentKHR(vk.graphicsQueue.queue, &presentInfo);
+    const VkResult presentResult = vkQueuePresentKHR(m_GraphicsQueue.queue, &presentInfo);
     switch (presentResult)
     {
     case VK_ERROR_OUT_OF_DATE_KHR:
     case VK_SUBOPTIMAL_KHR: {
-        vkQueueWaitIdle(vk.graphicsQueue.queue);
+        vkQueueWaitIdle(m_GraphicsQueue.queue);
         CreateSwapchain();
         break;
     }
@@ -107,22 +107,22 @@ void RhiFrameEnd()
     }
     }
 
-    vk.frameIndex = (vk.frameIndex + 1) % vk.numFramesInFlight;
+    m_FrameIndex = (m_FrameIndex + 1) % m_NumFramesInFlight;
 }
 
-auto RhiGetFrameIndex() -> uint32_t
+auto Rhi::Impl::GetFrameIndex() -> uint32_t
 {
-    return vk.frameIndex;
+    return m_FrameIndex;
 }
 
-auto RhiFrameGetCmdList() -> RhiCmdList
+auto Rhi::Impl::FrameGetCmdList() -> RhiCmdList
 { // TODO: get rid of this
-    return vk.graphicsQueueCmd[vk.frameIndex];
+    return m_GraphicsQueueCmd[m_FrameIndex];
 }
 
-auto RhiGetNumFramesInFlight() -> uint32_t
+auto Rhi::Impl::GetNumFramesInFlight() -> uint32_t
 {
-    return vk.numFramesInFlight;
+    return m_NumFramesInFlight;
 }
 
 } // namespace nyla

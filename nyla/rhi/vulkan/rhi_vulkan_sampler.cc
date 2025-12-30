@@ -39,7 +39,7 @@ auto ConvertSamplerAddressMode(RhiSamplerAddressMode addressMode) -> VkSamplerAd
 
 } // namespace
 
-auto RhiCreateSampler(const RhiSamplerDesc &desc) -> RhiSampler
+auto Rhi::Impl::CreateSampler(const RhiSamplerDesc &desc) -> RhiSampler
 {
     const VkSamplerCreateInfo createInfo{
         .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
@@ -57,15 +57,15 @@ auto RhiCreateSampler(const RhiSamplerDesc &desc) -> RhiSampler
     };
 
     VulkanSamplerData samplerData;
-    VK_CHECK(vkCreateSampler(vk.dev, &createInfo, vk.alloc, &samplerData.sampler));
+    VK_CHECK(vkCreateSampler(m_Dev, &createInfo, m_Alloc, &samplerData.sampler));
 
-    return rhiHandles.samplers.Acquire(samplerData);
+    return m_Samplers.Acquire(samplerData);
 }
 
-void RhiDestroySampler(RhiSampler sampler)
+void Rhi::Impl::DestroySampler(RhiSampler sampler)
 {
-    VulkanSamplerData samplerData = rhiHandles.samplers.ReleaseData(sampler);
-    vkDestroySampler(vk.dev, samplerData.sampler, vk.alloc);
+    VulkanSamplerData samplerData = m_Samplers.ReleaseData(sampler);
+    vkDestroySampler(m_Dev, samplerData.sampler, m_Alloc);
 }
 
 } // namespace nyla

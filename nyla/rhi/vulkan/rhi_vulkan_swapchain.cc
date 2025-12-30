@@ -19,19 +19,19 @@ namespace rhi_vulkan_internal
 
 void CreateSwapchain()
 {
-    VkSwapchainKHR oldSwapchain = vk.swapchain;
+    VkSwapchainKHR oldSwapchain = m_Swapchain;
 
-    std::array oldSwapchainTextures = vk.swapchainTextures;
-    uint32_t oldImagesViewsCount = vk.swapchainTexturesCount;
+    std::array oldSwapchainTextures = m_SwapchainTextures;
+    uint32_t oldImagesViewsCount = m_SwapchainTexturesCount;
 
     static bool logPresentModes = true;
     VkPresentModeKHR presentMode = [] -> VkPresentModeKHR {
         std::vector<VkPresentModeKHR> presentModes;
         uint32_t presentModeCount = 0;
-        vkGetPhysicalDeviceSurfacePresentModesKHR(vk.physDev, vk.surface, &presentModeCount, nullptr);
+        vkGetPhysicalDeviceSurfacePresentModesKHR(m_PhysDev, vm_Surface, &presentModeCount, nullptr);
 
         presentModes.resize(presentModeCount);
-        vkGetPhysicalDeviceSurfacePresentModesKHR(vk.physDev, vk.surface, &presentModeCount, presentModes.data());
+        vkGetPhysicalDeviceSurfacePresentModesKHR(m_PhysDev, vm_Surface, &presentModeCount, presentModes.data());
 
         VkPresentModeKHR bestMode = VK_PRESENT_MODE_FIFO_KHR;
         for (VkPresentModeKHR presentMode : presentModes)
@@ -44,11 +44,11 @@ void CreateSwapchain()
             {
 
             case VK_PRESENT_MODE_FIFO_LATEST_READY_KHR: {
-                better = !Any(vk.flags & RhiFlags::VSync);
+                better = !Any(m_Flags & RhiFlags::VSync);
                 break;
             }
             case VK_PRESENT_MODE_IMMEDIATE_KHR: {
-                better = !Any(vk.flags & RhiFlags::VSync) && bestMode != VK_PRESENT_MODE_FIFO_LATEST_READY_KHR;
+                better = !Any(m_Flags & RhiFlags::VSync) && bestMode != VK_PRESENT_MODE_FIFO_LATEST_READY_KHR;
                 break;
             }
 
@@ -73,14 +73,14 @@ void CreateSwapchain()
     }();
 
     VkSurfaceCapabilitiesKHR surfaceCapabilities;
-    VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vk.physDev, vk.surface, &surfaceCapabilities));
+    VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_PhysDev, vm_Surface, &surfaceCapabilities));
 
     auto surfaceFormat = [] -> VkSurfaceFormatKHR {
         uint32_t surfaceFormatCount;
-        VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(vk.physDev, vk.surface, &surfaceFormatCount, nullptr));
+        VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(m_PhysDev, vm_Surface, &surfaceFormatCount, nullptr));
 
         std::vector<VkSurfaceFormatKHR> surfaceFormats(surfaceFormatCount);
-        vkGetPhysicalDeviceSurfaceFormatsKHR(vk.physDev, vk.surface, &surfaceFormatCount, surfaceFormats.data());
+        vkGetPhysicalDeviceSurfaceFormatsKHR(m_PhysDev, vm_Surface, &surfaceFormatCount, surfaceFormats.data());
 
         auto it = std::ranges::find_if(surfaceFormats, [](VkSurfaceFormatKHR surfaceFormat) -> bool {
             return surfaceFormat.format == VK_FORMAT_B8G8R8A8_SRGB &&
@@ -94,7 +94,7 @@ void CreateSwapchain()
         if (surfaceCapabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
             return surfaceCapabilities.currentExtent;
 
-        const PlatformWindowSize windowSize = g_Platform->GetWindowSize(vk.window);
+        const PlatformWindowSize windowSize = g_Platform->GetWindowSize(m_Window);
         return VkExtent2D{
             .width = std::clamp(windowSize.width, surfaceCapabilities.minImageExtent.width,
                                 surfaceCapabilities.maxImageExtent.width),
@@ -110,7 +110,7 @@ void CreateSwapchain()
 
     const VkSwapchainCreateInfoKHR createInfo{
         .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-        .surface = vk.surface,
+        .surface = m_Surface,
         .minImageCount = swapchainMinImageCount,
         .imageFormat = surfaceFormat.format,
         .imageColorSpace = surfaceFormat.colorSpace,
@@ -122,20 +122,20 @@ void CreateSwapchain()
         .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
         .presentMode = presentMode,
         .clipped = VK_TRUE,
-        .oldSwapchain = vk.swapchain,
+        .oldSwapchain = m_Swapchain,
     };
-    VK_CHECK(vkCreateSwapchainKHR(vk.dev, &createInfo, nullptr, &vk.swapchain));
+    VK_CHECK(vkCreateSwapchainKHR(m_Dev, &createInfo, nullptr, &vm_Swapchain));
 
-    vkGetSwapchainImagesKHR(vk.dev, vk.swapchain, &vk.swapchainTexturesCount, nullptr);
+    vkGetSwapchainImagesKHR(m_Dev, vm_Swapchain, &vm_SwapchainTexturesCount, nullptr);
 
-    NYLA_ASSERT(vk.swapchainTexturesCount <= kRhiMaxNumSwapchainTextures);
+    NYLA_ASSERT(m_SwapchainTexturesCount <= kRhiMaxNumSwapchainTextures);
     std::array<VkImage, kRhiMaxNumSwapchainTextures> swapchainImages;
 
-    vkGetSwapchainImagesKHR(vk.dev, vk.swapchain, &vk.swapchainTexturesCount, swapchainImages.data());
+    vkGetSwapchainImagesKHR(m_Dev, vm_Swapchain, &vm_SwapchainTexturesCount, swapchainImages.data());
 
-    for (size_t i = 0; i < vk.swapchainTexturesCount; ++i)
+    for (size_t i = 0; i < m_SwapchainTexturesCount; ++i)
     {
-        vk.swapchainTextures[i] = RhiCreateTextureFromSwapchainImage(swapchainImages[i], surfaceFormat, surfaceExtent);
+        m_SwapchainTextures[i] = RhiCreateTextureFromSwapchainImage(swapchainImages[i], surfaceFormat, surfaceExtent);
 
 #if 0
         const VkImageCreateInfo depthImageCreateInfo{
@@ -143,7 +143,7 @@ void CreateSwapchain()
 
             .imageType = VK_IMAGE_TYPE_2D,
             .format = VK_FORMAT_D32_SFLOAT,
-            .extent = VkExtent3D{vk.surfaceExtent.width, vk.surfaceExtent.height, 1},
+            .extent = VkExtent3D{m_SurfaceExtent.width, vm_SurfaceExtent.height, 1},
             .mipLevels = 1,
             .arrayLayers = 1,
             .samples = VK_SAMPLE_COUNT_1_BIT,
@@ -169,7 +169,7 @@ void CreateSwapchain()
         };
 
         VkImage depthImage;
-        VK_CHECK(vkCreateImage(vk.dev, &depthImageCreateInfo, vk.alloc, &depthImage));
+        VK_CHECK(vkCreateImage(m_Dev, &depthImageCreateInfo, vm_Alloc, &depthImage));
 
         const VkImageViewCreateInfo depthImageImageViewCreateInfo{
             .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -187,7 +187,7 @@ void CreateSwapchain()
         };
 
         VkImageView depthImageView;
-        // VK_CHECK(vkCreateImageView(vk.dev, &depthImageImageViewCreateInfo, vk.alloc, &depthImageView));
+        // VK_CHECK(vkCreateImageView(m_Dev, &depthImageImageViewCreateInfo, vm_Alloc, &depthImageView));
 #endif
     }
 
@@ -197,7 +197,7 @@ void CreateSwapchain()
         for (uint32_t i = 0; i < oldImagesViewsCount; ++i)
             RhiDestroySwapchainTexture(oldSwapchainTextures[i]);
 
-        vkDestroySwapchainKHR(vk.dev, oldSwapchain, nullptr);
+        vkDestroySwapchainKHR(m_Dev, oldSwapchain, nullptr);
     }
 }
 
@@ -220,7 +220,7 @@ auto RhiCreateTextureFromSwapchainImage(VkImage image, VkSurfaceFormatKHR surfac
     };
 
     VkImageView imageView;
-    VK_CHECK(vkCreateImageView(vk.dev, &imageViewCreateInfo, vk.alloc, &imageView));
+    VK_CHECK(vkCreateImageView(m_Dev, &imageViewCreateInfo, vm_Alloc, &imageView));
 
     VulkanTextureData textureData{
         .isSwapchain = true,
@@ -232,16 +232,16 @@ auto RhiCreateTextureFromSwapchainImage(VkImage image, VkSurfaceFormatKHR surfac
         .extent = {surfaceExtent.width, surfaceExtent.height, 1},
     };
 
-    return rhiHandles.textures.Acquire(textureData);
+    return m_Textures.Acquire(textureData);
 }
 
 void RhiDestroySwapchainTexture(RhiTexture texture)
 {
-    VulkanTextureData textureData = rhiHandles.textures.ReleaseData(texture);
+    VulkanTextureData textureData = m_Textures.ReleaseData(texture);
     NYLA_ASSERT(textureData.isSwapchain);
 
     NYLA_ASSERT(textureData.imageView);
-    vkDestroyImageView(vk.dev, textureData.imageView, vk.alloc);
+    vkDestroyImageView(m_Dev, textureData.imageView, vm_Alloc);
 
     NYLA_ASSERT(textureData.image);
 }
@@ -250,7 +250,7 @@ void RhiDestroySwapchainTexture(RhiTexture texture)
 
 auto RhiGetBackbufferTexture() -> RhiTexture
 {
-    return vk.swapchainTextures[vk.swapchainTextureIndex];
+    return m_SwapchainTextures[vm_SwapchainTextureIndex];
 }
 
 } // namespace nyla

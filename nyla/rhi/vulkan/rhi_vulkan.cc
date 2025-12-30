@@ -34,13 +34,7 @@ namespace nyla
 
 using namespace rhi_vulkan_internal;
 
-namespace rhi_vulkan_internal
-{
-
-VulkanData vk;
-RhiHandles rhiHandles;
-
-auto ConvertRhiVertexFormatIntoVkFormat(RhiVertexFormat format) -> VkFormat
+auto Rhi::Impl::ConvertVertexFormatIntoVkFormat(RhiVertexFormat format) -> VkFormat
 {
     switch (format)
     {
@@ -55,7 +49,7 @@ auto ConvertRhiVertexFormatIntoVkFormat(RhiVertexFormat format) -> VkFormat
     return static_cast<VkFormat>(0);
 }
 
-auto ConvertRhiShaderStageIntoVkShaderStageFlags(RhiShaderStage stageFlags) -> VkShaderStageFlags
+auto Rhi::Impl::ConvertShaderStageIntoVkShaderStageFlags(RhiShaderStage stageFlags) -> VkShaderStageFlags
 {
     VkShaderStageFlags ret = 0;
     if (Any(stageFlags & RhiShaderStage::Vertex))
@@ -69,9 +63,10 @@ auto ConvertRhiShaderStageIntoVkShaderStageFlags(RhiShaderStage stageFlags) -> V
     return ret;
 }
 
-auto DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-                            VkDebugUtilsMessageTypeFlagsEXT messageType,
-                            const VkDebugUtilsMessengerCallbackDataEXT *callbackData, void *userData) -> VkBool32
+auto Rhi::Impl::DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+                                       VkDebugUtilsMessageTypeFlagsEXT messageType,
+                                       const VkDebugUtilsMessengerCallbackDataEXT *callbackData, void *userData)
+    -> VkBool32
 {
     switch (messageSeverity)
     {
@@ -92,7 +87,7 @@ auto DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeveri
     return VK_FALSE;
 }
 
-void VulkanNameHandle(VkObjectType type, uint64_t handle, std::string_view name)
+void Rhi::Impl::VulkanNameHandle(VkObjectType type, uint64_t handle, std::string_view name)
 {
     auto nameCopy = std::string{name};
     const VkDebugUtilsObjectNameInfoEXT nameInfo{
@@ -103,27 +98,25 @@ void VulkanNameHandle(VkObjectType type, uint64_t handle, std::string_view name)
     };
 
     static auto fn = VK_GET_INSTANCE_PROC_ADDR(vkSetDebugUtilsObjectNameEXT);
-    fn(vk.dev, &nameInfo);
+    fn(m_Dev, &nameInfo);
 }
 
-} // namespace rhi_vulkan_internal
-
-void RhiInit(const RhiDesc &rhiDesc)
+void Rhi::Impl::Init(const RhiDesc &rhiDesc)
 {
     constexpr uint32_t kInvalidIndex = std::numeric_limits<uint32_t>::max();
 
     NYLA_ASSERT(rhiDesc.numFramesInFlight <= kRhiMaxNumFramesInFlight);
     if (rhiDesc.numFramesInFlight)
     {
-        vk.numFramesInFlight = rhiDesc.numFramesInFlight;
+        m_NumFramesInFlight = rhiDesc.numFramesInFlight;
     }
     else
     {
-        vk.numFramesInFlight = 2;
+        m_NumFramesInFlight = 2;
     }
 
-    vk.flags = rhiDesc.flags;
-    vk.window = rhiDesc.window;
+    m_Flags = rhiDesc.flags;
+    m_Window = rhiDesc.window;
 
     const VkApplicationInfo appInfo{
         .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
@@ -166,7 +159,11 @@ void RhiInit(const RhiDesc &rhiDesc)
                            VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
         .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
                        VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
-        .pfnUserCallback = DebugMessengerCallback,
+        .pfnUserCallback = [](VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+                              VkDebugUtilsMessageTypeFlagsEXT messageType,
+                              const VkDebugUtilsMessengerCallbackDataEXT *callbackData,
+                              void *userData) -> VkBool32 { return ((Rhi::Impl *)userData)->DebugMessengerCallback(); },
+        .pfnUserData = this,
     };
 
     std::vector<VkLayerProperties> layers;
@@ -245,19 +242,19 @@ void RhiInit(const RhiDesc &rhiDesc)
         .enabledExtensionCount = static_cast<uint32_t>(enabledInstanceExtensions.size()),
         .ppEnabledExtensionNames = enabledInstanceExtensions.data(),
     };
-    VK_CHECK(vkCreateInstance(&instanceCreateInfo, nullptr, &vk.instance));
+    VK_CHECK(vkCreateInstance(&instanceCreateInfo, nullptr, &m_Instance));
 
     if constexpr (kRhiValidations)
     {
         auto createDebugUtilsMessenger = VK_GET_INSTANCE_PROC_ADDR(vkCreateDebugUtilsMessengerEXT);
-        VK_CHECK(createDebugUtilsMessenger(vk.instance, &debugMessengerCreateInfo, nullptr, &debugMessenger));
+        VK_CHECK(createDebugUtilsMessenger(m_Instance, &debugMessengerCreateInfo, nullptr, &debugMessenger));
     }
 
     uint32_t numPhysDevices = 0;
-    VK_CHECK(vkEnumeratePhysicalDevices(vk.instance, &numPhysDevices, nullptr));
+    VK_CHECK(vkEnumeratePhysicalDevices(m_Instance, &numPhysDevices, nullptr));
 
     std::vector<VkPhysicalDevice> physDevs(numPhysDevices);
-    VK_CHECK(vkEnumeratePhysicalDevices(vk.instance, &numPhysDevices, physDevs.data()));
+    VK_CHECK(vkEnumeratePhysicalDevices(m_Instance, &numPhysDevices, physDevs.data()));
 
     std::vector<const char *> deviceExtensions;
     deviceExtensions.emplace_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
@@ -348,24 +345,24 @@ void RhiInit(const RhiDesc &rhiDesc)
         }
 
         // TODO: pick best device
-        vk.physDev = physDev;
-        vk.physDevProps = props;
-        vk.physDevMemProps = memProps;
-        vk.graphicsQueue.queueFamilyIndex = graphicsQueueIndex;
-        vk.transferQueue.queueFamilyIndex = transferQueueIndex;
+        m_PhysDev = physDev;
+        m_PhysDevProps = props;
+        m_PhysDevMemProps = memProps;
+        m_GraphicsQueue.queueFamilyIndex = graphicsQueueIndex;
+        m_TransferQueue.queueFamilyIndex = transferQueueIndex;
 
         break;
     }
 
-    NYLA_ASSERT(vk.physDev);
+    NYLA_ASSERT(m_PhysDev);
 
     const float queuePriority = 1.0f;
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-    if (vk.transferQueue.queueFamilyIndex == kInvalidIndex)
+    if (m_TransferQueue.queueFamilyIndex == kInvalidIndex)
     {
         queueCreateInfos.emplace_back(VkDeviceQueueCreateInfo{
             .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-            .queueFamilyIndex = vk.graphicsQueue.queueFamilyIndex,
+            .queueFamilyIndex = m_GraphicsQueue.queueFamilyIndex,
             .queueCount = 1,
             .pQueuePriorities = &queuePriority,
         });
@@ -376,14 +373,14 @@ void RhiInit(const RhiDesc &rhiDesc)
 
         queueCreateInfos.emplace_back(VkDeviceQueueCreateInfo{
             .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-            .queueFamilyIndex = vk.graphicsQueue.queueFamilyIndex,
+            .queueFamilyIndex = m_GraphicsQueue.queueFamilyIndex,
             .queueCount = 1,
             .pQueuePriorities = &queuePriority,
         });
 
         queueCreateInfos.emplace_back(VkDeviceQueueCreateInfo{
             .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-            .queueFamilyIndex = vk.transferQueue.queueFamilyIndex,
+            .queueFamilyIndex = m_TransferQueue.queueFamilyIndex,
             .queueCount = 1,
             .pQueuePriorities = &queuePriority,
         });
@@ -439,18 +436,18 @@ void RhiInit(const RhiDesc &rhiDesc)
         .enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size()),
         .ppEnabledExtensionNames = deviceExtensions.data(),
     };
-    VK_CHECK(vkCreateDevice(vk.physDev, &deviceCreateInfo, nullptr, &vk.dev));
+    VK_CHECK(vkCreateDevice(m_PhysDev, &deviceCreateInfo, nullptr, &m_Dev));
 
-    vkGetDeviceQueue(vk.dev, vk.graphicsQueue.queueFamilyIndex, 0, &vk.graphicsQueue.queue);
+    vkGetDeviceQueue(m_Dev, m_GraphicsQueue.queueFamilyIndex, 0, &m_GraphicsQueue.queue);
 
-    if (vk.transferQueue.queueFamilyIndex == kInvalidIndex)
+    if (m_TransferQueue.queueFamilyIndex == kInvalidIndex)
     {
-        vk.transferQueue.queueFamilyIndex = vk.graphicsQueue.queueFamilyIndex;
-        vk.transferQueue.queue = vk.graphicsQueue.queue;
+        m_TransferQueue.queueFamilyIndex = m_GraphicsQueue.queueFamilyIndex;
+        m_TransferQueue.queue = m_GraphicsQueue.queue;
     }
     else
     {
-        vkGetDeviceQueue(vk.dev, vk.transferQueue.queueFamilyIndex, 0, &vk.transferQueue.queue);
+        vkGetDeviceQueue(m_Dev, m_TransferQueue.queueFamilyIndex, 0, &m_TransferQueue.queue);
     }
 
     auto initQueue = [](DeviceQueue &queue, RhiQueueType queueType, std::span<RhiCmdList> cmd) -> void {
@@ -459,7 +456,7 @@ void RhiInit(const RhiDesc &rhiDesc)
             .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
             .queueFamilyIndex = queue.queueFamilyIndex,
         };
-        VK_CHECK(vkCreateCommandPool(vk.dev, &commandPoolCreateInfo, nullptr, &queue.cmdPool));
+        VK_CHECK(vkCreateCommandPool(m_Dev, &commandPoolCreateInfo, nullptr, &queue.cmdPool));
 
         queue.timeline = CreateTimeline(0);
         queue.timelineNext = 1;
@@ -469,19 +466,19 @@ void RhiInit(const RhiDesc &rhiDesc)
             i = RhiCreateCmdList(queueType);
         }
     };
-    initQueue(vk.graphicsQueue, RhiQueueType::Graphics, std::span{vk.graphicsQueueCmd.data(), vk.numFramesInFlight});
-    initQueue(vk.transferQueue, RhiQueueType::Transfer, std::span{&vk.transferQueueCmd, 1});
+    initQueue(m_GraphicsQueue, RhiQueueType::Graphics, std::span{m_GraphicsQueueCmd.data(), m_NumFramesInFlight});
+    initQueue(m_TransferQueue, RhiQueueType::Transfer, std::span{&m_TransferQueueCmd, 1});
 
     const VkSemaphoreCreateInfo semaphoreCreateInfo{
         .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
     };
-    for (size_t i = 0; i < vk.numFramesInFlight; ++i)
+    for (size_t i = 0; i < m_NumFramesInFlight; ++i)
     {
-        VK_CHECK(vkCreateSemaphore(vk.dev, &semaphoreCreateInfo, nullptr, vk.swapchainAcquireSemaphores.data() + i));
+        VK_CHECK(vkCreateSemaphore(m_Dev, &semaphoreCreateInfo, nullptr, m_SwapchainAcquireSemaphores.data() + i));
     }
     for (size_t i = 0; i < kRhiMaxNumSwapchainTextures; ++i)
     {
-        VK_CHECK(vkCreateSemaphore(vk.dev, &semaphoreCreateInfo, nullptr, vk.renderFinishedSemaphores.data() + i));
+        VK_CHECK(vkCreateSemaphore(m_Dev, &semaphoreCreateInfo, nullptr, m_RenderFinishedSemaphores.data() + i));
     }
 
     const std::array<VkDescriptorPoolSize, 4> descriptorPoolSizes{
@@ -499,35 +496,35 @@ void RhiInit(const RhiDesc &rhiDesc)
         .poolSizeCount = static_cast<uint32_t>(descriptorPoolSizes.size()),
         .pPoolSizes = descriptorPoolSizes.data(),
     };
-    vkCreateDescriptorPool(vk.dev, &descriptorPoolCreateInfo, nullptr, &vk.descriptorPool);
+    vkCreateDescriptorPool(m_Dev, &descriptorPoolCreateInfo, nullptr, &m_DescriptorPool);
 
 #if defined(__linux__)
     const VkXcbSurfaceCreateInfoKHR surfaceCreateInfo{
         .sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR,
         .connection = xcb_connect(nullptr, nullptr),
-        .window = static_cast<xcb_window_t>(vk.window.handle),
+        .window = static_cast<xcb_window_t>(m_Window.handle),
     };
-    VK_CHECK(vkCreateXcbSurfaceKHR(vk.instance, &surfaceCreateInfo, vk.alloc, &vk.surface));
+    VK_CHECK(vkCreateXcbSurfaceKHR(m_Instance, &surfaceCreateInfo, m_Alloc, &m_Surface));
 #else
     const VkWin32SurfaceCreateInfoKHR surfaceCreateInfo{
         .sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
         .hinstance = g_Platform->GetImpl()->GetHInstance(),
-        .hwnd = reinterpret_cast<HWND>(vk.window.handle),
+        .hwnd = reinterpret_cast<HWND>(m_Window.handle),
     };
-    vkCreateWin32SurfaceKHR(vk.instance, &surfaceCreateInfo, vk.alloc, &vk.surface);
+    vkCreateWin32SurfaceKHR(m_Instance, &surfaceCreateInfo, m_Alloc, &m_Surface);
 #endif
 
     CreateSwapchain();
 }
 
-auto RhiGetMinUniformBufferOffsetAlignment() -> uint32_t
+auto Rhi::Impl::GetMinUniformBufferOffsetAlignment() -> uint32_t
 {
-    return vk.physDevProps.limits.minUniformBufferOffsetAlignment;
+    return m_PhysDevProps.limits.minUniformBufferOffsetAlignment;
 }
 
-auto RhiGetOptimalBufferCopyOffsetAlignment() -> uint32_t
+auto Rhi::Impl::GetOptimalBufferCopyOffsetAlignment() -> uint32_t
 {
-    return vk.physDevProps.limits.optimalBufferCopyOffsetAlignment;
+    return m_PhysDevProps.limits.optimalBufferCopyOffsetAlignment;
 }
 
 } // namespace nyla
