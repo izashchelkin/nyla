@@ -6,16 +6,31 @@
 
 #include "absl/log/check.h"
 #include "absl/log/log.h"
+#include "nyla/commons/bitenum.h"
+#include "nyla/commons/debug/debugger.h"
 #include "nyla/commons/containers/inline_vec.h"
 #include "nyla/commons/debug/debugger.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_pipeline.h"
 #include "vulkan/vulkan_core.h"
+#include "nyla/platform/platform.h"
+#include "nyla/commons/debug/debugger.h"
 
+#if defined(__linux__)
 // clang-format off
 #include "xcb/xcb.h"
 #include "vulkan/vulkan_xcb.h"
 // clang-format on
+#else
+// clang-format off
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+#include "vulkan/vulkan_win32.h"
+
+#include "nyla/platform/windows/platform_windows.h"
+// clang-format on
+#endif
 
 namespace nyla
 {
@@ -65,7 +80,7 @@ auto DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeveri
     {
     case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT: {
         LOG(ERROR) << callbackData->pMessage;
-        DebugBreak;
+        DebugBreak();
     }
     case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT: {
         LOG(WARNING) << callbackData->pMessage;
@@ -83,7 +98,7 @@ void VulkanNameHandle(VkObjectType type, uint64_t handle, std::string_view name)
     const VkDebugUtilsObjectNameInfoEXT nameInfo{
         .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
         .objectType = type,
-        .objectHandle = reinterpret_cast<uint64_t>(handle),
+        .objectHandle = handle,
         .pObjectName = nameCopy.c_str(),
     };
 
@@ -121,7 +136,11 @@ void RhiInit(const RhiDesc &rhiDesc)
 
     InlineVec<const char *, 4> enabledInstanceExtensions;
     enabledInstanceExtensions.emplace_back(VK_KHR_SURFACE_EXTENSION_NAME);
+#if defined(__linux__)
     enabledInstanceExtensions.emplace_back(VK_KHR_XCB_SURFACE_EXTENSION_NAME);
+#else
+    enabledInstanceExtensions.emplace_back(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
+#endif
 
     InlineVec<const char *, 2> instanceLayers;
     if (kRhiValidations)
@@ -482,12 +501,21 @@ void RhiInit(const RhiDesc &rhiDesc)
     };
     vkCreateDescriptorPool(vk.dev, &descriptorPoolCreateInfo, nullptr, &vk.descriptorPool);
 
+#if defined(__linux__)
     const VkXcbSurfaceCreateInfoKHR surfaceCreateInfo{
         .sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR,
         .connection = xcb_connect(nullptr, nullptr),
         .window = vk.window.handle,
     };
-    VK_CHECK(vkCreateXcbSurfaceKHR(vk.instance, &surfaceCreateInfo, nullptr, &vk.surface));
+    VK_CHECK(vkCreateXcbSurfaceKHR(vk.instance, &surfaceCreateInfo, vk.alloc, &vk.surface));
+#else
+    const VkWin32SurfaceCreateInfoKHR surfaceCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
+        .hinstance = g_Platform->GetImpl()->GetHInstance(),
+        .hwnd = reinterpret_cast<HWND>(vk.window.handle),
+    };
+    vkCreateWin32SurfaceKHR(vk.instance, &surfaceCreateInfo, vk.alloc, &vk.surface);
+#endif
 
     CreateSwapchain();
 }

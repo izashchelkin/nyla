@@ -12,6 +12,9 @@
 #include <cstdint>
 #include <xkbcommon/xkbcommon-x11.h>
 
+#include "vulkan/vulkan_core.h"
+#include "vulkan/vulkan_xcb.h"
+
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wkeyword-macro"
@@ -25,7 +28,7 @@
 
 #undef explicit
 
-int main (int argc, char *argv[])
+int main(int argc, char *argv[])
 {
     nyla::PlatformMain();
     return 0;
@@ -110,11 +113,9 @@ auto Platform::Impl::CreateWin() -> PlatformWindow
 {
     xcb_window_t window =
         CreateWin(m_Screen->width_in_pixels, m_Screen->height_in_pixels, false,
-                     static_cast<xcb_event_mask_t>(XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_KEY_RELEASE |
-                                                   XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE));
-    return {
-        .window = static_cast<uint64_t>(window)
-    };
+                  static_cast<xcb_event_mask_t>(XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_KEY_RELEASE |
+                                                XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE));
+    return {.window = static_cast<uint64_t>(window)};
 }
 
 auto Platform::Impl::CreateWin(uint32_t width, uint32_t height, bool overrideRedirect, xcb_event_mask_t eventMask)

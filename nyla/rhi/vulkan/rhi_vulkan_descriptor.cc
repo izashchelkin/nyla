@@ -146,7 +146,7 @@ void RhiWriteDescriptors(std::span<const RhiDescriptorWriteDesc> writes)
             return *it;
         }();
 
-        CHECK_EQ(descriptorLayout.type, write.type);
+        CHECK(descriptorLayout.type == write.type);
         const RhiBindingType bindingType = descriptorLayout.type;
 
         VkWriteDescriptorSet &vulkanSetWrite = descriptorWrites.emplace_back(VkWriteDescriptorSet{

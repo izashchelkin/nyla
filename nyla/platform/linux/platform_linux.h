@@ -42,8 +42,7 @@ class Platform::Impl
     auto GetWindowSize(PlatformWindow platformWindow) -> PlatformWindowSize;
     auto PollEvent(PlatformEvent &outEvent) -> bool;
 
-    auto CreateWin(uint32_t width, uint32_t height, bool overrideRedirect, xcb_event_mask_t eventMask)
-        -> xcb_window_t;
+    auto CreateWin(uint32_t width, uint32_t height, bool overrideRedirect, xcb_event_mask_t eventMask) -> xcb_window_t;
 
     auto GetScreenIndex() -> auto
     {
@@ -70,7 +69,8 @@ class Platform::Impl
         return m_Atoms;
     }
 
-    auto GetXInputExtensionMajorOpCode() {
+    auto GetXInputExtensionMajorOpCode()
+    {
         return m_ExtensionXInput2MajorOpCode;
     }
 

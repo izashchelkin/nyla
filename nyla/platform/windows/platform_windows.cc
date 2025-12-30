@@ -1,3 +1,5 @@
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
 #include <windows.h>
 
 #include "absl/log/check.h"
@@ -55,14 +57,14 @@ auto Platform::Impl::CreateWin() -> PlatformWindow
 
     WNDCLASS wc = {
         .lpfnWndProc = MainWndProc,
-        .hInstance = reinterpret_cast<HINSTANCE>(m_HInstance),
+        .hInstance = m_HInstance,
         .lpszClassName = CLASS_NAME,
     };
 
     RegisterClass(&wc);
 
     HWND hwnd = CreateWindowEx(0, CLASS_NAME, TEXT("nyla"), WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
-                               CW_USEDEFAULT, CW_USEDEFAULT, nullptr, nullptr, (HINSTANCE)m_HInstance, nullptr);
+                               CW_USEDEFAULT, CW_USEDEFAULT, nullptr, nullptr, m_HInstance, nullptr);
     CHECK(hwnd);
 
     PlatformWindow ret{
@@ -84,7 +86,12 @@ auto Platform::Impl::GetWindowSize(PlatformWindow window) -> PlatformWindowSize
     };
 }
 
-void Platform::Impl::SetHInstance(void *hInstance)
+auto Platform::Impl::GetHInstance() -> HINSTANCE
+{
+    return m_HInstance;
+}
+
+void Platform::Impl::SetHInstance(HINSTANCE hInstance)
 {
     m_HInstance = hInstance;
 }

@@ -185,9 +185,9 @@ void EnsureHostWritesVisible(VkCommandBuffer cmdbuf, VulkanBufferData &bufferDat
         .srcAccessMask = VK_ACCESS_2_HOST_WRITE_BIT,
         .dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
         .dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT,
-        .buffer = bufferData.buffer,
         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .buffer = bufferData.buffer,
         .offset = bufferData.dirtyBegin,
         .size = bufferData.dirtyEnd - bufferData.dirtyBegin,
     };

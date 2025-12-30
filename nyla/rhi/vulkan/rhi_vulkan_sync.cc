@@ -38,11 +38,13 @@ void WaitTimeline(VkSemaphore timeline, uint64_t waitValue)
         .pValues = &waitValue,
     };
 
-    if (vkWaitSemaphores(vk.dev, &waitInfo, 1e9) != VK_SUCCESS)
+    VK_CHECK(vkWaitSemaphores(vk.dev, &waitInfo, 1e9));
+
+#if 0
     {
         uint64_t currentValue = -1;
         vkGetSemaphoreCounterValue(vk.dev, timeline, &currentValue);
-        DebugBreak;
+        DebugBreak();
 
         VkSemaphoreSignalInfo info{
             .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO,
@@ -52,8 +54,9 @@ void WaitTimeline(VkSemaphore timeline, uint64_t waitValue)
         VK_CHECK(vkSignalSemaphore(vk.dev, &info));
 
         vkGetSemaphoreCounterValue(vk.dev, vk.graphicsQueue.timeline, &currentValue);
-        DebugBreak;
+        DebugBreak();
     }
+#endif
 }
 
 } // namespace rhi_vulkan_internal

@@ -1,3 +1,4 @@
+#include <array>
 #include <cstdint>
 #include <vulkan/vulkan_core.h>
 
@@ -322,6 +323,20 @@ void RhiCmdDraw(RhiCmdList cmd, uint32_t vertexCount, uint32_t instanceCount, ui
 {
     VulkanCmdListData cmdData = rhiHandles.cmdLists.ResolveData(cmd);
     vkCmdDraw(cmdData.cmdbuf, vertexCount, instanceCount, firstVertex, firstInstance);
+}
+
+auto RhiGetVertexFormatSize(RhiVertexFormat format) -> uint32_t
+{
+    switch (format)
+    {
+    case nyla::RhiVertexFormat::None:
+        break;
+
+    case RhiVertexFormat::R32G32B32A32Float:
+        return 16;
+    }
+    CHECK(false);
+    return 0;
 }
 
 } // namespace nyla

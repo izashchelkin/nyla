@@ -30,7 +30,7 @@ static auto GetRenderDocAPI() -> RENDERDOC_API_1_6_0 *
         }
 
         LOG(ERROR) << "failed to get renderdoc api";
-        DebugBreak;
+        DebugBreak();
     }
 
     return nullptr;
