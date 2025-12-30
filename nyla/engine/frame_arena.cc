@@ -1,5 +1,6 @@
 #include "nyla/engine/frame_arena.h"
 
+#include "nyla/commons/assert.h"
 #include <cstdint>
 #include <cstdlib>
 

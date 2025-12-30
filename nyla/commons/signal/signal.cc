@@ -7,7 +7,6 @@
 #include <csignal>
 #include <cstdlib>
 
-
 namespace nyla
 {
 

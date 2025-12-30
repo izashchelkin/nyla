@@ -1,4 +1,6 @@
+#include <algorithm>
 #include <cstdint>
+#include <vector>
 #include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/vulkan_core.h>
 
@@ -101,7 +103,7 @@ void CreateSwapchain()
         };
     }();
 
-    CHECK_GE(kRhiMaxNumSwapchainTextures, surfaceCapabilities.minImageCount);
+    NYLA_ASSERT(kRhiMaxNumSwapchainTextures >= surfaceCapabilities.minImageCount);
     uint32_t swapchainMinImageCount = std::min(kRhiMaxNumSwapchainTextures, surfaceCapabilities.minImageCount + 1);
     if (surfaceCapabilities.maxImageCount)
         swapchainMinImageCount = std::min(surfaceCapabilities.maxImageCount, swapchainMinImageCount);
@@ -191,7 +193,7 @@ void CreateSwapchain()
 
     if (oldSwapchain)
     {
-        CHECK_GT(oldImagesViewsCount, 0);
+        NYLA_ASSERT(oldImagesViewsCount);
         for (uint32_t i = 0; i < oldImagesViewsCount; ++i)
             RhiDestroySwapchainTexture(oldSwapchainTextures[i]);
 

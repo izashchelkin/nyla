@@ -1,8 +1,8 @@
 #include "nyla/apps/wm/screen_saver_inhibitor.h"
 
 #include <cstdint>
-#include <unordered_map>
 #include <string_view>
+#include <unordered_map>
 
 #include "nyla/commons/containers/map.h"
 #include "nyla/dbus/dbus.h"

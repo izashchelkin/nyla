@@ -1,5 +1,5 @@
-#include "nyla/commons/assert.h"
 #include "nyla/commons/color.h"
+#include "nyla/commons/assert.h"
 
 #include "nyla/commons/math/vec.h"
 

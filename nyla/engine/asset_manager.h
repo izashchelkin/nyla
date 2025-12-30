@@ -7,6 +7,7 @@
 #include "nyla/rhi/rhi_sampler.h"
 #include "nyla/rhi/rhi_texture.h"
 #include <cstdint>
+#include <string>
 
 namespace nyla
 {

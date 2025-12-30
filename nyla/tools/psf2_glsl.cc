@@ -143,8 +143,8 @@ int Main()
         else
         {
             NYLA_LOG() << "Note: codepoint U+" << std::hex << std::uppercase << c
-                         << " not mapped; emitting blank glyph.\n"
-                         << std::dec;
+                       << " not mapped; emitting blank glyph.\n"
+                       << std::dec;
         }
 
         auto pack4 = [&](uint32_t base_row) -> uint32_t {

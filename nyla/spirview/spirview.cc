@@ -1,4 +1,5 @@
 #include "nyla/spirview/spirview.h"
+#include "nyla/commons/assert.h"
 #include "nyla/rhi/rhi_shader.h"
 #include <array>
 #include <cstdint>

@@ -1,5 +1,6 @@
 #include "nyla/engine/engine0_internal.h"
 
+#include "nyla/commons/assert.h"
 #include "nyla/commons/os/readfile.h"
 #include "nyla/rhi/rhi_shader.h"
 #include "nyla/spirview/spirview.h"

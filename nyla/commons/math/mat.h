@@ -1,5 +1,6 @@
 #pragma once
 
+#include "nyla/commons/assert.h"
 #include "nyla/commons/math/vec.h"
 
 #include <algorithm>
@@ -117,7 +118,7 @@ template <typename T, uint32_t N> class Mat
                 }
             }
 
-            NYLA_ASSERT(maxAbs > static_cast<T>(1e-8)) << "Mat is singular or nearly singular in Inversed()";
+            NYLA_ASSERT(maxAbs > static_cast<T>(1e-8));
 
             if (pivotRow != col)
             {

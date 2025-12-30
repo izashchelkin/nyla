@@ -1,6 +1,7 @@
 #include "nyla/engine/asset_manager.h"
 #include "nyla/commons/containers/inline_vec.h"
 #include "nyla/commons/handle_pool.h"
+#include "nyla/commons/log.h"
 #include "nyla/engine/engine.h"
 #include "nyla/engine/staging_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
@@ -105,7 +106,11 @@ void AssetManager::Upload(RhiCmdList cmd)
 
         void *data = stbi_load(textureData.path.c_str(), (int *)&textureData.width, (int *)&textureData.height,
                                (int *)&textureData.channels, STBI_rgb_alpha);
-        NYLA_ASSERT(data) << "stbi_load failed for '" << textureData.path << "': " << stbi_failure_reason();
+        if (!data)
+        {
+            NYLA_LOG("stbi_load failed for '%s': %s", textureData.path.data(), stbi_failure_reason());
+            NYLA_ASSERT(false);
+        }
 
         textureData.texture = RhiCreateTexture({
             .width = textureData.width,
@@ -135,7 +140,7 @@ void AssetManager::Upload(RhiCmdList cmd)
         // TODO: this barrier does not need to be here
         RhiCmdTransitionTexture(cmd, texture, RhiTextureState::ShaderRead);
 
-        NYLA_LOG("Uploading '%s'", textureData.path);
+        NYLA_LOG("Uploading '%s'", (const char *)textureData.path.data());
 
         textureData.needsUpload = false;
     }

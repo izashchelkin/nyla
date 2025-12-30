@@ -81,9 +81,10 @@ void Platform::Impl::Init(const PlatformInitDesc &desc)
             &err);
         if (!reply || err)
             NYLA_ASSERT(false && "could not set up detectable autorepeat");
-    }<< 
+    }
+    <<
 
-    if (Any(desc.enabledFeatures & PlatformFeature::MouseInput))
+        if (Any(desc.enabledFeatures & PlatformFeature::MouseInput))
     {
         const xcb_query_extension_reply_t *ext = xcb_get_extension_data(m_Conn, &xcb_input_id);
         if (!ext || !ext->present)

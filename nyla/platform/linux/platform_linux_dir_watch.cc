@@ -30,7 +30,7 @@ class PlatformDirWatch::Impl
 void PlatformDirWatch::Impl::Init(const char *path)
 {
     m_InotifyFd = inotify_init1(IN_NONBLOCK);
-    CHECK_GT(m_InotifyFd, 0);
+    NYLA_ASSERT(m_InotifyFd > 0);
 
     int wd = inotify_add_watch(m_InotifyFd, path, IN_MODIFY | IN_DELETE | IN_MOVED_FROM | IN_MOVED_TO);
     NYLA_ASSERT(wd != -1);

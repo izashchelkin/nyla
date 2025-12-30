@@ -1,4 +1,5 @@
 #include "nyla/engine/staging_buffer.h"
+#include "nyla/commons/assert.h"
 #include "nyla/commons/memory/align.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_buffer.h"

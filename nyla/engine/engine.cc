@@ -9,6 +9,7 @@
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_cmdlist.h"
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <thread>
