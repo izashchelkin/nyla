@@ -89,4 +89,31 @@ auto Rhi::Impl::GetLastCheckpointData(RhiQueueType queueType) -> uint64_t
     return (uint64_t)data.pCheckpointMarker;
 }
 
+//
+
+auto Rhi::CreateCmdList(RhiQueueType queueType) -> RhiCmdList
+{
+    return m_Impl->CreateCmdList(queueType);
+}
+
+void Rhi::NameCmdList(RhiCmdList cmd, std::string_view name)
+{
+    m_Impl->NameCmdList(cmd, name);
+}
+
+void Rhi::DestroyCmdList(RhiCmdList cmd)
+{
+    m_Impl->DestroyCmdList(cmd);
+}
+
+auto Rhi::CmdSetCheckpoint(RhiCmdList cmd, uint64_t data) -> uint64_t
+{
+    return m_Impl->CmdSetCheckpoint(cmd, data);
+}
+
+auto Rhi::GetLastCheckpointData(RhiQueueType queueType) -> uint64_t
+{
+    return m_Impl->GetLastCheckpointData(queueType);
+}
+
 } // namespace nyla

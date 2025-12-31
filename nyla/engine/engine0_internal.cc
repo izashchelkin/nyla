@@ -2,12 +2,12 @@
 
 #include "nyla/commons/assert.h"
 #include "nyla/commons/os/readfile.h"
+#include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_shader.h"
 #include "nyla/spirview/spirview.h"
 #include <cstdint>
 #include <format>
 #include <sys/types.h>
-#include "nyla/rhi/rhi.h"
 
 namespace nyla::engine0_internal
 {

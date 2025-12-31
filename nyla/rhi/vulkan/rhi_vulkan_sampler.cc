@@ -68,4 +68,16 @@ void Rhi::Impl::DestroySampler(RhiSampler sampler)
     vkDestroySampler(m_Dev, samplerData.sampler, m_Alloc);
 }
 
+//
+
+auto Rhi::CreateSampler(const RhiSamplerDesc &desc) -> RhiSampler
+{
+    return m_Impl->CreateSampler(desc);
+}
+
+void Rhi::DestroySampler(RhiSampler sampler)
+{
+    m_Impl->DestroySampler(sampler);
+}
+
 } // namespace nyla

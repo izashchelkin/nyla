@@ -66,4 +66,16 @@ void Rhi::Impl::PassEnd(RhiPassDesc desc)
     CmdTransitionTexture(cmd, desc.colorTarget, desc.state);
 }
 
+//
+
+void Rhi::PassBegin(RhiPassDesc desc)
+{
+    m_Impl->PassBegin(desc);
+}
+
+void Rhi::PassEnd(RhiPassDesc desc)
+{
+    m_Impl->PassEnd(desc);
+}
+
 } // namespace nyla

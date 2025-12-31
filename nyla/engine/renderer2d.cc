@@ -1,3 +1,4 @@
+#include "nyla/engine/renderer2d.h"
 #include "nyla/commons/containers/inline_vec.h"
 #include "nyla/commons/math/mat.h"
 #include "nyla/commons/math/vec.h"
@@ -5,7 +6,6 @@
 #include "nyla/engine/asset_manager.h"
 #include "nyla/engine/engine.h"
 #include "nyla/engine/engine0_internal.h"
-#include "nyla/engine/renderer2d.h"
 #include "nyla/engine/staging_buffer.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_buffer.h"

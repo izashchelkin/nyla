@@ -338,4 +338,64 @@ auto Rhi::Impl::GetVertexFormatSize(RhiVertexFormat format) -> uint32_t
     return 0;
 }
 
+//
+
+auto Rhi::CreateShader(const RhiShaderDesc &desc) -> RhiShader
+{
+    return m_Impl->CreateShader(desc);
+}
+
+void Rhi::DestroyShader(RhiShader shader)
+{
+    m_Impl->DestroyShader(shader);
+}
+
+auto Rhi::GetVertexFormatSize(RhiVertexFormat format) -> uint32_t
+{
+    return m_Impl->GetVertexFormatSize(format);
+}
+
+auto Rhi::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGraphicsPipeline
+{
+    return m_Impl->CreateGraphicsPipeline(desc);
+}
+
+void Rhi::NameGraphicsPipeline(RhiGraphicsPipeline pipeline, std::string_view name)
+{
+    m_Impl->NameGraphicsPipeline(pipeline, name);
+}
+
+void Rhi::DestroyGraphicsPipeline(RhiGraphicsPipeline pipeline)
+{
+    m_Impl->DestroyGraphicsPipeline(pipeline);
+}
+
+void Rhi::CmdBindGraphicsPipeline(RhiCmdList cmd, RhiGraphicsPipeline pipeline)
+{
+    m_Impl->CmdBindGraphicsPipeline(cmd, pipeline);
+}
+
+void Rhi::CmdBindVertexBuffers(RhiCmdList cmd, uint32_t firstBinding, std::span<const RhiBuffer> buffers,
+                               std::span<const uint32_t> offsets)
+{
+    m_Impl->CmdBindVertexBuffers(cmd, firstBinding, buffers, offsets);
+}
+
+void Rhi::CmdBindGraphicsBindGroup(RhiCmdList cmd, uint32_t setIndex, RhiDescriptorSet bindGroup,
+                                   std::span<const uint32_t> dynamicOffsets)
+{
+    m_Impl->CmdBindGraphicsBindGroup(cmd, setIndex, bindGroup, dynamicOffsets);
+}
+
+void Rhi::CmdPushGraphicsConstants(RhiCmdList cmd, uint32_t offset, RhiShaderStage stage, ByteView data)
+{
+    m_Impl->CmdPushGraphicsConstants(cmd, offset, stage, data);
+}
+
+void Rhi::CmdDraw(RhiCmdList cmd, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
+                  uint32_t firstInstance)
+{
+    m_Impl->CmdDraw(cmd, vertexCount, instanceCount, firstVertex, firstInstance);
+}
+
 } // namespace nyla

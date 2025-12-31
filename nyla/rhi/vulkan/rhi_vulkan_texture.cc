@@ -255,7 +255,7 @@ void Rhi::Impl::CmdTransitionTexture(RhiCmdList cmd, RhiTexture texture, RhiText
     textureData.layout = newSyncInfo.layout;
 }
 
-void Rhi::Impl::RhiDestroyTexture(RhiTexture texture)
+void Rhi::Impl::DestroyTexture(RhiTexture texture)
 {
     VulkanTextureData textureData = m_Textures.ReleaseData(texture);
     NYLA_ASSERT(!textureData.isSwapchain);
@@ -293,6 +293,33 @@ void Rhi::Impl::CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, ui
     };
 
     vkCmdCopyBufferToImage(cmdbuf, srcBufferData.buffer, dstTextureData.image, dstTextureData.layout, 1, &region);
+}
+
+//
+
+auto Rhi::CreateTexture(RhiTextureDesc desc) -> RhiTexture
+{
+    return m_Impl->CreateTexture(desc);
+}
+
+void Rhi::DestroyTexture(RhiTexture texture)
+{
+    return m_Impl->DestroyTexture(texture);
+}
+
+auto Rhi::GetTextureInfo(RhiTexture texture) -> RhiTextureInfo
+{
+    return m_Impl->GetTextureInfo(texture);
+}
+
+void Rhi::CmdTransitionTexture(RhiCmdList cmd, RhiTexture texture, RhiTextureState state)
+{
+    m_Impl->CmdTransitionTexture(cmd, texture, state);
+}
+
+void Rhi::CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, uint32_t srcOffset, uint32_t size)
+{
+    m_Impl->CmdCopyTexture(cmd, dst, src, srcOffset, size);
 }
 
 } // namespace nyla

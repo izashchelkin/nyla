@@ -334,4 +334,57 @@ void Rhi::Impl::BufferMarkWritten(RhiBuffer buffer, uint32_t offset, uint32_t si
     }
 }
 
+//
+
+auto Rhi::CreateBuffer(const RhiBufferDesc &desc) -> RhiBuffer
+{
+    return m_Impl->CreateBuffer(desc);
+}
+
+void Rhi::NameBuffer(RhiBuffer buffer, std::string_view name)
+{
+    m_Impl->NameBuffer(buffer, name);
+}
+
+void Rhi::DestroyBuffer(RhiBuffer buffer)
+{
+    m_Impl->DestroyBuffer(buffer);
+}
+
+auto Rhi::GetBufferSize(RhiBuffer buffer) -> uint32_t
+{
+    return m_Impl->GetBufferSize(buffer);
+}
+
+auto Rhi::MapBuffer(RhiBuffer buffer) -> char *
+{
+    return m_Impl->MapBuffer(buffer);
+}
+
+void Rhi::UnmapBuffer(RhiBuffer buffer)
+{
+    return m_Impl->UnmapBuffer(buffer);
+}
+
+void Rhi::BufferMarkWritten(RhiBuffer buffer, uint32_t offset, uint32_t size)
+{
+    m_Impl->BufferMarkWritten(buffer, offset, size);
+}
+
+void Rhi::CmdCopyBuffer(RhiCmdList cmd, RhiBuffer dst, uint32_t dstOffset, RhiBuffer src, uint32_t srcOffset,
+                        uint32_t size)
+{
+    m_Impl->CmdCopyBuffer(cmd, dst, dstOffset, src, srcOffset, size);
+}
+
+void Rhi::CmdTransitionBuffer(RhiCmdList cmd, RhiBuffer buffer, RhiBufferState newState)
+{
+    m_Impl->CmdTransitionBuffer(cmd, buffer, newState);
+}
+
+void Rhi::CmdUavBarrierBuffer(RhiCmdList cmd, RhiBuffer buffer)
+{
+    m_Impl->CmdUavBarrierBuffer(cmd, buffer);
+}
+
 } // namespace nyla

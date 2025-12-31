@@ -248,4 +248,11 @@ auto Rhi::Impl::GetBackbufferTexture() -> RhiTexture
     return m_SwapchainTextures[m_SwapchainTextureIndex];
 }
 
+//
+
+auto Rhi::GetBackbufferTexture() -> RhiTexture
+{
+    return m_Impl->GetBackbufferTexture();
+}
+
 } // namespace nyla

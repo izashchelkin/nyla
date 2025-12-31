@@ -527,6 +527,27 @@ auto Rhi::Impl::GetOptimalBufferCopyOffsetAlignment() -> uint32_t
     return m_PhysDevProps.limits.optimalBufferCopyOffsetAlignment;
 }
 
+//
+
+void Rhi::Init(const RhiInitDesc &rhiDesc)
+{
+    NYLA_ASSERT(!m_Impl);
+    m_Impl = new Impl{};
+    m_Impl->Init(rhiDesc);
+}
+
+auto Rhi::GetMinUniformBufferOffsetAlignment() -> uint32_t
+{
+    return m_Impl->GetMinUniformBufferOffsetAlignment();
+}
+
+auto Rhi::GetOptimalBufferCopyOffsetAlignment() -> uint32_t
+{
+    return m_Impl->GetOptimalBufferCopyOffsetAlignment();
+}
+
+Rhi *g_Rhi = new Rhi{};
+
 } // namespace nyla
 
 #undef VK_CHECK

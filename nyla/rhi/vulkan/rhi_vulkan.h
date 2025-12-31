@@ -176,7 +176,7 @@ class Rhi::Impl
 
     auto CreateTexture(RhiTextureDesc desc) -> RhiTexture;
     auto GetTextureInfo(RhiTexture texture) -> RhiTextureInfo;
-    void RhiDestroyTexture(RhiTexture texture);
+    void DestroyTexture(RhiTexture texture);
     void CmdTransitionTexture(RhiCmdList cmd, RhiTexture texture, RhiTextureState newState);
     void CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, uint32_t srcOffset, uint32_t size);
 

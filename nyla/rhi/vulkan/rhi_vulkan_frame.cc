@@ -125,4 +125,31 @@ auto Rhi::Impl::GetNumFramesInFlight() -> uint32_t
     return m_NumFramesInFlight;
 }
 
+//
+
+auto Rhi::GetNumFramesInFlight() -> uint32_t
+{
+    return m_Impl->GetNumFramesInFlight();
+}
+
+auto Rhi::GetFrameIndex() -> uint32_t
+{
+    return m_Impl->GetFrameIndex();
+}
+
+auto Rhi::FrameBegin() -> RhiCmdList
+{
+    return m_Impl->FrameBegin();
+}
+
+void Rhi::FrameEnd()
+{
+    m_Impl->FrameEnd();
+}
+
+auto Rhi::FrameGetCmdList() -> RhiCmdList
+{
+    return m_Impl->FrameGetCmdList();
+}
+
 } // namespace nyla

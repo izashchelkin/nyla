@@ -1,7 +1,7 @@
+#include "nyla/engine/engine.h"
 #include "nyla/commons/bitenum.h"
 #include "nyla/commons/os/clock.h"
 #include "nyla/engine/asset_manager.h"
-#include "nyla/engine/engine.h"
 #include "nyla/engine/frame_arena.h"
 #include "nyla/engine/input_manager.h"
 #include "nyla/engine/staging_buffer.h"

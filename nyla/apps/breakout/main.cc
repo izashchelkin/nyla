@@ -4,10 +4,10 @@
 #include "nyla/engine/debug_text_renderer.h"
 #include "nyla/engine/engine.h"
 #include "nyla/platform/platform.h"
+#include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_texture.h"
 #include <format>
-#include "nyla/rhi/rhi.h"
 
 namespace nyla
 {

@@ -218,4 +218,31 @@ void Rhi::Impl::CmdBindGraphicsBindGroup(RhiCmdList cmd, uint32_t setIndex, RhiD
                             &descriptorSet, dynamicOffsets.size(), dynamicOffsets.data());
 }
 
+//
+
+auto Rhi::CreateDescriptorSetLayout(const RhiDescriptorSetLayoutDesc &desc) -> RhiDescriptorSetLayout
+{
+    return m_Impl->CreateDescriptorSetLayout(desc);
+}
+
+void Rhi::DestroyDescriptorSetLayout(RhiDescriptorSetLayout layout)
+{
+    m_Impl->DestroyDescriptorSetLayout(layout);
+}
+
+auto Rhi::CreateDescriptorSet(RhiDescriptorSetLayout layout) -> RhiDescriptorSet
+{
+    return m_Impl->CreateDescriptorSet(layout);
+}
+
+void Rhi::DestroyDescriptorSet(RhiDescriptorSet set)
+{
+    m_Impl->DestroyDescriptorSet(set);
+}
+
+void Rhi::WriteDescriptors(std::span<const RhiDescriptorWriteDesc> writes)
+{
+    m_Impl->WriteDescriptors(writes);
+}
+
 } // namespace nyla

@@ -122,7 +122,7 @@ class Rhi
 
   private:
     class Impl;
-    Impl *impl;
+    Impl *m_Impl;
 };
 extern Rhi *g_Rhi;
 
