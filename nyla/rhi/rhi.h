@@ -54,71 +54,71 @@ class Rhi
     auto GetMinUniformBufferOffsetAlignment() -> uint32_t;
     auto GetOptimalBufferCopyOffsetAlignment() -> uint32_t;
 
-    auto RhiCreateBuffer(const RhiBufferDesc &) -> RhiBuffer;
-    void RhiNameBuffer(RhiBuffer, std::string_view name);
-    void RhiDestroyBuffer(RhiBuffer);
+    auto CreateBuffer(const RhiBufferDesc &) -> RhiBuffer;
+    void NameBuffer(RhiBuffer, std::string_view name);
+    void DestroyBuffer(RhiBuffer);
 
-    auto RhiGetBufferSize(RhiBuffer) -> uint32_t;
+    auto GetBufferSize(RhiBuffer) -> uint32_t;
 
-    auto RhiMapBuffer(RhiBuffer) -> char *;
-    void RhiUnmapBuffer(RhiBuffer);
-    void RhiBufferMarkWritten(RhiBuffer, uint32_t offset, uint32_t size);
+    auto MapBuffer(RhiBuffer) -> char *;
+    void UnmapBuffer(RhiBuffer);
+    void BufferMarkWritten(RhiBuffer, uint32_t offset, uint32_t size);
 
-    void RhiCmdCopyBuffer(RhiCmdList cmd, RhiBuffer dst, uint32_t dstOffset, RhiBuffer src, uint32_t srcOffset,
-                          uint32_t size);
-    void RhiCmdTransitionBuffer(RhiCmdList cmd, RhiBuffer buffer, RhiBufferState newState);
-    void RhiCmdUavBarrierBuffer(RhiCmdList cmd, RhiBuffer buffer);
+    void CmdCopyBuffer(RhiCmdList cmd, RhiBuffer dst, uint32_t dstOffset, RhiBuffer src, uint32_t srcOffset,
+                       uint32_t size);
+    void CmdTransitionBuffer(RhiCmdList cmd, RhiBuffer buffer, RhiBufferState newState);
+    void CmdUavBarrierBuffer(RhiCmdList cmd, RhiBuffer buffer);
 
-    auto RhiCreateCmdList(RhiQueueType queueType) -> RhiCmdList;
-    void RhiNameCmdList(RhiCmdList, std::string_view name);
-    void RhiDestroyCmdList(RhiCmdList cmd);
+    auto CreateCmdList(RhiQueueType queueType) -> RhiCmdList;
+    void NameCmdList(RhiCmdList, std::string_view name);
+    void DestroyCmdList(RhiCmdList cmd);
 
-    auto RhiCmdSetCheckpoint(RhiCmdList cmd, uint64_t data) -> uint64_t;
-    auto RhiGetLastCheckpointData(RhiQueueType queueType) -> uint64_t;
+    auto CmdSetCheckpoint(RhiCmdList cmd, uint64_t data) -> uint64_t;
+    auto GetLastCheckpointData(RhiQueueType queueType) -> uint64_t;
 
-    auto RhiFrameBegin() -> RhiCmdList;
-    void RhiFrameEnd();
+    auto FrameBegin() -> RhiCmdList;
+    void FrameEnd();
 
-    auto RhiFrameGetCmdList() -> RhiCmdList;
+    auto FrameGetCmdList() -> RhiCmdList;
 
-    auto RhiCreateDescriptorSetLayout(const RhiDescriptorSetLayoutDesc &) -> RhiDescriptorSetLayout;
-    void RhiDestroyDescriptorSetLayout(RhiDescriptorSetLayout);
+    auto CreateDescriptorSetLayout(const RhiDescriptorSetLayoutDesc &) -> RhiDescriptorSetLayout;
+    void DestroyDescriptorSetLayout(RhiDescriptorSetLayout);
 
-    auto RhiCreateDescriptorSet(RhiDescriptorSetLayout) -> RhiDescriptorSet;
-    void RhiDestroyDescriptorSet(RhiDescriptorSet);
-    void RhiWriteDescriptors(std::span<const RhiDescriptorWriteDesc>);
+    auto CreateDescriptorSet(RhiDescriptorSetLayout) -> RhiDescriptorSet;
+    void DestroyDescriptorSet(RhiDescriptorSet);
+    void WriteDescriptors(std::span<const RhiDescriptorWriteDesc>);
 
-    void RhiPassBegin(RhiPassDesc);
-    void RhiPassEnd(RhiPassDesc);
+    void PassBegin(RhiPassDesc);
+    void PassEnd(RhiPassDesc);
 
-    auto RhiGetVertexFormatSize(RhiVertexFormat) -> uint32_t;
+    auto GetVertexFormatSize(RhiVertexFormat) -> uint32_t;
 
-    auto RhiCreateGraphicsPipeline(const RhiGraphicsPipelineDesc &) -> RhiGraphicsPipeline;
-    void RhiNameGraphicsPipeline(RhiGraphicsPipeline, std::string_view name);
-    void RhiDestroyGraphicsPipeline(RhiGraphicsPipeline);
+    auto CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &) -> RhiGraphicsPipeline;
+    void NameGraphicsPipeline(RhiGraphicsPipeline, std::string_view name);
+    void DestroyGraphicsPipeline(RhiGraphicsPipeline);
 
-    void RhiCmdBindGraphicsPipeline(RhiCmdList, RhiGraphicsPipeline);
-    void RhiCmdBindVertexBuffers(RhiCmdList cmd, uint32_t firstBinding, std::span<const RhiBuffer> buffers,
-                                 std::span<const uint32_t> offsets);
-    void RhiCmdBindGraphicsBindGroup(RhiCmdList, uint32_t setIndex, RhiDescriptorSet bindGroup,
-                                     std::span<const uint32_t> dynamicOffsets);
-    void RhiCmdPushGraphicsConstants(RhiCmdList cmd, uint32_t offset, RhiShaderStage stage, ByteView data);
-    void RhiCmdDraw(RhiCmdList cmd, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
-                    uint32_t firstInstance);
+    void CmdBindGraphicsPipeline(RhiCmdList, RhiGraphicsPipeline);
+    void CmdBindVertexBuffers(RhiCmdList cmd, uint32_t firstBinding, std::span<const RhiBuffer> buffers,
+                              std::span<const uint32_t> offsets);
+    void CmdBindGraphicsBindGroup(RhiCmdList, uint32_t setIndex, RhiDescriptorSet bindGroup,
+                                  std::span<const uint32_t> dynamicOffsets);
+    void CmdPushGraphicsConstants(RhiCmdList cmd, uint32_t offset, RhiShaderStage stage, ByteView data);
+    void CmdDraw(RhiCmdList cmd, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
+                 uint32_t firstInstance);
 
-    auto RhiCreateSampler(const RhiSamplerDesc &) -> RhiSampler;
-    void RhiDestroySampler(RhiSampler);
+    auto CreateSampler(const RhiSamplerDesc &) -> RhiSampler;
+    void DestroySampler(RhiSampler);
 
-    auto RhiCreateShader(const RhiShaderDesc &) -> RhiShader;
-    void RhiDestroyShader(RhiShader);
+    auto CreateShader(const RhiShaderDesc &) -> RhiShader;
+    void DestroyShader(RhiShader);
 
-    auto RhiCreateTexture(RhiTextureDesc) -> RhiTexture;
-    void RhiDestroyTexture(RhiTexture);
-    auto RhiGetTextureInfo(RhiTexture) -> RhiTextureInfo;
-    void RhiCmdTransitionTexture(RhiCmdList, RhiTexture, RhiTextureState);
-    void RhiCmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, uint32_t srcOffset, uint32_t size);
+    auto CreateTexture(RhiTextureDesc) -> RhiTexture;
+    void DestroyTexture(RhiTexture);
+    auto GetTextureInfo(RhiTexture) -> RhiTextureInfo;
+    void CmdTransitionTexture(RhiCmdList, RhiTexture, RhiTextureState);
+    void CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, uint32_t srcOffset, uint32_t size);
 
-    auto RhiGetBackbufferTexture() -> RhiTexture;
+    auto GetBackbufferTexture() -> RhiTexture;
 
   private:
     class Impl;

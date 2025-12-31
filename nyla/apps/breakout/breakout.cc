@@ -18,6 +18,7 @@
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_pass.h"
 #include "nyla/rhi/rhi_texture.h"
+#include "nyla/rhi/rhi.h"
 
 namespace nyla
 {
@@ -206,10 +207,10 @@ void GameProcess(RhiCmdList cmd, float dt)
 
 void GameRender(RhiCmdList cmd, RhiTexture colorTarget)
 {
-    RhiTextureInfo colorTargetInfo = RhiGetTextureInfo(colorTarget);
+    RhiTextureInfo colorTargetInfo = g_Rhi->GetTextureInfo(colorTarget);
 
-    RhiPassBegin({
-        .colorTarget = RhiGetBackbufferTexture(),
+    g_Rhi->PassBegin({
+        .colorTarget = g_Rhi->GetBackbufferTexture(),
         .state = RhiTextureState::ColorTarget,
     });
 
@@ -246,8 +247,8 @@ void GameRender(RhiCmdList cmd, RhiTexture colorTarget)
     Renderer2DDraw(cmd, renderer2d, colorTargetInfo.width, colorTargetInfo.height, 64);
     DebugTextRendererDraw(cmd, debugTextRenderer);
 
-    RhiPassEnd({
-        .colorTarget = RhiGetBackbufferTexture(),
+    g_Rhi->PassEnd({
+        .colorTarget = g_Rhi->GetBackbufferTexture(),
         .state = RhiTextureState::Present,
     });
 }

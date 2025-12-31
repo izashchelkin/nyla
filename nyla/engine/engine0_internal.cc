@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <format>
 #include <sys/types.h>
+#include "nyla/rhi/rhi.h"
 
 namespace nyla::engine0_internal
 {
@@ -42,7 +43,7 @@ auto GetShader(const char *name, RhiShaderStage stage) -> RhiShader
     }
     }
 
-    RhiShader shader = RhiCreateShader(RhiShaderDesc{
+    RhiShader shader = g_Rhi->CreateShader(RhiShaderDesc{
         .spirv = spirv,
     });
     return shader;

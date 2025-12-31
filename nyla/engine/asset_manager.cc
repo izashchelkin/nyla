@@ -1,7 +1,7 @@
-#include "nyla/engine/asset_manager.h"
 #include "nyla/commons/containers/inline_vec.h"
 #include "nyla/commons/handle_pool.h"
 #include "nyla/commons/log.h"
+#include "nyla/engine/asset_manager.h"
 #include "nyla/engine/engine.h"
 #include "nyla/engine/staging_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
@@ -10,6 +10,7 @@
 #include "nyla/rhi/rhi_sampler.h"
 #include "nyla/rhi/rhi_shader.h"
 #include "nyla/rhi/rhi_texture.h"
+#include "nyla/rhi/rhi.h"
 #include "third_party/stb/stb_image.h"
 #include <cstdint>
 
@@ -40,11 +41,11 @@ void AssetManager::Init()
             .stageFlags = RhiShaderStage::Pixel,
         },
     };
-    m_DescriptorSetLayout = RhiCreateDescriptorSetLayout(RhiDescriptorSetLayoutDesc{
+    m_DescriptorSetLayout = g_Rhi->CreateDescriptorSetLayout(RhiDescriptorSetLayoutDesc{
         .descriptors = descriptors,
     });
 
-    m_DescriptorSet = RhiCreateDescriptorSet(m_DescriptorSetLayout);
+    m_DescriptorSet = g_Rhi->CreateDescriptorSet(m_DescriptorSetLayout);
 
     //
 
@@ -53,7 +54,7 @@ void AssetManager::Init()
 
     auto addSampler = [this, &descriptorWrites](SamplerType samplerType, RhiFilter filter,
                                                 RhiSamplerAddressMode addressMode) -> void {
-        RhiSampler sampler = RhiCreateSampler({
+        RhiSampler sampler = g_Rhi->CreateSampler({
             .minFilter = filter,
             .magFilter = filter,
             .addressModeU = addressMode,
@@ -77,7 +78,7 @@ void AssetManager::Init()
     addSampler(SamplerType::NearestClamp, RhiFilter::Nearest, RhiSamplerAddressMode::ClampToEdge);
     addSampler(SamplerType::NearestRepeat, RhiFilter::Nearest, RhiSamplerAddressMode::Repeat);
 
-    RhiWriteDescriptors(descriptorWrites);
+    g_Rhi->WriteDescriptors(descriptorWrites);
 }
 
 auto AssetManager::GetDescriptorSetLayout() -> RhiDescriptorSetLayout
@@ -87,7 +88,7 @@ auto AssetManager::GetDescriptorSetLayout() -> RhiDescriptorSetLayout
 
 void AssetManager::BindDescriptorSet(RhiCmdList cmd)
 {
-    RhiCmdBindGraphicsBindGroup(cmd, 1, m_DescriptorSet, {});
+    g_Rhi->CmdBindGraphicsBindGroup(cmd, 1, m_DescriptorSet, {});
 }
 
 void AssetManager::Upload(RhiCmdList cmd)
@@ -112,7 +113,7 @@ void AssetManager::Upload(RhiCmdList cmd)
             NYLA_ASSERT(false);
         }
 
-        textureData.texture = RhiCreateTexture({
+        textureData.texture = g_Rhi->CreateTexture({
             .width = textureData.width,
             .height = textureData.height,
             .memoryUsage = RhiMemoryUsage::GpuOnly,
@@ -129,7 +130,7 @@ void AssetManager::Upload(RhiCmdList cmd)
             .resourceBinding = {.texture = {.texture = texture}},
         });
 
-        RhiCmdTransitionTexture(cmd, texture, RhiTextureState::TransferDst);
+        g_Rhi->CmdTransitionTexture(cmd, texture, RhiTextureState::TransferDst);
 
         const uint32_t size = textureData.width * textureData.height * textureData.channels;
         char *uploadMemory = StagingBufferCopyIntoTexture(cmd, g_StagingBuffer, texture, size);
@@ -138,7 +139,7 @@ void AssetManager::Upload(RhiCmdList cmd)
         free(data);
 
         // TODO: this barrier does not need to be here
-        RhiCmdTransitionTexture(cmd, texture, RhiTextureState::ShaderRead);
+        g_Rhi->CmdTransitionTexture(cmd, texture, RhiTextureState::ShaderRead);
 
         NYLA_LOG("Uploading '%s'", (const char *)textureData.path.data());
 
@@ -146,7 +147,7 @@ void AssetManager::Upload(RhiCmdList cmd)
     }
 
     if (!descriptorWrites.empty())
-        RhiWriteDescriptors(descriptorWrites);
+        g_Rhi->WriteDescriptors(descriptorWrites);
 }
 
 auto AssetManager::DeclareTexture(std::string_view path) -> Texture

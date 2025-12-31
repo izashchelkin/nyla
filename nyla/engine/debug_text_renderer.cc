@@ -58,7 +58,7 @@ auto CreateDebugTextRenderer() -> DebugTextRenderer *
         .arraySize = 1,
         .stageFlags = RhiShaderStage::Pixel,
     };
-    renderer->bindGroupLayout = RhiCreateDescriptorSetLayout(RhiDescriptorSetLayoutDesc{
+    renderer->bindGroupLayout = g_Rhi->CreateDescriptorSetLayout(RhiDescriptorSetLayoutDesc{
         .descriptors = std::span{&descriptorLayout, 1},
     });
 
@@ -74,21 +74,21 @@ auto CreateDebugTextRenderer() -> DebugTextRenderer *
         .colorTargetFormatsCount = 1,
         .colorTargetFormats =
             {
-                RhiGetTextureInfo(RhiGetBackbufferTexture()).format,
+                g_Rhi->GetTextureInfo(g_Rhi->GetBackbufferTexture()).format,
             },
     };
-    renderer->pipeline = RhiCreateGraphicsPipeline(pipelineDesc);
+    renderer->pipeline = g_Rhi->CreateGraphicsPipeline(pipelineDesc);
 
-    for (uint32_t i = 0; i < RhiGetNumFramesInFlight(); ++i)
+    for (uint32_t i = 0; i < g_Rhi->GetNumFramesInFlight(); ++i)
     {
         constexpr uint32_t kDynamicUniformBufferSize = 1 << 10;
-        renderer->dynamicUniformBuffer[i] = RhiCreateBuffer(RhiBufferDesc{
+        renderer->dynamicUniformBuffer[i] = g_Rhi->CreateBuffer(RhiBufferDesc{
             .size = kDynamicUniformBufferSize,
             .bufferUsage = RhiBufferUsage::Uniform,
             .memoryUsage = RhiMemoryUsage::CpuToGpu,
         });
 
-        renderer->bindGroup[i] = RhiCreateDescriptorSet(renderer->bindGroupLayout);
+        renderer->bindGroup[i] = g_Rhi->CreateDescriptorSet(renderer->bindGroupLayout);
 
         const RhiDescriptorWriteDesc descriptorWrite{
             .set = renderer->bindGroup[i],
@@ -100,7 +100,7 @@ auto CreateDebugTextRenderer() -> DebugTextRenderer *
                                                            .offset = 0,
                                                            .range = sizeof(DrawData)}},
         };
-        RhiWriteDescriptors(std::span{&descriptorWrite, 1});
+        g_Rhi->WriteDescriptors(std::span{&descriptorWrite, 1});
     }
 
     return renderer;
@@ -138,21 +138,21 @@ void DebugTextRendererDraw(RhiCmdList cmd, DebugTextRenderer *renderer)
     if (pendingDebugTextDraws.empty())
         return;
 
-    const uint32_t frameIndex = RhiGetFrameIndex();
+    const uint32_t frameIndex = g_Rhi->GetFrameIndex();
 
-    RhiCmdBindGraphicsPipeline(cmd, renderer->pipeline);
+    g_Rhi->CmdBindGraphicsPipeline(cmd, renderer->pipeline);
 
     for (const DrawData &drawData : pendingDebugTextDraws)
     {
-        AlignUp(renderer->dymamicUniformBufferWritten, RhiGetMinUniformBufferOffsetAlignment());
-        new (RhiMapBuffer(renderer->dynamicUniformBuffer[frameIndex]) + renderer->dymamicUniformBufferWritten)
+        AlignUp(renderer->dymamicUniformBufferWritten, g_Rhi->GetMinUniformBufferOffsetAlignment());
+        new (g_Rhi->MapBuffer(renderer->dynamicUniformBuffer[frameIndex]) + renderer->dymamicUniformBufferWritten)
             DrawData{drawData};
 
         const uint32_t offset = renderer->dymamicUniformBufferWritten;
         renderer->dymamicUniformBufferWritten += sizeof(DrawData);
 
-        RhiCmdBindGraphicsBindGroup(cmd, 0, renderer->bindGroup[frameIndex], {&offset, 1});
-        RhiCmdDraw(cmd, 3, 1, 0, 0);
+        g_Rhi->CmdBindGraphicsBindGroup(cmd, 0, renderer->bindGroup[frameIndex], {&offset, 1});
+        g_Rhi->CmdDraw(cmd, 3, 1, 0, 0);
     }
     pendingDebugTextDraws.clear();
 

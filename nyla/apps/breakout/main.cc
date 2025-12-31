@@ -7,6 +7,7 @@
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_texture.h"
 #include <format>
+#include "nyla/rhi/rhi.h"
 
 namespace nyla
 {
@@ -32,7 +33,7 @@ auto PlatformMain() -> int
 
         GameProcess(cmd, dt);
 
-        RhiTexture colorTarget = RhiGetBackbufferTexture();
+        RhiTexture colorTarget = g_Rhi->GetBackbufferTexture();
         GameRender(cmd, colorTarget);
 
         g_Engine->FrameEnd();
