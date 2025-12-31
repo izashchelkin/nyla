@@ -33,7 +33,8 @@ inline auto VkCheckImpl(VkResult res)
         break;
 
     case VK_ERROR_DEVICE_LOST:
-        NYLA_LOG("Last checkpoint: %I64d", RhiGetLastCheckpointData(RhiQueueType::Graphics));
+        // TODO:
+        // NYLA_LOG("Last checkpoint: %I64d", RhiGetLastCheckpointData(RhiQueueType::Graphics));
         // FALLTHROUGH
 
     default: {
@@ -113,10 +114,6 @@ struct VulkanDescriptorSetData
     RhiDescriptorSetLayout layout;
 };
 
-auto DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-                            VkDebugUtilsMessageTypeFlagsEXT messageType,
-                            const VkDebugUtilsMessengerCallbackDataEXT *callbackData, void *userData) -> VkBool32;
-
 void CreateSwapchain();
 
 } // namespace rhi_vulkan_internal
@@ -129,10 +126,6 @@ class Rhi::Impl
     void Init(const RhiInitDesc &);
     auto GetMinUniformBufferOffsetAlignment() -> uint32_t;
     auto GetOptimalBufferCopyOffsetAlignment() -> uint32_t;
-
-    auto CreateTextureFromSwapchainImage(VkImage image, VkSurfaceFormatKHR surfaceFormat, VkExtent2D surfaceExtent)
-        -> RhiTexture;
-    void DestroySwapchainTexture(RhiTexture texture);
 
     auto CreateTimeline(uint64_t initialValue) -> VkSemaphore;
     void WaitTimeline(VkSemaphore timeline, uint64_t waitValue);
@@ -153,6 +146,10 @@ class Rhi::Impl
     auto ConvertTextureUsageToVkImageUsageFlags(RhiTextureUsage usage) -> VkImageUsageFlags;
 
     auto ConvertShaderStageIntoVkShaderStageFlags(RhiShaderStage stageFlags) -> VkShaderStageFlags;
+
+    auto DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+                                VkDebugUtilsMessageTypeFlagsEXT messageType,
+                                const VkDebugUtilsMessengerCallbackDataEXT *callbackData) -> VkBool32;
 
     //
 
@@ -182,6 +179,8 @@ class Rhi::Impl
     void RhiDestroyTexture(RhiTexture texture);
     void CmdTransitionTexture(RhiCmdList cmd, RhiTexture texture, RhiTextureState newState);
     void CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, uint32_t srcOffset, uint32_t size);
+
+    void EnsureHostWritesVisible(VkCommandBuffer cmdbuf, VulkanBufferData &bufferData);
 
     auto CreateCmdList(RhiQueueType queueType) -> RhiCmdList;
     void NameCmdList(RhiCmdList cmd, std::string_view name);
@@ -214,6 +213,12 @@ class Rhi::Impl
     void DestroyDescriptorSet(RhiDescriptorSet bindGroup);
     void CmdBindGraphicsBindGroup(RhiCmdList cmd, uint32_t setIndex, RhiDescriptorSet bindGroup,
                                   std::span<const uint32_t> dynamicOffsets);
+
+    void CreateSwapchain();
+    auto CreateTextureFromSwapchainImage(VkImage image, VkSurfaceFormatKHR surfaceFormat, VkExtent2D surfaceExtent)
+        -> RhiTexture;
+    void DestroySwapchainTexture(RhiTexture texture);
+    auto GetBackbufferTexture() -> RhiTexture;
 
   private:
     HandlePool<RhiDescriptorSetLayout, VulkanDescriptorSetLayoutData, 16> m_DescriptorSetLayouts;

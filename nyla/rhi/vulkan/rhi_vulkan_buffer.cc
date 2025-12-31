@@ -98,16 +98,16 @@ auto Rhi::Impl::CreateBuffer(const RhiBufferDesc &desc) -> RhiBuffer
     const VkBufferCreateInfo bufferCreateInfo{
         .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
         .size = desc.size,
-        .usage = ConvertRhiBufferUsageIntoVkBufferUsageFlags(desc.bufferUsage),
+        .usage = ConvertBufferUsageIntoVkBufferUsageFlags(desc.bufferUsage),
         .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
     };
     VK_CHECK(vkCreateBuffer(m_Dev, &bufferCreateInfo, nullptr, &bufferData.buffer));
 
     VkMemoryRequirements memRequirements;
-    vkGetBufferMemoryRequirements(rhi_vulkan_internal::m_Dev, bufferData.buffer, &memRequirements);
+    vkGetBufferMemoryRequirements(m_Dev, bufferData.buffer, &memRequirements);
 
     const uint32_t memoryTypeIndex =
-        FindMemoryTypeIndex(memRequirements, ConvertRhiMemoryUsageIntoVkMemoryPropertyFlags(desc.memoryUsage));
+        FindMemoryTypeIndex(memRequirements, ConvertMemoryUsageIntoVkMemoryPropertyFlags(desc.memoryUsage));
     const VkMemoryAllocateInfo memoryAllocInfo{
         .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
         .allocationSize = memRequirements.size,
@@ -120,7 +120,7 @@ auto Rhi::Impl::CreateBuffer(const RhiBufferDesc &desc) -> RhiBuffer
     return m_Buffers.Acquire(bufferData);
 }
 
-void Rhi::Impl::RhiNameBuffer(RhiBuffer buf, std::string_view name)
+void Rhi::Impl::NameBuffer(RhiBuffer buf, std::string_view name)
 {
     VulkanBufferData &bufferData = m_Buffers.ResolveData(buf);
     VulkanNameHandle(VK_OBJECT_TYPE_BUFFER, (uint64_t)bufferData.buffer, name);
@@ -164,10 +164,7 @@ void Rhi::Impl::UnmapBuffer(RhiBuffer buffer)
     }
 }
 
-namespace
-{
-
-void EnsureHostWritesVisible(VkCommandBuffer cmdbuf, VulkanBufferData &bufferData)
+void Rhi::Impl::EnsureHostWritesVisible(VkCommandBuffer cmdbuf, VulkanBufferData &bufferData)
 {
     if (bufferData.memoryUsage != RhiMemoryUsage::CpuToGpu)
         return;
@@ -197,8 +194,6 @@ void EnsureHostWritesVisible(VkCommandBuffer cmdbuf, VulkanBufferData &bufferDat
 
     bufferData.dirty = false;
 }
-
-} // namespace
 
 void Rhi::Impl::CmdCopyBuffer(RhiCmdList cmd, RhiBuffer dst, uint32_t dstOffset, RhiBuffer src, uint32_t srcOffset,
                               uint32_t size)
@@ -281,7 +276,7 @@ void Rhi::Impl::CmdTransitionBuffer(RhiCmdList cmd, RhiBuffer buffer, RhiBufferS
         .dstStageMask = newSync.stage,
         .dstAccessMask = newSync.access,
         .buffer = bufferData.buffer,
-        .size = RhiGetBufferSize(buffer),
+        .size = GetBufferSize(buffer),
     };
 
     const VkDependencyInfo dependencyInfo{

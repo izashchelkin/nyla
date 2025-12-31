@@ -27,7 +27,4 @@ struct RhiShaderDesc
     std::span<const uint32_t> spirv;
 };
 
-auto RhiCreateShader(const RhiShaderDesc &) -> RhiShader;
-void RhiDestroyShader(RhiShader);
-
 } // namespace nyla

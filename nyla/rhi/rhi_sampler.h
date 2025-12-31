@@ -30,7 +30,4 @@ struct RhiSamplerDesc
     RhiSamplerAddressMode addressModeW;
 };
 
-auto RhiCreateSampler(const RhiSamplerDesc &) -> RhiSampler;
-void RhiDestroySampler(RhiSampler);
-
 } // namespace nyla

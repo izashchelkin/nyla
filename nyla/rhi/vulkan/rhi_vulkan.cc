@@ -65,8 +65,7 @@ auto Rhi::Impl::ConvertShaderStageIntoVkShaderStageFlags(RhiShaderStage stageFla
 
 auto Rhi::Impl::DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
                                        VkDebugUtilsMessageTypeFlagsEXT messageType,
-                                       const VkDebugUtilsMessengerCallbackDataEXT *callbackData, void *userData)
-    -> VkBool32
+                                       const VkDebugUtilsMessengerCallbackDataEXT *callbackData) -> VkBool32
 {
     switch (messageSeverity)
     {
@@ -101,7 +100,7 @@ void Rhi::Impl::VulkanNameHandle(VkObjectType type, uint64_t handle, std::string
     fn(m_Dev, &nameInfo);
 }
 
-void Rhi::Impl::Init(const RhiDesc &rhiDesc)
+void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
 {
     constexpr uint32_t kInvalidIndex = std::numeric_limits<uint32_t>::max();
 
@@ -161,9 +160,10 @@ void Rhi::Impl::Init(const RhiDesc &rhiDesc)
                        VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
         .pfnUserCallback = [](VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
                               VkDebugUtilsMessageTypeFlagsEXT messageType,
-                              const VkDebugUtilsMessengerCallbackDataEXT *callbackData,
-                              void *userData) -> VkBool32 { return ((Rhi::Impl *)userData)->DebugMessengerCallback(); },
-        .pfnUserData = this,
+                              const VkDebugUtilsMessengerCallbackDataEXT *callbackData, void *userData) -> VkBool32 {
+            return ((Rhi::Impl *)userData)->DebugMessengerCallback(messageSeverity, messageType, callbackData);
+        },
+        .pUserData = this,
     };
 
     std::vector<VkLayerProperties> layers;
@@ -450,7 +450,7 @@ void Rhi::Impl::Init(const RhiDesc &rhiDesc)
         vkGetDeviceQueue(m_Dev, m_TransferQueue.queueFamilyIndex, 0, &m_TransferQueue.queue);
     }
 
-    auto initQueue = [](DeviceQueue &queue, RhiQueueType queueType, std::span<RhiCmdList> cmd) -> void {
+    auto initQueue = [this](DeviceQueue &queue, RhiQueueType queueType, std::span<RhiCmdList> cmd) -> void {
         const VkCommandPoolCreateInfo commandPoolCreateInfo{
             .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
             .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
@@ -463,7 +463,7 @@ void Rhi::Impl::Init(const RhiDesc &rhiDesc)
 
         for (auto &i : cmd)
         {
-            i = RhiCreateCmdList(queueType);
+            i = CreateCmdList(queueType);
         }
     };
     initQueue(m_GraphicsQueue, RhiQueueType::Graphics, std::span{m_GraphicsQueueCmd.data(), m_NumFramesInFlight});

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <string>
 
@@ -84,20 +85,5 @@ struct RhiGraphicsPipelineDesc
     RhiCullMode cullMode;
     RhiFrontFace frontFace;
 };
-
-auto RhiGetVertexFormatSize(RhiVertexFormat) -> uint32_t;
-
-auto RhiCreateGraphicsPipeline(const RhiGraphicsPipelineDesc &) -> RhiGraphicsPipeline;
-void RhiNameGraphicsPipeline(RhiGraphicsPipeline, std::string_view name);
-void RhiDestroyGraphicsPipeline(RhiGraphicsPipeline);
-
-void RhiCmdBindGraphicsPipeline(RhiCmdList, RhiGraphicsPipeline);
-void RhiCmdBindVertexBuffers(RhiCmdList cmd, uint32_t firstBinding, std::span<const RhiBuffer> buffers,
-                             std::span<const uint32_t> offsets);
-void RhiCmdBindGraphicsBindGroup(RhiCmdList, uint32_t setIndex, RhiDescriptorSet bindGroup,
-                                 std::span<const uint32_t> dynamicOffsets);
-void RhiCmdPushGraphicsConstants(RhiCmdList cmd, uint32_t offset, RhiShaderStage stage, ByteView data);
-void RhiCmdDraw(RhiCmdList cmd, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
-                uint32_t firstInstance);
 
 } // namespace nyla

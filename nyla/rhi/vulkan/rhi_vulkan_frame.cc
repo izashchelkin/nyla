@@ -20,7 +20,7 @@ auto Rhi::Impl::FrameBegin() -> RhiCmdList
         vkDeviceWaitIdle(m_Dev);
         CreateSwapchain();
 
-        return RhiFrameBegin();
+        return FrameBegin();
     }
 
     default: {

@@ -66,12 +66,4 @@ struct RhiTextureInfo
     RhiTextureFormat format;
 };
 
-auto RhiCreateTexture(RhiTextureDesc) -> RhiTexture;
-void RhiDestroyTexture(RhiTexture);
-auto RhiGetTextureInfo(RhiTexture) -> RhiTextureInfo;
-void RhiCmdTransitionTexture(RhiCmdList, RhiTexture, RhiTextureState);
-void RhiCmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, uint32_t srcOffset, uint32_t size);
-
-auto RhiGetBackbufferTexture() -> RhiTexture;
-
 } // namespace nyla

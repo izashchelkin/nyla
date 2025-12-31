@@ -11,7 +11,4 @@ struct RhiPassDesc
     RhiTextureState state;
 };
 
-void RhiPassBegin(RhiPassDesc);
-void RhiPassEnd(RhiPassDesc);
-
 } // namespace nyla

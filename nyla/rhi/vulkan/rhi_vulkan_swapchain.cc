@@ -14,10 +14,7 @@ namespace nyla
 
 using namespace rhi_vulkan_internal;
 
-namespace rhi_vulkan_internal
-{
-
-void CreateSwapchain()
+void Rhi::Impl::CreateSwapchain()
 {
     VkSwapchainKHR oldSwapchain = m_Swapchain;
 
@@ -25,13 +22,13 @@ void CreateSwapchain()
     uint32_t oldImagesViewsCount = m_SwapchainTexturesCount;
 
     static bool logPresentModes = true;
-    VkPresentModeKHR presentMode = [] -> VkPresentModeKHR {
+    VkPresentModeKHR presentMode = [this] -> VkPresentModeKHR {
         std::vector<VkPresentModeKHR> presentModes;
         uint32_t presentModeCount = 0;
-        vkGetPhysicalDeviceSurfacePresentModesKHR(m_PhysDev, vm_Surface, &presentModeCount, nullptr);
+        vkGetPhysicalDeviceSurfacePresentModesKHR(m_PhysDev, m_Surface, &presentModeCount, nullptr);
 
         presentModes.resize(presentModeCount);
-        vkGetPhysicalDeviceSurfacePresentModesKHR(m_PhysDev, vm_Surface, &presentModeCount, presentModes.data());
+        vkGetPhysicalDeviceSurfacePresentModesKHR(m_PhysDev, m_Surface, &presentModeCount, presentModes.data());
 
         VkPresentModeKHR bestMode = VK_PRESENT_MODE_FIFO_KHR;
         for (VkPresentModeKHR presentMode : presentModes)
@@ -73,14 +70,14 @@ void CreateSwapchain()
     }();
 
     VkSurfaceCapabilitiesKHR surfaceCapabilities;
-    VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_PhysDev, vm_Surface, &surfaceCapabilities));
+    VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_PhysDev, m_Surface, &surfaceCapabilities));
 
-    auto surfaceFormat = [] -> VkSurfaceFormatKHR {
+    auto surfaceFormat = [this] -> VkSurfaceFormatKHR {
         uint32_t surfaceFormatCount;
-        VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(m_PhysDev, vm_Surface, &surfaceFormatCount, nullptr));
+        VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(m_PhysDev, m_Surface, &surfaceFormatCount, nullptr));
 
         std::vector<VkSurfaceFormatKHR> surfaceFormats(surfaceFormatCount);
-        vkGetPhysicalDeviceSurfaceFormatsKHR(m_PhysDev, vm_Surface, &surfaceFormatCount, surfaceFormats.data());
+        vkGetPhysicalDeviceSurfaceFormatsKHR(m_PhysDev, m_Surface, &surfaceFormatCount, surfaceFormats.data());
 
         auto it = std::ranges::find_if(surfaceFormats, [](VkSurfaceFormatKHR surfaceFormat) -> bool {
             return surfaceFormat.format == VK_FORMAT_B8G8R8A8_SRGB &&
@@ -90,7 +87,7 @@ void CreateSwapchain()
         return *it;
     }();
 
-    auto surfaceExtent = [surfaceCapabilities] -> VkExtent2D {
+    auto surfaceExtent = [this, surfaceCapabilities] -> VkExtent2D {
         if (surfaceCapabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
             return surfaceCapabilities.currentExtent;
 
@@ -124,18 +121,18 @@ void CreateSwapchain()
         .clipped = VK_TRUE,
         .oldSwapchain = m_Swapchain,
     };
-    VK_CHECK(vkCreateSwapchainKHR(m_Dev, &createInfo, nullptr, &vm_Swapchain));
+    VK_CHECK(vkCreateSwapchainKHR(m_Dev, &createInfo, nullptr, &m_Swapchain));
 
-    vkGetSwapchainImagesKHR(m_Dev, vm_Swapchain, &vm_SwapchainTexturesCount, nullptr);
+    vkGetSwapchainImagesKHR(m_Dev, m_Swapchain, &m_SwapchainTexturesCount, nullptr);
 
     NYLA_ASSERT(m_SwapchainTexturesCount <= kRhiMaxNumSwapchainTextures);
     std::array<VkImage, kRhiMaxNumSwapchainTextures> swapchainImages;
 
-    vkGetSwapchainImagesKHR(m_Dev, vm_Swapchain, &vm_SwapchainTexturesCount, swapchainImages.data());
+    vkGetSwapchainImagesKHR(m_Dev, m_Swapchain, &m_SwapchainTexturesCount, swapchainImages.data());
 
     for (size_t i = 0; i < m_SwapchainTexturesCount; ++i)
     {
-        m_SwapchainTextures[i] = RhiCreateTextureFromSwapchainImage(swapchainImages[i], surfaceFormat, surfaceExtent);
+        m_SwapchainTextures[i] = CreateTextureFromSwapchainImage(swapchainImages[i], surfaceFormat, surfaceExtent);
 
 #if 0
         const VkImageCreateInfo depthImageCreateInfo{
@@ -143,7 +140,7 @@ void CreateSwapchain()
 
             .imageType = VK_IMAGE_TYPE_2D,
             .format = VK_FORMAT_D32_SFLOAT,
-            .extent = VkExtent3D{m_SurfaceExtent.width, vm_SurfaceExtent.height, 1},
+            .extent = VkExtent3D{m_SurfaceExtent.width, m_SurfaceExtent.height, 1},
             .mipLevels = 1,
             .arrayLayers = 1,
             .samples = VK_SAMPLE_COUNT_1_BIT,
@@ -169,7 +166,7 @@ void CreateSwapchain()
         };
 
         VkImage depthImage;
-        VK_CHECK(vkCreateImage(m_Dev, &depthImageCreateInfo, vm_Alloc, &depthImage));
+        VK_CHECK(vkCreateImage(m_Dev, &depthImageCreateInfo, m_Alloc, &depthImage));
 
         const VkImageViewCreateInfo depthImageImageViewCreateInfo{
             .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -187,7 +184,7 @@ void CreateSwapchain()
         };
 
         VkImageView depthImageView;
-        // VK_CHECK(vkCreateImageView(m_Dev, &depthImageImageViewCreateInfo, vm_Alloc, &depthImageView));
+        // VK_CHECK(vkCreateImageView(m_Dev, &depthImageImageViewCreateInfo, m_Alloc, &depthImageView));
 #endif
     }
 
@@ -195,14 +192,14 @@ void CreateSwapchain()
     {
         NYLA_ASSERT(oldImagesViewsCount);
         for (uint32_t i = 0; i < oldImagesViewsCount; ++i)
-            RhiDestroySwapchainTexture(oldSwapchainTextures[i]);
+            DestroySwapchainTexture(oldSwapchainTextures[i]);
 
         vkDestroySwapchainKHR(m_Dev, oldSwapchain, nullptr);
     }
 }
 
-auto RhiCreateTextureFromSwapchainImage(VkImage image, VkSurfaceFormatKHR surfaceFormat, VkExtent2D surfaceExtent)
-    -> RhiTexture
+auto Rhi::Impl::CreateTextureFromSwapchainImage(VkImage image, VkSurfaceFormatKHR surfaceFormat,
+                                                VkExtent2D surfaceExtent) -> RhiTexture
 {
     const VkImageViewCreateInfo imageViewCreateInfo{
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -220,7 +217,7 @@ auto RhiCreateTextureFromSwapchainImage(VkImage image, VkSurfaceFormatKHR surfac
     };
 
     VkImageView imageView;
-    VK_CHECK(vkCreateImageView(m_Dev, &imageViewCreateInfo, vm_Alloc, &imageView));
+    VK_CHECK(vkCreateImageView(m_Dev, &imageViewCreateInfo, m_Alloc, &imageView));
 
     VulkanTextureData textureData{
         .isSwapchain = true,
@@ -235,22 +232,20 @@ auto RhiCreateTextureFromSwapchainImage(VkImage image, VkSurfaceFormatKHR surfac
     return m_Textures.Acquire(textureData);
 }
 
-void RhiDestroySwapchainTexture(RhiTexture texture)
+void Rhi::Impl::DestroySwapchainTexture(RhiTexture texture)
 {
     VulkanTextureData textureData = m_Textures.ReleaseData(texture);
     NYLA_ASSERT(textureData.isSwapchain);
 
     NYLA_ASSERT(textureData.imageView);
-    vkDestroyImageView(m_Dev, textureData.imageView, vm_Alloc);
+    vkDestroyImageView(m_Dev, textureData.imageView, m_Alloc);
 
     NYLA_ASSERT(textureData.image);
 }
 
-} // namespace rhi_vulkan_internal
-
-auto RhiGetBackbufferTexture() -> RhiTexture
+auto Rhi::Impl::GetBackbufferTexture() -> RhiTexture
 {
-    return m_SwapchainTextures[vm_SwapchainTextureIndex];
+    return m_SwapchainTextures[m_SwapchainTextureIndex];
 }
 
 } // namespace nyla

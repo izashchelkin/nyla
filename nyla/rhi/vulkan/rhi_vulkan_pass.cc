@@ -13,7 +13,7 @@ void Rhi::Impl::PassBegin(RhiPassDesc desc)
     RhiCmdList cmd = m_GraphicsQueueCmd[m_FrameIndex];
     VkCommandBuffer cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
 
-    RhiCmdTransitionTexture(cmd, desc.colorTarget, desc.state);
+    CmdTransitionTexture(cmd, desc.colorTarget, desc.state);
 
     const VulkanTextureData colorTargetData = m_Textures.ResolveData(desc.colorTarget);
 
@@ -63,7 +63,7 @@ void Rhi::Impl::PassEnd(RhiPassDesc desc)
     VkCommandBuffer cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
     vkCmdEndRendering(cmdbuf);
 
-    RhiCmdTransitionTexture(cmd, desc.colorTarget, desc.state);
+    CmdTransitionTexture(cmd, desc.colorTarget, desc.state);
 }
 
 } // namespace nyla
