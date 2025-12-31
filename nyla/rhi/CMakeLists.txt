@@ -15,9 +15,24 @@ target_sources(${TARGET}
         rhi_texture.h
 )
 
-add_subdirectory(vulkan)
+if (WIN32)
 
-target_link_libraries(${TARGET}
-    INTERFACE
-        nyla::rhi::vulkan
-)
+    add_subdirectory(d3d12)
+    add_subdirectory(vulkan)
+
+    target_link_libraries(${TARGET}
+        INTERFACE
+            # nyla::rhi::vulkan
+            nyla::rhi::d3d12
+    )
+
+else()
+
+    add_subdirectory(vulkan)
+
+    target_link_libraries(${TARGET}
+        INTERFACE
+            nyla::rhi::vulkan
+    )
+
+endif()
