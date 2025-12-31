@@ -123,10 +123,6 @@ using namespace rhi_vulkan_internal;
 class Rhi::Impl
 {
   public:
-    void Init(const RhiInitDesc &);
-    auto GetMinUniformBufferOffsetAlignment() -> uint32_t;
-    auto GetOptimalBufferCopyOffsetAlignment() -> uint32_t;
-
     auto CreateTimeline(uint64_t initialValue) -> VkSemaphore;
     void WaitTimeline(VkSemaphore timeline, uint64_t waitValue);
 
@@ -152,6 +148,10 @@ class Rhi::Impl
                                 const VkDebugUtilsMessengerCallbackDataEXT *callbackData) -> VkBool32;
 
     //
+
+    void Init(const RhiInitDesc &);
+    auto GetMinUniformBufferOffsetAlignment() -> uint32_t;
+    auto GetOptimalBufferCopyOffsetAlignment() -> uint32_t;
 
     auto FrameBegin() -> RhiCmdList;
     void FrameEnd();

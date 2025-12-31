@@ -74,12 +74,10 @@ auto Platform::Impl::CreateWin() -> PlatformWindow
     return ret;
 }
 
-auto Platform::Impl::GetWindowSize(PlatformWindow window) -> PlatformWindowSize
+auto Platform::Impl::GetWindowSize(HWND window) -> PlatformWindowSize
 {
-    auto hWnd = reinterpret_cast<HWND>(window.handle);
-
     RECT rect{};
-    NYLA_ASSERT(GetWindowRect(hWnd, &rect));
+    NYLA_ASSERT(GetWindowRect(window, &rect));
 
     return {
         .width = static_cast<uint32_t>(rect.right - rect.left),
@@ -112,7 +110,7 @@ auto Platform::CreateWin() -> PlatformWindow
 
 auto Platform::GetWindowSize(PlatformWindow window) -> PlatformWindowSize
 {
-    return m_Impl->GetWindowSize(window);
+    return m_Impl->GetWindowSize(reinterpret_cast<HWND>(window.handle));
 }
 
 auto Platform::PollEvent(PlatformEvent &outEvent) -> bool

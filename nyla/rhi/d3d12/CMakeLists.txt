@@ -5,6 +5,7 @@ add_library(nyla::rhi::d3d12 ALIAS ${TARGET})
 target_sources(${TARGET}
     PRIVATE
         rhi_d3d12.cc
+        rhi_d3d12_swapchain.cc
 )
 
 target_include_directories(${TARGET}

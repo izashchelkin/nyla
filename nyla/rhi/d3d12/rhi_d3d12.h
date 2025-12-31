@@ -14,6 +14,10 @@ template <class T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 class Rhi::Impl
 {
   public:
+    void CreateSwapchain();
+
+    //
+
     void Init(const RhiInitDesc &);
     auto GetNumFramesInFlight() -> uint32_t;
     auto GetFrameIndex() -> uint32_t;
@@ -87,12 +91,19 @@ class Rhi::Impl
     auto GetBackbufferTexture() -> RhiTexture;
 
   private:
-    RhiFlags m_Flags;
-    uint32_t m_NumFramesInFlight;
-    PlatformWindow m_Window;
+    RhiFlags m_Flags{};
+    uint32_t m_NumFramesInFlight{};
+    HWND m_Window{};
 
-    ComPtr<IDXGISwapChain3> m_swapChain;
-    ComPtr<ID3D12Device> m_device;
+    uint32_t m_FrameIndex{};
+
+    ComPtr<IDXGIAdapter1> m_Adapter;
+    ComPtr<ID3D12Device> m_Device;
+
+    ComPtr<IDXGIFactory2> m_Factory;
+    ComPtr<IDXGISwapChain3> m_Swapchain;
+
+    ComPtr<ID3D12CommandQueue> m_DirectCommandQueue;
 };
 
 } // namespace nyla

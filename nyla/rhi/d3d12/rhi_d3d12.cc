@@ -10,51 +10,6 @@ namespace nyla
 
 template <class T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
-namespace
-{
-
-auto GetHardwareAdapter(IDXGIFactory1 *pFactory) -> IDXGIAdapter1 *
-{
-    ComPtr<IDXGIAdapter1> adapter;
-
-    ComPtr<IDXGIFactory6> factory6;
-    if (SUCCEEDED(pFactory->QueryInterface(IID_PPV_ARGS(&factory6))))
-    {
-        for (UINT adapterIndex = 0; SUCCEEDED(factory6->EnumAdapterByGpuPreference(
-                 adapterIndex, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, IID_PPV_ARGS(&adapter)));
-             ++adapterIndex)
-        {
-            DXGI_ADAPTER_DESC1 desc;
-            adapter->GetDesc1(&desc);
-
-            if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
-                continue;
-
-            if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0, _uuidof(ID3D12Device), nullptr)))
-                break;
-        }
-    }
-
-    if (adapter.Get() == nullptr)
-    {
-        for (UINT adapterIndex = 0; SUCCEEDED(pFactory->EnumAdapters1(adapterIndex, &adapter)); ++adapterIndex)
-        {
-            DXGI_ADAPTER_DESC1 desc;
-            adapter->GetDesc1(&desc);
-
-            if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
-                continue;
-
-            if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0, _uuidof(ID3D12Device), nullptr)))
-                break;
-        }
-    }
-
-    return adapter.Detach();
-}
-
-} // namespace
-
 void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
 {
     NYLA_ASSERT(rhiDesc.numFramesInFlight <= kRhiMaxNumFramesInFlight);
@@ -68,9 +23,9 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
     }
 
     m_Flags = rhiDesc.flags;
-    m_Window = rhiDesc.window;
+    m_Window = reinterpret_cast<HWND>(rhiDesc.window.handle);
 
-    UINT dxgiFactoryFlags = 0;
+    uint32_t dxgiFactoryFlags = 0;
 
 #if !defined(NDEBUG)
     {
@@ -84,41 +39,67 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
     }
 #endif
 
-    ComPtr<IDXGIFactory4> factory;
-    NYLA_ASSERT(SUCCEEDED(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory))));
+    HRESULT res;
 
-    ComPtr<IDXGIAdapter1> hardwareAdapter = GetHardwareAdapter(factory.Get());
+    res = CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&m_Factory));
+    NYLA_ASSERT(SUCCEEDED(res));
 
-    NYLA_ASSERT(SUCCEEDED(D3D12CreateDevice(hardwareAdapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_device))));
+    const DXGI_GPU_PREFERENCE gpuPreference = DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE;
 
-    // Describe and create the command queue.
-    D3D12_COMMAND_QUEUE_DESC queueDesc = {};
-    queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-    queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+    ComPtr<IDXGIAdapter1> adapter;
 
-    ThrowIfFailed(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue)));
+    if (ComPtr<IDXGIFactory6> factory6; SUCCEEDED(m_Factory->QueryInterface(IID_PPV_ARGS(&factory6))))
+    {
+        for (uint32_t i = 0; SUCCEEDED(factory6->EnumAdapterByGpuPreference(i, gpuPreference, IID_PPV_ARGS(&adapter)));
+             ++i)
+        {
+            DXGI_ADAPTER_DESC1 desc;
+            adapter->GetDesc1(&desc);
 
-    // Describe and create the swap chain.
-    DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
-    swapChainDesc.BufferCount = FrameCount;
-    swapChainDesc.Width = m_width;
-    swapChainDesc.Height = m_height;
-    swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-    swapChainDesc.SampleDesc.Count = 1;
+            if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
+                continue;
 
-    ComPtr<IDXGISwapChain1> swapChain;
-    ThrowIfFailed(factory->CreateSwapChainForHwnd(
-        m_commandQueue.Get(), // Swap chain needs the queue so that it can force a flush on it.
-        Win32Application::GetHwnd(), &swapChainDesc, nullptr, nullptr, &swapChain));
+            if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0, _uuidof(ID3D12Device), nullptr)))
+                break;
+        }
+    }
 
-    // This sample does not support fullscreen transitions.
-    ThrowIfFailed(factory->MakeWindowAssociation(Win32Application::GetHwnd(), DXGI_MWA_NO_ALT_ENTER));
+    if (!adapter.Get())
+    {
+        for (uint32_t i = 0; SUCCEEDED(m_Factory->EnumAdapters1(i, &adapter)); ++i)
+        {
+            DXGI_ADAPTER_DESC1 desc;
+            adapter->GetDesc1(&desc);
 
-    ThrowIfFailed(swapChain.As(&m_swapChain));
-    m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
+            if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
+                continue;
 
+            if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0, _uuidof(ID3D12Device), nullptr)))
+                break;
+        }
+    }
+
+    NYLA_ASSERT(adapter.Get());
+    res = adapter.As(&m_Adapter);
+    NYLA_ASSERT(SUCCEEDED(res));
+
+    res = D3D12CreateDevice(m_Adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_Device));
+    NYLA_ASSERT(SUCCEEDED(res));
+
+    D3D12_COMMAND_QUEUE_DESC directQueueDesc = {
+        .Type = D3D12_COMMAND_LIST_TYPE_DIRECT,
+        .Flags = D3D12_COMMAND_QUEUE_FLAG_NONE,
+    };
+    NYLA_ASSERT(m_Device->CreateCommandQueue(&directQueueDesc, IID_PPV_ARGS(&m_DirectCommandQueue)));
+
+    CreateSwapchain();
+
+    res = m_Factory->MakeWindowAssociation(m_Window, DXGI_MWA_NO_ALT_ENTER);
+    NYLA_ASSERT(SUCCEEDED(res));
+
+    m_FrameIndex = m_Swapchain->GetCurrentBackBufferIndex();
+
+#if 0
     // Create descriptor heaps.
     {
         // Describe and create a render target view (RTV) descriptor heap.
@@ -145,6 +126,7 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
     }
 
     ThrowIfFailed(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator)));
+#endif
 }
 
 } // namespace nyla

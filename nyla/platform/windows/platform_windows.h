@@ -4,12 +4,13 @@
 
 #include "nyla/commons/containers/inline_ring.h"
 
-namespace nyla
-{
-
 #ifndef _WINDEF_
 typedef struct HINSTANCE__ *HINSTANCE;
+typedef struct HWND__ *HWND;
 #endif
+
+namespace nyla
+{
 
 class Platform::Impl
 {
@@ -18,7 +19,7 @@ class Platform::Impl
     auto CreateWin() -> PlatformWindow;
     auto PollEvent(PlatformEvent &outEvent) -> bool;
     void EnqueueEvent(const PlatformEvent &);
-    auto GetWindowSize(PlatformWindow window) -> PlatformWindowSize;
+    auto GetWindowSize(HWND window) -> PlatformWindowSize;
 
     auto GetHInstance() -> HINSTANCE;
     void SetHInstance(HINSTANCE hInstance);
