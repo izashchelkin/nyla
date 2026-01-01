@@ -90,7 +90,8 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
         .Type = D3D12_COMMAND_LIST_TYPE_DIRECT,
         .Flags = D3D12_COMMAND_QUEUE_FLAG_NONE,
     };
-    NYLA_ASSERT(m_Device->CreateCommandQueue(&directQueueDesc, IID_PPV_ARGS(&m_DirectCommandQueue)));
+    res = m_Device->CreateCommandQueue(&directQueueDesc, IID_PPV_ARGS(&m_DirectCommandQueue));
+    NYLA_ASSERT(SUCCEEDED(res));
 
     CreateSwapchain();
 
@@ -99,34 +100,58 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
 
     m_FrameIndex = m_Swapchain->GetCurrentBackBufferIndex();
 
-#if 0
-    // Create descriptor heaps.
-    {
-        // Describe and create a render target view (RTV) descriptor heap.
-        D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
-        rtvHeapDesc.NumDescriptors = FrameCount;
-        rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-        rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-        ThrowIfFailed(m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap)));
+    const D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc{
+        .Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
+        .NumDescriptors = m_NumFramesInFlight,
+        .Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE,
+    };
+    res = m_Device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_RtvHeap));
+    NYLA_ASSERT(SUCCEEDED(res));
 
-        m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-    }
+    const D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc{
+        .Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV,
+        .NumDescriptors = 1,
+        .Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE,
+    };
+    res = m_Device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&m_DsvHeap));
+    NYLA_ASSERT(SUCCEEDED(res));
+
+    const D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc{
+        .Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
+        .NumDescriptors = 256,
+        .Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE,
+    };
+    res = m_Device->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(&m_CbvHeap));
+    NYLA_ASSERT(SUCCEEDED(res));
+
+    const D3D12_QUERY_HEAP_DESC queryHeapDesc{
+        .Type = D3D12_QUERY_HEAP_TYPE_OCCLUSION,
+        .Count = 1,
+    };
+    res = m_Device->CreateQueryHeap(&queryHeapDesc, IID_PPV_ARGS(&m_QueryHeap));
+    NYLA_ASSERT(SUCCEEDED(res));
+
+    m_RTVDescriptorSize = m_Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+    m_CBVDescriptorSize = m_Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
     // Create frame resources.
     {
-        CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart());
+        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = m_RtvHeap->GetCPUDescriptorHandleForHeapStart();
 
-        // Create a RTV for each frame.
-        for (UINT n = 0; n < FrameCount; n++)
+        // Create a RTV and a command allocator for each frame.
+        for (uint32_t n = 0; n < m_NumFramesInFlight; n++)
         {
-            ThrowIfFailed(m_swapChain->GetBuffer(n, IID_PPV_ARGS(&m_renderTargets[n])));
-            m_device->CreateRenderTargetView(m_renderTargets[n].Get(), nullptr, rtvHandle);
-            rtvHandle.Offset(1, m_rtvDescriptorSize);
+            res = m_Swapchain->GetBuffer(n, IID_PPV_ARGS(&m_renderTargets[n]));
+            NYLA_ASSERT(SUCCEEDED(res));
+
+            m_Device->CreateRenderTargetView(m_renderTargets[n].Get(), nullptr, rtvHandle);
+
+            rtvHandle.ptr += m_rtvDescriptorSize;
+
+            ThrowIfFailed(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT,
+                                                           IID_PPV_ARGS(&m_commandAllocators[n])));
         }
     }
-
-    ThrowIfFailed(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator)));
-#endif
 }
 
 } // namespace nyla

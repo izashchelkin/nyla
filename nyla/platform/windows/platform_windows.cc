@@ -50,28 +50,25 @@ auto Platform::Impl::PollEvent(PlatformEvent &outEvent) -> bool
     }
 }
 
-auto Platform::Impl::CreateWin() -> PlatformWindow
+auto Platform::Impl::CreateWin() -> HWND
 {
-    const TCHAR CLASS_NAME[] = TEXT("nyla");
+    const wchar_t CLASS_NAME[] = L"nyla";
 
-    WNDCLASS wc = {
+    WNDCLASSW wc = {
         .lpfnWndProc = MainWndProc,
         .hInstance = m_HInstance,
         .lpszClassName = CLASS_NAME,
     };
 
-    RegisterClass(&wc);
+    RegisterClassW(&wc);
 
-    HWND hWnd = CreateWindowEx(0, CLASS_NAME, TEXT("nyla"), WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
-                               CW_USEDEFAULT, CW_USEDEFAULT, nullptr, nullptr, m_HInstance, nullptr);
-    NYLA_ASSERT(hWnd);
-    ShowWindow(hWnd, true);
-    UpdateWindow(hWnd);
+    HWND window = CreateWindowExW(0, CLASS_NAME, L"nyla", WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
+                                  CW_USEDEFAULT, CW_USEDEFAULT, nullptr, nullptr, m_HInstance, nullptr);
+    NYLA_ASSERT(window);
+    ShowWindow(window, SW_SHOW);
+    UpdateWindow(window);
 
-    PlatformWindow ret{
-        .handle = reinterpret_cast<uint64_t>(hWnd),
-    };
-    return ret;
+    return window;
 }
 
 auto Platform::Impl::GetWindowSize(HWND window) -> PlatformWindowSize
@@ -105,7 +102,7 @@ void Platform::Init(const PlatformInitDesc &desc)
 
 auto Platform::CreateWin() -> PlatformWindow
 {
-    return m_Impl->CreateWin();
+    return {.handle = reinterpret_cast<std::uintptr_t>(m_Impl->CreateWin())};
 }
 
 auto Platform::GetWindowSize(PlatformWindow window) -> PlatformWindowSize

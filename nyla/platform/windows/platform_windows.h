@@ -16,13 +16,14 @@ class Platform::Impl
 {
   public:
     void Init(const PlatformInitDesc &desc);
-    auto CreateWin() -> PlatformWindow;
-    auto PollEvent(PlatformEvent &outEvent) -> bool;
-    void EnqueueEvent(const PlatformEvent &);
-    auto GetWindowSize(HWND window) -> PlatformWindowSize;
-
     auto GetHInstance() -> HINSTANCE;
     void SetHInstance(HINSTANCE hInstance);
+
+    auto CreateWin() -> HWND;
+    auto GetWindowSize(HWND window) -> PlatformWindowSize;
+
+    auto PollEvent(PlatformEvent &outEvent) -> bool;
+    void EnqueueEvent(const PlatformEvent &);
 
   private:
     InlineRing<PlatformEvent, 8> m_EventsRing{};

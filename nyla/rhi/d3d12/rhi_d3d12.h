@@ -11,6 +11,11 @@ namespace nyla
 
 template <class T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
+namespace rhi_d3d12_internal
+{
+} // namespace rhi_d3d12_internal
+using namespace rhi_d3d12_internal;
+
 class Rhi::Impl
 {
   public:
@@ -104,6 +109,21 @@ class Rhi::Impl
     ComPtr<IDXGISwapChain3> m_Swapchain;
 
     ComPtr<ID3D12CommandQueue> m_DirectCommandQueue;
+
+    ComPtr<ID3D12DescriptorHeap> m_RtvHeap;
+    ComPtr<ID3D12DescriptorHeap> m_CbvHeap;
+    ComPtr<ID3D12DescriptorHeap> m_DsvHeap;
+    ComPtr<ID3D12QueryHeap> m_QueryHeap;
+
+    struct FrameContext
+    {
+        ComPtr<ID3D12CommandAllocator> cmdAlloc;
+        ComPtr<ID3D12CommandList> cmd;
+    };
+    std::array<FrameContext, kRhiMaxNumFramesInFlight> frameContext;
+
+    uint32_t m_RTVDescriptorSize;
+    uint32_t m_CBVDescriptorSize;
 };
 
 } // namespace nyla
