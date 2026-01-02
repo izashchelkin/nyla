@@ -3,6 +3,7 @@
 #include <vector>
 #include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/vulkan_core.h>
+#include <limits>
 
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"

@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <cstring>
 #include <vector>
+#include <limits>
 
 #include "nyla/commons/assert.h"
 #include "nyla/commons/bitenum.h"
@@ -71,7 +72,7 @@ auto Rhi::Impl::DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT me
     {
     case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT: {
         NYLA_LOG("%s", callbackData->pMessage);
-        DebugBreak();
+        NYLA_DEBUGBREAK();
         break;
     }
     case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT: {

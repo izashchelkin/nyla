@@ -1,5 +1,6 @@
 #include "nyla/commons/os/spawn.h"
 #include "nyla/commons/assert.h"
+#include "nyla/commons/log.h"
 
 #if defined(__linux__) // TODO: move to platform
 

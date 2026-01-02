@@ -1,5 +1,6 @@
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
+#include <limits>
 
 namespace nyla
 {

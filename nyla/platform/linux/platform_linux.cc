@@ -1,12 +1,16 @@
 #include "nyla/platform/linux/platform_linux.h"
 #include "nyla/platform/platform.h"
 
+#include "nyla/commons/assert.h"
+#include "nyla/commons/cleanup.h"
 #include "nyla/commons/string.h"
+#include "nyla/commons/log.h"
 #include "nyla/platform/platform.h"
 #include "xcb/xcb.h"
 #include "xcb/xcb_aux.h"
 #include "xcb/xinput.h"
 #include <cstdint>
+#include <array>
 #include <xkbcommon/xkbcommon-x11.h>
 
 #include "vulkan/vulkan_core.h"
@@ -39,7 +43,7 @@ auto Platform::Impl::InternAtom(std::string_view name, bool onlyIfExists) -> xcb
     xcb_intern_atom_reply_t *reply =
         xcb_intern_atom_reply(m_Conn, xcb_intern_atom(m_Conn, onlyIfExists, name.size(), name.data()), nullptr);
     if (!reply || !reply->atom)
-        NYLA_LOG("could not intern atom %s", name);
+        NYLA_LOG("could not intern atom " NYLA_SV_FMT, NYLA_SV_ARG(name));
 
     auto ret = reply->atom;
     free(reply);
@@ -82,9 +86,9 @@ void Platform::Impl::Init(const PlatformInitDesc &desc)
         if (!reply || err)
             NYLA_ASSERT(false && "could not set up detectable autorepeat");
     }
-    <<
+    
 
-        if (Any(desc.enabledFeatures & PlatformFeature::MouseInput))
+    if (Any(desc.enabledFeatures & PlatformFeature::MouseInput))
     {
         const xcb_query_extension_reply_t *ext = xcb_get_extension_data(m_Conn, &xcb_input_id);
         if (!ext || !ext->present)

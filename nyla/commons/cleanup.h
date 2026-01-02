@@ -1,10 +1,10 @@
 #pragma once
 
-namespace nyla
-{
-
 #include <type_traits>
 #include <utility>
+
+namespace nyla
+{
 
 template <class F> class Cleanup
 {
@@ -22,16 +22,7 @@ template <class F> class Cleanup
     ~Cleanup() noexcept
     {
         if (m_active)
-        {
-            try
-            {
-                m_fn();
-            }
-            catch (...)
-            {
-                std::terminate();
-            }
-        }
+            m_fn();
     }
 
     void dismiss() noexcept
