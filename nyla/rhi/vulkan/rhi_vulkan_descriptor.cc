@@ -220,6 +220,64 @@ void Rhi::Impl::CmdBindGraphicsBindGroup(RhiCmdList cmd, uint32_t setIndex, RhiD
                             &descriptorSet, dynamicOffsets.size(), dynamicOffsets.data());
 }
 
+void Rhi::Impl::WriteResourceViewsDescriptors()
+{
+    InlineVec<VkWriteDescriptorSet, 32> descriptorWrites;
+    InlineVec<VkDescriptorImageInfo, 32> descriptorImageInfos;
+
+    for (auto &slot : m_TextureViews)
+    {
+        if (!slot.used)
+            continue;
+        if (slot.descriptorWritten)
+            continue;
+
+        const TextureViewData &textureViewData = slot.data;
+        const TextureData &textureData = m_Textures.ResolveData(textureViewData.texture);
+
+        VkWriteDescriptorSet &vulkanSetWrite = descriptorWrites.emplace_back(VkWriteDescriptorSet{
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .dstSet = vulkanDescriptorSet,
+            .dstBinding = write.binding,
+            .dstArrayElement = write.arrayIndex,
+            .descriptorCount = 1,
+            .descriptorType = ConvertVulkanBindingType(bindingType, descriptorLayout.flags),
+        });
+
+        vulkanSetWrite.pImageInfo = &descriptorImageInfos.emplace_back(VkDescriptorImageInfo{
+            .imageView = textureViewData.imageView,
+            .imageLayout = textureData.layout,
+        });
+
+        slot.descriptorWritten = true;
+    }
+
+    for (auto &slot : m_Samplers)
+    {
+        if (!slot.used)
+            continue;
+        if (slot.descriptorWritten)
+            continue;
+
+        const VulkanSamplerData &samplerData = slot.data;
+
+        VkWriteDescriptorSet &vulkanSetWrite = descriptorWrites.emplace_back(VkWriteDescriptorSet{
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .dstSet = vulkanDescriptorSet,
+            .dstBinding = write.binding,
+            .dstArrayElement = write.arrayIndex,
+            .descriptorCount = 1,
+            .descriptorType = ConvertVulkanBindingType(bindingType, descriptorLayout.flags),
+        });
+
+        vulkanSetWrite.pImageInfo = &imageInfos.emplace_back(VkDescriptorImageInfo{
+            .sampler = samplerData.sampler,
+        });
+    }
+
+    vkUpdateDescriptorSets(m_Dev, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
+}
+
 //
 
 auto Rhi::CreateDescriptorSetLayout(const RhiDescriptorSetLayoutDesc &desc) -> RhiDescriptorSetLayout

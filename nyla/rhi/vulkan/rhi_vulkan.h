@@ -106,11 +106,15 @@ struct VulkanTextureViewData
     VkImageViewType imageViewType;
     VkFormat format;
     VkImageSubresourceRange subresourceRange;
+
+    bool descriptorWritten;
 };
 
 struct VulkanSamplerData
 {
     VkSampler sampler;
+
+    bool descriptorWritten;
 };
 
 struct VulkanDescriptorSetLayoutData
