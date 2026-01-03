@@ -47,6 +47,7 @@ class AssetManager
     {
         std::string path;
         RhiTexture texture;
+        RhiTextureView textureView;
         uint32_t width = 0;
         uint32_t height = 0;
         uint32_t channels = 0;

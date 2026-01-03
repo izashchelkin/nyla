@@ -101,38 +101,49 @@ void AssetManager::Upload(RhiCmdList cmd)
         if (!slot.used)
             continue;
 
-        TextureData &textureData = slot.data;
-        if (!textureData.needsUpload)
+        TextureData &textureAssetData = slot.data;
+        if (!textureAssetData.needsUpload)
             continue;
 
-        void *data = stbi_load(textureData.path.c_str(), (int *)&textureData.width, (int *)&textureData.height,
-                               (int *)&textureData.channels, STBI_rgb_alpha);
+        void *data = stbi_load(textureAssetData.path.c_str(), (int *)&textureAssetData.width,
+                               (int *)&textureAssetData.height, (int *)&textureAssetData.channels, STBI_rgb_alpha);
         if (!data)
         {
-            NYLA_LOG("stbi_load failed for '%s': %s", textureData.path.data(), stbi_failure_reason());
+            NYLA_LOG("stbi_load failed for '%s': %s", textureAssetData.path.data(), stbi_failure_reason());
             NYLA_ASSERT(false);
         }
 
-        textureData.texture = g_Rhi->CreateTexture({
-            .width = textureData.width,
-            .height = textureData.height,
+        const RhiTexture texture = g_Rhi->CreateTexture(RhiTextureDesc{
+            .width = textureAssetData.width,
+            .height = textureAssetData.height,
             .memoryUsage = RhiMemoryUsage::GpuOnly,
             .usage = RhiTextureUsage::TransferDst | RhiTextureUsage::ShaderSampled,
             .format = RhiTextureFormat::R8G8B8A8_sRGB,
         });
-        const RhiTexture texture = textureData.texture;
+        textureAssetData.texture = texture;
+
+        const RhiTextureView textureView = g_Rhi->CreateTextureView(RhiTextureViewDesc{
+            .texture = texture,
+        });
+        textureAssetData.textureView = textureView;
 
         descriptorWrites.emplace_back(RhiDescriptorWriteDesc{
             .set = m_DescriptorSet,
             .binding = kTexturesDescriptorBinding,
             .arrayIndex = i,
             .type = RhiBindingType::Texture,
-            .resourceBinding = {.texture = {.textureView = textureView},
+            .resourceBinding =
+                RhiDescriptorResourceBinding{
+                    .texture =
+                        RhiTextureBinding{
+                            .textureView = textureView,
+                        },
+                },
         });
 
         g_Rhi->CmdTransitionTexture(cmd, texture, RhiTextureState::TransferDst);
 
-        const uint32_t size = textureData.width * textureData.height * textureData.channels;
+        const uint32_t size = textureAssetData.width * textureAssetData.height * textureAssetData.channels;
         char *uploadMemory = StagingBufferCopyIntoTexture(cmd, g_StagingBuffer, texture, size);
         memcpy(uploadMemory, data, size);
 
@@ -141,9 +152,9 @@ void AssetManager::Upload(RhiCmdList cmd)
         // TODO: this barrier does not need to be here
         g_Rhi->CmdTransitionTexture(cmd, texture, RhiTextureState::ShaderRead);
 
-        NYLA_LOG("Uploading '%s'", (const char *)textureData.path.data());
+        NYLA_LOG("Uploading '%s'", (const char *)textureAssetData.path.data());
 
-        textureData.needsUpload = false;
+        textureAssetData.needsUpload = false;
     }
 
     if (!descriptorWrites.empty())

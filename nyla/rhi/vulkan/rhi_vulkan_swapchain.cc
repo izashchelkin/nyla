@@ -157,13 +157,9 @@ void Rhi::Impl::CreateSwapchain()
         {
             VulkanTextureData textureData = m_Textures.ReleaseData(oldSwapchainTextures[i]);
             NYLA_ASSERT(textureData.isSwapchain);
-
-            DestroyTextureView(textureData);
-
-            NYLA_ASSERT(textureData.imageView);
-            vkDestroyImageView(m_Dev, textureData.imageView, m_Alloc);
-
             NYLA_ASSERT(textureData.image);
+
+            DestroyTextureView(textureData.view);
         };
 
         vkDestroySwapchainKHR(m_Dev, oldSwapchain, m_Alloc);
