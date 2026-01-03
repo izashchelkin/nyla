@@ -50,12 +50,22 @@ struct RhiTexture : Handle
 {
 };
 
+struct RhiTextureView : Handle
+{
+};
+
 struct RhiTextureDesc
 {
     uint32_t width;
     uint32_t height;
     RhiMemoryUsage memoryUsage;
     RhiTextureUsage usage;
+    RhiTextureFormat format;
+};
+
+struct RhiTextureViewDesc
+{
+    RhiTexture texture;
     RhiTextureFormat format;
 };
 

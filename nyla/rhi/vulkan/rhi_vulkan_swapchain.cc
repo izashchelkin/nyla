@@ -1,9 +1,9 @@
 #include <algorithm>
 #include <cstdint>
+#include <limits>
 #include <vector>
 #include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/vulkan_core.h>
-#include <limits>
 
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
@@ -133,115 +133,41 @@ void Rhi::Impl::CreateSwapchain()
 
     for (size_t i = 0; i < m_SwapchainTexturesCount; ++i)
     {
-        m_SwapchainTextures[i] = CreateTextureFromSwapchainImage(swapchainImages[i], surfaceFormat, surfaceExtent);
-
-#if 0
-        const VkImageCreateInfo depthImageCreateInfo{
-            .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-
-            .imageType = VK_IMAGE_TYPE_2D,
-            .format = VK_FORMAT_D32_SFLOAT,
-            .extent = VkExtent3D{m_SurfaceExtent.width, m_SurfaceExtent.height, 1},
-            .mipLevels = 1,
-            .arrayLayers = 1,
-            .samples = VK_SAMPLE_COUNT_1_BIT,
-            .tiling = VK_IMAGE_TILING_OPTIMAL,
-            .usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-            .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-
-            // const void*              pNext;
-            // VkImageCreateFlags       flags;
-            // VkImageType              imageType;
-            // VkFormat                 format;
-            // VkExtent3D               extent;
-            // uint32_t                 mipLevels;
-            // uint32_t                 arrayLayers;
-            // VkSampleCountFlagBits    samples;
-            // VkImageTiling            tiling;
-            // VkImageUsageFlags        usage;
-            // VkSharingMode            sharingMode;
-            // uint32_t                 queueFamilyIndexCount;
-            // const uint32_t*          pQueueFamilyIndices;
-            // VkImageLayout            initialLayout;
-
+        const VulkanTextureData textureData{
+            .isSwapchain = true,
+            .image = swapchainImages[i],
+            .memory = nullptr,
+            .state = RhiTextureState::Present,
+            .format = surfaceFormat.format,
+            .extent = {surfaceExtent.width, surfaceExtent.height, 1},
         };
+        RhiTexture texture = m_Textures.Acquire(textureData);
+        m_SwapchainTextures[i] = texture;
 
-        VkImage depthImage;
-        VK_CHECK(vkCreateImage(m_Dev, &depthImageCreateInfo, m_Alloc, &depthImage));
-
-        const VkImageViewCreateInfo depthImageImageViewCreateInfo{
-            .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-            .image = depthImage,
-            .viewType = VK_IMAGE_VIEW_TYPE_2D,
-            .format = VK_FORMAT_D32_SFLOAT_S8_UINT,
-            .subresourceRange =
-                {
-                    .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
-                    .baseMipLevel = 0,
-                    .levelCount = 1,
-                    .baseArrayLayer = 0,
-                    .layerCount = 1,
-                },
-        };
-
-        VkImageView depthImageView;
-        // VK_CHECK(vkCreateImageView(m_Dev, &depthImageImageViewCreateInfo, m_Alloc, &depthImageView));
-#endif
+        const RhiTextureView textureView = CreateTextureView(RhiTextureViewDesc{
+            .texture = texture,
+        });
+        m_Textures.ResolveData(texture).view = textureView;
     }
 
     if (oldSwapchain)
     {
         NYLA_ASSERT(oldImagesViewsCount);
         for (uint32_t i = 0; i < oldImagesViewsCount; ++i)
-            DestroySwapchainTexture(oldSwapchainTextures[i]);
+        {
+            VulkanTextureData textureData = m_Textures.ReleaseData(oldSwapchainTextures[i]);
+            NYLA_ASSERT(textureData.isSwapchain);
 
-        vkDestroySwapchainKHR(m_Dev, oldSwapchain, nullptr);
+            DestroyTextureView(textureData);
+
+            NYLA_ASSERT(textureData.imageView);
+            vkDestroyImageView(m_Dev, textureData.imageView, m_Alloc);
+
+            NYLA_ASSERT(textureData.image);
+        };
+
+        vkDestroySwapchainKHR(m_Dev, oldSwapchain, m_Alloc);
     }
-}
-
-auto Rhi::Impl::CreateTextureFromSwapchainImage(VkImage image, VkSurfaceFormatKHR surfaceFormat,
-                                                VkExtent2D surfaceExtent) -> RhiTexture
-{
-    const VkImageViewCreateInfo imageViewCreateInfo{
-        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-        .image = image,
-        .viewType = VK_IMAGE_VIEW_TYPE_2D,
-        .format = surfaceFormat.format,
-        .subresourceRange =
-            {
-                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                .baseMipLevel = 0,
-                .levelCount = 1,
-                .baseArrayLayer = 0,
-                .layerCount = 1,
-            },
-    };
-
-    VkImageView imageView;
-    VK_CHECK(vkCreateImageView(m_Dev, &imageViewCreateInfo, m_Alloc, &imageView));
-
-    VulkanTextureData textureData{
-        .isSwapchain = true,
-        .image = image,
-        .imageView = imageView,
-        .memory = VK_NULL_HANDLE,
-        .state = RhiTextureState::Present,
-        .format = surfaceFormat.format,
-        .extent = {surfaceExtent.width, surfaceExtent.height, 1},
-    };
-
-    return m_Textures.Acquire(textureData);
-}
-
-void Rhi::Impl::DestroySwapchainTexture(RhiTexture texture)
-{
-    VulkanTextureData textureData = m_Textures.ReleaseData(texture);
-    NYLA_ASSERT(textureData.isSwapchain);
-
-    NYLA_ASSERT(textureData.imageView);
-    vkDestroyImageView(m_Dev, textureData.imageView, m_Alloc);
-
-    NYLA_ASSERT(textureData.image);
 }
 
 auto Rhi::Impl::GetBackbufferTexture() -> RhiTexture

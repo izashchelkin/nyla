@@ -1,7 +1,7 @@
-#include "nyla/engine/asset_manager.h"
 #include "nyla/commons/containers/inline_vec.h"
 #include "nyla/commons/handle_pool.h"
 #include "nyla/commons/log.h"
+#include "nyla/engine/asset_manager.h"
 #include "nyla/engine/engine.h"
 #include "nyla/engine/staging_buffer.h"
 #include "nyla/rhi/rhi.h"
@@ -127,7 +127,7 @@ void AssetManager::Upload(RhiCmdList cmd)
             .binding = kTexturesDescriptorBinding,
             .arrayIndex = i,
             .type = RhiBindingType::Texture,
-            .resourceBinding = {.texture = {.texture = texture}},
+            .resourceBinding = {.texture = {.textureView = textureView},
         });
 
         g_Rhi->CmdTransitionTexture(cmd, texture, RhiTextureState::TransferDst);

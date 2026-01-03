@@ -82,7 +82,7 @@ void GameInit()
 #if defined(__linux__) // TODO: deal with this
         std::string assetsBasePath = "assets/BBreaker";
 #else
-        std::string assetsBasePath = "C:\\nyla\\assets\\BBreaker";
+        std::string assetsBasePath = "D:\\nyla\\assets\\BBreaker";
 #endif
 
         g_State->assets.background = g_AssetManager->DeclareTexture(assetsBasePath + "/Background1.png");

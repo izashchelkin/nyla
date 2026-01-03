@@ -22,8 +22,8 @@ if (WIN32)
 
     target_link_libraries(${TARGET}
         INTERFACE
-            # nyla::rhi::vulkan
-            nyla::rhi::d3d12
+            nyla::rhi::vulkan
+            # nyla::rhi::d3d12
     )
 
 else()

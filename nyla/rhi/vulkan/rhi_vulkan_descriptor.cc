@@ -173,10 +173,12 @@ void Rhi::Impl::WriteDescriptors(std::span<const RhiDescriptorWriteDesc> writes)
         }
 
         case RhiBindingType::Texture: {
-            const VulkanTextureData &textureData = m_Textures.ResolveData(resourceBinding.texture.texture);
+            const VulkanTextureViewData &textureViewData =
+                m_TextureViews.ResolveData(resourceBinding.texture.textureView);
+            const VulkanTextureData &textureData = m_Textures.ResolveData(textureViewData.texture);
 
             vulkanSetWrite.pImageInfo = &imageInfos.emplace_back(VkDescriptorImageInfo{
-                .imageView = textureData.imageView,
+                .imageView = textureViewData.imageView,
                 .imageLayout = textureData.layout,
             });
 

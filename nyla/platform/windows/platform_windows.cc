@@ -1,11 +1,8 @@
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <windows.h>
+#include "nyla/platform/windows/platform_windows.h"
 
 #include "nyla/commons/assert.h"
 #include "nyla/commons/containers/inline_ring.h"
 #include "nyla/platform/platform.h"
-#include "nyla/platform/windows/platform_windows.h"
 
 LRESULT CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 

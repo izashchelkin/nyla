@@ -1,5 +1,7 @@
 #pragma once
 
+#include "nyla/commons/assert.h"
+
 #include <array>
 #include <cstdint>
 #include <span>

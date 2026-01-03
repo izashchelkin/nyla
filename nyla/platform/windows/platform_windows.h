@@ -4,10 +4,9 @@
 
 #include "nyla/commons/containers/inline_ring.h"
 
-#ifndef _WINDEF_
-typedef struct HINSTANCE__ *HINSTANCE;
-typedef struct HWND__ *HWND;
-#endif
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
 
 namespace nyla
 {

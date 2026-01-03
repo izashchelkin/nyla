@@ -184,11 +184,21 @@ auto Rhi::Impl::CreateTexture(RhiTextureDesc desc) -> RhiTexture
     vkAllocateMemory(m_Dev, &memoryAllocInfo, m_Alloc, &textureData.memory);
     vkBindImageMemory(m_Dev, textureData.image, textureData.memory, 0);
 
-    const VkImageViewCreateInfo imageViewCreateInfo{
-        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-        .image = textureData.image,
-        .viewType = VK_IMAGE_VIEW_TYPE_2D,
-        .format = textureData.format,
+    return m_Textures.Acquire(textureData);
+}
+
+auto Rhi::Impl::CreateTextureView(const RhiTextureViewDesc &desc) -> RhiTextureView
+{
+    VulkanTextureData &textureData = m_Textures.ResolveData(desc.texture);
+
+    // TODO: allow multiple
+    NYLA_ASSERT(!HandleIsSet(textureData.view));
+
+    VulkanTextureViewData textureViewData{
+        .texture = desc.texture,
+
+        // TODO: expose these as well!
+        .imageViewType = VK_IMAGE_VIEW_TYPE_2D,
         .subresourceRange =
             {
                 .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -198,9 +208,25 @@ auto Rhi::Impl::CreateTexture(RhiTextureDesc desc) -> RhiTexture
                 .layerCount = 1,
             },
     };
-    vkCreateImageView(m_Dev, &imageViewCreateInfo, m_Alloc, &textureData.imageView);
 
-    return m_Textures.Acquire(textureData);
+    if (desc.format == RhiTextureFormat::None)
+        textureViewData.format = textureData.format;
+    else
+        textureViewData.format = ConvertTextureFormatIntoVkFormat(desc.format);
+
+    const VkImageViewCreateInfo imageViewCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+        .image = textureData.image,
+        .viewType = textureViewData.imageViewType,
+        .format = textureViewData.format,
+        .subresourceRange = textureViewData.subresourceRange,
+    };
+
+    VK_CHECK(vkCreateImageView(m_Dev, &imageViewCreateInfo, m_Alloc, &textureViewData.imageView));
+
+    const RhiTextureView view = m_TextureViews.Acquire(textureViewData);
+    textureData.view = view;
+    return view;
 }
 
 auto Rhi::Impl::GetTextureInfo(RhiTexture texture) -> RhiTextureInfo
@@ -260,14 +286,31 @@ void Rhi::Impl::DestroyTexture(RhiTexture texture)
     VulkanTextureData textureData = m_Textures.ReleaseData(texture);
     NYLA_ASSERT(!textureData.isSwapchain);
 
-    NYLA_ASSERT(textureData.imageView);
-    vkDestroyImageView(m_Dev, textureData.imageView, m_Alloc);
+    if (HandleIsSet(textureData.view))
+    {
+        VulkanTextureViewData textureViewData = m_TextureViews.ReleaseData(textureData.view);
+        NYLA_ASSERT(textureViewData.texture == texture);
+
+        vkDestroyImageView(m_Dev, textureViewData.imageView, m_Alloc);
+    }
 
     NYLA_ASSERT(textureData.image);
     vkDestroyImage(m_Dev, textureData.image, m_Alloc);
 
     NYLA_ASSERT(textureData.memory);
     vkFreeMemory(m_Dev, textureData.memory, m_Alloc);
+}
+
+void Rhi::Impl::DestroyTextureView(RhiTextureView textureView)
+{
+    VulkanTextureViewData textureViewData = m_TextureViews.ResolveData(textureView);
+    NYLA_ASSERT(textureViewData.imageView);
+
+    VulkanTextureData textureData = m_Textures.ReleaseData(textureViewData.texture);
+    NYLA_ASSERT(textureData.view == textureView);
+
+    vkDestroyImageView(m_Dev, textureViewData.imageView, m_Alloc);
+    textureData.view = {};
 }
 
 void Rhi::Impl::CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, uint32_t srcOffset, uint32_t size)
@@ -295,11 +338,69 @@ void Rhi::Impl::CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, ui
     vkCmdCopyBufferToImage(cmdbuf, srcBufferData.buffer, dstTextureData.image, dstTextureData.layout, 1, &region);
 }
 
+#if 0
+        const VkImageCreateInfo depthImageCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+
+            .imageType = VK_IMAGE_TYPE_2D,
+            .format = VK_FORMAT_D32_SFLOAT,
+            .extent = VkExtent3D{m_SurfaceExtent.width, m_SurfaceExtent.height, 1},
+            .mipLevels = 1,
+            .arrayLayers = 1,
+            .samples = VK_SAMPLE_COUNT_1_BIT,
+            .tiling = VK_IMAGE_TILING_OPTIMAL,
+            .usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+            .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+
+            // const void*              pNext;
+            // VkImageCreateFlags       flags;
+            // VkImageType              imageType;
+            // VkFormat                 format;
+            // VkExtent3D               extent;
+            // uint32_t                 mipLevels;
+            // uint32_t                 arrayLayers;
+            // VkSampleCountFlagBits    samples;
+            // VkImageTiling            tiling;
+            // VkImageUsageFlags        usage;
+            // VkSharingMode            sharingMode;
+            // uint32_t                 queueFamilyIndexCount;
+            // const uint32_t*          pQueueFamilyIndices;
+            // VkImageLayout            initialLayout;
+
+        };
+
+        VkImage depthImage;
+        VK_CHECK(vkCreateImage(m_Dev, &depthImageCreateInfo, m_Alloc, &depthImage));
+
+        const VkImageViewCreateInfo depthImageImageViewCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+            .image = depthImage,
+            .viewType = VK_IMAGE_VIEW_TYPE_2D,
+            .format = VK_FORMAT_D32_SFLOAT_S8_UINT,
+            .subresourceRange =
+                {
+                    .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
+                    .baseMipLevel = 0,
+                    .levelCount = 1,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1,
+                },
+        };
+
+        VkImageView depthImageView;
+        // VK_CHECK(vkCreateImageView(m_Dev, &depthImageImageViewCreateInfo, m_Alloc, &depthImageView));
+#endif
+
 //
 
-auto Rhi::CreateTexture(RhiTextureDesc desc) -> RhiTexture
+auto Rhi::CreateTexture(const RhiTextureDesc& desc) -> RhiTexture
 {
     return m_Impl->CreateTexture(desc);
+}
+
+auto Rhi::CreateTextureView(const RhiTextureViewDesc &desc) -> RhiTextureView
+{
+    return m_Impl->CreateTextureView(desc);
 }
 
 void Rhi::DestroyTexture(RhiTexture texture)

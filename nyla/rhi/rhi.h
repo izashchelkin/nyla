@@ -112,11 +112,14 @@ class Rhi
     auto CreateShader(const RhiShaderDesc &) -> RhiShader;
     void DestroyShader(RhiShader);
 
-    auto CreateTexture(RhiTextureDesc) -> RhiTexture;
+    auto CreateTexture(const RhiTextureDesc&) -> RhiTexture;
     void DestroyTexture(RhiTexture);
     auto GetTextureInfo(RhiTexture) -> RhiTextureInfo;
     void CmdTransitionTexture(RhiCmdList, RhiTexture, RhiTextureState);
     void CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, uint32_t srcOffset, uint32_t size);
+
+    auto CreateTextureView(const RhiTextureViewDesc&) -> RhiTextureView;
+    void DestroyTextureView(RhiTextureView);
 
     auto GetBackbufferTexture() -> RhiTexture;
 

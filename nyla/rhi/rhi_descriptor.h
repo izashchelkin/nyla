@@ -68,7 +68,7 @@ struct RhiSamplerBinding
 
 struct RhiTextureBinding
 {
-    RhiTexture texture;
+    RhiTextureView textureView;
 };
 
 union RhiDescriptorResourceBinding {

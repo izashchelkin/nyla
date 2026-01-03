@@ -2,8 +2,8 @@
 
 #include <cstdint>
 #include <cstring>
-#include <vector>
 #include <limits>
+#include <vector>
 
 #include "nyla/commons/assert.h"
 #include "nyla/commons/bitenum.h"
@@ -14,21 +14,15 @@
 #include "nyla/rhi/rhi_pipeline.h"
 #include "vulkan/vulkan_core.h"
 
-#if defined(__linux__)
 // clang-format off
+#if defined(__linux__)
 #include "xcb/xcb.h"
 #include "vulkan/vulkan_xcb.h"
-// clang-format on
 #else
-// clang-format off
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <windows.h>
-#include "vulkan/vulkan_win32.h"
-
 #include "nyla/platform/windows/platform_windows.h"
-// clang-format on
+#include "vulkan/vulkan_win32.h"
 #endif
+// clang-format on
 
 namespace nyla
 {
@@ -482,23 +476,6 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
         VK_CHECK(vkCreateSemaphore(m_Dev, &semaphoreCreateInfo, nullptr, m_RenderFinishedSemaphores.data() + i));
     }
 
-    const std::array<VkDescriptorPoolSize, 4> descriptorPoolSizes{
-        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 256},
-        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 256},
-        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 256},
-        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_SAMPLER, 256},
-    };
-
-    const VkDescriptorPoolCreateInfo descriptorPoolCreateInfo{
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-        .flags =
-            VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT /* | VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT */,
-        .maxSets = 256,
-        .poolSizeCount = static_cast<uint32_t>(descriptorPoolSizes.size()),
-        .pPoolSizes = descriptorPoolSizes.data(),
-    };
-    vkCreateDescriptorPool(m_Dev, &descriptorPoolCreateInfo, nullptr, &m_DescriptorPool);
-
 #if defined(__linux__)
     const VkXcbSurfaceCreateInfoKHR surfaceCreateInfo{
         .sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR,
@@ -516,6 +493,100 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
 #endif
 
     CreateSwapchain();
+
+    //
+
+    const std::array<VkDescriptorPoolSize, 4> descriptorPoolSizes{
+        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 16},
+        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 16},
+        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 256},
+        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_SAMPLER, 8},
+    };
+
+    const VkDescriptorPoolCreateInfo descriptorPoolCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+        .flags =
+            VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT /* | VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT */,
+        .maxSets = 16,
+        .poolSizeCount = static_cast<uint32_t>(descriptorPoolSizes.size()),
+        .pPoolSizes = descriptorPoolSizes.data(),
+    };
+    vkCreateDescriptorPool(m_Dev, &descriptorPoolCreateInfo, nullptr, &m_DescriptorPool);
+
+
+    { // Textures
+
+        const VkDescriptorBindingFlags bindingFlags = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
+
+        const VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
+            .bindingCount = 1,
+            .pBindingFlags = &bindingFlags,
+        };
+
+        const VkDescriptorSetLayoutBinding descriptorLayoutBinding{
+            .binding = 0,
+            .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+            .descriptorCount = 1024,
+            .stageFlags = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+        };
+
+        const VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+            .pNext = &bindingFlagsCreateInfo,
+            .bindingCount = 1,
+            .pBindings = &descriptorLayoutBinding,
+        };
+
+        VK_CHECK(
+            vkCreateDescriptorSetLayout(m_Dev, &descriptorSetLayoutCreateInfo, m_Alloc, &m_TextureDescriptors.layout));
+
+        const VkDescriptorSetAllocateInfo descriptorSetAllocInfo{
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+            .descriptorPool = m_DescriptorPool,
+            .descriptorSetCount = 1,
+            .pSetLayouts = &m_TextureDescriptors.layout,
+        };
+
+        VK_CHECK(vkAllocateDescriptorSets(m_Dev, &descriptorSetAllocInfo, &m_TextureDescriptors.set));
+    }
+
+    { // Samplers
+
+        const VkDescriptorBindingFlags bindingFlags = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
+
+        const VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
+            .bindingCount = 1,
+            .pBindingFlags = &bindingFlags,
+        };
+
+        const VkDescriptorSetLayoutBinding descriptorLayoutBinding{
+            .binding = 0,
+            .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+            .descriptorCount = 16,
+            .stageFlags = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+        };
+
+        const VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+            .pNext = &bindingFlagsCreateInfo,
+            .bindingCount = 1,
+            .pBindings = &descriptorLayoutBinding,
+        };
+
+        VK_CHECK(
+            vkCreateDescriptorSetLayout(m_Dev, &descriptorSetLayoutCreateInfo, m_Alloc, &m_SamplerDescriptors.layout));
+
+        const VkDescriptorSetAllocateInfo descriptorSetAllocInfo{
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+            .descriptorPool = m_DescriptorPool,
+            .descriptorSetCount = 1,
+            .pSetLayouts = &m_TextureDescriptors.layout,
+        };
+
+        VK_CHECK(vkAllocateDescriptorSets(m_Dev, &descriptorSetAllocInfo, &m_SamplerDescriptors.set));
+    }
 }
 
 auto Rhi::Impl::GetMinUniformBufferOffsetAlignment() -> uint32_t

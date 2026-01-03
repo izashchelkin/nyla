@@ -89,12 +89,23 @@ struct VulkanTextureData
 {
     bool isSwapchain;
     VkImage image;
-    VkImageView imageView;
     VkDeviceMemory memory;
     RhiTextureState state;
     VkImageLayout layout;
     VkFormat format;
     VkExtent3D extent;
+
+    RhiTextureView view;
+};
+
+struct VulkanTextureViewData
+{
+    RhiTexture texture;
+
+    VkImageView imageView;
+    VkImageViewType imageViewType;
+    VkFormat format;
+    VkImageSubresourceRange subresourceRange;
 };
 
 struct VulkanSamplerData
@@ -180,6 +191,9 @@ class Rhi::Impl
     void CmdTransitionTexture(RhiCmdList cmd, RhiTexture texture, RhiTextureState newState);
     void CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, uint32_t srcOffset, uint32_t size);
 
+    auto CreateTextureView(const RhiTextureViewDesc &desc) -> RhiTextureView;
+    void DestroyTextureView(RhiTextureView textureView);
+
     void EnsureHostWritesVisible(VkCommandBuffer cmdbuf, VulkanBufferData &bufferData);
 
     auto CreateCmdList(RhiQueueType queueType) -> RhiCmdList;
@@ -215,9 +229,6 @@ class Rhi::Impl
                                   std::span<const uint32_t> dynamicOffsets);
 
     void CreateSwapchain();
-    auto CreateTextureFromSwapchainImage(VkImage image, VkSurfaceFormatKHR surfaceFormat, VkExtent2D surfaceExtent)
-        -> RhiTexture;
-    void DestroySwapchainTexture(RhiTexture texture);
     auto GetBackbufferTexture() -> RhiTexture;
 
   private:
@@ -228,6 +239,7 @@ class Rhi::Impl
     HandlePool<RhiShader, VkShaderModule, 16> m_Shaders;
     HandlePool<RhiGraphicsPipeline, VulkanPipelineData, 16> m_GraphicsPipelines;
     HandlePool<RhiTexture, VulkanTextureData, 128> m_Textures;
+    HandlePool<RhiTextureView, VulkanTextureViewData, 128> m_TextureViews;
     HandlePool<RhiSampler, VulkanSamplerData, 16> m_Samplers;
 
     VkAllocationCallbacks *m_Alloc;
@@ -240,6 +252,14 @@ class Rhi::Impl
     VkPhysicalDeviceProperties m_PhysDevProps;
     VkPhysicalDeviceMemoryProperties m_PhysDevMemProps;
     VkDescriptorPool m_DescriptorPool;
+
+    struct Heap
+    {
+        VkDescriptorSetLayout layout;
+        VkDescriptorSet set;
+    };
+    Heap m_TextureDescriptors;
+    Heap m_SamplerDescriptors;
 
     PlatformWindow m_Window;
     VkSurfaceKHR m_Surface;

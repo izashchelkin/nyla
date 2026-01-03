@@ -13,13 +13,14 @@ void Rhi::Impl::PassBegin(RhiPassDesc desc)
     RhiCmdList cmd = m_GraphicsQueueCmd[m_FrameIndex];
     VkCommandBuffer cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
 
-    CmdTransitionTexture(cmd, desc.colorTarget, desc.state);
+    const VulkanTextureViewData colorTargetViewData = m_TextureViews.ResolveData(desc.colorTarget);
+    const VulkanTextureData colorTargetData = m_Textures.ResolveData(colorTargetViewData.texture);
 
-    const VulkanTextureData colorTargetData = m_Textures.ResolveData(desc.colorTarget);
+    CmdTransitionTexture(cmd, colorTargetViewData.texture, desc.state);
 
     const VkRenderingAttachmentInfo colorAttachmentInfo{
         .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-        .imageView = colorTargetData.imageView,
+        .imageView = colorTargetViewData.imageView,
         .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
         .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
@@ -63,7 +64,9 @@ void Rhi::Impl::PassEnd(RhiPassDesc desc)
     VkCommandBuffer cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
     vkCmdEndRendering(cmdbuf);
 
-    CmdTransitionTexture(cmd, desc.colorTarget, desc.state);
+    const VulkanTextureViewData colorTargetViewData = m_TextureViews.ResolveData(desc.colorTarget);
+
+    CmdTransitionTexture(cmd, colorTargetViewData.texture, desc.state);
 }
 
 //
