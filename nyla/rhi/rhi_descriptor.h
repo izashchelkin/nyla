@@ -10,6 +10,7 @@
 namespace nyla
 {
 
+#if 0
 struct RhiDescriptorSetLayout : Handle
 {
 };
@@ -85,5 +86,6 @@ struct RhiDescriptorWriteDesc
     RhiBindingType type;
     RhiDescriptorResourceBinding resourceBinding;
 };
+#endif
 
 } // namespace nyla

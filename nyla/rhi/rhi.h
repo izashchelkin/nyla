@@ -5,7 +5,6 @@
 #include "nyla/commons/bitenum.h"
 #include "nyla/platform/platform.h"
 
-#include "rhi.h"
 #include "rhi_buffer.h"
 #include "rhi_cmdlist.h"
 #include "rhi_descriptor.h"
@@ -100,12 +99,14 @@ class Rhi
 
     auto FrameGetCmdList() -> RhiCmdList;
 
+#if 0
     auto CreateDescriptorSetLayout(const RhiDescriptorSetLayoutDesc &) -> RhiDescriptorSetLayout;
     void DestroyDescriptorSetLayout(RhiDescriptorSetLayout);
 
     auto CreateDescriptorSet(RhiDescriptorSetLayout) -> RhiDescriptorSet;
     void DestroyDescriptorSet(RhiDescriptorSet);
     void WriteDescriptors(std::span<const RhiDescriptorWriteDesc>);
+#endif
 
     void PassBegin(RhiPassDesc);
     void PassEnd(RhiPassDesc);
@@ -119,8 +120,10 @@ class Rhi
     void CmdBindGraphicsPipeline(RhiCmdList, RhiGraphicsPipeline);
     void CmdBindVertexBuffers(RhiCmdList cmd, uint32_t firstBinding, std::span<const RhiBuffer> buffers,
                               std::span<const uint32_t> offsets);
+#if 0
     void CmdBindGraphicsBindGroup(RhiCmdList, uint32_t setIndex, RhiDescriptorSet bindGroup,
                                   std::span<const uint32_t> dynamicOffsets);
+#endif
     void CmdPushGraphicsConstants(RhiCmdList cmd, uint32_t offset, RhiShaderStage stage, ByteView data);
     void CmdDraw(RhiCmdList cmd, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
                  uint32_t firstInstance);
@@ -141,6 +144,13 @@ class Rhi
     void DestroyTextureView(RhiTextureView);
 
     auto GetBackbufferTexture() -> RhiTexture;
+
+    //
+
+    void SetPerFrameConstant(RhiCmdList cmd, std::span<const std::byte> data);
+    void SetPerPassConstant(RhiCmdList cmd, std::span<const std::byte> data);
+    void SetPerDrawConstant(RhiCmdList cmd, std::span<const std::byte> data);
+    void SetPerDrawLargeConstant(RhiCmdList cmd, std::span<const std::byte> data);
 
   private:
     class Impl;

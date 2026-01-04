@@ -209,9 +209,11 @@ auto Rhi::Impl::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> R
         },
     };
 
+#if 0
     NYLA_ASSERT(desc.bindGroupLayoutsCount <= std::size(desc.bindGroupLayouts));
     pipelineData.bindGroupLayoutCount = desc.bindGroupLayoutsCount;
     pipelineData.bindGroupLayouts = desc.bindGroupLayouts;
+#endif
 
     NYLA_ASSERT(desc.pushConstantSize <= kRhiMaxPushConstantSize);
     const VkPushConstantRange pushConstantRange{
@@ -220,17 +222,18 @@ auto Rhi::Impl::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> R
         .size = desc.pushConstantSize,
     };
 
-    std::array<VkDescriptorSetLayout, 4> descriptorSetLayouts;
-    for (uint32_t i = 0; i < desc.bindGroupLayoutsCount; ++i)
-    {
-        descriptorSetLayouts[i] = m_DescriptorSetLayouts.ResolveData(desc.bindGroupLayouts[i]).layout;
-    }
+    const std::array<VkDescriptorSetLayout, 4> descriptorSetLayouts = {
+        m_ConstantsDescriptorTable.layout,
+        m_TexturesDescriptorTable.layout,
+        m_SamplersDescriptorTable.layout,
+        m_ConstantsDescriptorTable.layout,
+    };
 
     const VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-        .setLayoutCount = desc.bindGroupLayoutsCount,
+        .setLayoutCount = descriptorSetLayouts.size(),
         .pSetLayouts = descriptorSetLayouts.data(),
-        .pushConstantRangeCount = static_cast<bool>(desc.pushConstantSize),
+        .pushConstantRangeCount = desc.pushConstantSize > 0,
         .pPushConstantRanges = &pushConstantRange,
     };
 
@@ -284,10 +287,21 @@ void Rhi::Impl::DestroyGraphicsPipeline(RhiGraphicsPipeline pipeline)
 void Rhi::Impl::CmdBindGraphicsPipeline(RhiCmdList cmd, RhiGraphicsPipeline pipeline)
 {
     VulkanCmdListData &cmdData = m_CmdLists.ResolveData(cmd);
+    VkCommandBuffer cmdbuf = cmdData.cmdbuf;
+
     const VulkanPipelineData &pipelineData = m_GraphicsPipelines.ResolveData(pipeline);
 
-    vkCmdBindPipeline(cmdData.cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineData.pipeline);
+    vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineData.pipeline);
     cmdData.boundGraphicsPipeline = pipeline;
+
+    std::array<VkDescriptorSet, 3> descriptorSets{
+        m_CBVsDescriptorTable.set,
+        m_TexturesDescriptorTable.set,
+        m_SamplersDescriptorTable.set,
+    };
+
+    vkCmdBindDescriptorSets(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineData.layout, 1, descriptorSets.size(),
+                            descriptorSets.data(), 0, nullptr);
 }
 
 void Rhi::Impl::CmdPushGraphicsConstants(RhiCmdList cmd, uint32_t offset, RhiShaderStage stage, ByteView data)
@@ -313,15 +327,23 @@ void Rhi::Impl::CmdBindVertexBuffers(RhiCmdList cmd, uint32_t firstBinding, std:
         vkOffsets[i] = offsets[i];
     }
 
-    VulkanCmdListData cmdData = m_CmdLists.ResolveData(cmd);
+    const VulkanCmdListData& cmdData = m_CmdLists.ResolveData(cmd);
     vkCmdBindVertexBuffers(cmdData.cmdbuf, firstBinding, buffers.size(), vkBufs.data(), vkOffsets.data());
 }
 
 void Rhi::Impl::CmdDraw(RhiCmdList cmd, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
                         uint32_t firstInstance)
 {
-    VulkanCmdListData cmdData = m_CmdLists.ResolveData(cmd);
-    vkCmdDraw(cmdData.cmdbuf, vertexCount, instanceCount, firstVertex, firstInstance);
+    VulkanCmdListData &cmdData = m_CmdLists.ResolveData(cmd);
+    VkCommandBuffer cmdbuf = cmdData.cmdbuf;
+    const VulkanPipelineData &pipelineData = m_GraphicsPipelines.ResolveData(cmdData.boundGraphicsPipeline);
+
+    vkCmdBindDescriptorSets(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineData.layout, 0, 1,
+                            &m_ConstantsDescriptorTable.set, 0, nullptr);
+    vkCmdDraw(cmdbuf, vertexCount, instanceCount, firstVertex, firstInstance);
+
+    cmdData.drawConstantHead += CbvOffset(m_Limits.perDrawConstantSize);
+    cmdData.largeDrawConstantHead += CbvOffset(m_Limits.perDrawLargeConstantSize);
 }
 
 auto Rhi::Impl::GetVertexFormatSize(RhiVertexFormat format) -> uint32_t
@@ -381,11 +403,13 @@ void Rhi::CmdBindVertexBuffers(RhiCmdList cmd, uint32_t firstBinding, std::span<
     m_Impl->CmdBindVertexBuffers(cmd, firstBinding, buffers, offsets);
 }
 
+#if 0
 void Rhi::CmdBindGraphicsBindGroup(RhiCmdList cmd, uint32_t setIndex, RhiDescriptorSet bindGroup,
                                    std::span<const uint32_t> dynamicOffsets)
 {
     m_Impl->CmdBindGraphicsBindGroup(cmd, setIndex, bindGroup, dynamicOffsets);
 }
+#endif
 
 void Rhi::CmdPushGraphicsConstants(RhiCmdList cmd, uint32_t offset, RhiShaderStage stage, ByteView data)
 {

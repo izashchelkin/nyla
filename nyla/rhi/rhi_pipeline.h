@@ -68,9 +68,6 @@ struct RhiGraphicsPipelineDesc
     RhiShader vs;
     RhiShader ps;
 
-    uint32_t bindGroupLayoutsCount;
-    std::array<RhiDescriptorSetLayout, 4> bindGroupLayouts;
-
     uint32_t vertexBindingsCount;
     std::array<RhiVertexBindingDesc, 4> vertexBindings;
 

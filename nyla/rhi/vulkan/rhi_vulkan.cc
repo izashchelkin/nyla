@@ -528,25 +528,25 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
             VkDescriptorSetLayoutBinding{
                 .binding = 0,
                 .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
-                .descriptorCount = m_Limits.numFramesInFlight,
+                .descriptorCount = 1,
                 .stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
             },
             VkDescriptorSetLayoutBinding{
                 .binding = 1,
                 .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
-                .descriptorCount = m_Limits.maxPassCount,
+                .descriptorCount = 1,
                 .stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
             },
             VkDescriptorSetLayoutBinding{
                 .binding = 2,
                 .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
-                .descriptorCount = m_Limits.maxDrawCount,
+                .descriptorCount = 1,
                 .stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
             },
             VkDescriptorSetLayoutBinding{
                 .binding = 3,
                 .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
-                .descriptorCount = m_Limits.maxDrawCount,
+                .descriptorCount = 1,
                 .stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
             },
         };
@@ -559,29 +559,53 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
 
         initDescriptorTable(m_ConstantsDescriptorTable, descriptorSetLayoutCreateInfo);
 
-        m_ConstantsBuffers.perFrame = CreateBuffer(RhiBufferDesc{
-            .size = m_Limits.numFramesInFlight * CbvOffset(m_Limits.perFrameConstantSize),
-            .bufferUsage = RhiBufferUsage::Uniform,
-            .memoryUsage = RhiMemoryUsage::CpuToGpu,
-        });
+        const uint32_t bufferSize =
+            m_Limits.numFramesInFlight * (CbvOffset(m_Limits.perFrameConstantSize) +
+                                          m_Limits.maxPassCount * CbvOffset(m_Limits.perPassConstantSize) +
+                                          m_Limits.maxDrawCount * CbvOffset(m_Limits.perDrawConstantSize) +
+                                          m_Limits.maxDrawCount * CbvOffset(m_Limits.perDrawLargeConstantSize));
+        NYLA_LOG("Constants Buffer Size: %fmb", (double)bufferSize / 1024.0 / 1024.0);
 
-        m_ConstantsBuffers.perPass = CreateBuffer(RhiBufferDesc{
-            .size = m_Limits.maxPassCount * CbvOffset(m_Limits.perPassConstantSize),
+        m_ConstantsUniformBuffer = CreateBuffer(RhiBufferDesc{
+            .size = bufferSize,
             .bufferUsage = RhiBufferUsage::Uniform,
             .memoryUsage = RhiMemoryUsage::CpuToGpu,
         });
+        const VkBuffer &vulkanBuffer = m_Buffers.ResolveData(m_ConstantsUniformBuffer).buffer;
 
-        m_ConstantsBuffers.perDrawSmall = CreateBuffer(RhiBufferDesc{
-            .size = m_Limits.maxDrawCount * CbvOffset(m_Limits.perDrawConstantSize),
-            .bufferUsage = RhiBufferUsage::Uniform,
-            .memoryUsage = RhiMemoryUsage::CpuToGpu,
-        });
+        const std::array<VkDescriptorBufferInfo, 4> bufferInfos{
+            VkDescriptorBufferInfo{
+                .buffer = vulkanBuffer,
+                .range = CbvOffset(m_Limits.perFrameConstantSize),
+            },
+            VkDescriptorBufferInfo{
+                .buffer = vulkanBuffer,
+                .range = CbvOffset(m_Limits.perPassConstantSize),
+            },
+            VkDescriptorBufferInfo{
+                .buffer = vulkanBuffer,
+                .range = CbvOffset(m_Limits.perDrawConstantSize),
+            },
+            VkDescriptorBufferInfo{
+                .buffer = vulkanBuffer,
+                .range = CbvOffset(m_Limits.perDrawLargeConstantSize),
+            },
+        };
 
-        m_ConstantsBuffers.perDrawLarge = CreateBuffer(RhiBufferDesc{
-            .size = m_Limits.maxDrawCount * CbvOffset(m_Limits.perDrawLargeConstantSize),
-            .bufferUsage = RhiBufferUsage::Uniform,
-            .memoryUsage = RhiMemoryUsage::CpuToGpu,
-        });
+        std::array<VkWriteDescriptorSet, bufferInfos.size()> descriptorWrites;
+        for (uint32_t i = 0; i < bufferInfos.size(); ++i)
+        {
+            descriptorWrites[i] = VkWriteDescriptorSet{
+                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                .dstSet = m_ConstantsDescriptorTable.set,
+                .dstBinding = i,
+                .descriptorCount = 1,
+                .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+                .pBufferInfo = &bufferInfos[i],
+            };
+        }
+
+        vkUpdateDescriptorSets(m_Dev, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
     }
 
     { // Constant Buffer Views

@@ -49,8 +49,8 @@ void Engine::Impl::Init(const EngineInitDesc &desc)
         flags |= RhiFlags::VSync;
 
     g_Rhi->Init(RhiInitDesc{
-        .flags = flags,
         .window = desc.window,
+        .flags = flags,
     });
 
     FrameArenaInit();

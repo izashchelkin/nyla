@@ -87,6 +87,11 @@ struct VulkanCmdListData
     VkCommandBuffer cmdbuf;
     RhiQueueType queueType;
     RhiGraphicsPipeline boundGraphicsPipeline;
+
+    uint32_t frameConstantHead;
+    uint32_t passConstantHead;
+    uint32_t drawConstantHead;
+    uint32_t largeDrawConstantHead;
 };
 
 struct VulkanPipelineData
@@ -94,8 +99,6 @@ struct VulkanPipelineData
     VkPipelineLayout layout;
     VkPipeline pipeline;
     VkPipelineBindPoint bindPoint;
-    std::array<RhiDescriptorSetLayout, 4> bindGroupLayouts;
-    uint32_t bindGroupLayoutCount;
 };
 
 struct VulkanTextureData
@@ -130,6 +133,7 @@ struct VulkanSamplerData
     bool descriptorWritten;
 };
 
+#if 0
 struct VulkanDescriptorSetLayoutData
 {
     VkDescriptorSetLayout layout;
@@ -141,6 +145,7 @@ struct VulkanDescriptorSetData
     VkDescriptorSet set;
     RhiDescriptorSetLayout layout;
 };
+#endif
 
 void CreateSwapchain();
 
@@ -187,7 +192,10 @@ class Rhi::Impl
     {
         return m_Limits.numFramesInFlight;
     }
-    auto GetFrameIndex() -> uint32_t;
+    auto GetFrameIndex() -> uint32_t
+    {
+        return m_FrameIndex;
+    }
     auto FrameGetCmdList() -> RhiCmdList;
 
     auto CreateSampler(const RhiSamplerDesc &desc) -> RhiSampler;
@@ -240,6 +248,7 @@ class Rhi::Impl
                  uint32_t firstInstance);
     auto GetVertexFormatSize(RhiVertexFormat format) -> uint32_t;
 
+#if 0
     auto CreateDescriptorSetLayout(const RhiDescriptorSetLayoutDesc &desc) -> RhiDescriptorSetLayout;
     void DestroyDescriptorSetLayout(RhiDescriptorSetLayout layout);
     auto CreateDescriptorSet(RhiDescriptorSetLayout layout) -> RhiDescriptorSet;
@@ -247,12 +256,18 @@ class Rhi::Impl
     void DestroyDescriptorSet(RhiDescriptorSet bindGroup);
     void CmdBindGraphicsBindGroup(RhiCmdList cmd, uint32_t setIndex, RhiDescriptorSet bindGroup,
                                   std::span<const uint32_t> dynamicOffsets);
+#endif
 
     void CreateSwapchain();
     auto GetBackbufferTexture() -> RhiTexture;
 
     void WriteDescriptorTables();
     void BindDescriptorTables(RhiCmdList cmd);
+
+    void SetPerFrameConstant(RhiCmdList cmd, std::span<const std::byte> data);
+    void SetPerPassConstant(RhiCmdList cmd, std::span<const std::byte> data);
+    void SetPerDrawConstant(RhiCmdList cmd, std::span<const std::byte> data);
+    void SetPerDrawLargeConstant(RhiCmdList cmd, std::span<const std::byte> data);
 
   private:
 #if 0
@@ -297,13 +312,8 @@ class Rhi::Impl
     };
 
     DescriptorTable m_ConstantsDescriptorTable;
-    struct
-    {
-        RhiBuffer perFrame;
-        RhiBuffer perPass;
-        RhiBuffer perDrawSmall;
-        RhiBuffer perDrawLarge;
-    } m_ConstantsBuffers;
+
+    RhiBuffer m_ConstantsUniformBuffer;
 
     DescriptorTable m_TexturesDescriptorTable;
     DescriptorTable m_SamplersDescriptorTable;

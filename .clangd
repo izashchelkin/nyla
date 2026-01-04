@@ -1,2 +1,9 @@
 Style:
   QuotedHeaders: ["nyla/.*", "absl/.*", "xcb/.*", "fuse/.*"]
+
+Index:
+  Background: Skip
+  StandardLibrary: false
+
+CompileFlags:
+  Add: [ -std=c++23 ]

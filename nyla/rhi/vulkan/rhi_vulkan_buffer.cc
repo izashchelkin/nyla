@@ -122,7 +122,7 @@ auto Rhi::Impl::CreateBuffer(const RhiBufferDesc &desc) -> RhiBuffer
 
 void Rhi::Impl::NameBuffer(RhiBuffer buf, std::string_view name)
 {
-    VulkanBufferData &bufferData = m_Buffers.ResolveData(buf);
+    const VulkanBufferData &bufferData = m_Buffers.ResolveData(buf);
     VulkanNameHandle(VK_OBJECT_TYPE_BUFFER, (uint64_t)bufferData.buffer, name);
 }
 
@@ -145,7 +145,7 @@ auto Rhi::Impl::GetBufferSize(RhiBuffer buffer) -> uint32_t
 
 auto Rhi::Impl::MapBuffer(RhiBuffer buffer) -> char *
 {
-    VulkanBufferData &bufferData = m_Buffers.ResolveData(buffer);
+    const VulkanBufferData &bufferData = m_Buffers.ResolveData(buffer);
     if (!bufferData.mapped)
     {
         vkMapMemory(m_Dev, bufferData.memory, 0, VK_WHOLE_SIZE, 0, (void **)&bufferData.mapped);
@@ -198,7 +198,7 @@ void Rhi::Impl::EnsureHostWritesVisible(VkCommandBuffer cmdbuf, VulkanBufferData
 void Rhi::Impl::CmdCopyBuffer(RhiCmdList cmd, RhiBuffer dst, uint32_t dstOffset, RhiBuffer src, uint32_t srcOffset,
                               uint32_t size)
 {
-    VkCommandBuffer cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
+    const VkCommandBuffer &cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
 
     VulkanBufferData &dstBufferData = m_Buffers.ResolveData(dst);
     VulkanBufferData &srcBufferData = m_Buffers.ResolveData(src);
@@ -263,7 +263,7 @@ auto VulkanBufferStateGetSyncInfo(RhiBufferState state) -> VulkanBufferStateSync
 
 void Rhi::Impl::CmdTransitionBuffer(RhiCmdList cmd, RhiBuffer buffer, RhiBufferState newState)
 {
-    VkCommandBuffer cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
+    const VkCommandBuffer &cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
     VulkanBufferData &bufferData = m_Buffers.ResolveData(buffer);
 
     VulkanBufferStateSyncInfo oldSync = VulkanBufferStateGetSyncInfo(bufferData.state);
@@ -292,7 +292,7 @@ void Rhi::Impl::CmdTransitionBuffer(RhiCmdList cmd, RhiBuffer buffer, RhiBufferS
 
 void Rhi::Impl::CmdUavBarrierBuffer(RhiCmdList cmd, RhiBuffer buffer)
 {
-    VkCommandBuffer cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
+    const VkCommandBuffer &cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
     VulkanBufferData &bufferData = m_Buffers.ResolveData(buffer);
 
     const VkBufferMemoryBarrier2 barrier{

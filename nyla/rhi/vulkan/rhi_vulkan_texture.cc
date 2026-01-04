@@ -231,7 +231,7 @@ auto Rhi::Impl::CreateTextureView(const RhiTextureViewDesc &desc) -> RhiTextureV
 
 auto Rhi::Impl::GetTextureInfo(RhiTexture texture) -> RhiTextureInfo
 {
-    const VulkanTextureData textureData = m_Textures.ResolveData(texture);
+    const VulkanTextureData &textureData = m_Textures.ResolveData(texture);
     return {
         .width = textureData.extent.width,
         .height = textureData.extent.height,
@@ -241,7 +241,7 @@ auto Rhi::Impl::GetTextureInfo(RhiTexture texture) -> RhiTextureInfo
 
 void Rhi::Impl::CmdTransitionTexture(RhiCmdList cmd, RhiTexture texture, RhiTextureState newState)
 {
-    VkCommandBuffer cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
+    const VkCommandBuffer &cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
 
     VulkanTextureData &textureData = m_Textures.ResolveData(texture);
 
@@ -303,7 +303,7 @@ void Rhi::Impl::DestroyTexture(RhiTexture texture)
 
 void Rhi::Impl::DestroyTextureView(RhiTextureView textureView)
 {
-    VulkanTextureViewData textureViewData = m_TextureViews.ResolveData(textureView);
+    const VulkanTextureViewData& textureViewData = m_TextureViews.ResolveData(textureView);
     NYLA_ASSERT(textureViewData.imageView);
 
     VulkanTextureData textureData = m_Textures.ReleaseData(textureViewData.texture);
@@ -315,7 +315,7 @@ void Rhi::Impl::DestroyTextureView(RhiTextureView textureView)
 
 void Rhi::Impl::CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, uint32_t srcOffset, uint32_t size)
 {
-    VkCommandBuffer cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
+    const VkCommandBuffer& cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
 
     VulkanTextureData &dstTextureData = m_Textures.ResolveData(dst);
     VulkanBufferData &srcBufferData = m_Buffers.ResolveData(src);

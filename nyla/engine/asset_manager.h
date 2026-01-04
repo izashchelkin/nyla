@@ -1,10 +1,7 @@
 #pragma once
 
-#include "nyla/commons/containers/inline_vec.h"
 #include "nyla/commons/handle.h"
 #include "nyla/commons/handle_pool.h"
-#include "nyla/rhi/rhi_descriptor.h"
-#include "nyla/rhi/rhi_sampler.h"
 #include "nyla/rhi/rhi_texture.h"
 #include <cstdint>
 #include <string>
@@ -18,7 +15,7 @@ class AssetManager
     constexpr static uint32_t kTexturesDescriptorBinding = 1;
 
   public:
-    AssetManager() : m_Samplers{}, m_Textures{}
+    AssetManager() : m_Textures{}
     {
     }
 
@@ -37,9 +34,6 @@ class AssetManager
     void Init();
     void Upload(RhiCmdList cmd);
 
-    auto GetDescriptorSetLayout() -> RhiDescriptorSetLayout;
-    void BindDescriptorSet(RhiCmdList);
-
     auto DeclareTexture(std::string_view path) -> Texture;
 
   private:
@@ -54,15 +48,6 @@ class AssetManager
         bool needsUpload;
     };
     HandlePool<Texture, TextureData, 128> m_Textures;
-
-    struct SamplerData
-    {
-        RhiSampler sampler;
-    };
-    InlineVec<SamplerData, 4> m_Samplers;
-
-    RhiDescriptorSetLayout m_DescriptorSetLayout;
-    RhiDescriptorSet m_DescriptorSet;
 };
 
 extern AssetManager *g_AssetManager;

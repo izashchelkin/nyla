@@ -31,7 +31,7 @@ auto Rhi::Impl::FrameBegin() -> RhiCmdList
     }
 
     RhiCmdList cmd = m_GraphicsQueueCmd[m_FrameIndex];
-    VkCommandBuffer cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
+    const VkCommandBuffer &cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
 
     VK_CHECK(vkResetCommandBuffer(cmdbuf, 0));
 
@@ -40,16 +40,13 @@ auto Rhi::Impl::FrameBegin() -> RhiCmdList
     };
     VK_CHECK(vkBeginCommandBuffer(cmdbuf, &commandBufferBeginInfo));
 
-    vkCmdBindDescriptorSets(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineData.layout, setIndex, 1, &descriptorSet,
-                            dynamicOffsets.size(), dynamicOffsets.data());
-
     return cmd;
 }
 
 void Rhi::Impl::FrameEnd()
 {
     RhiCmdList cmd = m_GraphicsQueueCmd[m_FrameIndex];
-    VkCommandBuffer cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
+    const VkCommandBuffer &cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
 
     VK_CHECK(vkEndCommandBuffer(cmdbuf));
 
@@ -112,11 +109,6 @@ void Rhi::Impl::FrameEnd()
     }
 
     m_FrameIndex = (m_FrameIndex + 1) % m_Limits.numFramesInFlight;
-}
-
-auto Rhi::Impl::GetFrameIndex() -> uint32_t
-{
-    return m_FrameIndex;
 }
 
 auto Rhi::Impl::FrameGetCmdList() -> RhiCmdList

@@ -28,6 +28,19 @@
     },
 
     {
+      "name": "clangd-db",
+      "displayName": "Clangd compile DB only (clang-cl)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/clangd-db",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CMAKE_C_COMPILER": "clang-cl",
+        "CMAKE_CXX_COMPILER": "clang-cl"
+      }
+    },
+
+    {
       "name": "linux-debug",
       "displayName": "Linux (Ninja Debug)",
       "generator": "Ninja",

@@ -11,10 +11,10 @@ using namespace rhi_vulkan_internal;
 void Rhi::Impl::PassBegin(RhiPassDesc desc)
 {
     RhiCmdList cmd = m_GraphicsQueueCmd[m_FrameIndex];
-    VkCommandBuffer cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
+    const VkCommandBuffer &cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
 
-    const VulkanTextureViewData colorTargetViewData = m_TextureViews.ResolveData(desc.colorTarget);
-    const VulkanTextureData colorTargetData = m_Textures.ResolveData(colorTargetViewData.texture);
+    const VulkanTextureViewData &colorTargetViewData = m_TextureViews.ResolveData(desc.colorTarget);
+    const VulkanTextureData &colorTargetData = m_Textures.ResolveData(colorTargetViewData.texture);
 
     CmdTransitionTexture(cmd, colorTargetViewData.texture, desc.state);
 
@@ -61,12 +61,15 @@ void Rhi::Impl::PassBegin(RhiPassDesc desc)
 void Rhi::Impl::PassEnd(RhiPassDesc desc)
 {
     RhiCmdList cmd = m_GraphicsQueueCmd[m_FrameIndex];
-    VkCommandBuffer cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
+    VulkanCmdListData &cmdData = m_CmdLists.ResolveData(cmd);
+    VkCommandBuffer cmdbuf = cmdData.cmdbuf;
     vkCmdEndRendering(cmdbuf);
 
-    const VulkanTextureViewData colorTargetViewData = m_TextureViews.ResolveData(desc.colorTarget);
+    const VulkanTextureViewData &colorTargetViewData = m_TextureViews.ResolveData(desc.colorTarget);
 
     CmdTransitionTexture(cmd, colorTargetViewData.texture, desc.state);
+
+    cmdData.passConstantHead += CbvOffset(m_Limits.perPassConstantSize);
 }
 
 //

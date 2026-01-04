@@ -34,10 +34,24 @@ auto Rhi::Impl::CreateCmdList(RhiQueueType queueType) -> RhiCmdList
     VkCommandBuffer commandBuffer;
     VK_CHECK(vkAllocateCommandBuffers(m_Dev, &allocInfo, &commandBuffer));
 
-    const VulkanCmdListData cmdData{
+    VulkanCmdListData cmdData{
         .cmdbuf = commandBuffer,
         .queueType = queueType,
     };
+
+    cmdData.frameConstantHead =
+        GetFrameIndex() *
+        (CbvOffset(m_Limits.perFrameConstantSize) + m_Limits.maxPassCount * CbvOffset(m_Limits.perPassConstantSize) +
+         m_Limits.maxDrawCount * CbvOffset(m_Limits.perDrawConstantSize) +
+         m_Limits.maxDrawCount * CbvOffset(m_Limits.perDrawLargeConstantSize));
+
+    cmdData.passConstantHead = cmdData.frameConstantHead + m_Limits.perFrameConstantSize;
+
+    cmdData.drawConstantHead =
+        cmdData.passConstantHead + (m_Limits.maxPassCount * CbvOffset(m_Limits.perPassConstantSize));
+
+    cmdData.largeDrawConstantHead =
+        cmdData.drawConstantHead + (m_Limits.maxDrawCount * CbvOffset(m_Limits.perDrawConstantSize));
 
     RhiCmdList cmd = m_CmdLists.Acquire(cmdData);
     return cmd;
@@ -45,7 +59,7 @@ auto Rhi::Impl::CreateCmdList(RhiQueueType queueType) -> RhiCmdList
 
 void Rhi::Impl::NameCmdList(RhiCmdList cmd, std::string_view name)
 {
-    VulkanCmdListData cmdData = m_CmdLists.ResolveData(cmd);
+    const VulkanCmdListData &cmdData = m_CmdLists.ResolveData(cmd);
     VulkanNameHandle(VK_OBJECT_TYPE_COMMAND_BUFFER, (uint64_t)cmdData.cmdbuf, name);
 }
 
@@ -63,7 +77,7 @@ auto Rhi::Impl::CmdSetCheckpoint(RhiCmdList cmd, uint64_t data) -> uint64_t
         return data;
     }
 
-    VulkanCmdListData cmdData = m_CmdLists.ResolveData(cmd);
+    const VulkanCmdListData &cmdData = m_CmdLists.ResolveData(cmd);
 
     static auto fn = VK_GET_INSTANCE_PROC_ADDR(vkCmdSetCheckpointNV);
     fn(cmdData.cmdbuf, reinterpret_cast<void *>(data));
