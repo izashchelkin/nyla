@@ -107,8 +107,7 @@ struct TextLineUBO
     float4 bg;
 };
 
-[[vk::binding(0, 0)]]
-ConstantBuffer<TextLineUBO> textLine;
+ConstantBuffer<TextLineUBO> textLine : register(b3, space0);
 
 bool GlyphPixel(uint glyph_idx, uint x, uint y)
 {

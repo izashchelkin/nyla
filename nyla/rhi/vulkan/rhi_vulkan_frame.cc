@@ -31,9 +31,10 @@ auto Rhi::Impl::FrameBegin() -> RhiCmdList
     }
 
     RhiCmdList cmd = m_GraphicsQueueCmd[m_FrameIndex];
-    const VkCommandBuffer &cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
+    ResetCmdList(cmd);
 
-    VK_CHECK(vkResetCommandBuffer(cmdbuf, 0));
+    const VulkanCmdListData &cmdData = m_CmdLists.ResolveData(cmd);
+    VkCommandBuffer cmdbuf = cmdData.cmdbuf;
 
     const VkCommandBufferBeginInfo commandBufferBeginInfo{
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,

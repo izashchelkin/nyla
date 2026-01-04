@@ -139,7 +139,7 @@ void Rhi::Impl::WriteDescriptors(std::span<const RhiDescriptorWriteDesc> writes)
         const VkDescriptorSet vulkanDescriptorSet = descriptorSetData.set;
 
         const RhiDescriptorSetLayout descriptorSetLayout = descriptorSetData.layout;
-        const VulkanDescriptorSetLayoutData &layoutData = m_DescriptorSetLayouts.ResolveData(descriptorSetData.layout);
+        const VulkanDescriptorSetLayoutData layoutData = m_DescriptorSetLayouts.ResolveData(descriptorSetData.layout);
 
         const auto &descriptorLayout = [binding, &layoutData] -> const RhiDescriptorLayoutDesc & {
             auto it = std::ranges::lower_bound(layoutData.descriptors, binding, {}, &RhiDescriptorLayoutDesc::binding);
@@ -219,9 +219,9 @@ void Rhi::Impl::CmdBindGraphicsBindGroup(RhiCmdList cmd, uint32_t setIndex, RhiD
 
 #endif
 
-void Rhi::Impl::SetPerFrameConstant(RhiCmdList cmd, std::span<const std::byte> data)
+void Rhi::Impl::SetFrameConstant(RhiCmdList cmd, std::span<const std::byte> data)
 {
-    NYLA_ASSERT(data.size() <= m_Limits.perFrameConstantSize);
+    NYLA_ASSERT(data.size() <= m_Limits.frameConstantSize);
 
     const VulkanCmdListData &cmdData = m_CmdLists.ResolveData(cmd);
 
@@ -229,9 +229,9 @@ void Rhi::Impl::SetPerFrameConstant(RhiCmdList cmd, std::span<const std::byte> d
     memcpy(mem + cmdData.frameConstantHead, data.data(), data.size());
 }
 
-void Rhi::Impl::SetPerPassConstant(RhiCmdList cmd, std::span<const std::byte> data)
+void Rhi::Impl::SetPassConstant(RhiCmdList cmd, std::span<const std::byte> data)
 {
-    NYLA_ASSERT(data.size() <= m_Limits.perPassConstantSize);
+    NYLA_ASSERT(data.size() <= m_Limits.passConstantSize);
 
     const VulkanCmdListData &cmdData = m_CmdLists.ResolveData(cmd);
 
@@ -239,9 +239,9 @@ void Rhi::Impl::SetPerPassConstant(RhiCmdList cmd, std::span<const std::byte> da
     memcpy(mem + cmdData.passConstantHead, data.data(), data.size());
 }
 
-void Rhi::Impl::SetPerDrawConstant(RhiCmdList cmd, std::span<const std::byte> data)
+void Rhi::Impl::SetDrawConstant(RhiCmdList cmd, std::span<const std::byte> data)
 {
-    NYLA_ASSERT(data.size() <= m_Limits.perDrawConstantSize);
+    NYLA_ASSERT(data.size() <= m_Limits.drawConstantSize);
 
     const VulkanCmdListData &cmdData = m_CmdLists.ResolveData(cmd);
 
@@ -249,9 +249,9 @@ void Rhi::Impl::SetPerDrawConstant(RhiCmdList cmd, std::span<const std::byte> da
     memcpy(mem + cmdData.drawConstantHead, data.data(), data.size());
 }
 
-void Rhi::Impl::SetPerDrawLargeConstant(RhiCmdList cmd, std::span<const std::byte> data)
+void Rhi::Impl::SetLargeDrawConstant(RhiCmdList cmd, std::span<const std::byte> data)
 {
-    NYLA_ASSERT(data.size() <= m_Limits.perDrawLargeConstantSize);
+    NYLA_ASSERT(data.size() <= m_Limits.largeDrawConstantSize);
 
     const VulkanCmdListData &cmdData = m_CmdLists.ResolveData(cmd);
 
@@ -325,60 +325,29 @@ void Rhi::Impl::WriteDescriptorTables()
         }
     }
 
-    { // CBVs
-        for (uint32_t i = 0; i < m_CBVs.size(); ++i)
-        {
-            auto &slot = m_CBVs[i];
-            if (!slot.used)
-                continue;
-            if (slot.data.descriptorWritten)
-                continue;
-
-            const VulkanBufferViewData &bufferViewData = slot.data;
-            const VulkanBufferData &bufferData = m_Buffers.ResolveData(bufferViewData.buffer);
-
-            VkWriteDescriptorSet &vulkanSetWrite = descriptorWrites.emplace_back(VkWriteDescriptorSet{
-                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                .dstSet = m_CBVsDescriptorTable.set,
-                .dstBinding = 0,
-                .dstArrayElement = i,
-                .descriptorCount = 1,
-                .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            });
-
-            vulkanSetWrite.pBufferInfo = &descriptorBufferInfos.emplace_back(VkDescriptorBufferInfo{
-                .buffer = bufferData.buffer,
-                .offset = bufferViewData.offset,
-                .range = bufferViewData.range,
-            });
-
-            slot.data.descriptorWritten = true;
-        }
-    }
-
     vkUpdateDescriptorSets(m_Dev, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
 }
 
 //
 
-void Rhi::SetPerFrameConstant(RhiCmdList cmd, std::span<const std::byte> data)
+void Rhi::SetFrameConstant(RhiCmdList cmd, std::span<const std::byte> data)
 {
-    m_Impl->SetPerFrameConstant(cmd, data);
+    m_Impl->SetFrameConstant(cmd, data);
 }
 
-void Rhi::SetPerPassConstant(RhiCmdList cmd, std::span<const std::byte> data)
+void Rhi::SetPassConstant(RhiCmdList cmd, std::span<const std::byte> data)
 {
-    m_Impl->SetPerPassConstant(cmd, data);
+    m_Impl->SetPassConstant(cmd, data);
 }
 
-void Rhi::SetPerDrawConstant(RhiCmdList cmd, std::span<const std::byte> data)
+void Rhi::SetDrawConstant(RhiCmdList cmd, std::span<const std::byte> data)
 {
-    m_Impl->SetPerDrawConstant(cmd, data);
+    m_Impl->SetDrawConstant(cmd, data);
 }
 
-void Rhi::SetPerDrawLargeConstant(RhiCmdList cmd, std::span<const std::byte> data)
+void Rhi::SetLargeDrawConstant(RhiCmdList cmd, std::span<const std::byte> data)
 {
-    m_Impl->SetPerDrawLargeConstant(cmd, data);
+    m_Impl->SetLargeDrawConstant(cmd, data);
 }
 
 #if 0

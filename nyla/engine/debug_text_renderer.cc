@@ -98,7 +98,7 @@ void DebugTextRendererDraw(RhiCmdList cmd, DebugTextRenderer *renderer)
 
     for (const DrawData &drawData : g_PendingDebugTextDraws)
     {
-        g_Rhi->SetPerDrawConstant(cmd, ByteViewPtr(&drawData));
+        g_Rhi->SetLargeDrawConstant(cmd, ByteViewPtr(&drawData));
         g_Rhi->CmdDraw(cmd, 3, 1, 0, 0);
     }
     g_PendingDebugTextDraws.clear();

@@ -199,7 +199,7 @@ void Renderer2DDraw(RhiCmdList cmd, Renderer2D *renderer, uint32_t width, uint32
         .invVp = invVp,
     };
 
-    g_Rhi->SetPerPassConstant(cmd, ByteViewPtr(&scene));
+    g_Rhi->SetPassConstant(cmd, ByteViewPtr(&scene));
 
     std::array<RhiBuffer, 1> buffers{renderer->vertexBuffer};
     std::array<uint32_t, 1> offsets{0};
@@ -210,7 +210,7 @@ void Renderer2DDraw(RhiCmdList cmd, Renderer2D *renderer, uint32_t width, uint32
 
     for (const EntityUbo &entityUbo : renderer->pendingDraws)
     {
-        g_Rhi->SetPerDrawConstant(cmd, ByteViewPtr(&entityUbo));
+        g_Rhi->SetDrawConstant(cmd, ByteViewPtr(&entityUbo));
         g_Rhi->CmdDraw(cmd, 6, 1, 0, 0);
     }
     renderer->pendingDraws.clear();

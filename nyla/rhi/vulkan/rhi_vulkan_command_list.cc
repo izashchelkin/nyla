@@ -1,6 +1,7 @@
 #include <cstdint>
 
 #include "nyla/rhi/rhi.h"
+#include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
 
 namespace nyla
@@ -39,22 +40,29 @@ auto Rhi::Impl::CreateCmdList(RhiQueueType queueType) -> RhiCmdList
         .queueType = queueType,
     };
 
-    cmdData.frameConstantHead =
-        GetFrameIndex() *
-        (CbvOffset(m_Limits.perFrameConstantSize) + m_Limits.maxPassCount * CbvOffset(m_Limits.perPassConstantSize) +
-         m_Limits.maxDrawCount * CbvOffset(m_Limits.perDrawConstantSize) +
-         m_Limits.maxDrawCount * CbvOffset(m_Limits.perDrawLargeConstantSize));
-
-    cmdData.passConstantHead = cmdData.frameConstantHead + m_Limits.perFrameConstantSize;
-
-    cmdData.drawConstantHead =
-        cmdData.passConstantHead + (m_Limits.maxPassCount * CbvOffset(m_Limits.perPassConstantSize));
-
-    cmdData.largeDrawConstantHead =
-        cmdData.drawConstantHead + (m_Limits.maxDrawCount * CbvOffset(m_Limits.perDrawConstantSize));
-
     RhiCmdList cmd = m_CmdLists.Acquire(cmdData);
     return cmd;
+}
+
+void Rhi::Impl::ResetCmdList(RhiCmdList cmd)
+{
+    VulkanCmdListData &cmdData = m_CmdLists.ResolveData(cmd);
+    VkCommandBuffer cmdbuf = cmdData.cmdbuf;
+
+    VK_CHECK(vkResetCommandBuffer(cmdbuf, 0));
+
+    cmdData.frameConstantHead = GetFrameIndex() * (CbvOffset(m_Limits.frameConstantSize) +
+                                                   m_Limits.maxPassCount * CbvOffset(m_Limits.passConstantSize) +
+                                                   m_Limits.maxDrawCount * CbvOffset(m_Limits.drawConstantSize) +
+                                                   m_Limits.maxDrawCount * CbvOffset(m_Limits.largeDrawConstantSize));
+
+    cmdData.passConstantHead = cmdData.frameConstantHead + m_Limits.frameConstantSize;
+
+    cmdData.drawConstantHead =
+        cmdData.passConstantHead + (m_Limits.maxPassCount * CbvOffset(m_Limits.passConstantSize));
+
+    cmdData.largeDrawConstantHead =
+        cmdData.drawConstantHead + (m_Limits.maxDrawCount * CbvOffset(m_Limits.drawConstantSize));
 }
 
 void Rhi::Impl::NameCmdList(RhiCmdList cmd, std::string_view name)

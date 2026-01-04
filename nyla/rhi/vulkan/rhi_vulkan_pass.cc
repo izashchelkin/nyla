@@ -69,7 +69,7 @@ void Rhi::Impl::PassEnd(RhiPassDesc desc)
 
     CmdTransitionTexture(cmd, colorTargetViewData.texture, desc.state);
 
-    cmdData.passConstantHead += CbvOffset(m_Limits.perPassConstantSize);
+    cmdData.passConstantHead += CbvOffset(m_Limits.passConstantSize);
 }
 
 //

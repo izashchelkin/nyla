@@ -217,16 +217,15 @@ auto Rhi::Impl::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> R
 
     NYLA_ASSERT(desc.pushConstantSize <= kRhiMaxPushConstantSize);
     const VkPushConstantRange pushConstantRange{
-        .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT,
+        .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
         .offset = 0,
         .size = desc.pushConstantSize,
     };
 
-    const std::array<VkDescriptorSetLayout, 4> descriptorSetLayouts = {
+    const std::array<VkDescriptorSetLayout, 3> descriptorSetLayouts = {
         m_ConstantsDescriptorTable.layout,
         m_TexturesDescriptorTable.layout,
         m_SamplersDescriptorTable.layout,
-        m_ConstantsDescriptorTable.layout,
     };
 
     const VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{
@@ -294,8 +293,7 @@ void Rhi::Impl::CmdBindGraphicsPipeline(RhiCmdList cmd, RhiGraphicsPipeline pipe
     vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineData.pipeline);
     cmdData.boundGraphicsPipeline = pipeline;
 
-    std::array<VkDescriptorSet, 3> descriptorSets{
-        m_CBVsDescriptorTable.set,
+    std::array<VkDescriptorSet, 2> descriptorSets{
         m_TexturesDescriptorTable.set,
         m_SamplersDescriptorTable.set,
     };
@@ -327,7 +325,7 @@ void Rhi::Impl::CmdBindVertexBuffers(RhiCmdList cmd, uint32_t firstBinding, std:
         vkOffsets[i] = offsets[i];
     }
 
-    const VulkanCmdListData& cmdData = m_CmdLists.ResolveData(cmd);
+    const VulkanCmdListData &cmdData = m_CmdLists.ResolveData(cmd);
     vkCmdBindVertexBuffers(cmdData.cmdbuf, firstBinding, buffers.size(), vkBufs.data(), vkOffsets.data());
 }
 
@@ -338,12 +336,20 @@ void Rhi::Impl::CmdDraw(RhiCmdList cmd, uint32_t vertexCount, uint32_t instanceC
     VkCommandBuffer cmdbuf = cmdData.cmdbuf;
     const VulkanPipelineData &pipelineData = m_GraphicsPipelines.ResolveData(cmdData.boundGraphicsPipeline);
 
+    const std::array<uint32_t, 4> offsets{
+        cmdData.frameConstantHead,
+        cmdData.passConstantHead,
+        cmdData.drawConstantHead,
+        cmdData.largeDrawConstantHead,
+    };
+
     vkCmdBindDescriptorSets(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineData.layout, 0, 1,
-                            &m_ConstantsDescriptorTable.set, 0, nullptr);
+                            &m_ConstantsDescriptorTable.set, offsets.size(), offsets.data());
+
     vkCmdDraw(cmdbuf, vertexCount, instanceCount, firstVertex, firstInstance);
 
-    cmdData.drawConstantHead += CbvOffset(m_Limits.perDrawConstantSize);
-    cmdData.largeDrawConstantHead += CbvOffset(m_Limits.perDrawLargeConstantSize);
+    cmdData.drawConstantHead += CbvOffset(m_Limits.drawConstantSize);
+    cmdData.largeDrawConstantHead += CbvOffset(m_Limits.largeDrawConstantSize);
 }
 
 auto Rhi::Impl::GetVertexFormatSize(RhiVertexFormat format) -> uint32_t

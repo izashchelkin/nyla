@@ -529,25 +529,25 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
                 .binding = 0,
                 .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
                 .descriptorCount = 1,
-                .stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
             },
             VkDescriptorSetLayoutBinding{
                 .binding = 1,
                 .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
                 .descriptorCount = 1,
-                .stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
             },
             VkDescriptorSetLayoutBinding{
                 .binding = 2,
                 .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
                 .descriptorCount = 1,
-                .stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
             },
             VkDescriptorSetLayoutBinding{
                 .binding = 3,
                 .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
                 .descriptorCount = 1,
-                .stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
             },
         };
 
@@ -560,10 +560,10 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
         initDescriptorTable(m_ConstantsDescriptorTable, descriptorSetLayoutCreateInfo);
 
         const uint32_t bufferSize =
-            m_Limits.numFramesInFlight * (CbvOffset(m_Limits.perFrameConstantSize) +
-                                          m_Limits.maxPassCount * CbvOffset(m_Limits.perPassConstantSize) +
-                                          m_Limits.maxDrawCount * CbvOffset(m_Limits.perDrawConstantSize) +
-                                          m_Limits.maxDrawCount * CbvOffset(m_Limits.perDrawLargeConstantSize));
+            m_Limits.numFramesInFlight *
+            (CbvOffset(m_Limits.frameConstantSize) + m_Limits.maxPassCount * CbvOffset(m_Limits.passConstantSize) +
+             m_Limits.maxDrawCount * CbvOffset(m_Limits.drawConstantSize) +
+             m_Limits.maxDrawCount * CbvOffset(m_Limits.largeDrawConstantSize));
         NYLA_LOG("Constants Buffer Size: %fmb", (double)bufferSize / 1024.0 / 1024.0);
 
         m_ConstantsUniformBuffer = CreateBuffer(RhiBufferDesc{
@@ -576,19 +576,19 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
         const std::array<VkDescriptorBufferInfo, 4> bufferInfos{
             VkDescriptorBufferInfo{
                 .buffer = vulkanBuffer,
-                .range = CbvOffset(m_Limits.perFrameConstantSize),
+                .range = CbvOffset(m_Limits.frameConstantSize),
             },
             VkDescriptorBufferInfo{
                 .buffer = vulkanBuffer,
-                .range = CbvOffset(m_Limits.perPassConstantSize),
+                .range = CbvOffset(m_Limits.passConstantSize),
             },
             VkDescriptorBufferInfo{
                 .buffer = vulkanBuffer,
-                .range = CbvOffset(m_Limits.perDrawConstantSize),
+                .range = CbvOffset(m_Limits.drawConstantSize),
             },
             VkDescriptorBufferInfo{
                 .buffer = vulkanBuffer,
-                .range = CbvOffset(m_Limits.perDrawLargeConstantSize),
+                .range = CbvOffset(m_Limits.largeDrawConstantSize),
             },
         };
 
@@ -608,33 +608,6 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
         vkUpdateDescriptorSets(m_Dev, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
     }
 
-    { // Constant Buffer Views
-
-        const VkDescriptorBindingFlags bindingFlags = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
-
-        const VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsCreateInfo{
-            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
-            .bindingCount = 1,
-            .pBindingFlags = &bindingFlags,
-        };
-
-        const VkDescriptorSetLayoutBinding descriptorLayoutBinding{
-            .binding = 0,
-            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            .descriptorCount = 1024,
-            .stageFlags = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-        };
-
-        const VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{
-            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-            .pNext = &bindingFlagsCreateInfo,
-            .bindingCount = 1,
-            .pBindings = &descriptorLayoutBinding,
-        };
-
-        initDescriptorTable(m_CBVsDescriptorTable, descriptorSetLayoutCreateInfo);
-    }
-
     { // Textures
 
         const VkDescriptorBindingFlags bindingFlags = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
@@ -648,8 +621,8 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
         const VkDescriptorSetLayoutBinding descriptorLayoutBinding{
             .binding = 0,
             .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-            .descriptorCount = 1024,
-            .stageFlags = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+            .descriptorCount = m_Limits.numTextureViews,
+            .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
         };
 
         const VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{
@@ -675,8 +648,8 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
         const VkDescriptorSetLayoutBinding descriptorLayoutBinding{
             .binding = 0,
             .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
-            .descriptorCount = 16,
-            .stageFlags = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+            .descriptorCount = m_Limits.numSamplers,
+            .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
         };
 
         const VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{

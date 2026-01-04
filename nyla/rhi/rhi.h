@@ -42,7 +42,6 @@ struct RhiLimits
     uint32_t numTextureViews = 64;
 
     uint32_t numBuffers = 16;
-    uint32_t numCBVs = 16;
 
     uint32_t numSamplers = 8;
 
@@ -50,10 +49,10 @@ struct RhiLimits
     uint32_t maxDrawCount = 1024;
     uint32_t maxPassCount = 4;
 
-    uint32_t perFrameConstantSize = 256;
-    uint32_t perPassConstantSize = 512;
-    uint32_t perDrawConstantSize = 256;
-    uint32_t perDrawLargeConstantSize = 1024;
+    uint32_t frameConstantSize = 256;
+    uint32_t passConstantSize = 512;
+    uint32_t drawConstantSize = 256;
+    uint32_t largeDrawConstantSize = 1024;
 };
 
 struct RhiInitDesc
@@ -147,10 +146,10 @@ class Rhi
 
     //
 
-    void SetPerFrameConstant(RhiCmdList cmd, std::span<const std::byte> data);
-    void SetPerPassConstant(RhiCmdList cmd, std::span<const std::byte> data);
-    void SetPerDrawConstant(RhiCmdList cmd, std::span<const std::byte> data);
-    void SetPerDrawLargeConstant(RhiCmdList cmd, std::span<const std::byte> data);
+    void SetFrameConstant(RhiCmdList cmd, std::span<const std::byte> data);
+    void SetPassConstant(RhiCmdList cmd, std::span<const std::byte> data);
+    void SetDrawConstant(RhiCmdList cmd, std::span<const std::byte> data);
+    void SetLargeDrawConstant(RhiCmdList cmd, std::span<const std::byte> data);
 
   private:
     class Impl;

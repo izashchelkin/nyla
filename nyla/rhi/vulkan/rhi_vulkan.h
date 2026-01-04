@@ -227,6 +227,7 @@ class Rhi::Impl
     auto CreateCmdList(RhiQueueType queueType) -> RhiCmdList;
     void NameCmdList(RhiCmdList cmd, std::string_view name);
     void DestroyCmdList(RhiCmdList cmd);
+    void ResetCmdList(RhiCmdList cmd);
     auto CmdSetCheckpoint(RhiCmdList cmd, uint64_t data) -> uint64_t;
     auto GetLastCheckpointData(RhiQueueType queueType) -> uint64_t;
     auto GetDeviceQueue(RhiQueueType queueType) -> DeviceQueue &;
@@ -264,10 +265,10 @@ class Rhi::Impl
     void WriteDescriptorTables();
     void BindDescriptorTables(RhiCmdList cmd);
 
-    void SetPerFrameConstant(RhiCmdList cmd, std::span<const std::byte> data);
-    void SetPerPassConstant(RhiCmdList cmd, std::span<const std::byte> data);
-    void SetPerDrawConstant(RhiCmdList cmd, std::span<const std::byte> data);
-    void SetPerDrawLargeConstant(RhiCmdList cmd, std::span<const std::byte> data);
+    void SetFrameConstant(RhiCmdList cmd, std::span<const std::byte> data);
+    void SetPassConstant(RhiCmdList cmd, std::span<const std::byte> data);
+    void SetDrawConstant(RhiCmdList cmd, std::span<const std::byte> data);
+    void SetLargeDrawConstant(RhiCmdList cmd, std::span<const std::byte> data);
 
   private:
 #if 0
@@ -312,12 +313,9 @@ class Rhi::Impl
     };
 
     DescriptorTable m_ConstantsDescriptorTable;
-
     RhiBuffer m_ConstantsUniformBuffer;
-
     DescriptorTable m_TexturesDescriptorTable;
     DescriptorTable m_SamplersDescriptorTable;
-    DescriptorTable m_CBVsDescriptorTable;
 
     PlatformWindow m_Window;
     VkSurfaceKHR m_Surface;

@@ -4,9 +4,6 @@ struct Scene
     float4x4 invVp;
 };
 
-[[vk::push_constant]]
-ConstantBuffer<Scene> scene;
-
 struct Entity
 {
     float4x4 model;
@@ -15,8 +12,8 @@ struct Entity
     uint32_t samplerIndex;
 };
 
-[[vk::binding(0, 0)]]
-ConstantBuffer<Entity> entity;
+ConstantBuffer<Scene> scene : register(b1, space0);
+ConstantBuffer<Entity> entity : register(b2, space0);
 
 struct VSInput
 {
