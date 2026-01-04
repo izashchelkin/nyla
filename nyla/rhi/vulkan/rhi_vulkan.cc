@@ -11,6 +11,7 @@
 #include "nyla/commons/log.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
+#include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_pipeline.h"
 #include "vulkan/vulkan_core.h"
 
@@ -99,17 +100,10 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
 {
     constexpr uint32_t kInvalidIndex = std::numeric_limits<uint32_t>::max();
 
-    NYLA_ASSERT(rhiDesc.numFramesInFlight <= kRhiMaxNumFramesInFlight);
-    if (rhiDesc.numFramesInFlight)
-    {
-        m_NumFramesInFlight = rhiDesc.numFramesInFlight;
-    }
-    else
-    {
-        m_NumFramesInFlight = 2;
-    }
+    NYLA_ASSERT(rhiDesc.limits.numFramesInFlight <= kRhiMaxNumFramesInFlight);
 
     m_Flags = rhiDesc.flags;
+    m_Limits = rhiDesc.limits;
     m_Window = rhiDesc.window;
 
     const VkApplicationInfo appInfo{
@@ -461,13 +455,14 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
             i = CreateCmdList(queueType);
         }
     };
-    initQueue(m_GraphicsQueue, RhiQueueType::Graphics, std::span{m_GraphicsQueueCmd.data(), m_NumFramesInFlight});
+    initQueue(m_GraphicsQueue, RhiQueueType::Graphics,
+              std::span{m_GraphicsQueueCmd.data(), m_Limits.numFramesInFlight});
     initQueue(m_TransferQueue, RhiQueueType::Transfer, std::span{&m_TransferQueueCmd, 1});
 
     const VkSemaphoreCreateInfo semaphoreCreateInfo{
         .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
     };
-    for (size_t i = 0; i < m_NumFramesInFlight; ++i)
+    for (size_t i = 0; i < m_Limits.numFramesInFlight; ++i)
     {
         VK_CHECK(vkCreateSemaphore(m_Dev, &semaphoreCreateInfo, nullptr, m_SwapchainAcquireSemaphores.data() + i));
     }
@@ -513,6 +508,108 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
     };
     vkCreateDescriptorPool(m_Dev, &descriptorPoolCreateInfo, nullptr, &m_DescriptorPool);
 
+    auto initDescriptorTable = [this](DescriptorTable &table,
+                                      const VkDescriptorSetLayoutCreateInfo &layoutCreateInfo) -> void {
+        VK_CHECK(vkCreateDescriptorSetLayout(m_Dev, &layoutCreateInfo, m_Alloc, &table.layout));
+
+        const VkDescriptorSetAllocateInfo descriptorSetAllocInfo{
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+            .descriptorPool = m_DescriptorPool,
+            .descriptorSetCount = 1,
+            .pSetLayouts = &table.layout,
+        };
+
+        VK_CHECK(vkAllocateDescriptorSets(m_Dev, &descriptorSetAllocInfo, &table.set));
+    };
+
+    { // Constants
+
+        const std::array<VkDescriptorSetLayoutBinding, 4> descriptorLayoutBindings{
+            VkDescriptorSetLayoutBinding{
+                .binding = 0,
+                .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+                .descriptorCount = m_Limits.numFramesInFlight,
+                .stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+            },
+            VkDescriptorSetLayoutBinding{
+                .binding = 1,
+                .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+                .descriptorCount = m_Limits.maxPassCount,
+                .stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+            },
+            VkDescriptorSetLayoutBinding{
+                .binding = 2,
+                .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+                .descriptorCount = m_Limits.maxDrawCount,
+                .stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+            },
+            VkDescriptorSetLayoutBinding{
+                .binding = 3,
+                .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+                .descriptorCount = m_Limits.maxDrawCount,
+                .stageFlags = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+            },
+        };
+
+        const VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+            .bindingCount = descriptorLayoutBindings.size(),
+            .pBindings = descriptorLayoutBindings.data(),
+        };
+
+        initDescriptorTable(m_ConstantsDescriptorTable, descriptorSetLayoutCreateInfo);
+
+        m_ConstantsBuffers.perFrame = CreateBuffer(RhiBufferDesc{
+            .size = m_Limits.numFramesInFlight * CbvOffset(m_Limits.perFrameConstantSize),
+            .bufferUsage = RhiBufferUsage::Uniform,
+            .memoryUsage = RhiMemoryUsage::CpuToGpu,
+        });
+
+        m_ConstantsBuffers.perPass = CreateBuffer(RhiBufferDesc{
+            .size = m_Limits.maxPassCount * CbvOffset(m_Limits.perPassConstantSize),
+            .bufferUsage = RhiBufferUsage::Uniform,
+            .memoryUsage = RhiMemoryUsage::CpuToGpu,
+        });
+
+        m_ConstantsBuffers.perDrawSmall = CreateBuffer(RhiBufferDesc{
+            .size = m_Limits.maxDrawCount * CbvOffset(m_Limits.perDrawConstantSize),
+            .bufferUsage = RhiBufferUsage::Uniform,
+            .memoryUsage = RhiMemoryUsage::CpuToGpu,
+        });
+
+        m_ConstantsBuffers.perDrawLarge = CreateBuffer(RhiBufferDesc{
+            .size = m_Limits.maxDrawCount * CbvOffset(m_Limits.perDrawLargeConstantSize),
+            .bufferUsage = RhiBufferUsage::Uniform,
+            .memoryUsage = RhiMemoryUsage::CpuToGpu,
+        });
+    }
+
+    { // Constant Buffer Views
+
+        const VkDescriptorBindingFlags bindingFlags = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
+
+        const VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
+            .bindingCount = 1,
+            .pBindingFlags = &bindingFlags,
+        };
+
+        const VkDescriptorSetLayoutBinding descriptorLayoutBinding{
+            .binding = 0,
+            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .descriptorCount = 1024,
+            .stageFlags = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+        };
+
+        const VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+            .pNext = &bindingFlagsCreateInfo,
+            .bindingCount = 1,
+            .pBindings = &descriptorLayoutBinding,
+        };
+
+        initDescriptorTable(m_CBVsDescriptorTable, descriptorSetLayoutCreateInfo);
+    }
 
     { // Textures
 
@@ -538,17 +635,7 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
             .pBindings = &descriptorLayoutBinding,
         };
 
-        VK_CHECK(
-            vkCreateDescriptorSetLayout(m_Dev, &descriptorSetLayoutCreateInfo, m_Alloc, &m_TextureDescriptors.layout));
-
-        const VkDescriptorSetAllocateInfo descriptorSetAllocInfo{
-            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-            .descriptorPool = m_DescriptorPool,
-            .descriptorSetCount = 1,
-            .pSetLayouts = &m_TextureDescriptors.layout,
-        };
-
-        VK_CHECK(vkAllocateDescriptorSets(m_Dev, &descriptorSetAllocInfo, &m_TextureDescriptors.set));
+        initDescriptorTable(m_TexturesDescriptorTable, descriptorSetLayoutCreateInfo);
     }
 
     { // Samplers
@@ -563,7 +650,7 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
 
         const VkDescriptorSetLayoutBinding descriptorLayoutBinding{
             .binding = 0,
-            .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+            .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
             .descriptorCount = 16,
             .stageFlags = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
         };
@@ -575,17 +662,7 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
             .pBindings = &descriptorLayoutBinding,
         };
 
-        VK_CHECK(
-            vkCreateDescriptorSetLayout(m_Dev, &descriptorSetLayoutCreateInfo, m_Alloc, &m_SamplerDescriptors.layout));
-
-        const VkDescriptorSetAllocateInfo descriptorSetAllocInfo{
-            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-            .descriptorPool = m_DescriptorPool,
-            .descriptorSetCount = 1,
-            .pSetLayouts = &m_TextureDescriptors.layout,
-        };
-
-        VK_CHECK(vkAllocateDescriptorSets(m_Dev, &descriptorSetAllocInfo, &m_SamplerDescriptors.set));
+        initDescriptorTable(m_SamplersDescriptorTable, descriptorSetLayoutCreateInfo);
     }
 }
 

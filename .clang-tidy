@@ -10,6 +10,8 @@ Checks: >
   -performance-enum-size,
 
   modernize-*,
+  -modernize-use-std-print,
+
   readability-identifier-naming
 
 CheckOptions:

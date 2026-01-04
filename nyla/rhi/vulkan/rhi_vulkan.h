@@ -1,11 +1,13 @@
 #pragma once
 
 #include <cstdint>
+#include <string_view>
 
 #include "nyla/commons/assert.h"
 #include "nyla/commons/containers/inline_vec.h"
 #include "nyla/commons/handle_pool.h"
 #include "nyla/commons/log.h"
+#include "nyla/commons/memory/align.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
@@ -67,6 +69,17 @@ struct VulkanBufferData
     uint32_t dirtyBegin;
     uint32_t dirtyEnd;
     bool dirty;
+};
+
+struct VulkanBufferViewData
+{
+    RhiBuffer buffer;
+    uint32_t size;
+    uint32_t offset;
+    uint32_t range;
+    bool dynamic;
+
+    bool descriptorWritten;
 };
 
 struct VulkanCmdListData
@@ -170,7 +183,10 @@ class Rhi::Impl
 
     auto FrameBegin() -> RhiCmdList;
     void FrameEnd();
-    auto GetNumFramesInFlight() -> uint32_t;
+    auto GetNumFramesInFlight() -> uint32_t
+    {
+        return m_Limits.numFramesInFlight;
+    }
     auto GetFrameIndex() -> uint32_t;
     auto FrameGetCmdList() -> RhiCmdList;
 
@@ -235,20 +251,37 @@ class Rhi::Impl
     void CreateSwapchain();
     auto GetBackbufferTexture() -> RhiTexture;
 
+    void WriteDescriptorTables();
+    void BindDescriptorTables(RhiCmdList cmd);
+
   private:
+#if 0
     HandlePool<RhiDescriptorSetLayout, VulkanDescriptorSetLayoutData, 16> m_DescriptorSetLayouts;
     HandlePool<RhiDescriptorSet, VulkanDescriptorSetData, 16> m_DescriptorSets;
-    HandlePool<RhiBuffer, VulkanBufferData, 16> m_Buffers;
+#endif
+
     HandlePool<RhiCmdList, VulkanCmdListData, 16> m_CmdLists;
+
     HandlePool<RhiShader, VkShaderModule, 16> m_Shaders;
     HandlePool<RhiGraphicsPipeline, VulkanPipelineData, 16> m_GraphicsPipelines;
+
+    HandlePool<RhiBuffer, VulkanBufferData, 16> m_Buffers;
+    HandlePool<RhiBuffer, VulkanBufferViewData, 16> m_CBVs;
+
     HandlePool<RhiTexture, VulkanTextureData, 128> m_Textures;
     HandlePool<RhiTextureView, VulkanTextureViewData, 128> m_TextureViews;
+
     HandlePool<RhiSampler, VulkanSamplerData, 16> m_Samplers;
 
     VkAllocationCallbacks *m_Alloc;
 
     RhiFlags m_Flags;
+    RhiLimits m_Limits;
+
+    auto CbvOffset(uint32_t offset) -> uint32_t
+    {
+        return AlignedUp(offset, m_PhysDevProps.limits.minUniformBufferOffsetAlignment);
+    }
 
     VkInstance m_Instance;
     VkDevice m_Dev;
@@ -257,13 +290,24 @@ class Rhi::Impl
     VkPhysicalDeviceMemoryProperties m_PhysDevMemProps;
     VkDescriptorPool m_DescriptorPool;
 
-    struct Heap
+    struct DescriptorTable
     {
         VkDescriptorSetLayout layout;
         VkDescriptorSet set;
     };
-    Heap m_TextureDescriptors;
-    Heap m_SamplerDescriptors;
+
+    DescriptorTable m_ConstantsDescriptorTable;
+    struct
+    {
+        RhiBuffer perFrame;
+        RhiBuffer perPass;
+        RhiBuffer perDrawSmall;
+        RhiBuffer perDrawLarge;
+    } m_ConstantsBuffers;
+
+    DescriptorTable m_TexturesDescriptorTable;
+    DescriptorTable m_SamplersDescriptorTable;
+    DescriptorTable m_CBVsDescriptorTable;
 
     PlatformWindow m_Window;
     VkSurfaceKHR m_Surface;
@@ -277,7 +321,6 @@ class Rhi::Impl
 
     DeviceQueue m_GraphicsQueue;
     uint32_t m_FrameIndex;
-    uint32_t m_NumFramesInFlight;
     std::array<RhiCmdList, kRhiMaxNumFramesInFlight> m_GraphicsQueueCmd;
     std::array<uint64_t, kRhiMaxNumFramesInFlight> m_GraphicsQueueCmdDone;
 

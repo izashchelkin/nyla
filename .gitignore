@@ -6,3 +6,5 @@
 /.vs
 /vcpkg_installed
 /tags
+/.cache
+/compile_commands.json

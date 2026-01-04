@@ -40,6 +40,9 @@ auto Rhi::Impl::FrameBegin() -> RhiCmdList
     };
     VK_CHECK(vkBeginCommandBuffer(cmdbuf, &commandBufferBeginInfo));
 
+    vkCmdBindDescriptorSets(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineData.layout, setIndex, 1, &descriptorSet,
+                            dynamicOffsets.size(), dynamicOffsets.data());
+
     return cmd;
 }
 
@@ -108,7 +111,7 @@ void Rhi::Impl::FrameEnd()
     }
     }
 
-    m_FrameIndex = (m_FrameIndex + 1) % m_NumFramesInFlight;
+    m_FrameIndex = (m_FrameIndex + 1) % m_Limits.numFramesInFlight;
 }
 
 auto Rhi::Impl::GetFrameIndex() -> uint32_t
@@ -119,11 +122,6 @@ auto Rhi::Impl::GetFrameIndex() -> uint32_t
 auto Rhi::Impl::FrameGetCmdList() -> RhiCmdList
 { // TODO: get rid of this
     return m_GraphicsQueueCmd[m_FrameIndex];
-}
-
-auto Rhi::Impl::GetNumFramesInFlight() -> uint32_t
-{
-    return m_NumFramesInFlight;
 }
 
 //

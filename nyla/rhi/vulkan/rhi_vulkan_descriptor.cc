@@ -43,6 +43,8 @@ auto ConvertVulkanBindingType(RhiBindingType bindingType, RhiDescriptorFlags bin
 
 } // namespace
 
+#if 0
+
 auto Rhi::Impl::CreateDescriptorSetLayout(const RhiDescriptorSetLayoutDesc &desc) -> RhiDescriptorSetLayout
 {
     VulkanDescriptorSetLayoutData layoutData{
@@ -212,6 +214,12 @@ void Rhi::Impl::DestroyDescriptorSet(RhiDescriptorSet bindGroup)
 void Rhi::Impl::CmdBindGraphicsBindGroup(RhiCmdList cmd, uint32_t setIndex, RhiDescriptorSet bindGroup,
                                          std::span<const uint32_t> dynamicOffsets)
 { // TODO: validate dynamic offsets size !!!
+}
+
+#endif
+
+void Rhi::Impl::BindDescriptorTables(RhiCmdList cmd)
+{
     const VulkanCmdListData &cmdData = m_CmdLists.ResolveData(cmd);
     const VulkanPipelineData &pipelineData = m_GraphicsPipelines.ResolveData(cmdData.boundGraphicsPipeline);
     const VkDescriptorSet &descriptorSet = m_DescriptorSets.ResolveData(bindGroup).set;
@@ -220,59 +228,109 @@ void Rhi::Impl::CmdBindGraphicsBindGroup(RhiCmdList cmd, uint32_t setIndex, RhiD
                             &descriptorSet, dynamicOffsets.size(), dynamicOffsets.data());
 }
 
-void Rhi::Impl::WriteResourceViewsDescriptors()
+void Rhi::Impl::WriteDescriptorTables()
 {
-    InlineVec<VkWriteDescriptorSet, 32> descriptorWrites;
-    InlineVec<VkDescriptorImageInfo, 32> descriptorImageInfos;
+    constexpr uint32_t kMaxDescriptorUpdates = 128;
 
-    for (auto &slot : m_TextureViews)
-    {
-        if (!slot.used)
-            continue;
-        if (slot.descriptorWritten)
-            continue;
+    InlineVec<VkWriteDescriptorSet, kMaxDescriptorUpdates> descriptorWrites;
+    InlineVec<VkDescriptorImageInfo, kMaxDescriptorUpdates> descriptorImageInfos;
+    InlineVec<VkDescriptorBufferInfo, kMaxDescriptorUpdates> descriptorBufferInfos;
 
-        const TextureViewData &textureViewData = slot.data;
-        const TextureData &textureData = m_Textures.ResolveData(textureViewData.texture);
+    { // Constants
 
-        VkWriteDescriptorSet &vulkanSetWrite = descriptorWrites.emplace_back(VkWriteDescriptorSet{
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .dstSet = vulkanDescriptorSet,
-            .dstBinding = write.binding,
-            .dstArrayElement = write.arrayIndex,
-            .descriptorCount = 1,
-            .descriptorType = ConvertVulkanBindingType(bindingType, descriptorLayout.flags),
-        });
-
-        vulkanSetWrite.pImageInfo = &descriptorImageInfos.emplace_back(VkDescriptorImageInfo{
-            .imageView = textureViewData.imageView,
-            .imageLayout = textureData.layout,
-        });
-
-        slot.descriptorWritten = true;
+        // binding 0: PerFrame (range = 256)
+        // binding 1: PerPass (range = 512)
+        // binding 2: PerDrawSmall (range = 256)
+        // binding 3: PerDrawLarge (range = 1024)
     }
 
-    for (auto &slot : m_Samplers)
-    {
-        if (!slot.used)
-            continue;
-        if (slot.descriptorWritten)
-            continue;
+    { // TEXTURES
+        for (uint32_t i = 0; i < m_TextureViews.size(); ++i)
+        {
+            auto &slot = m_TextureViews[i];
+            if (!slot.used)
+                continue;
+            if (slot.data.descriptorWritten)
+                continue;
 
-        const VulkanSamplerData &samplerData = slot.data;
+            const VulkanTextureViewData &textureViewData = slot.data;
+            const VulkanTextureData &textureData = m_Textures.ResolveData(textureViewData.texture);
 
-        VkWriteDescriptorSet &vulkanSetWrite = descriptorWrites.emplace_back(VkWriteDescriptorSet{
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .dstSet = vulkanDescriptorSet,
-            .dstBinding = write.binding,
-            .dstArrayElement = write.arrayIndex,
-            .descriptorCount = 1,
-            .descriptorType = ConvertVulkanBindingType(bindingType, descriptorLayout.flags),
-        });
+            VkWriteDescriptorSet &vulkanSetWrite = descriptorWrites.emplace_back(VkWriteDescriptorSet{
+                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                .dstSet = m_TexturesDescriptorTable.set,
+                .dstBinding = 0,
+                .dstArrayElement = i,
+                .descriptorCount = 1,
+                .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+            });
 
-        vulkanSetWrite.pImageInfo = &imageInfos.emplace_back(VkDescriptorImageInfo{
-            .sampler = samplerData.sampler,
-        });
+            vulkanSetWrite.pImageInfo = &descriptorImageInfos.emplace_back(VkDescriptorImageInfo{
+                .imageView = textureViewData.imageView,
+                .imageLayout = textureData.layout,
+            });
+
+            slot.data.descriptorWritten = true;
+        }
+    }
+
+    { // SAMPLERS
+        for (uint32_t i = 0; i < m_Samplers.size(); ++i)
+        {
+            auto &slot = m_Samplers[i];
+            if (!slot.used)
+                continue;
+            if (slot.data.descriptorWritten)
+                continue;
+
+            const VulkanSamplerData &samplerData = slot.data;
+
+            VkWriteDescriptorSet &vulkanSetWrite = descriptorWrites.emplace_back(VkWriteDescriptorSet{
+                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                .dstSet = m_SamplersDescriptorTable.set,
+                .dstBinding = 0,
+                .dstArrayElement = i,
+                .descriptorCount = 1,
+                .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
+            });
+
+            vulkanSetWrite.pImageInfo = &descriptorImageInfos.emplace_back(VkDescriptorImageInfo{
+                .sampler = samplerData.sampler,
+            });
+
+            slot.data.descriptorWritten = true;
+        }
+    }
+
+    { // CBVs
+        for (uint32_t i = 0; i < m_CBVs.size(); ++i)
+        {
+            auto &slot = m_CBVs[i];
+            if (!slot.used)
+                continue;
+            if (slot.data.descriptorWritten)
+                continue;
+
+            const VulkanBufferViewData &bufferViewData = slot.data;
+            const VulkanBufferData &bufferData = m_Buffers.ResolveData(bufferViewData.buffer);
+
+            VkWriteDescriptorSet &vulkanSetWrite = descriptorWrites.emplace_back(VkWriteDescriptorSet{
+                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                .dstSet = m_CBVsDescriptorTable.set,
+                .dstBinding = 0,
+                .dstArrayElement = i,
+                .descriptorCount = 1,
+                .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            });
+
+            vulkanSetWrite.pBufferInfo = &descriptorBufferInfos.emplace_back(VkDescriptorBufferInfo{
+                .buffer = bufferData.buffer,
+                .offset = bufferViewData.offset,
+                .range = bufferViewData.range,
+            });
+
+            slot.data.descriptorWritten = true;
+        }
     }
 
     vkUpdateDescriptorSets(m_Dev, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);

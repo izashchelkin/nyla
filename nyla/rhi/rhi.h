@@ -37,12 +37,31 @@ enum class RhiFlags : uint32_t
 };
 NYLA_BITENUM(RhiFlags);
 
+struct RhiLimits
+{
+    uint32_t numTextures = 64;
+    uint32_t numTextureViews = 64;
+
+    uint32_t numBuffers = 16;
+    uint32_t numCBVs = 16;
+
+    uint32_t numSamplers = 8;
+
+    uint32_t numFramesInFlight = 2;
+    uint32_t maxDrawCount = 1024;
+    uint32_t maxPassCount = 4;
+
+    uint32_t perFrameConstantSize = 256;
+    uint32_t perPassConstantSize = 512;
+    uint32_t perDrawConstantSize = 256;
+    uint32_t perDrawLargeConstantSize = 1024;
+};
+
 struct RhiInitDesc
 {
-    RhiFlags flags;
-
     PlatformWindow window;
-    uint32_t numFramesInFlight;
+    RhiFlags flags;
+    RhiLimits limits;
 };
 
 class Rhi
@@ -112,13 +131,13 @@ class Rhi
     auto CreateShader(const RhiShaderDesc &) -> RhiShader;
     void DestroyShader(RhiShader);
 
-    auto CreateTexture(const RhiTextureDesc&) -> RhiTexture;
+    auto CreateTexture(const RhiTextureDesc &) -> RhiTexture;
     void DestroyTexture(RhiTexture);
     auto GetTextureInfo(RhiTexture) -> RhiTextureInfo;
     void CmdTransitionTexture(RhiCmdList, RhiTexture, RhiTextureState);
     void CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, uint32_t srcOffset, uint32_t size);
 
-    auto CreateTextureView(const RhiTextureViewDesc&) -> RhiTextureView;
+    auto CreateTextureView(const RhiTextureViewDesc &) -> RhiTextureView;
     void DestroyTextureView(RhiTextureView);
 
     auto GetBackbufferTexture() -> RhiTexture;

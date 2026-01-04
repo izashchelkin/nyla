@@ -42,13 +42,13 @@ template <typename HandleType, typename DataType, uint32_t Size> class HandlePoo
     [[nodiscard]]
     auto data() const -> const_pointer
     {
-        return m_slots.data();
+        return m_Slots.data();
     }
 
     [[nodiscard]]
     auto data() -> pointer
     {
-        return m_slots.data();
+        return m_Slots.data();
     }
 
     [[nodiscard]]
@@ -66,37 +66,47 @@ template <typename HandleType, typename DataType, uint32_t Size> class HandlePoo
     [[nodiscard]]
     auto begin() -> iterator
     {
-        return m_slots.data();
+        return m_Slots.data();
     }
 
     [[nodiscard]]
     auto end() -> iterator
     {
-        return m_slots.data() + kCapacity;
+        return m_Slots.data() + kCapacity;
     }
 
     [[nodiscard]]
     auto begin() const -> const_iterator
     {
-        return m_slots.data();
+        return m_Slots.data();
     }
 
     [[nodiscard]]
     auto end() const -> const_iterator
     {
-        return m_slots.data() + kCapacity;
+        return m_Slots.data() + kCapacity;
     }
 
     [[nodiscard]]
     auto cbegin() const -> const_iterator
     {
-        return m_slots.data();
+        return m_Slots.data();
     }
 
     [[nodiscard]]
     auto cend() const -> const_iterator
     {
-        return m_slots.data() + kCapacity;
+        return m_Slots.data() + kCapacity;
+    }
+
+    auto operator[](uint32_t i) -> Slot &
+    {
+        return m_Slots[i];
+    }
+
+    auto operator[](uint32_t i) const -> const Slot &
+    {
+        return m_Slots[i];
     }
 
     //
@@ -107,7 +117,7 @@ template <typename HandleType, typename DataType, uint32_t Size> class HandlePoo
 
         for (uint32_t i = 0; i < Size; ++i)
         {
-            Slot &slot = m_slots[i];
+            Slot &slot = m_Slots[i];
             if (slot.used)
                 continue;
 
@@ -132,7 +142,7 @@ template <typename HandleType, typename DataType, uint32_t Size> class HandlePoo
         if (!handle.gen)
             return {false, nullptr};
 
-        Slot *slot = &m_slots[handle.index];
+        Slot *slot = &m_Slots[handle.index];
         if (!slot->used)
             return {false, nullptr};
         if (handle.gen != slot->gen)
@@ -166,7 +176,7 @@ template <typename HandleType, typename DataType, uint32_t Size> class HandlePoo
     }
 
   private:
-    std::array<Slot, static_cast<size_t>(Size)> m_slots;
+    std::array<Slot, static_cast<size_t>(Size)> m_Slots;
 };
 
 } // namespace nyla
