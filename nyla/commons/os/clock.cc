@@ -24,14 +24,14 @@ auto GetMonotonicTimeMillis() -> uint64_t
 auto GetMonotonicTimeMicros() -> uint64_t
 {
     timespec ts{};
-    NYLA_ASSERT(clock_gettime(CLOCK_MONOTONIC_RAW,&ts)== 0);
+    NYLA_ASSERT(clock_gettime(CLOCK_MONOTONIC_RAW, &ts) == 0);
     return ts.tv_sec * 1e6 + ts.tv_nsec / 1e3;
 }
 
 auto GetMonotonicTimeNanos() -> uint64_t
 {
     timespec ts{};
-    NYLA_ASSERT(clock_gettime(CLOCK_MONOTONIC_RAW,& ts)== 0);
+    NYLA_ASSERT(clock_gettime(CLOCK_MONOTONIC_RAW, &ts) == 0);
     return ts.tv_sec * 1e9 + ts.tv_nsec;
 }
 

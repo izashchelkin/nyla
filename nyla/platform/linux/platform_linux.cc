@@ -3,14 +3,14 @@
 
 #include "nyla/commons/assert.h"
 #include "nyla/commons/cleanup.h"
-#include "nyla/commons/string.h"
 #include "nyla/commons/log.h"
+#include "nyla/commons/string.h"
 #include "nyla/platform/platform.h"
 #include "xcb/xcb.h"
 #include "xcb/xcb_aux.h"
 #include "xcb/xinput.h"
-#include <cstdint>
 #include <array>
+#include <cstdint>
 #include <xkbcommon/xkbcommon-x11.h>
 
 #include "vulkan/vulkan_core.h"
@@ -86,7 +86,6 @@ void Platform::Impl::Init(const PlatformInitDesc &desc)
         if (!reply || err)
             NYLA_ASSERT(false && "could not set up detectable autorepeat");
     }
-    
 
     if (Any(desc.enabledFeatures & PlatformFeature::MouseInput))
     {

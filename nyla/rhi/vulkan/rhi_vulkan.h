@@ -103,15 +103,12 @@ struct VulkanPipelineData
 
 struct VulkanTextureData
 {
-    bool isSwapchain;
     VkImage image;
     VkDeviceMemory memory;
     RhiTextureState state;
     VkImageLayout layout;
     VkFormat format;
     VkExtent3D extent;
-
-    RhiTextureView view;
 };
 
 struct VulkanTextureViewData
@@ -219,8 +216,13 @@ class Rhi::Impl
     void CmdTransitionTexture(RhiCmdList cmd, RhiTexture texture, RhiTextureState newState);
     void CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, uint32_t srcOffset, uint32_t size);
 
-    auto CreateTextureView(const RhiTextureViewDesc &desc) -> RhiTextureView;
-    void DestroyTextureView(RhiTextureView textureView);
+    auto CreeteSampledTextureView(const RhiTextureViewDesc &desc) -> RhiSampledTextureView;
+    void DestroySampledTextureView(RhiSampledTextureView textureView);
+    auto GetTexture(RhiSampledTextureView srv) -> RhiTexture;
+
+    auto CreateRenderTargetView(const RhiRenderTargetViewDesc &desc) -> RhiRenderTargetView;
+    void DestroyRenderTargetView(RhiRenderTargetView textureView);
+    auto GetTexture(RhiRenderTargetView rtv) -> RhiTexture;
 
     void EnsureHostWritesVisible(VkCommandBuffer cmdbuf, VulkanBufferData &bufferData);
 
@@ -260,7 +262,7 @@ class Rhi::Impl
 #endif
 
     void CreateSwapchain();
-    auto GetBackbufferTexture() -> RhiTexture;
+    auto GetBackbufferView() -> RhiRenderTargetView;
 
     void WriteDescriptorTables();
     void BindDescriptorTables(RhiCmdList cmd);
@@ -285,7 +287,8 @@ class Rhi::Impl
     HandlePool<RhiBuffer, VulkanBufferViewData, 16> m_CBVs;
 
     HandlePool<RhiTexture, VulkanTextureData, 128> m_Textures;
-    HandlePool<RhiTextureView, VulkanTextureViewData, 128> m_TextureViews;
+    HandlePool<RhiRenderTargetView, VulkanTextureViewData, 8> m_RenderTargetViews;
+    HandlePool<RhiSampledTextureView, VulkanTextureViewData, 128> m_SampledTextureViews;
 
     HandlePool<RhiSampler, VulkanSamplerData, 16> m_Samplers;
 
@@ -321,9 +324,9 @@ class Rhi::Impl
     VkSurfaceKHR m_Surface;
     VkSwapchainKHR m_Swapchain;
 
+    InlineVec<RhiRenderTargetView, kRhiMaxNumSwapchainTextures> m_SwapchainRTVs;
     uint32_t m_SwapchainTextureIndex;
-    uint32_t m_SwapchainTexturesCount;
-    std::array<RhiTexture, kRhiMaxNumSwapchainTextures> m_SwapchainTextures;
+
     std::array<VkSemaphore, kRhiMaxNumSwapchainTextures> m_RenderFinishedSemaphores;
     std::array<VkSemaphore, kRhiMaxNumFramesInFlight> m_SwapchainAcquireSemaphores;
 

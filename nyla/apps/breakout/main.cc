@@ -33,8 +33,8 @@ auto PlatformMain() -> int
 
         GameProcess(cmd, dt);
 
-        RhiTexture colorTarget = g_Rhi->GetBackbufferTexture();
-        GameRender(cmd, colorTarget);
+        RhiRenderTargetView rtv = g_Rhi->GetBackbufferView();
+        GameRender(cmd, rtv);
 
         g_Engine->FrameEnd();
     }

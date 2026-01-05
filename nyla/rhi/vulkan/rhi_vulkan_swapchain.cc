@@ -5,6 +5,7 @@
 #include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/vulkan_core.h>
 
+#include "nyla/commons/containers/inline_vec.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_texture.h"
@@ -18,9 +19,6 @@ using namespace rhi_vulkan_internal;
 void Rhi::Impl::CreateSwapchain()
 {
     VkSwapchainKHR oldSwapchain = m_Swapchain;
-
-    std::array oldSwapchainTextures = m_SwapchainTextures;
-    uint32_t oldImagesViewsCount = m_SwapchainTexturesCount;
 
     static bool logPresentModes = true;
     VkPresentModeKHR presentMode = [this] -> VkPresentModeKHR {
@@ -124,58 +122,85 @@ void Rhi::Impl::CreateSwapchain()
     };
     VK_CHECK(vkCreateSwapchainKHR(m_Dev, &createInfo, nullptr, &m_Swapchain));
 
-    vkGetSwapchainImagesKHR(m_Dev, m_Swapchain, &m_SwapchainTexturesCount, nullptr);
+    uint32_t swapchainTexturesCount;
+    vkGetSwapchainImagesKHR(m_Dev, m_Swapchain, &swapchainTexturesCount, nullptr);
 
-    NYLA_ASSERT(m_SwapchainTexturesCount <= kRhiMaxNumSwapchainTextures);
+    NYLA_ASSERT(swapchainTexturesCount <= kRhiMaxNumSwapchainTextures);
     std::array<VkImage, kRhiMaxNumSwapchainTextures> swapchainImages;
 
-    vkGetSwapchainImagesKHR(m_Dev, m_Swapchain, &m_SwapchainTexturesCount, swapchainImages.data());
+    vkGetSwapchainImagesKHR(m_Dev, m_Swapchain, &swapchainTexturesCount, swapchainImages.data());
 
-    for (size_t i = 0; i < m_SwapchainTexturesCount; ++i)
+    for (size_t i = 0; i < swapchainMinImageCount; ++i)
     {
-        const VulkanTextureData textureData{
-            .isSwapchain = true,
-            .image = swapchainImages[i],
-            .memory = nullptr,
-            .state = RhiTextureState::Present,
-            .format = surfaceFormat.format,
-            .extent = {surfaceExtent.width, surfaceExtent.height, 1},
-        };
-        RhiTexture texture = m_Textures.Acquire(textureData);
-        m_SwapchainTextures[i] = texture;
+        RhiTexture texture;
+        RhiRenderTargetView rtv;
 
-        const RhiTextureView textureView = CreateTextureView(RhiTextureViewDesc{
-            .texture = texture,
-        });
-        m_Textures.ResolveData(texture).view = textureView;
+        if (m_SwapchainRTVs.size() > i)
+        {
+            rtv = m_SwapchainRTVs[i];
+            VulkanTextureViewData &rtvData = m_RenderTargetViews.ResolveData(rtv);
+            rtvData.format = surfaceFormat.format;
+
+            texture = rtvData.texture;
+            VulkanTextureData &textureData = m_Textures.ResolveData(texture);
+            textureData.image = swapchainImages[i];
+            textureData.state = RhiTextureState::Present;
+            textureData.layout = VK_IMAGE_LAYOUT_UNDEFINED;
+            textureData.format = surfaceFormat.format;
+            textureData.extent = VkExtent3D{surfaceExtent.width, surfaceExtent.height, 1};
+
+            vkDestroyImageView(m_Dev, rtvData.imageView, m_Alloc);
+
+            const VkImageViewCreateInfo imageViewCreateInfo{
+                .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+                .image = textureData.image,
+                .viewType = VK_IMAGE_VIEW_TYPE_2D,
+                .format = rtvData.format,
+                .subresourceRange =
+                    {
+                        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                        .baseMipLevel = 0,
+                        .levelCount = 1,
+                        .baseArrayLayer = 0,
+                        .layerCount = 1,
+                    },
+            };
+            vkCreateImageView(m_Dev, &imageViewCreateInfo, m_Alloc, &rtvData.imageView);
+        }
+        else
+        {
+            const VulkanTextureData textureData{
+                .image = swapchainImages[i],
+                .memory = nullptr,
+                .state = RhiTextureState::Present,
+                .format = surfaceFormat.format,
+                .extent = VkExtent3D{surfaceExtent.width, surfaceExtent.height, 1},
+            };
+
+            texture = m_Textures.Acquire(textureData);
+
+            rtv = CreateRenderTargetView(RhiRenderTargetViewDesc{
+                .texture = texture,
+            });
+
+            m_SwapchainRTVs.emplace_back(rtv);
+        }
     }
 
     if (oldSwapchain)
-    {
-        NYLA_ASSERT(oldImagesViewsCount);
-        for (uint32_t i = 0; i < oldImagesViewsCount; ++i)
-        {
-            VulkanTextureData textureData = m_Textures.ReleaseData(oldSwapchainTextures[i]);
-            NYLA_ASSERT(textureData.isSwapchain);
-            NYLA_ASSERT(textureData.image);
-
-            DestroyTextureView(textureData.view);
-        };
-
         vkDestroySwapchainKHR(m_Dev, oldSwapchain, m_Alloc);
-    }
 }
 
-auto Rhi::Impl::GetBackbufferTexture() -> RhiTexture
+auto Rhi::Impl::GetBackbufferView() -> RhiRenderTargetView
 {
-    return m_SwapchainTextures[m_SwapchainTextureIndex];
+    return m_SwapchainRTVs[m_SwapchainTextureIndex];
 }
 
 //
 
-auto Rhi::GetBackbufferTexture() -> RhiTexture
+auto Rhi::GetBackbufferView() -> RhiRenderTargetView
 {
-    return m_Impl->GetBackbufferTexture();
+    return m_Impl->GetBackbufferView();
 }
 
 } // namespace nyla

@@ -268,9 +268,9 @@ void Rhi::Impl::WriteDescriptorTables()
     InlineVec<VkDescriptorBufferInfo, kMaxDescriptorUpdates> descriptorBufferInfos;
 
     { // TEXTURES
-        for (uint32_t i = 0; i < m_TextureViews.size(); ++i)
+        for (uint32_t i = 0; i < m_SampledTextureViews.size(); ++i)
         {
-            auto &slot = m_TextureViews[i];
+            auto &slot = m_SampledTextureViews[i];
             if (!slot.used)
                 continue;
             if (slot.data.descriptorWritten)

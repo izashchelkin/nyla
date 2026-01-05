@@ -1,7 +1,7 @@
+#include "nyla/commons/assert.h"
 #include "nyla/platform/linux/platform_linux.h"
 #include "nyla/platform/platform.h"
 #include "nyla/platform/platform_key_resolver.h"
-#include "nyla/commons/assert.h"
 #include "xcb/xcb.h"
 #include <xkbcommon/xkbcommon-x11.h>
 #include <xkbcommon/xkbcommon.h>

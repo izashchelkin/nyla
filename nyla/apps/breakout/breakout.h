@@ -56,6 +56,6 @@ struct GameLevel
 
 void GameInit();
 void GameProcess(RhiCmdList cmd, float dt);
-void GameRender(RhiCmdList cmd, RhiTexture colorTarget);
+void GameRender(RhiCmdList cmd, RhiRenderTargetView rtv);
 
 } // namespace nyla

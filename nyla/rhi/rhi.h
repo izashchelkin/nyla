@@ -139,10 +139,15 @@ class Rhi
     void CmdTransitionTexture(RhiCmdList, RhiTexture, RhiTextureState);
     void CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, uint32_t srcOffset, uint32_t size);
 
-    auto CreateTextureView(const RhiTextureViewDesc &) -> RhiTextureView;
-    void DestroyTextureView(RhiTextureView);
+    auto CreateSampledTextureView(const RhiTextureViewDesc &) -> RhiSampledTextureView;
+    void DestroySampledTextureView(RhiSampledTextureView);
+    auto GetTexture(RhiSampledTextureView srv) -> RhiTexture;
 
-    auto GetBackbufferTexture() -> RhiTexture;
+    auto CreateRenderTargetView(const RhiRenderTargetViewDesc &) -> RhiRenderTargetView;
+    void DestroyRenderTargetView(RhiRenderTargetView);
+    auto GetTexture(RhiRenderTargetView srv) -> RhiTexture;
+
+    auto GetBackbufferView() -> RhiRenderTargetView;
 
     //
 

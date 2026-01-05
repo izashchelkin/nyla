@@ -1,5 +1,5 @@
-#include "nyla/commons/bitenum.h"
 #include "nyla/commons/assert.h"
+#include "nyla/commons/bitenum.h"
 #include "nyla/platform/platform_dir_watch.h"
 #include <array>
 #include <cstdint>

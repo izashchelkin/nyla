@@ -64,7 +64,7 @@ void AssetManager::Upload(RhiCmdList cmd)
         });
         textureAssetData.texture = texture;
 
-        const RhiTextureView textureView = g_Rhi->CreateTextureView(RhiTextureViewDesc{
+        const RhiSampledTextureView textureView = g_Rhi->CreateSampledTextureView(RhiTextureViewDesc{
             .texture = texture,
         });
         textureAssetData.textureView = textureView;

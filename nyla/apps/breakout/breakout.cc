@@ -205,12 +205,12 @@ void GameProcess(RhiCmdList cmd, float dt)
     }
 }
 
-void GameRender(RhiCmdList cmd, RhiTexture colorTarget)
+void GameRender(RhiCmdList cmd, RhiRenderTargetView rtv)
 {
-    RhiTextureInfo colorTargetInfo = g_Rhi->GetTextureInfo(colorTarget);
+    RhiTextureInfo colorTargetInfo = g_Rhi->GetTextureInfo(g_Rhi->GetTexture(rtv));
 
     g_Rhi->PassBegin({
-        .colorTarget = g_Rhi->GetBackbufferTexture(),
+        .renderTarget = rtv,
         .state = RhiTextureState::ColorTarget,
     });
 
@@ -248,7 +248,7 @@ void GameRender(RhiCmdList cmd, RhiTexture colorTarget)
     DebugTextRendererDraw(cmd, debugTextRenderer);
 
     g_Rhi->PassEnd({
-        .colorTarget = g_Rhi->GetBackbufferTexture(),
+        .renderTarget = rtv,
         .state = RhiTextureState::Present,
     });
 }

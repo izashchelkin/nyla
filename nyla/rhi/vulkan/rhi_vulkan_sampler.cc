@@ -56,7 +56,7 @@ auto Rhi::Impl::CreateSampler(const RhiSamplerDesc &desc) -> RhiSampler
         .maxLod = 0.f,
     };
 
-    VulkanSamplerData samplerData;
+    VulkanSamplerData samplerData{};
     VK_CHECK(vkCreateSampler(m_Dev, &createInfo, m_Alloc, &samplerData.sampler));
 
     return m_Samplers.Acquire(samplerData);

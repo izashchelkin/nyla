@@ -2,8 +2,8 @@
 
 #if defined(__linux__) // TODO: what here?
 
-#include <unistd.h>
 #include "nyla/commons/assert.h"
+#include <unistd.h>
 
 #include <csignal>
 #include <cstdlib>

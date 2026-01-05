@@ -50,7 +50,11 @@ struct RhiTexture : Handle
 {
 };
 
-struct RhiTextureView : Handle
+struct RhiSampledTextureView : Handle
+{
+};
+
+struct RhiRenderTargetView : Handle
 {
 };
 
@@ -64,6 +68,12 @@ struct RhiTextureDesc
 };
 
 struct RhiTextureViewDesc
+{
+    RhiTexture texture;
+    RhiTextureFormat format;
+};
+
+struct RhiRenderTargetViewDesc
 {
     RhiTexture texture;
     RhiTextureFormat format;

@@ -187,12 +187,9 @@ auto Rhi::Impl::CreateTexture(RhiTextureDesc desc) -> RhiTexture
     return m_Textures.Acquire(textureData);
 }
 
-auto Rhi::Impl::CreateTextureView(const RhiTextureViewDesc &desc) -> RhiTextureView
+auto Rhi::Impl::CreeteSampledTextureView(const RhiTextureViewDesc &desc) -> RhiSampledTextureView
 {
     VulkanTextureData &textureData = m_Textures.ResolveData(desc.texture);
-
-    // TODO: allow multiple
-    NYLA_ASSERT(!HandleIsSet(textureData.view));
 
     VulkanTextureViewData textureViewData{
         .texture = desc.texture,
@@ -224,9 +221,55 @@ auto Rhi::Impl::CreateTextureView(const RhiTextureViewDesc &desc) -> RhiTextureV
 
     VK_CHECK(vkCreateImageView(m_Dev, &imageViewCreateInfo, m_Alloc, &textureViewData.imageView));
 
-    const RhiTextureView view = m_TextureViews.Acquire(textureViewData);
-    textureData.view = view;
+    const RhiSampledTextureView view = m_SampledTextureViews.Acquire(textureViewData);
     return view;
+}
+
+auto Rhi::Impl::CreateRenderTargetView(const RhiRenderTargetViewDesc &desc) -> RhiRenderTargetView
+{
+    VulkanTextureData &textureData = m_Textures.ResolveData(desc.texture);
+
+    VulkanTextureViewData renderTargetViewData{
+        .texture = desc.texture,
+
+        // TODO: expose these as well!
+        .imageViewType = VK_IMAGE_VIEW_TYPE_2D,
+        .subresourceRange =
+            {
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .baseMipLevel = 0,
+                .levelCount = 1,
+                .baseArrayLayer = 0,
+                .layerCount = 1,
+            },
+    };
+
+    if (desc.format == RhiTextureFormat::None)
+        renderTargetViewData.format = textureData.format;
+    else
+        renderTargetViewData.format = ConvertTextureFormatIntoVkFormat(desc.format);
+
+    const VkImageViewCreateInfo imageViewCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+        .image = textureData.image,
+        .viewType = renderTargetViewData.imageViewType,
+        .format = renderTargetViewData.format,
+        .subresourceRange = renderTargetViewData.subresourceRange,
+    };
+
+    VK_CHECK(vkCreateImageView(m_Dev, &imageViewCreateInfo, m_Alloc, &renderTargetViewData.imageView));
+    const RhiRenderTargetView rtv = m_RenderTargetViews.Acquire(renderTargetViewData);
+    return rtv;
+}
+
+auto Rhi::Impl::GetTexture(RhiSampledTextureView srv) -> RhiTexture
+{
+    return m_SampledTextureViews.ResolveData(srv).texture;
+}
+
+auto Rhi::Impl::GetTexture(RhiRenderTargetView rtv) -> RhiTexture
+{
+    return m_RenderTargetViews.ResolveData(rtv).texture;
 }
 
 auto Rhi::Impl::GetTextureInfo(RhiTexture texture) -> RhiTextureInfo
@@ -284,15 +327,6 @@ void Rhi::Impl::CmdTransitionTexture(RhiCmdList cmd, RhiTexture texture, RhiText
 void Rhi::Impl::DestroyTexture(RhiTexture texture)
 {
     VulkanTextureData textureData = m_Textures.ReleaseData(texture);
-    NYLA_ASSERT(!textureData.isSwapchain);
-
-    if (HandleIsSet(textureData.view))
-    {
-        VulkanTextureViewData textureViewData = m_TextureViews.ReleaseData(textureData.view);
-        NYLA_ASSERT(textureViewData.texture == texture);
-
-        vkDestroyImageView(m_Dev, textureViewData.imageView, m_Alloc);
-    }
 
     NYLA_ASSERT(textureData.image);
     vkDestroyImage(m_Dev, textureData.image, m_Alloc);
@@ -301,21 +335,25 @@ void Rhi::Impl::DestroyTexture(RhiTexture texture)
     vkFreeMemory(m_Dev, textureData.memory, m_Alloc);
 }
 
-void Rhi::Impl::DestroyTextureView(RhiTextureView textureView)
+void Rhi::Impl::DestroySampledTextureView(RhiSampledTextureView textureView)
 {
-    const VulkanTextureViewData& textureViewData = m_TextureViews.ResolveData(textureView);
+    const VulkanTextureViewData &textureViewData = m_SampledTextureViews.ReleaseData(textureView);
     NYLA_ASSERT(textureViewData.imageView);
 
-    VulkanTextureData textureData = m_Textures.ReleaseData(textureViewData.texture);
-    NYLA_ASSERT(textureData.view == textureView);
+    vkDestroyImageView(m_Dev, textureViewData.imageView, m_Alloc);
+}
+
+void Rhi::Impl::DestroyRenderTargetView(RhiRenderTargetView textureView)
+{
+    const VulkanTextureViewData &textureViewData = m_RenderTargetViews.ReleaseData(textureView);
+    NYLA_ASSERT(textureViewData.imageView);
 
     vkDestroyImageView(m_Dev, textureViewData.imageView, m_Alloc);
-    textureData.view = {};
 }
 
 void Rhi::Impl::CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, uint32_t srcOffset, uint32_t size)
 {
-    const VkCommandBuffer& cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
+    const VkCommandBuffer &cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
 
     VulkanTextureData &dstTextureData = m_Textures.ResolveData(dst);
     VulkanBufferData &srcBufferData = m_Buffers.ResolveData(src);
@@ -393,19 +431,44 @@ void Rhi::Impl::CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, ui
 
 //
 
-auto Rhi::CreateTexture(const RhiTextureDesc& desc) -> RhiTexture
+auto Rhi::CreateTexture(const RhiTextureDesc &desc) -> RhiTexture
 {
     return m_Impl->CreateTexture(desc);
 }
 
-auto Rhi::CreateTextureView(const RhiTextureViewDesc &desc) -> RhiTextureView
+auto Rhi::CreateSampledTextureView(const RhiTextureViewDesc &desc) -> RhiSampledTextureView
 {
-    return m_Impl->CreateTextureView(desc);
+    return m_Impl->CreeteSampledTextureView(desc);
+}
+
+void Rhi::DestroySampledTextureView(RhiSampledTextureView srv)
+{
+    m_Impl->DestroySampledTextureView(srv);
+}
+
+auto Rhi::CreateRenderTargetView(const RhiRenderTargetViewDesc &desc) -> RhiRenderTargetView
+{
+    return m_Impl->CreateRenderTargetView(desc);
+}
+
+void Rhi::DestroyRenderTargetView(RhiRenderTargetView rtv)
+{
+    m_Impl->DestroyRenderTargetView(rtv);
 }
 
 void Rhi::DestroyTexture(RhiTexture texture)
 {
     return m_Impl->DestroyTexture(texture);
+}
+
+auto Rhi::GetTexture(RhiSampledTextureView srv) -> RhiTexture
+{
+    return m_Impl->GetTexture(srv);
+}
+
+auto Rhi::GetTexture(RhiRenderTargetView rtv) -> RhiTexture
+{
+    return m_Impl->GetTexture(rtv);
 }
 
 auto Rhi::GetTextureInfo(RhiTexture texture) -> RhiTextureInfo

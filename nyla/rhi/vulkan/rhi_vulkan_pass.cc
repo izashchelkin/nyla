@@ -13,7 +13,7 @@ void Rhi::Impl::PassBegin(RhiPassDesc desc)
     RhiCmdList cmd = m_GraphicsQueueCmd[m_FrameIndex];
     const VkCommandBuffer &cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
 
-    const VulkanTextureViewData &colorTargetViewData = m_TextureViews.ResolveData(desc.colorTarget);
+    const VulkanTextureViewData &colorTargetViewData = m_RenderTargetViews.ResolveData(desc.renderTarget);
     const VulkanTextureData &colorTargetData = m_Textures.ResolveData(colorTargetViewData.texture);
 
     CmdTransitionTexture(cmd, colorTargetViewData.texture, desc.state);
@@ -65,9 +65,9 @@ void Rhi::Impl::PassEnd(RhiPassDesc desc)
     VkCommandBuffer cmdbuf = cmdData.cmdbuf;
     vkCmdEndRendering(cmdbuf);
 
-    const VulkanTextureViewData &colorTargetViewData = m_TextureViews.ResolveData(desc.colorTarget);
+    const VulkanTextureViewData &rtvData = m_RenderTargetViews.ResolveData(desc.renderTarget);
 
-    CmdTransitionTexture(cmd, colorTargetViewData.texture, desc.state);
+    CmdTransitionTexture(cmd, rtvData.texture, desc.state);
 
     cmdData.passConstantHead += CbvOffset(m_Limits.passConstantSize);
 }

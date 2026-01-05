@@ -500,8 +500,7 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
 
     const VkDescriptorPoolCreateInfo descriptorPoolCreateInfo{
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-        .flags =
-            VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT /* | VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT */,
+        .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT | VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT,
         .maxSets = 16,
         .poolSizeCount = static_cast<uint32_t>(descriptorPoolSizes.size()),
         .pPoolSizes = descriptorPoolSizes.data(),
@@ -610,7 +609,8 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
 
     { // Textures
 
-        const VkDescriptorBindingFlags bindingFlags = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
+        const VkDescriptorBindingFlags bindingFlags =
+            VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT;
 
         const VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsCreateInfo{
             .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
@@ -628,6 +628,7 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
         const VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{
             .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
             .pNext = &bindingFlagsCreateInfo,
+            .flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT,
             .bindingCount = 1,
             .pBindings = &descriptorLayoutBinding,
         };
@@ -637,7 +638,8 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
 
     { // Samplers
 
-        const VkDescriptorBindingFlags bindingFlags = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
+        const VkDescriptorBindingFlags bindingFlags =
+            VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT;
 
         const VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsCreateInfo{
             .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
@@ -655,6 +657,7 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
         const VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{
             .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
             .pNext = &bindingFlagsCreateInfo,
+            .flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT,
             .bindingCount = 1,
             .pBindings = &descriptorLayoutBinding,
         };

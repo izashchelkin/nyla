@@ -51,6 +51,8 @@ void Rhi::Impl::FrameEnd()
 
     VK_CHECK(vkEndCommandBuffer(cmdbuf));
 
+    WriteDescriptorTables();
+
     const std::array<VkPipelineStageFlags, 1> waitStages = {
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
     };

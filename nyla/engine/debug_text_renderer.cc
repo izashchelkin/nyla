@@ -10,6 +10,7 @@
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_pipeline.h"
 #include "nyla/rhi/rhi_shader.h"
+#include "nyla/rhi/rhi_texture.h"
 
 namespace nyla
 {
@@ -52,7 +53,7 @@ auto CreateDebugTextRenderer() -> DebugTextRenderer *
         .colorTargetFormatsCount = 1,
         .colorTargetFormats =
             {
-                g_Rhi->GetTextureInfo(g_Rhi->GetBackbufferTexture()).format,
+                RhiTextureFormat::B8G8R8A8_sRGB,
             },
     };
     renderer->pipeline = g_Rhi->CreateGraphicsPipeline(pipelineDesc);
