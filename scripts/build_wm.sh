@@ -1,4 +1,5 @@
 # cmake --preset linux-debug
 # cmake --preset linux-release
-ninja -C build/linux-debug wm
-ninja -C build/linux-release wm_overlay
+
+cmake --build build/linux-debug --target wm
+cmake --build build/linux-release --target wm_overlay

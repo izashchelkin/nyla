@@ -6,15 +6,18 @@
 #include <ctime>
 #include <iterator>
 #include <limits>
+#include <ranges>
 #include <span>
+#include <unordered_map>
 #include <vector>
 
 #include "nyla/apps/wm/layout.h"
 #include "nyla/apps/wm/palette.h"
+#include "nyla/commons/assert.h"
 #include "nyla/commons/cleanup.h"
-#include "nyla/commons/containers/map.h"
+#include "nyla/commons/log.h"
+#include "nyla/commons/os/clock.h"
 #include "nyla/platform/linux/platform_linux.h"
-#include "nyla/platform/linux/x11_error.h"
 #include "nyla/platform/linux/x11_wm_hints.h"
 #include "nyla/platform/platform.h"
 #include "xcb/xcb.h"
@@ -52,7 +55,7 @@ struct Client
     xcb_window_t transientFor;
     std::vector<xcb_window_t> subwindows;
 
-    Map<xcb_atom_t, xcb_get_property_cookie_t> propertyCookies;
+    std::unordered_map<xcb_atom_t, xcb_get_property_cookie_t> propertyCookies;
 };
 
 namespace
@@ -64,10 +67,10 @@ bool wmLayoutDirty;
 bool wmFollow;
 bool wmBorderDirty;
 
-Map<xcb_window_t, Client> wmClients;
+std::unordered_map<xcb_window_t, Client> wmClients;
 std::vector<xcb_window_t> wmPendingClients;
 
-Map<xcb_atom_t, void (*)(xcb_window_t, Client &, xcb_get_property_reply_t *)> wmPropertyChangeHandlers;
+std::unordered_map<xcb_atom_t, void (*)(xcb_window_t, Client &, xcb_get_property_reply_t *)> wmPropertyChangeHandlers;
 
 std::vector<WindowStack> wmStacks;
 uint64_t wmActiveStackIdx;
@@ -125,7 +128,7 @@ void X11SendWmDeleteWindow(xcb_window_t window)
 
 auto GetActiveStack() -> WindowStack &
 {
-    NYLA_ASSERT(wmActiveStackIdx & 0xFF < wmStacks.size());
+    NYLA_ASSERT((wmActiveStackIdx & 0xFF) < wmStacks.size());
     return wmStacks.at(wmActiveStackIdx & 0xFF);
 }
 
@@ -967,7 +970,7 @@ void ProcessWMEvents(const bool &isRunning, uint16_t modifier, std::vector<Keybi
         {
         case XCB_KEY_PRESS: {
             auto keypress = reinterpret_cast<xcb_key_press_event_t *>(event);
-            if (keypress->state == modifier)
+            if (keypress->state | modifier)
             {
                 for (const auto &[keycode, mod, fn] : keybinds)
                 {
@@ -987,6 +990,13 @@ void ProcessWMEvents(const bool &isRunning, uint16_t modifier, std::vector<Keybi
                         }
                         break;
                     }
+#if 0
+                    else
+                    {
+                        NYLA_LOG("mod: %d, state: %d, keycode: %d, detail: %d", mod, keypress->state, keycode,
+                                 keypress->detail);
+                    }
+#endif
                 }
             }
             break;
@@ -1073,7 +1083,7 @@ void ProcessWMEvents(const bool &isRunning, uint16_t modifier, std::vector<Keybi
 
         case 0: {
             auto error = reinterpret_cast<xcb_generic_error_t *>(event);
-            NYLA_LOG("xcb error: %d, sequence: ", error->error_code, error->sequence);
+            NYLA_LOG("xcb error: %d, sequence: %d", error->error_code, error->sequence);
             break;
         }
         }

@@ -1,3 +1,5 @@
+#include <cerrno>
+#include <cstring>
 #include <sys/poll.h>
 #include <sys/time.h>
 #include <unistd.h>
@@ -6,6 +8,8 @@
 #include <initializer_list>
 
 #include "nyla/apps/wm/window_manager.h"
+#include "nyla/commons/assert.h"
+#include "nyla/commons/log.h"
 #include "nyla/commons/logging/init.h"
 #include "nyla/commons/os/spawn.h"
 #include "nyla/commons/signal/signal.h"
@@ -59,8 +63,8 @@ auto PlatformMain() -> int
 
         for (auto [key, mod, handler] : std::initializer_list<std::tuple<KeyPhysical, int, KeybindHandler>>{
                  {KeyPhysical::W, 0, NextLayout},
-                 {KeyPhysical::E, 0, MoveStackPrev},
-                 {KeyPhysical::R, 0, MoveStackNext},
+                 {KeyPhysical::ArrowLeft, 4, MoveStackPrev},
+                 {KeyPhysical::ArrowRight, 4, MoveStackNext},
                  {KeyPhysical::E, 1, nothing},
                  {KeyPhysical::R, 1, nothing},
                  {KeyPhysical::D, 0, MoveLocalPrev},

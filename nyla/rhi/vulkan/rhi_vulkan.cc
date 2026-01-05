@@ -591,17 +591,21 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
             },
         };
 
-        std::array<VkWriteDescriptorSet, bufferInfos.size()> descriptorWrites;
+        InlineVec<VkWriteDescriptorSet, bufferInfos.size()> descriptorWrites;
         for (uint32_t i = 0; i < bufferInfos.size(); ++i)
         {
-            descriptorWrites[i] = VkWriteDescriptorSet{
-                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                .dstSet = m_ConstantsDescriptorTable.set,
-                .dstBinding = i,
-                .descriptorCount = 1,
-                .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
-                .pBufferInfo = &bufferInfos[i],
-            };
+            const VkDescriptorBufferInfo &bufferInfo = bufferInfos[i];
+            if (bufferInfo.range)
+            {
+                descriptorWrites.emplace_back(VkWriteDescriptorSet{
+                    .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                    .dstSet = m_ConstantsDescriptorTable.set,
+                    .dstBinding = i,
+                    .descriptorCount = 1,
+                    .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+                    .pBufferInfo = &bufferInfo,
+                });
+            }
         }
 
         vkUpdateDescriptorSets(m_Dev, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);

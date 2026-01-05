@@ -16,7 +16,6 @@
 #include <cstdint>
 
 #include "nyla/rhi/rhi.h"
-#include "nyla/rhi/rhi_pass.h"
 #include "nyla/rhi/rhi_texture.h"
 #include "xcb/xcb.h"
 #include "xcb/xproto.h"
@@ -24,7 +23,6 @@
 #include "nyla/engine/debug_text_renderer.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi_cmdlist.h"
-#include "nyla/rhi/rhi_pass.h"
 #include "nyla/rhi/rhi_texture.h"
 
 namespace nyla
@@ -43,15 +41,32 @@ auto PlatformMain() -> int
     xcb_configure_window(x11->GetConn(), window, XCB_CONFIG_WINDOW_STACK_MODE, (uint32_t[]){XCB_STACK_MODE_BELOW});
     x11->Flush();
 
-    RhiInit(RhiDesc{
+    g_Rhi->Init(RhiInitDesc{
         .window = {window},
+        .flags = RhiFlags::VSync,
+        .limits =
+            {
+                .numTextures = 0,
+                .numTextureViews = 0,
+                .numBuffers = 0,
+                .numSamplers = 0,
+
+                .numFramesInFlight = 1,
+                .maxDrawCount = 1,
+                .maxPassCount = 1,
+
+                .frameConstantSize = 0,
+                .passConstantSize = 0,
+                .drawConstantSize = 0,
+                .largeDrawConstantSize = 320,
+            },
     });
 
     DebugTextRenderer *debugTextRenderer = CreateDebugTextRenderer();
 
     for (;;)
     {
-        RhiCmdList cmd = RhiFrameBegin();
+        RhiCmdList cmd = g_Rhi->FrameBegin();
 
         bool shouldRedraw = false;
 
@@ -77,7 +92,7 @@ auto PlatformMain() -> int
             {
                 const uint64_t now = GetMonotonicTimeMicros();
                 const uint64_t diff = now - prevUs;
-                if (diff >= 1'000'000)
+                if (diff >= 500'000)
                 {
                     prevUs = now;
                     break;
@@ -99,24 +114,26 @@ auto PlatformMain() -> int
             }
         }
 
+        auto now = std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now());
+
         std::string barText =
-            std::format("{:%H:%M:%S %d.%m.%Y}",
-                        std::chrono::zoned_time{std::chrono::current_zone(), std::chrono::system_clock::now()});
+            std::format("{:%H:%M:%S %d.%m.%Y}", std::chrono::zoned_time{std::chrono::current_zone(), now});
+
         DebugText(1, 1, barText);
 
-        RhiPassBegin({
-            .colorTarget = RhiGetBackbufferTexture(),
+        g_Rhi->PassBegin({
+            .renderTarget = g_Rhi->GetBackbufferView(),
             .state = RhiTextureState::ColorTarget,
         });
 
         DebugTextRendererDraw(cmd, debugTextRenderer);
 
-        RhiPassEnd({
-            .colorTarget = RhiGetBackbufferTexture(),
+        g_Rhi->PassEnd({
+            .renderTarget = g_Rhi->GetBackbufferView(),
             .state = RhiTextureState::Present,
         });
 
-        RhiFrameEnd();
+        g_Rhi->FrameEnd();
     }
 
     return 0;
