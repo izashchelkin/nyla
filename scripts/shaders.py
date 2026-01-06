@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import multiprocessing
 
 
-def detect_stage(src: Path) -> str | None:
+def detect_stage_profile(src: Path) -> str | None:
     name = src.name
     if name.endswith(".vs.hlsl"):
         return "vs_6_0"
@@ -36,70 +36,112 @@ def find_dxc() -> str:
     return "dxc"
 
 
-def compile_shader(src_str: str) -> tuple[str, bool, int]:
-    src = Path(src_str)
+def run_cmd(cmd: list[str]) -> tuple[bool, str, str, int]:
+    proc = subprocess.run(cmd, check=False, capture_output=True, text=True)
+    return proc.returncode == 0, proc.stdout, proc.stderr, proc.returncode
 
-    stage = detect_stage(src)
-    if stage is None:
-        print(f"[HLSL] skipping {src} (unknown stage)", file=sys.stderr)
-        return src_str, False, 0
 
-    # Put output under the same folder as the shader: <dir>/build/<file>.spv
-    out_dir = src.parent / "build"
-    out_dir.mkdir(parents=True, exist_ok=True)
+def compile_spirv(dxc: str, src: Path, profile: str, out_dir: Path) -> tuple[bool, int]:
     outfile = out_dir / (src.name + ".spv")
-
-    dxc = find_dxc()
 
     cmd = [
         dxc,
         "-spirv",
+        "-DSPIRV=1",
         "-fspv-target-env=vulkan1.3",
         "-fvk-use-dx-layout",
         "-Zi",
         "-Qembed_debug",
         "-fspv-debug=vulkan-with-source",
         "-Od",
-        "-T", stage,
+        "-T", profile,
         "-E", "main",
         "-Fo", str(outfile),
         str(src),
     ]
 
-    print(f"[HLSL] {src} -> {outfile} ({stage})")
     begin = int(time() * 1000)
-
-    proc = subprocess.run(cmd, check=False, capture_output=True, text=True)
-
-    end = int(time() * 1000)
-    ms = end - begin
-
-    ok = proc.returncode == 0
-    print(f"  [{src}] {ms}ms (returncode={proc.returncode})")
+    ok, stdout, stderr, rc = run_cmd(cmd)
+    ms = int(time() * 1000) - begin
 
     if not ok:
-        if proc.stdout:
-            print(proc.stdout, file=sys.stderr)
-        if proc.stderr:
-            print(proc.stderr, file=sys.stderr)
+        print(f"[SPIRV] FAIL {src} (rc={rc})", file=sys.stderr)
+        if stdout:
+            print(stdout, file=sys.stderr)
+        if stderr:
+            print(stderr, file=sys.stderr)
+        return False, ms
 
-    # Extra sanity: even if returncode==0, verify the file exists
-    if ok and not outfile.exists():
-        print(f"[HLSL] dxc succeeded but output missing: {outfile}", file=sys.stderr)
-        ok = False
+    if not outfile.exists():
+        print(f"[SPIRV] dxc succeeded but output missing: {outfile}", file=sys.stderr)
+        return False, ms
 
-    return src_str, ok, ms
+    print(f"[SPIRV] {src} -> {outfile} ({profile}) {ms}ms")
+    return True, ms
+
+
+def compile_dxil(dxc: str, src: Path, profile: str, out_dir: Path) -> tuple[bool, int]:
+    outfile = out_dir / (src.name + ".dxil")
+
+    cmd = [
+        dxc,
+        "-Zi",
+        "-Qembed_debug",
+        "-Od",
+        "-T", profile,
+        "-E", "main",
+        "-Fo", str(outfile),
+        str(src),
+    ]
+
+    begin = int(time() * 1000)
+    ok, stdout, stderr, rc = run_cmd(cmd)
+    ms = int(time() * 1000) - begin
+
+    if not ok:
+        print(f"[DXIL] FAIL {src} (rc={rc})", file=sys.stderr)
+        if stdout:
+            print(stdout, file=sys.stderr)
+        if stderr:
+            print(stderr, file=sys.stderr)
+        return False, ms
+
+    if not outfile.exists():
+        print(f"[DXIL] dxc succeeded but output missing: {outfile}", file=sys.stderr)
+        return False, ms
+
+    print(f"[DXIL]  {src} -> {outfile} ({profile}) {ms}ms")
+    return True, ms
+
+
+def compile_shader(src_str: str) -> tuple[str, bool, int]:
+    src = Path(src_str)
+
+    profile = detect_stage_profile(src)
+    if profile is None:
+        print(f"[HLSL] skipping {src} (unknown stage)")
+        return src_str, True, 0
+
+    dxc = find_dxc()
+
+    out_dir = src.parent / "build"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    ok_spv, ms_spv = compile_spirv(dxc, src, profile, out_dir)
+    ok_dxil, ms_dxil = compile_dxil(dxc, src, profile, out_dir)
+
+    ok = ok_spv and ok_dxil
+    return src_str, ok, ms_spv + ms_dxil
 
 
 def main() -> int:
-    # Use forward slashes in the glob pattern; glob() handles it on Windows too.
     srcs = glob("nyla/**/shaders/*.hlsl", recursive=True)
     if not srcs:
         print("No HLSL shaders found under nyla/**/shaders", file=sys.stderr)
         return 0
 
     max_workers = max(1, multiprocessing.cpu_count())
-    print(f"Compiling {len(srcs)} shaders with up to {max_workers} workers...")
+    print(f"Compiling {len(srcs)} shaders (SPIR-V + DXIL) with up to {max_workers} workers...")
 
     failures = 0
     with ThreadPoolExecutor(max_workers=max_workers) as executor:

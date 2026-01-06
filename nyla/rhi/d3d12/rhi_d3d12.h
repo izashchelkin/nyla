@@ -1,5 +1,6 @@
 #pragma once
 
+#include "nyla/commons/containers/inline_vec.h"
 #include "nyla/rhi/rhi.h"
 
 #include <d3d12.h>
@@ -56,13 +57,6 @@ class Rhi::Impl
 
     auto FrameGetCmdList() -> RhiCmdList;
 
-    auto CreateDescriptorSetLayout(const RhiDescriptorSetLayoutDesc &) -> RhiDescriptorSetLayout;
-    void DestroyDescriptorSetLayout(RhiDescriptorSetLayout);
-
-    auto CreateDescriptorSet(RhiDescriptorSetLayout) -> RhiDescriptorSet;
-    void DestroyDescriptorSet(RhiDescriptorSet);
-    void WriteDescriptors(std::span<const RhiDescriptorWriteDesc>);
-
     void PassBegin(RhiPassDesc);
     void PassEnd(RhiPassDesc);
 
@@ -75,8 +69,6 @@ class Rhi::Impl
     void CmdBindGraphicsPipeline(RhiCmdList, RhiGraphicsPipeline);
     void CmdBindVertexBuffers(RhiCmdList cmd, uint32_t firstBinding, std::span<const RhiBuffer> buffers,
                               std::span<const uint32_t> offsets);
-    void CmdBindGraphicsBindGroup(RhiCmdList, uint32_t setIndex, RhiDescriptorSet bindGroup,
-                                  std::span<const uint32_t> dynamicOffsets);
     void CmdPushGraphicsConstants(RhiCmdList cmd, uint32_t offset, RhiShaderStage stage, ByteView data);
     void CmdDraw(RhiCmdList cmd, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
                  uint32_t firstInstance);
@@ -97,8 +89,8 @@ class Rhi::Impl
 
   private:
     RhiFlags m_Flags{};
+    RhiLimits m_Limits{};
     uint32_t m_NumFramesInFlight{};
-    HWND m_Window{};
 
     uint32_t m_FrameIndex{};
 
@@ -119,8 +111,9 @@ class Rhi::Impl
     {
         ComPtr<ID3D12CommandAllocator> cmdAlloc;
         ComPtr<ID3D12CommandList> cmd;
+        ComPtr<ID3D12Resource> renderTarget;
     };
-    std::array<FrameContext, kRhiMaxNumFramesInFlight> frameContext;
+    InlineVec<FrameContext, kRhiMaxNumFramesInFlight> m_FrameContext;
 
     uint32_t m_RTVDescriptorSize;
     uint32_t m_CBVDescriptorSize;

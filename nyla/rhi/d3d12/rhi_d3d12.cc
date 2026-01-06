@@ -1,5 +1,7 @@
 #include "nyla/rhi/d3d12/rhi_d3d12.h"
 #include "nyla/commons/assert.h"
+#include "nyla/platform/platform.h"
+#include "nyla/platform/windows/platform_windows.h"
 #include "nyla/rhi/rhi.h"
 #include <d3d12.h>
 #include <dxgi1_6.h>
@@ -12,18 +14,10 @@ template <class T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
 void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
 {
-    NYLA_ASSERT(rhiDesc.numFramesInFlight <= kRhiMaxNumFramesInFlight);
-    if (rhiDesc.numFramesInFlight)
-    {
-        m_NumFramesInFlight = rhiDesc.numFramesInFlight;
-    }
-    else
-    {
-        m_NumFramesInFlight = 2;
-    }
+    NYLA_ASSERT(rhiDesc.limits.numFramesInFlight <= kRhiMaxNumFramesInFlight);
 
     m_Flags = rhiDesc.flags;
-    m_Window = reinterpret_cast<HWND>(rhiDesc.window.handle);
+    m_Limits = rhiDesc.limits;
 
     uint32_t dxgiFactoryFlags = 0;
 
@@ -95,7 +89,8 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
 
     CreateSwapchain();
 
-    res = m_Factory->MakeWindowAssociation(m_Window, DXGI_MWA_NO_ALT_ENTER);
+    HWND wnd = g_Platform->GetImpl()->WinGetHandle();
+    res = m_Factory->MakeWindowAssociation(wnd, DXGI_MWA_NO_ALT_ENTER);
     NYLA_ASSERT(SUCCEEDED(res));
 
     m_FrameIndex = m_Swapchain->GetCurrentBackBufferIndex();
@@ -134,23 +129,23 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
     m_RTVDescriptorSize = m_Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
     m_CBVDescriptorSize = m_Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-    // Create frame resources.
+    D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = m_RtvHeap->GetCPUDescriptorHandleForHeapStart();
+    for (uint32_t i = 0; i < m_FrameContext.max_size(); ++i)
     {
-        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = m_RtvHeap->GetCPUDescriptorHandleForHeapStart();
+        FrameContext &frameContext = m_FrameContext.emplace_back(FrameContext{});
 
-        // Create a RTV and a command allocator for each frame.
-        for (uint32_t n = 0; n < m_NumFramesInFlight; n++)
-        {
-            res = m_Swapchain->GetBuffer(n, IID_PPV_ARGS(&m_renderTargets[n]));
-            NYLA_ASSERT(SUCCEEDED(res));
+        res = m_Swapchain->GetBuffer(i, IID_PPV_ARGS(&frameContext.renderTarget));
+        NYLA_ASSERT(SUCCEEDED(res));
 
-            m_Device->CreateRenderTargetView(m_renderTargets[n].Get(), nullptr, rtvHandle);
+        m_Device->CreateRenderTargetView(frameContext.renderTarget.Get(), nullptr, rtvHandle);
+        rtvHandle.ptr += m_RTVDescriptorSize;
 
-            rtvHandle.ptr += m_rtvDescriptorSize;
+        res = m_Device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&frameContext.cmdAlloc));
+        NYLA_ASSERT(SUCCEEDED(res));
 
-            ThrowIfFailed(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT,
-                                                           IID_PPV_ARGS(&m_commandAllocators[n])));
-        }
+        res = m_Device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, frameContext.cmdAlloc.Get(), nullptr,
+                                          IID_PPV_ARGS(&frameContext.cmd));
+        NYLA_ASSERT(SUCCEEDED(res));
     }
 }
 

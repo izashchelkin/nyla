@@ -5,16 +5,11 @@
 #include <string>
 
 #include "nyla/commons/handle.h"
-#include "nyla/commons/memory/charview.h"
-#include "nyla/rhi/rhi_cmdlist.h"
-#include "nyla/rhi/rhi_descriptor.h"
 #include "nyla/rhi/rhi_shader.h"
 #include "nyla/rhi/rhi_texture.h"
 
 namespace nyla
 {
-
-constexpr inline uint32_t kRhiMaxPushConstantSize = 256;
 
 struct RhiGraphicsPipeline : Handle
 {
@@ -76,8 +71,6 @@ struct RhiGraphicsPipelineDesc
 
     uint32_t colorTargetFormatsCount;
     std::array<RhiTextureFormat, 4> colorTargetFormats;
-
-    uint32_t pushConstantSize;
 
     RhiCullMode cullMode;
     RhiFrontFace frontFace;

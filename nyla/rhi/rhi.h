@@ -1,13 +1,14 @@
 #pragma once
 
 #include <cstdint>
+#include <string_view>
 
 #include "nyla/commons/bitenum.h"
+#include "nyla/commons/memory/charview.h"
 #include "nyla/platform/platform.h"
 
 #include "rhi_buffer.h"
 #include "rhi_cmdlist.h"
-#include "rhi_descriptor.h"
 #include "rhi_pass.h"
 #include "rhi_pipeline.h"
 #include "rhi_sampler.h"
@@ -18,7 +19,7 @@ namespace nyla
 {
 
 constexpr inline uint32_t kRhiMaxNumFramesInFlight = 3;
-constexpr inline uint32_t kRhiMaxNumSwapchainTextures = 4;
+constexpr inline uint32_t kRhiMaxNumSwapchainTextures = 3;
 
 #if defined(NDEBUG)
 constexpr inline bool kRhiValidations = false;

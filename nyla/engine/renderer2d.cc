@@ -97,7 +97,6 @@ auto CreateRenderer2D() -> Renderer2D *
             },
         .colorTargetFormatsCount = 1,
         .colorTargetFormats = {RhiTextureFormat::B8G8R8A8_sRGB},
-        .pushConstantSize = sizeof(Scene),
         .cullMode = RhiCullMode::None,
         .frontFace = RhiFrontFace::CCW,
     };

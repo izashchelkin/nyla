@@ -215,12 +215,14 @@ auto Rhi::Impl::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> R
     pipelineData.bindGroupLayouts = desc.bindGroupLayouts;
 #endif
 
+#if 0
     NYLA_ASSERT(desc.pushConstantSize <= kRhiMaxPushConstantSize);
     const VkPushConstantRange pushConstantRange{
         .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
         .offset = 0,
         .size = desc.pushConstantSize,
     };
+#endif
 
     const std::array<VkDescriptorSetLayout, 3> descriptorSetLayouts = {
         m_ConstantsDescriptorTable.layout,
@@ -232,8 +234,10 @@ auto Rhi::Impl::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> R
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         .setLayoutCount = descriptorSetLayouts.size(),
         .pSetLayouts = descriptorSetLayouts.data(),
+#if 0
         .pushConstantRangeCount = desc.pushConstantSize > 0,
         .pPushConstantRanges = &pushConstantRange,
+#endif
     };
 
     vkCreatePipelineLayout(m_Dev, &pipelineLayoutCreateInfo, nullptr, &pipelineData.layout);

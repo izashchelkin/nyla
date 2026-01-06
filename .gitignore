@@ -1,6 +1,7 @@
 /bazel-*
 /.gdb_history
 *.spv
+*.dxil
 
 /build
 /.vs

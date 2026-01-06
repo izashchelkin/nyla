@@ -8,7 +8,7 @@ namespace nyla
 
 void Rhi::Impl::CreateSwapchain()
 {
-    const PlatformWindowSize windowSize = g_Platform->GetImpl()->GetWindowSize(m_Window);
+    const PlatformWindowSize windowSize = g_Platform->WinGetSize();
 
     const DXGI_SWAP_CHAIN_DESC1 swapchainDesc{
         .Width = windowSize.width,
@@ -28,8 +28,8 @@ void Rhi::Impl::CreateSwapchain()
     ComPtr<IDXGISwapChain1> swapchain;
 
     HRESULT res;
-    res = m_Factory->CreateSwapChainForHwnd(directQueue, m_Window, &swapchainDesc, nullptr, nullptr,
-                                            swapchain.GetAddressOf());
+    res = m_Factory->CreateSwapChainForHwnd(directQueue, g_Platform->GetImpl()->WinGetHandle(), &swapchainDesc, nullptr,
+                                            nullptr, swapchain.GetAddressOf());
     NYLA_ASSERT(SUCCEEDED(res));
 
     res = swapchain.As(&m_Swapchain);
