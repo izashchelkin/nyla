@@ -12,7 +12,6 @@ class Engine;
 struct EngineInitDesc
 {
     uint32_t maxFps;
-    PlatformWindow window;
     bool vsync;
 };
 

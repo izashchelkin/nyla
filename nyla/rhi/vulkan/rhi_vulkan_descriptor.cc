@@ -4,6 +4,7 @@
 #include "nyla/commons/assert.h"
 #include "nyla/commons/containers/inline_vec.h"
 #include "nyla/commons/handle_pool.h"
+#include "nyla/commons/log.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_descriptor.h"
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
@@ -257,6 +258,16 @@ void Rhi::Impl::SetLargeDrawConstant(RhiCmdList cmd, std::span<const std::byte> 
 
     char *mem = MapBuffer(m_ConstantsUniformBuffer);
     memcpy(mem + cmdData.largeDrawConstantHead, data.data(), data.size());
+
+    if constexpr (false)
+    {
+        const VulkanBufferData &bufferData = m_Buffers.ResolveData(m_ConstantsUniformBuffer);
+        const VkMappedMemoryRange range{
+            .sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,
+            .memory = bufferData.memory,
+        };
+        vkInvalidateMappedMemoryRanges(m_Dev, 1, &range);
+    }
 }
 
 void Rhi::Impl::WriteDescriptorTables()

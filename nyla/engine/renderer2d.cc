@@ -116,6 +116,8 @@ auto CreateRenderer2D() -> Renderer2D *
 
 void Renderer2DFrameBegin(RhiCmdList cmd, Renderer2D *renderer, GpuStagingBuffer *stagingBuffer)
 {
+    renderer->pendingDraws.clear();
+
     static bool uploadedVertices = false;
     if (!uploadedVertices)
     {

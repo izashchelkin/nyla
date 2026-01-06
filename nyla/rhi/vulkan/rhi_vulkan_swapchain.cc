@@ -6,6 +6,7 @@
 #include <vulkan/vulkan_core.h>
 
 #include "nyla/commons/containers/inline_vec.h"
+#include "nyla/commons/log.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_texture.h"
@@ -90,7 +91,7 @@ void Rhi::Impl::CreateSwapchain()
         if (surfaceCapabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
             return surfaceCapabilities.currentExtent;
 
-        const PlatformWindowSize windowSize = g_Platform->GetWindowSize(m_Window);
+        const PlatformWindowSize windowSize = g_Platform->WinGetSize();
         return VkExtent2D{
             .width = std::clamp(windowSize.width, surfaceCapabilities.minImageExtent.width,
                                 surfaceCapabilities.maxImageExtent.width),
@@ -201,6 +202,11 @@ auto Rhi::Impl::GetBackbufferView() -> RhiRenderTargetView
 auto Rhi::GetBackbufferView() -> RhiRenderTargetView
 {
     return m_Impl->GetBackbufferView();
+}
+
+void Rhi::TriggerSwapchainRecreate()
+{
+    m_Impl->TriggerSwapchainRecreate();
 }
 
 } // namespace nyla

@@ -104,7 +104,6 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
 
     m_Flags = rhiDesc.flags;
     m_Limits = rhiDesc.limits;
-    m_Window = rhiDesc.window;
 
     const VkApplicationInfo appInfo{
         .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
@@ -482,7 +481,7 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
     const VkWin32SurfaceCreateInfoKHR surfaceCreateInfo{
         .sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
         .hinstance = g_Platform->GetImpl()->GetHInstance(),
-        .hwnd = reinterpret_cast<HWND>(m_Window.handle),
+        .hwnd = g_Platform->GetImpl()->WinGetHandle(),
     };
     vkCreateWin32SurfaceKHR(m_Instance, &surfaceCreateInfo, m_Alloc, &m_Surface);
 #endif

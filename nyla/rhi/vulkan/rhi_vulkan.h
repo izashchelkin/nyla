@@ -261,6 +261,10 @@ class Rhi::Impl
                                   std::span<const uint32_t> dynamicOffsets);
 #endif
 
+    void TriggerSwapchainRecreate()
+    {
+        m_RecreateSwapchain = true;
+    }
     void CreateSwapchain();
     auto GetBackbufferView() -> RhiRenderTargetView;
 
@@ -320,9 +324,10 @@ class Rhi::Impl
     DescriptorTable m_TexturesDescriptorTable;
     DescriptorTable m_SamplersDescriptorTable;
 
-    PlatformWindow m_Window;
     VkSurfaceKHR m_Surface;
     VkSwapchainKHR m_Swapchain;
+    bool m_SwapchainUsable = true;
+    bool m_RecreateSwapchain = true;
 
     InlineVec<RhiRenderTargetView, kRhiMaxNumSwapchainTextures> m_SwapchainRTVs;
     uint32_t m_SwapchainTextureIndex;

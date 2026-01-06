@@ -1,4 +1,5 @@
 #include "nyla/engine/engine.h"
+#include "nyla/commons/assert.h"
 #include "nyla/commons/bitenum.h"
 #include "nyla/commons/os/clock.h"
 #include "nyla/engine/asset_manager.h"
@@ -49,7 +50,6 @@ void Engine::Impl::Init(const EngineInitDesc &desc)
         flags |= RhiFlags::VSync;
 
     g_Rhi->Init(RhiInitDesc{
-        .window = desc.window,
         .flags = flags,
     });
 
@@ -97,12 +97,12 @@ auto Engine::Impl::FrameBegin() -> EngineFrameBeginResult
 
         switch (event.type)
         {
-        case PlatformEventType::KeyPress: {
-            g_InputManager->HandlePressed(1, event.key.code, frameStart);
+        case PlatformEventType::KeyDown: {
+            g_InputManager->HandlePressed(1, uint32_t(event.key), frameStart);
             break;
         }
-        case PlatformEventType::KeyRelease: {
-            g_InputManager->HandleReleased(1, event.key.code, frameStart);
+        case PlatformEventType::KeyUp: {
+            g_InputManager->HandleReleased(1, uint32_t(event.key), frameStart);
             break;
         }
 
@@ -115,12 +115,16 @@ auto Engine::Impl::FrameBegin() -> EngineFrameBeginResult
             break;
         }
 
-        case PlatformEventType::ShouldExit: {
-            m_ShouldExit = true;
+        case PlatformEventType::WinResize: {
+            g_Rhi->TriggerSwapchainRecreate();
             break;
         }
 
-        case PlatformEventType::ShouldRedraw:
+        case PlatformEventType::Quit: {
+            std::exit(0);
+        }
+
+        case PlatformEventType::Repaint:
         case PlatformEventType::None:
             break;
         }

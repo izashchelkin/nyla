@@ -9,22 +9,36 @@ using namespace rhi_vulkan_internal;
 
 auto Rhi::Impl::FrameBegin() -> RhiCmdList
 {
-    WaitTimeline(m_GraphicsQueue.timeline, m_GraphicsQueueCmdDone[m_FrameIndex]);
+    if (m_RecreateSwapchain)
+    {
+        vkDeviceWaitIdle(m_Dev);
+        CreateSwapchain();
+        m_SwapchainUsable = true;
+        m_RecreateSwapchain = false;
+    }
+
+    if (m_SwapchainUsable)
+        WaitTimeline(m_GraphicsQueue.timeline, m_GraphicsQueueCmdDone[m_FrameIndex]);
+    else
+        vkDeviceWaitIdle(m_Dev);
 
     VkResult acquireResult =
         vkAcquireNextImageKHR(m_Dev, m_Swapchain, std::numeric_limits<uint64_t>::max(),
                               m_SwapchainAcquireSemaphores[m_FrameIndex], VK_NULL_HANDLE, &m_SwapchainTextureIndex);
     switch (acquireResult)
-    { // TODO: is drag a problem?
-    case VK_ERROR_OUT_OF_DATE_KHR:
-    case VK_SUBOPTIMAL_KHR: {
-        vkDeviceWaitIdle(m_Dev);
-        CreateSwapchain();
+    {
+    case VK_ERROR_OUT_OF_DATE_KHR: {
+        m_SwapchainUsable = false;
+        break;
+    }
 
-        return FrameBegin();
+    case VK_SUBOPTIMAL_KHR: {
+        m_SwapchainUsable = true;
+        break;
     }
 
     default: {
+        m_SwapchainUsable = true;
         VK_CHECK(acquireResult);
         break;
     }
@@ -73,42 +87,31 @@ void Rhi::Impl::FrameEnd()
         .pSignalSemaphoreValues = &m_GraphicsQueueCmdDone[m_FrameIndex],
     };
 
-    const VkSubmitInfo submitInfo{
-        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-        .pNext = &timelineSubmitInfo,
-        .waitSemaphoreCount = 1,
-        .pWaitSemaphores = &acquireSemaphore,
-        .pWaitDstStageMask = waitStages.data(),
-        .commandBufferCount = 1,
-        .pCommandBuffers = &cmdbuf,
-        .signalSemaphoreCount = std::size(signalSemaphores),
-        .pSignalSemaphores = signalSemaphores.data(),
-    };
-    VK_CHECK(vkQueueSubmit(m_GraphicsQueue.queue, 1, &submitInfo, VK_NULL_HANDLE));
-
-    const VkPresentInfoKHR presentInfo{
-        .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-        .waitSemaphoreCount = 1,
-        .pWaitSemaphores = &renderFinishedSemaphore,
-        .swapchainCount = 1,
-        .pSwapchains = &m_Swapchain,
-        .pImageIndices = &m_SwapchainTextureIndex,
-    };
-
-    const VkResult presentResult = vkQueuePresentKHR(m_GraphicsQueue.queue, &presentInfo);
-    switch (presentResult)
+    if (m_SwapchainUsable)
     {
-    case VK_ERROR_OUT_OF_DATE_KHR:
-    case VK_SUBOPTIMAL_KHR: {
-        vkQueueWaitIdle(m_GraphicsQueue.queue);
-        CreateSwapchain();
-        break;
-    }
+        const VkSubmitInfo submitInfo{
+            .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+            .pNext = &timelineSubmitInfo,
+            .waitSemaphoreCount = 1,
+            .pWaitSemaphores = &acquireSemaphore,
+            .pWaitDstStageMask = waitStages.data(),
+            .commandBufferCount = 1,
+            .pCommandBuffers = &cmdbuf,
+            .signalSemaphoreCount = std::size(signalSemaphores),
+            .pSignalSemaphores = signalSemaphores.data(),
+        };
+        VK_CHECK(vkQueueSubmit(m_GraphicsQueue.queue, 1, &submitInfo, VK_NULL_HANDLE));
 
-    default: {
-        VK_CHECK(presentResult);
-        break;
-    }
+        const VkPresentInfoKHR presentInfo{
+            .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+            .waitSemaphoreCount = 1,
+            .pWaitSemaphores = &renderFinishedSemaphore,
+            .swapchainCount = 1,
+            .pSwapchains = &m_Swapchain,
+            .pImageIndices = &m_SwapchainTextureIndex,
+        };
+
+        const VkResult presentResult = vkQueuePresentKHR(m_GraphicsQueue.queue, &presentInfo);
     }
 
     m_FrameIndex = (m_FrameIndex + 1) % m_Limits.numFramesInFlight;

@@ -72,8 +72,8 @@ void GameInit()
 
     PlatformKeyResolver keyResolver{};
     keyResolver.Init();
-    g_InputManager->Map(g_State->input.moveLeft, 1, keyResolver.ResolveKeyCode(KeyPhysical::S));
-    g_InputManager->Map(g_State->input.moveRight, 1, keyResolver.ResolveKeyCode(KeyPhysical::F));
+    g_InputManager->Map(g_State->input.moveLeft, 1, uint32_t(KeyPhysical::S));
+    g_InputManager->Map(g_State->input.moveRight, 1, uint32_t(KeyPhysical::F));
     keyResolver.Destroy();
 
     //

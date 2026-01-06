@@ -148,6 +148,7 @@ class Rhi
     auto GetTexture(RhiRenderTargetView srv) -> RhiTexture;
 
     auto GetBackbufferView() -> RhiRenderTargetView;
+    void TriggerSwapchainRecreate();
 
     //
 

@@ -20,9 +20,9 @@ auto PlatformMain() -> int
     g_Platform->Init({
         .enabledFeatures = PlatformFeature::KeyboardInput,
     });
-    PlatformWindow window = g_Platform->CreateWin();
+    g_Platform->WinOpen();
 
-    g_Engine->Init({.window = window});
+    g_Engine->Init({});
 
     GameInit();
 
