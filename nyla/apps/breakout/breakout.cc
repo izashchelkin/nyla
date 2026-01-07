@@ -14,7 +14,6 @@
 #include "nyla/engine/renderer2d.h"
 #include "nyla/engine/tween_manager.h"
 #include "nyla/platform/platform.h"
-#include "nyla/platform/platform_key_resolver.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_pass.h"
@@ -70,11 +69,8 @@ void GameInit()
 
     //
 
-    PlatformKeyResolver keyResolver{};
-    keyResolver.Init();
     g_InputManager->Map(g_State->input.moveLeft, 1, uint32_t(KeyPhysical::S));
     g_InputManager->Map(g_State->input.moveRight, 1, uint32_t(KeyPhysical::F));
-    keyResolver.Destroy();
 
     //
 

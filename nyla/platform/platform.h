@@ -88,7 +88,7 @@ int PlatformMain();
 
 enum class KeyPhysical
 {
-    Unknown = 0,
+    Unknown,
 
     Escape,
     Grave,
@@ -171,6 +171,8 @@ enum class KeyPhysical
     F10,
     F11,
     F12,
+
+    Count,
 };
 
 } // namespace nyla

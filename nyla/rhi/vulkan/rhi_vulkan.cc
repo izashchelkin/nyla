@@ -17,7 +17,7 @@
 
 // clang-format off
 #if defined(__linux__)
-#include "xcb/xcb.h"
+#include "nyla/platform/linux/platform_linux.h"
 #include "vulkan/vulkan_xcb.h"
 #else
 #include "nyla/platform/windows/platform_windows.h"
@@ -474,7 +474,7 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
     const VkXcbSurfaceCreateInfoKHR surfaceCreateInfo{
         .sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR,
         .connection = xcb_connect(nullptr, nullptr),
-        .window = static_cast<xcb_window_t>(m_Window.handle),
+        .window = g_Platform->GetImpl()->WinGetHandle(),
     };
     VK_CHECK(vkCreateXcbSurfaceKHR(m_Instance, &surfaceCreateInfo, m_Alloc, &m_Surface));
 #else

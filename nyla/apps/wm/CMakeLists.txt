@@ -18,7 +18,6 @@ target_include_directories(wm
 target_link_libraries(wm
     PRIVATE
         nyla::platform::linux
-        nyla::platform::linux::key_resolver
         xcb-screensaver
 )
 

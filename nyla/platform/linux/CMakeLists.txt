@@ -51,28 +51,6 @@ target_link_libraries(${TARGET_PLATFORM_DIR_WATCH}
 
 #
 
-set(target_key_resolver nyla_platform_linux_keyresolver)
-add_library(${target_key_resolver})
-add_library(nyla::platform::linux::key_resolver ALIAS ${target_key_resolver})
-
-target_sources(${target_key_resolver}
-    PRIVATE
-        platform_linux_key_resolver.cc
-)
-
-target_include_directories(${target_key_resolver}
-    PUBLIC
-        ${PROJECT_SOURCE_DIR}
-)
-
-target_link_libraries(${target_key_resolver}
-    PUBLIC
-        nyla::commons
-        nyla::platform::linux
-)
-
-#
-
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(ALSA REQUIRED IMPORTED_TARGET alsa)
 

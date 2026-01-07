@@ -1,5 +1,6 @@
 #pragma once
 
+#include "nyla/commons/containers/inline_vec.h"
 #include "nyla/platform/platform.h"
 #include "xcb/xcb.h"
 #include "xcb/xproto.h"
@@ -38,9 +39,14 @@ class Platform::Impl
   public:
     auto InternAtom(std::string_view name, bool onlyIfExists) -> xcb_atom_t;
     void Init(const PlatformInitDesc &desc);
-    auto CreateWin() -> PlatformWindow;
-    auto GetWindowSize(PlatformWindow platformWindow) -> PlatformWindowSize;
+    void WinOpen();
+    auto WinGetSize() -> PlatformWindowSize;
     auto PollEvent(PlatformEvent &outEvent) -> bool;
+
+    auto WinGetHandle() -> xcb_window_t
+    {
+        return m_Win;
+    }
 
     auto CreateWin(uint32_t width, uint32_t height, bool overrideRedirect, xcb_event_mask_t eventMask) -> xcb_window_t;
 
@@ -85,12 +91,17 @@ class Platform::Impl
     xcb_screen_t *m_Screen{};
     uint32_t m_ExtensionXInput2MajorOpCode{};
 
+    xcb_window_t m_Win{};
+    xcb_get_geometry_reply_t m_WinGeom{};
+
     struct
     {
 #define X(name) xcb_atom_t name;
         NYLA_X11_ATOMS(X)
 #undef X
     } m_Atoms;
+
+    std::array<xcb_keycode_t, static_cast<uint32_t>(KeyPhysical::Count)> m_KeyPhysicalCodes;
 };
 
 //

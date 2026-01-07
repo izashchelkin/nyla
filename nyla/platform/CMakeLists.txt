@@ -7,15 +7,6 @@ target_sources(${target_platform}
         platform.h
 )
 
-set(target_key_resolver nyla_platform_key_resolver)
-add_library(${target_key_resolver} INTERFACE)
-add_library(nyla::platform::key_resolver ALIAS ${target_key_resolver})
-
-target_sources(${target_key_resolver}
-    INTERFACE
-        platform_key_resolver.h
-)
-
 set(target_dir_watch nyla_platform_dir_watch)
 add_library(${target_dir_watch} INTERFACE)
 add_library(nyla::platform::dir_watch ALIAS ${target_dir_watch})
@@ -40,19 +31,11 @@ if (WIN32)
         INTERFACE
             nyla::platform::windows
     )
-    target_link_libraries(${target_key_resolver}
-        INTERFACE
-            nyla::platform::windows::key_resolver
-    )
 elseif (UNIX AND NOT APPLE)
     add_subdirectory(linux)
     target_link_libraries(${target_platform}
         INTERFACE
             nyla::platform::linux
-    )
-    target_link_libraries(${target_key_resolver}
-        INTERFACE
-            nyla::platform::linux::key_resolver
     )
     target_link_libraries(${target_dir_watch}
         INTERFACE

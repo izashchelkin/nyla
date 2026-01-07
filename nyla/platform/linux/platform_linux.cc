@@ -9,12 +9,11 @@
 #include "xcb/xcb.h"
 #include "xcb/xcb_aux.h"
 #include "xcb/xinput.h"
+#include "xcb/xproto.h"
 #include <array>
 #include <cstdint>
 #include <xkbcommon/xkbcommon-x11.h>
-
-#include "vulkan/vulkan_core.h"
-#include "vulkan/vulkan_xcb.h"
+#include <xkbcommon/xkbcommon.h>
 
 #ifdef __clang__
 #pragma clang diagnostic push
@@ -29,7 +28,7 @@
 
 #undef explicit
 
-int main(int argc, char *argv[])
+auto main(int argc, char *argv[]) -> int
 {
     nyla::PlatformMain();
     return 0;
@@ -37,6 +36,8 @@ int main(int argc, char *argv[])
 
 namespace nyla
 {
+
+auto ConvertKeyPhysicalIntoXkbName(KeyPhysical key) -> const char *;
 
 auto Platform::Impl::InternAtom(std::string_view name, bool onlyIfExists) -> xcb_atom_t
 {
@@ -85,6 +86,31 @@ void Platform::Impl::Init(const PlatformInitDesc &desc)
             &err);
         if (!reply || err)
             NYLA_ASSERT(false && "could not set up detectable autorepeat");
+
+        {
+            xkb_context *ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
+            NYLA_ASSERT(ctx);
+
+            xcb_connection_t *conn = g_Platform->GetImpl()->GetConn();
+
+            const int32_t deviceId = xkb_x11_get_core_keyboard_device_id(conn);
+            NYLA_ASSERT(deviceId != -1);
+
+            xkb_keymap *keymap = xkb_x11_keymap_new_from_device(ctx, conn, deviceId, XKB_KEYMAP_COMPILE_NO_FLAGS);
+            NYLA_ASSERT(keymap);
+
+            for (uint32_t i = 1; i < static_cast<uint32_t>(KeyPhysical::Count); ++i)
+            {
+                const auto key = static_cast<KeyPhysical>(i);
+                const char *xkbName = ConvertKeyPhysicalIntoXkbName(key);
+                const xkb_keycode_t keycode = xkb_keymap_key_by_name(keymap, xkbName);
+                NYLA_ASSERT(xkb_keycode_is_legal_x11(keycode));
+                m_KeyPhysicalCodes[i] = keycode;
+            }
+
+            xkb_keymap_unref(keymap);
+            xkb_context_unref(ctx);
+        }
     }
 
     if (Any(desc.enabledFeatures & PlatformFeature::MouseInput))
@@ -110,13 +136,22 @@ void Platform::Impl::Init(const PlatformInitDesc &desc)
     }
 }
 
-auto Platform::Impl::CreateWin() -> PlatformWindow
+void Platform::Impl::WinOpen()
 {
-    xcb_window_t window =
-        CreateWin(m_Screen->width_in_pixels, m_Screen->height_in_pixels, false,
-                  static_cast<xcb_event_mask_t>(XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_KEY_RELEASE |
-                                                XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE));
-    return {.handle = static_cast<uint64_t>(window)};
+    if (m_Win)
+    {
+        xcb_map_window(m_Conn, m_Win);
+        return;
+    }
+
+    constexpr auto kEventMask = static_cast<xcb_event_mask_t>(
+        XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_KEY_RELEASE | XCB_EVENT_MASK_BUTTON_PRESS |
+        XCB_EVENT_MASK_BUTTON_RELEASE | XCB_EVENT_MASK_EXPOSURE | XCB_EVENT_MASK_STRUCTURE_NOTIFY);
+    m_Win = CreateWin(m_Screen->width_in_pixels, m_Screen->height_in_pixels, false, kEventMask);
+
+    xcb_get_geometry_reply_t *windowGeometry = xcb_get_geometry_reply(m_Conn, xcb_get_geometry(m_Conn, m_Win), nullptr);
+    m_WinGeom = *windowGeometry;
+    free(windowGeometry);
 }
 
 auto Platform::Impl::CreateWin(uint32_t width, uint32_t height, bool overrideRedirect, xcb_event_mask_t eventMask)
@@ -135,14 +170,11 @@ auto Platform::Impl::CreateWin(uint32_t width, uint32_t height, bool overrideRed
     return window;
 }
 
-auto Platform::Impl::GetWindowSize(PlatformWindow platformWindow) -> PlatformWindowSize
+auto Platform::Impl::WinGetSize() -> PlatformWindowSize
 {
-    const auto window = static_cast<xcb_window_t>(platformWindow.handle);
-    const xcb_get_geometry_reply_t *windowGeometry =
-        xcb_get_geometry_reply(m_Conn, xcb_get_geometry(m_Conn, window), nullptr);
-    return {
-        .width = windowGeometry->width,
-        .height = windowGeometry->height,
+    return PlatformWindowSize{
+        .width = m_WinGeom.width,
+        .height = m_WinGeom.height,
     };
 }
 
@@ -152,7 +184,7 @@ auto Platform::Impl::PollEvent(PlatformEvent &outEvent) -> bool
     {
         if (xcb_connection_has_error(m_Conn))
         {
-            outEvent = {.type = PlatformEventType::ShouldExit};
+            outEvent = {.type = PlatformEventType::Quit};
             return true;
         }
 
@@ -170,42 +202,79 @@ auto Platform::Impl::PollEvent(PlatformEvent &outEvent) -> bool
 
         case XCB_KEY_PRESS: {
             auto keypress = reinterpret_cast<xcb_key_press_event_t *>(event);
-            outEvent = {
-                .type = PlatformEventType::KeyPress,
-                .key = {.code = keypress->detail},
-            };
-            return true;
+
+            for (uint32_t i = 1; i < static_cast<uint32_t>(KeyPhysical::Count); ++i)
+            {
+                if (m_KeyPhysicalCodes[i] == keypress->detail)
+                {
+                    outEvent = PlatformEvent{
+                        .type = PlatformEventType::KeyDown,
+                        .key = static_cast<KeyPhysical>(i),
+                    };
+                    return true;
+                }
+            }
+
+            continue;
         }
 
         case XCB_KEY_RELEASE: {
             auto keyrelease = reinterpret_cast<xcb_key_release_event_t *>(event);
-            outEvent = {
-                .type = PlatformEventType::KeyRelease,
-                .key = {.code = keyrelease->detail},
-            };
-            return true;
+
+            for (uint32_t i = 1; i < static_cast<uint32_t>(KeyPhysical::Count); ++i)
+            {
+                if (m_KeyPhysicalCodes[i] == keyrelease->detail)
+                {
+                    outEvent = PlatformEvent{
+                        .type = PlatformEventType::KeyUp,
+                        .key = static_cast<KeyPhysical>(i),
+                    };
+                    return true;
+                }
+            }
+
+            continue;
         }
 
         case XCB_BUTTON_PRESS: {
             auto buttonpress = reinterpret_cast<xcb_button_press_event_t *>(event);
-            outEvent = {
+            outEvent = PlatformEvent{
                 .type = PlatformEventType::MousePress,
-                .key = {.code = buttonpress->detail},
+                .mouse = {.code = buttonpress->detail},
             };
             return true;
         }
 
         case XCB_BUTTON_RELEASE: {
             auto buttonrelease = reinterpret_cast<xcb_button_release_event_t *>(event);
-            outEvent = {
+            outEvent = PlatformEvent{
                 .type = PlatformEventType::MouseRelease,
-                .key = {.code = buttonrelease->detail},
+                .mouse = {.code = buttonrelease->detail},
             };
             return true;
         }
 
+        case XCB_CONFIGURE_NOTIFY: {
+            auto configurenotify = reinterpret_cast<xcb_configure_notify_event_t *>(event);
+
+            xcb_get_geometry_reply_t *newGeom =
+                xcb_get_geometry_reply(m_Conn, xcb_get_geometry(m_Conn, m_Win), nullptr);
+
+            const bool windowResized = newGeom->width != m_WinGeom.width || newGeom->height != m_WinGeom.height;
+            m_WinGeom = *newGeom;
+            free(newGeom);
+
+            if (windowResized)
+            {
+                outEvent = PlatformEvent{.type = PlatformEventType::WinResize};
+                return true;
+            }
+
+            continue;
+        }
+
         case XCB_EXPOSE: {
-            outEvent = {.type = PlatformEventType::ShouldRedraw};
+            outEvent = PlatformEvent{.type = PlatformEventType::Repaint};
             return true;
         }
 
@@ -215,13 +284,180 @@ auto Platform::Impl::PollEvent(PlatformEvent &outEvent) -> bool
             if (clientmessage->format == 32 && clientmessage->type == m_Atoms.wm_protocols &&
                 clientmessage->data.data32[0] == m_Atoms.wm_delete_window)
             {
-                outEvent = {.type = PlatformEventType::ShouldExit};
+                outEvent = {.type = PlatformEventType::Quit};
                 return true;
             }
 
             break;
         }
         }
+    }
+}
+
+auto ConvertKeyPhysicalIntoXkbName(KeyPhysical key) -> const char *
+{
+    using K = KeyPhysical;
+
+    switch (key)
+    {
+    case K::Escape:
+        return "ESC";
+    case K::Grave:
+        return "TLDE";
+
+    case K::Digit1:
+        return "AE01";
+    case K::Digit2:
+        return "AE02";
+    case K::Digit3:
+        return "AE03";
+    case K::Digit4:
+        return "AE04";
+    case K::Digit5:
+        return "AE05";
+    case K::Digit6:
+        return "AE06";
+    case K::Digit7:
+        return "AE07";
+    case K::Digit8:
+        return "AE08";
+    case K::Digit9:
+        return "AE09";
+    case K::Digit0:
+        return "AE10";
+    case K::Minus:
+        return "AE11";
+    case K::Equal:
+        return "AE12";
+    case K::Backspace:
+        return "BKSP";
+
+    case K::Tab:
+        return "TAB";
+    case K::Q:
+        return "AD01";
+    case K::W:
+        return "AD02";
+    case K::E:
+        return "AD03";
+    case K::R:
+        return "AD04";
+    case K::T:
+        return "AD05";
+    case K::Y:
+        return "AD06";
+    case K::U:
+        return "AD07";
+    case K::I:
+        return "AD08";
+    case K::O:
+        return "AD09";
+    case K::P:
+        return "AD10";
+    case K::LeftBracket:
+        return "AD11";
+    case K::RightBracket:
+        return "AD12";
+    case K::Enter:
+        return "RTRN";
+
+    case K::CapsLock:
+        return "CAPS";
+    case K::A:
+        return "AC01";
+    case K::S:
+        return "AC02";
+    case K::D:
+        return "AC03";
+    case K::F:
+        return "AC04";
+    case K::G:
+        return "AC05";
+    case K::H:
+        return "AC06";
+    case K::J:
+        return "AC07";
+    case K::K:
+        return "AC08";
+    case K::L:
+        return "AC09";
+    case K::Semicolon:
+        return "AC10";
+    case K::Apostrophe:
+        return "AC11";
+
+    case K::LeftShift:
+        return "LFSH";
+    case K::Z:
+        return "AB01";
+    case K::X:
+        return "AB02";
+    case K::C:
+        return "AB03";
+    case K::V:
+        return "AB04";
+    case K::B:
+        return "AB05";
+    case K::N:
+        return "AB06";
+    case K::M:
+        return "AB07";
+    case K::Comma:
+        return "AB08";
+    case K::Period:
+        return "AB09";
+    case K::Slash:
+        return "AB10";
+    case K::RightShift:
+        return "RTSH";
+
+    case K::LeftCtrl:
+        return "LCTL";
+    case K::LeftAlt:
+        return "LALT";
+    case K::Space:
+        return "SPCE";
+    case K::RightAlt:
+        return "RALT";
+    case K::RightCtrl:
+        return "RCTL";
+
+    case K::ArrowLeft:
+        return "LEFT";
+    case K::ArrowRight:
+        return "RGHT";
+    case K::ArrowUp:
+        return "UP";
+    case K::ArrowDown:
+        return "DOWN";
+
+    case K::F1:
+        return "FK01";
+    case K::F2:
+        return "FK02";
+    case K::F3:
+        return "FK03";
+    case K::F4:
+        return "FK04";
+    case K::F5:
+        return "FK05";
+    case K::F6:
+        return "FK06";
+    case K::F7:
+        return "FK07";
+    case K::F8:
+        return "FK08";
+    case K::F9:
+        return "FK09";
+    case K::F10:
+        return "FK10";
+    case K::F11:
+        return "FK11";
+    case K::F12:
+        return "FK12";
+
+    default:
+        return nullptr;
     }
 }
 
@@ -234,14 +470,14 @@ void Platform::Init(const PlatformInitDesc &desc)
     m_Impl->Init(desc);
 }
 
-auto Platform::CreateWin() -> PlatformWindow
+void Platform::WinOpen()
 {
-    return m_Impl->CreateWin();
+    m_Impl->WinOpen();
 }
 
-auto Platform::GetWindowSize(PlatformWindow window) -> PlatformWindowSize
+auto Platform::WinGetSize() -> PlatformWindowSize
 {
-    return m_Impl->GetWindowSize(window);
+    return m_Impl->WinGetSize();
 }
 
 auto Platform::PollEvent(PlatformEvent &outEvent) -> bool
