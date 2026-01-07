@@ -48,10 +48,16 @@ struct RhiVertexBindingDesc
     RhiInputRate inputRate;
 };
 
+enum class RhiVertexSemantic
+{
+    Position,
+    Color,
+    TexCoord,
+};
+
 struct RhiVertexAttributeDesc
 {
     uint32_t binding;
-    uint32_t location;
     RhiVertexFormat format;
     uint32_t offset;
 };

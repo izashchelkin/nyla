@@ -1,22 +1,27 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <string_view>
 
 namespace nyla
 {
 
+inline auto AsciiChrToUpper(uint32_t ch) -> uint32_t
+{
+    if (ch >= 'a' && ch <= 'z')
+        return ch - ('a' - 'A');
+    else
+        return ch;
+}
+
 inline void AsciiStrToUpperInPlace(std::string &s)
 {
     for (char &c : s)
-    {
-        unsigned char uc = static_cast<unsigned char>(c);
-        if (uc >= 'a' && uc <= 'z')
-            c = static_cast<char>(uc - ('a' - 'A'));
-    }
+        c = static_cast<char>(AsciiChrToUpper(c));
 }
 
-inline std::string AsciiStrToUpper(std::string_view sv)
+inline auto AsciiStrToUpper(std::string_view sv) -> std::string
 {
     std::string out(sv);
     AsciiStrToUpperInPlace(out);

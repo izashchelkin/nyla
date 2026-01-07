@@ -50,6 +50,7 @@ def compile_spirv(dxc: str, src: Path, profile: str, out_dir: Path) -> tuple[boo
         "-DSPIRV=1",
         "-fspv-target-env=vulkan1.3",
         "-fvk-use-dx-layout",
+        "-fspv-reflect",
         "-Zi",
         "-Qembed_debug",
         "-fspv-debug=vulkan-with-source",

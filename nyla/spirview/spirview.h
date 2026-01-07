@@ -1,9 +1,10 @@
 #pragma once
 
-#include <array>
 #include <cstdint>
 #include <span>
-#include <variant>
+
+#include "nyla/commons/containers/inline_string.h"
+#include "nyla/commons/containers/inline_vec.h"
 
 namespace nyla
 {
@@ -16,42 +17,25 @@ enum class SpirviewShaderStage
     Compute,
 };
 
-enum class SpirviewResourceKind
-{
-    Unknown,
-    ConstantBuffer,
-    StorageBuffer,
-    Texture,
-    RWTexture,
-    Sampler,
-    PushConstant,
-};
-
-struct SpirviewType
-{
-    bool block;
-};
-
-struct SpirviewResource
-{
-    uint32_t typeId;
-    SpirviewResourceKind kind;
-    uint32_t set;
-    uint32_t binding;
-    uint32_t arrayCount;
-};
-
-using SpirviewRecord = std::variant<std::monostate, SpirviewType, SpirviewResource>;
-
 struct SpirviewReflectResult
 {
     SpirviewShaderStage stage;
 
-    std::array<SpirviewRecord, 1024> records;
-    uint32_t typesCount;
-    std::array<uint32_t, 32> types;
-    uint32_t resourcesCount;
-    std::array<uint32_t, 32> resources;
+    InlineVec<uint32_t, 1 << 18> outSpirv;
+
+    struct IdLocation
+    {
+        uint32_t id;
+        uint32_t location;
+    };
+    InlineVec<IdLocation, 8> locations;
+
+    struct IdSemantic
+    {
+        uint32_t id;
+        InlineString<16> semantic;
+    };
+    InlineVec<IdSemantic, 8> semantics;
 };
 
 auto SpirviewReflect(std::span<const uint32_t> spirv, SpirviewReflectResult *result) -> bool;

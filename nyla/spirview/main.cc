@@ -1,5 +1,7 @@
 #include "nyla/spirview/spirview.h"
 
+#include "nyla/commons/assert.h"
+#include "nyla/commons/log.h"
 #include "nyla/commons/logging/init.h"
 #include "nyla/commons/os/readfile.h"
 #include "nyla/spirview/spirview.h"
@@ -14,7 +16,7 @@ auto Main() -> int
 {
     LoggingInit();
 
-    std::vector<std::byte> spirvBytes = ReadFile("nyla/apps/breakout/shaders/build/world.vs.hlsl.spv");
+    std::vector<std::byte> spirvBytes = ReadFile("nyla/shaders/build/renderer2d.vs.hlsl.spv");
     if (spirvBytes.size() % 4)
     {
         NYLA_LOG("invalid spirv");
@@ -26,9 +28,14 @@ auto Main() -> int
     SpirviewReflectResult result{};
     NYLA_ASSERT(SpirviewReflect(spirvWords, &result));
 
-    for (uint32_t i = 0; i < result.resourcesCount; ++i)
+    for (const SpirviewReflectResult::IdLocation &idLocation : result.locations)
     {
-        const auto &resource = std::get<SpirviewResource>(result.records[result.resources[i]]);
+        NYLA_LOG("ID: %d, location %d", idLocation.id, idLocation.location);
+    }
+
+    for (const SpirviewReflectResult::IdSemantic &idSemantic : result.semantics)
+    {
+        NYLA_LOG("ID: %d, semantic %s", idSemantic.id, idSemantic.semantic.CString());
     }
 
     return 0;

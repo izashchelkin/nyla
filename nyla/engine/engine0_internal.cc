@@ -44,7 +44,7 @@ auto GetShader(const char *name, RhiShaderStage stage) -> RhiShader
     }
 
     RhiShader shader = g_Rhi->CreateShader(RhiShaderDesc{
-        .spirv = spirv,
+        .spirv = result.outSpirv,
     });
     return shader;
 }
