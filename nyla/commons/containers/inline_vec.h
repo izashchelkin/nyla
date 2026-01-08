@@ -32,6 +32,13 @@ template <typename T, uint32_t N> class InlineVec
     {
     }
 
+    InlineVec(std::span<value_type> elems) : m_Size(0)
+    {
+        NYLA_ASSERT(elems.size() <= kCapacity);
+        for (const auto &e : elems)
+            emplace_back(e);
+    }
+
     InlineVec(std::span<const value_type> elems) : m_Size(0)
     {
         NYLA_ASSERT(elems.size() <= kCapacity);

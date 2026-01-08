@@ -1,21 +1,28 @@
+#include "nyla/commons/containers/inline_string.h"
+#include "nyla/commons/containers/inline_vec.h"
 #include "nyla/spirview/spirview.h"
 
 #include "nyla/commons/assert.h"
 #include "nyla/commons/log.h"
-#include "nyla/commons/logging/init.h"
 #include "nyla/commons/os/readfile.h"
 #include "nyla/spirview/spirview.h"
 
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <span>
+
+#define spv_enable_utility_code
+#if defined(__linux__)
+#include <spirv/unified1/spirv.hpp>
+#else
+#include <spirv-headers/spirv.hpp>
+#endif
 
 namespace nyla
 {
 auto Main() -> int
 {
-    LoggingInit();
-
     std::vector<std::byte> spirvBytes = ReadFile("nyla/shaders/build/renderer2d.vs.hlsl.spv");
     if (spirvBytes.size() % 4)
     {
@@ -23,20 +30,38 @@ auto Main() -> int
         return 1;
     }
 
-    std::span<const uint32_t> spirvWords = {reinterpret_cast<uint32_t *>(spirvBytes.data()), spirvBytes.size() / 4};
 
-    SpirviewReflectResult result{};
-    NYLA_ASSERT(SpirviewReflect(spirvWords, &result));
+    NYLA_LOG("=====================");
 
-    for (const SpirviewReflectResult::IdLocation &idLocation : result.locations)
+    for (const IdLocation &idLocation : locations)
     {
         NYLA_LOG("ID: %d, location %d", idLocation.id, idLocation.location);
     }
 
-    for (const SpirviewReflectResult::IdSemantic &idSemantic : result.semantics)
+    NYLA_LOG("=====================");
+
+    for (const IdSemantic &idSemantic : semantics)
     {
         NYLA_LOG("ID: %d, semantic %s", idSemantic.id, idSemantic.semantic.CString());
     }
+
+    NYLA_LOG("=====================");
+
+    for (uint32_t id : outputs)
+    {
+        NYLA_LOG("ID: %d is output", id);
+    }
+
+    NYLA_LOG("=====================");
+
+    for (uint32_t id : inputs)
+    {
+        NYLA_LOG("ID: %d is input", id);
+    }
+
+    NYLA_LOG("=====================");
+
+    getc(stdin);
 
     return 0;
 }

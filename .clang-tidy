@@ -11,6 +11,7 @@ Checks: >
 
   modernize-*,
   -modernize-use-std-print,
+  -modernize-use-ranges,
 
   readability-identifier-naming
 

@@ -10,7 +10,6 @@
 #include "nyla/apps/wm/window_manager.h"
 #include "nyla/commons/assert.h"
 #include "nyla/commons/log.h"
-#include "nyla/commons/logging/init.h"
 #include "nyla/commons/os/spawn.h"
 #include "nyla/commons/signal/signal.h"
 #include "nyla/platform/linux/platform_linux.h"

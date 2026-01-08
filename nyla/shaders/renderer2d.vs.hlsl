@@ -17,8 +17,8 @@ ConstantBuffer<Entity> entity : register(b2, space0);
 
 struct VSInput
 {
-    float4 position : POSITION;
-    float4 color : Color0;
+    float4 position : POSITION0;
+    float4 color : COLOR0;
     float2 uv : TEXCOORD0;
 };
 

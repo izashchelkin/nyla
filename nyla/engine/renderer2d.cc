@@ -78,19 +78,19 @@ auto CreateRenderer2D() -> Renderer2D *
             {
                 RhiVertexAttributeDesc{
                     .binding = 0,
-                    .location = 0,
+                    .semantic = "POSITION0",
                     .format = RhiVertexFormat::R32G32B32A32Float,
                     .offset = offsetof(VSInput, pos),
                 },
                 RhiVertexAttributeDesc{
                     .binding = 0,
-                    .location = 1,
+                    .semantic = "COLOR0",
                     .format = RhiVertexFormat::R32G32B32A32Float,
                     .offset = offsetof(VSInput, color),
                 },
                 RhiVertexAttributeDesc{
                     .binding = 0,
-                    .location = 2,
+                    .semantic = "TEXCOORD0",
                     .format = RhiVertexFormat::R32G32Float,
                     .offset = offsetof(VSInput, uv),
                 },

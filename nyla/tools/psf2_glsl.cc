@@ -6,8 +6,6 @@
 #include <iostream>
 #include <vector>
 
-#include "nyla/commons/logging/init.h"
-
 namespace nyla
 {
 

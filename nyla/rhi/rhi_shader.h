@@ -24,7 +24,8 @@ struct RhiShader : Handle
 
 struct RhiShaderDesc
 {
-    std::span<const uint32_t> spirv;
+    RhiShaderStage stage;
+    std::span<uint32_t> code;
 };
 
 } // namespace nyla

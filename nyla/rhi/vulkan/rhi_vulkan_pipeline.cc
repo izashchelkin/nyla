@@ -1,9 +1,21 @@
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <vulkan/vulkan_core.h>
 
+#include "nyla/commons/assert.h"
+#include "nyla/commons/containers/inline_string.h"
+#include "nyla/commons/containers/inline_vec.h"
 #include "nyla/rhi/rhi_pipeline.h"
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
+#include "nyla/spirview/spirview.h"
+
+#define spv_enable_utility_code
+#if defined(__linux__)
+#include <spirv/unified1/spirv.hpp>
+#else
+#include <spirv-headers/spirv.hpp>
+#endif
 
 namespace nyla
 {
@@ -61,22 +73,126 @@ auto ConvertVulkanInputRate(RhiInputRate inputRate) -> VkVertexInputRate
 
 auto Rhi::Impl::CreateShader(const RhiShaderDesc &desc) -> RhiShader
 {
-    const VkShaderModuleCreateInfo createInfo{
-        .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-        .codeSize = desc.spirv.size_bytes(),
-        .pCode = desc.spirv.data(),
-    };
+    VulkanShaderData shaderData{.spv = InlineVec<uint32_t, 4096>{desc.code}};
 
-    VkShaderModule shaderModule;
-    VK_CHECK(vkCreateShaderModule(m_Dev, &createInfo, nullptr, &shaderModule));
+    auto &locations = shaderData.reflect.locations;
+    auto &semantics = shaderData.reflect.semantics;
+    auto &inputs = shaderData.reflect.inputs;
+    auto &outputs = shaderData.reflect.outputs;
 
-    return m_Shaders.Acquire(shaderModule);
+    auto view = Spirview{shaderData.spv};
+    auto it = view.begin();
+    auto end = view.end();
+
+    for (; it != end; ++it)
+    {
+        auto operandIt = it.Operands().begin();
+
+        switch (it.Op())
+        {
+
+        case spv::OpEntryPoint: {
+            switch (spv::ExecutionModel(*operandIt++))
+            {
+            case spv::ExecutionModel::ExecutionModelVertex:
+                NYLA_ASSERT(desc.stage == RhiShaderStage::Vertex);
+                break;
+            case spv::ExecutionModel::ExecutionModelFragment:
+                NYLA_ASSERT(desc.stage == RhiShaderStage::Pixel);
+                break;
+            default:
+                NYLA_ASSERT(false);
+                break;
+            }
+            break;
+        }
+
+        case spv::OpExtension: {
+            InlineString<32> name;
+            Spirview::ParseStringLiteral(operandIt, name);
+
+            if (name == "SPV_GOOGLE_hlsl_functionality1" || name == "SPV_GOOGLE_user_type")
+                it.MakeNop();
+
+            break;
+        }
+
+        case spv::OpDecorate: {
+
+            uint32_t targetId = *operandIt++;
+
+            auto decoration = spv::Decoration(*operandIt++);
+            switch (decoration)
+            {
+            case spv::Decoration::DecorationLocation: {
+                locations.emplace_back(VulkanShaderData::IdLocation{.id = targetId, .location = *operandIt++});
+                break;
+            }
+            }
+
+            break;
+        }
+
+        case spv::OpDecorateString: {
+
+            uint32_t targetId = *operandIt++;
+
+            auto decoration = spv::Decoration(*operandIt++);
+            switch (decoration)
+            {
+
+            case spv::Decoration::DecorationUserTypeGOOGLE: {
+                it.MakeNop();
+                break;
+            }
+
+            case spv::Decoration::DecorationUserSemantic: {
+                InlineString<16> semantic;
+                Spirview::ParseStringLiteral(operandIt, semantic);
+                semantic.AsciiToUpper();
+
+                semantics.emplace_back(VulkanShaderData::IdSemantic{.id = targetId, .semantic = semantic});
+
+                it.MakeNop();
+                break;
+            }
+            }
+
+            break;
+        }
+
+        case spv::OpVariable: {
+            uint32_t resultType = *operandIt++;
+            uint32_t resultId = *operandIt++;
+            auto storageClass = static_cast<spv::StorageClass>(*operandIt++);
+
+            switch (storageClass)
+            {
+            case spv::StorageClass::StorageClassInput:
+                inputs.emplace_back(resultId);
+                break;
+            case spv::StorageClass::StorageClassOutput:
+                outputs.emplace_back(resultId);
+                break;
+            default:
+                break;
+            }
+
+            break;
+        }
+        }
+    }
+
+    return m_Shaders.Acquire(shaderData);
 }
 
 void Rhi::Impl::DestroyShader(RhiShader shader)
 {
+    m_Shaders.ReleaseData(shader);
+#if 0
     VkShaderModule shaderModule = m_Shaders.ReleaseData(shader);
     vkDestroyShaderModule(m_Dev, shaderModule, nullptr);
+#endif
 }
 
 auto Rhi::Impl::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGraphicsPipeline
@@ -97,18 +213,133 @@ auto Rhi::Impl::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> R
         };
     }
 
-    std::array<VkVertexInputAttributeDescription, std::size(desc.vertexAttributes)> vertexAttributes;
+    VulkanShaderData &vertexShaderData = m_Shaders.ResolveData(desc.vs);
+    VulkanShaderData &pixelShaderData = m_Shaders.ResolveData(desc.ps);
+
+    InlineVec<VkVertexInputAttributeDescription, std::size(desc.vertexAttributes)> vertexAttributes;
     NYLA_ASSERT(desc.vertexAttributeCount <= std::size(desc.vertexAttributes));
+    NYLA_ASSERT(desc.vertexAttributeCount == vertexShaderData.reflect.inputs.size());
+    NYLA_ASSERT(vertexShaderData.reflect.outputs.size() >= pixelShaderData.reflect.inputs.size());
+
     for (uint32_t i = 0; i < desc.vertexAttributeCount; ++i)
     {
         const auto &attribute = desc.vertexAttributes[i];
-        vertexAttributes[i] = VkVertexInputAttributeDescription{
-            .location = attribute.location,
+
+        const auto id = [&] -> uint32_t {
+            auto it = vertexShaderData.reflect.semantics.begin();
+            auto end = vertexShaderData.reflect.semantics.end();
+            for (; it != end; ++it)
+                if (attribute.semantic == it->semantic)
+                    break;
+            NYLA_ASSERT(it != end);
+            return it->id;
+        }();
+
+        const auto location = [&] -> uint32_t {
+            auto it = vertexShaderData.reflect.locations.begin();
+            auto end = vertexShaderData.reflect.locations.end();
+            for (; it != end; ++it)
+                if (id == it->id)
+                    break;
+            NYLA_ASSERT(it != end);
+            return it->location;
+        }();
+
+        vertexAttributes.emplace_back(VkVertexInputAttributeDescription{
+            .location = location,
             .binding = attribute.binding,
             .format = ConvertVertexFormatIntoVkFormat(attribute.format),
             .offset = attribute.offset,
-        };
+        });
     }
+
+    for (uint32_t outputId : vertexShaderData.reflect.outputs)
+    {
+        uint32_t location;
+        {
+            auto it = vertexShaderData.reflect.locations.begin();
+            auto end = vertexShaderData.reflect.locations.end();
+            for (; it != end; ++it)
+                if (outputId == it->id)
+                    break;
+            if (it == end)
+                continue;
+            location = it->location;
+        }
+
+        const auto semantic = [&] -> const InlineString<16> & {
+            auto it = vertexShaderData.reflect.semantics.begin();
+            auto end = vertexShaderData.reflect.semantics.end();
+            for (; it != end; ++it)
+                if (it->id == outputId)
+                    break;
+            NYLA_ASSERT(it != end);
+            return it->semantic;
+        }();
+
+        uint32_t id;
+        {
+            auto it = pixelShaderData.reflect.semantics.begin();
+            auto end = pixelShaderData.reflect.semantics.end();
+            for (; it != end; ++it)
+                if (it->semantic == semantic)
+                    break;
+            if (it == end)
+                continue;
+            id = it->id;
+        }
+
+        auto view = Spirview{pixelShaderData.spv};
+        auto it = view.begin();
+        auto end = view.end();
+        for (; it != end; ++it)
+        {
+            if (it.Op() != spv::OpDecorate)
+                continue;
+
+            auto operandIt = it.Operands().begin();
+
+            const uint32_t targetId = *operandIt++;
+            if (targetId != id)
+                continue;
+
+            const auto decoration = spv::Decoration(*operandIt++);
+            if (decoration != spv::DecorationLocation)
+                continue;
+
+            *operandIt = location;
+            break;
+        }
+        NYLA_ASSERT(it != end);
+    }
+
+    auto createShaderModule = [dev = this->m_Dev](std::span<const uint32_t> spv) -> VkShaderModule {
+        const VkShaderModuleCreateInfo createInfo{
+            .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+            .codeSize = spv.size_bytes(),
+            .pCode = spv.data(),
+        };
+
+        VkShaderModule shaderModule;
+        VK_CHECK(vkCreateShaderModule(dev, &createInfo, nullptr, &shaderModule));
+
+        return shaderModule;
+    };
+
+    const std::array<VkPipelineShaderStageCreateInfo, 2> stages{
+        VkPipelineShaderStageCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+            .stage = VK_SHADER_STAGE_VERTEX_BIT,
+            .module = createShaderModule(vertexShaderData.spv),
+            .pName = "main",
+        },
+        VkPipelineShaderStageCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+            .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+            .module = createShaderModule(pixelShaderData.spv),
+            .pName = "main",
+        },
+    };
 
     const VkPipelineVertexInputStateCreateInfo vertexInputStateCreateInfo{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
@@ -192,21 +423,6 @@ auto Rhi::Impl::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> R
         .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
         .colorAttachmentCount = desc.colorTargetFormatsCount,
         .pColorAttachmentFormats = colorTargetFormats.data(),
-    };
-
-    std::array<VkPipelineShaderStageCreateInfo, 2> stages{
-        VkPipelineShaderStageCreateInfo{
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-            .stage = VK_SHADER_STAGE_VERTEX_BIT,
-            .module = m_Shaders.ResolveData(desc.vs),
-            .pName = "main",
-        },
-        VkPipelineShaderStageCreateInfo{
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-            .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-            .module = m_Shaders.ResolveData(desc.ps),
-            .pName = "main",
-        },
     };
 
 #if 0

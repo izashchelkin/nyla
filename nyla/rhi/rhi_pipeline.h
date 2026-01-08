@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <string>
 
+#include "nyla/commons/containers/inline_string.h"
 #include "nyla/commons/handle.h"
 #include "nyla/rhi/rhi_shader.h"
 #include "nyla/rhi/rhi_texture.h"
@@ -48,16 +49,10 @@ struct RhiVertexBindingDesc
     RhiInputRate inputRate;
 };
 
-enum class RhiVertexSemantic
-{
-    Position,
-    Color,
-    TexCoord,
-};
-
 struct RhiVertexAttributeDesc
 {
     uint32_t binding;
+    InlineString<16> semantic;
     RhiVertexFormat format;
     uint32_t offset;
 };

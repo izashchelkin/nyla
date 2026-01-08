@@ -1,5 +1,4 @@
 #include "nyla/apps/wm/wm_overlay.h"
-#include "nyla/commons/logging/init.h"
 #include "nyla/commons/os/clock.h"
 #include "nyla/commons/signal/signal.h"
 #include "nyla/platform/linux/platform_linux.h"

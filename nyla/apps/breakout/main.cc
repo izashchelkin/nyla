@@ -1,5 +1,4 @@
 #include "nyla/apps/breakout/breakout.h"
-#include "nyla/commons/logging/init.h"
 #include "nyla/commons/signal/signal.h"
 #include "nyla/engine/debug_text_renderer.h"
 #include "nyla/engine/engine.h"
@@ -14,7 +13,6 @@ namespace nyla
 
 auto PlatformMain() -> int
 {
-    LoggingInit();
     SigIntCoreDump();
 
     g_Platform->Init({

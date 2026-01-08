@@ -11,11 +11,11 @@
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
-#include "nyla/rhi/rhi_descriptor.h"
 #include "nyla/rhi/rhi_pass.h"
 #include "nyla/rhi/rhi_pipeline.h"
 #include "nyla/rhi/rhi_sampler.h"
 #include "nyla/rhi/rhi_texture.h"
+#include "nyla/spirview/spirview.h"
 #include "vulkan/vk_enum_string_helper.h"
 #include "vulkan/vulkan_core.h"
 
@@ -99,6 +99,29 @@ struct VulkanPipelineData
     VkPipelineLayout layout;
     VkPipeline pipeline;
     VkPipelineBindPoint bindPoint;
+};
+
+struct VulkanShaderData
+{
+    struct IdLocation
+    {
+        uint32_t id;
+        uint32_t location;
+    };
+    struct IdSemantic
+    {
+        uint32_t id;
+        InlineString<16> semantic;
+    };
+
+    InlineVec<uint32_t, 4096> spv;
+    struct
+    {
+        InlineVec<IdLocation, 8> locations;
+        InlineVec<IdSemantic, 8> semantics;
+        InlineVec<uint32_t, 16> inputs;
+        InlineVec<uint32_t, 16> outputs;
+    } reflect;
 };
 
 struct VulkanTextureData
@@ -284,7 +307,7 @@ class Rhi::Impl
 
     HandlePool<RhiCmdList, VulkanCmdListData, 16> m_CmdLists;
 
-    HandlePool<RhiShader, VkShaderModule, 16> m_Shaders;
+    HandlePool<RhiShader, VulkanShaderData, 16> m_Shaders;
     HandlePool<RhiGraphicsPipeline, VulkanPipelineData, 16> m_GraphicsPipelines;
 
     HandlePool<RhiBuffer, VulkanBufferData, 16> m_Buffers;

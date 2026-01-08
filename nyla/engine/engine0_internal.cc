@@ -1,6 +1,7 @@
 #include "nyla/engine/engine0_internal.h"
 
 #include "nyla/commons/assert.h"
+#include "nyla/commons/containers/inline_vec.h"
 #include "nyla/commons/os/readfile.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_shader.h"
@@ -22,29 +23,12 @@ auto GetShader(const char *name, RhiShaderStage stage) -> RhiShader
     // TODO: directory watch
     // PlatformFsWatchFile(path);
 
-    const std::vector<std::byte> code = ReadFile(path);
-    const auto spirv = std::span{reinterpret_cast<const uint32_t *>(code.data()), code.size() / 4};
-
-    SpirviewReflectResult result{};
-    SpirviewReflect(spirv, &result);
-
-    switch (result.stage)
-    {
-    case SpirviewShaderStage::Vertex: {
-        NYLA_ASSERT(stage == RhiShaderStage::Vertex);
-        break;
-    }
-    case SpirviewShaderStage::Fragment: {
-        NYLA_ASSERT(stage == RhiShaderStage::Pixel);
-        break;
-    }
-    default: {
-        NYLA_ASSERT(false);
-    }
-    }
+    std::vector<std::byte> code = ReadFile(path);
+    const auto spirv = std::span{reinterpret_cast<uint32_t *>(code.data()), code.size() / 4};
 
     RhiShader shader = g_Rhi->CreateShader(RhiShaderDesc{
-        .spirv = result.outSpirv,
+        .stage = stage,
+        .code = spirv,
     });
     return shader;
 }
