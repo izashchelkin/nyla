@@ -99,7 +99,7 @@ auto SpvReflect(std::span<uint32_t> spirv, SpvReflectResult *result) -> bool
     auto view = Spirview{spirv};
     for (auto it = view.begin(); it != view.end(); ++it)
     {
-        if (ProcessOp(result, it.Op(), it.Operands()))
+        if (ProcessOp(result, it.Op(), it.GetOperandReader()))
             it.MakeNop();
     }
 

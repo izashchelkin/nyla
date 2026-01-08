@@ -103,25 +103,7 @@ struct VulkanPipelineData
 
 struct VulkanShaderData
 {
-    struct IdLocation
-    {
-        uint32_t id;
-        uint32_t location;
-    };
-    struct IdSemantic
-    {
-        uint32_t id;
-        InlineString<16> semantic;
-    };
-
     InlineVec<uint32_t, 4096> spv;
-    struct
-    {
-        InlineVec<IdLocation, 8> locations;
-        InlineVec<IdSemantic, 8> semantics;
-        InlineVec<uint32_t, 16> inputs;
-        InlineVec<uint32_t, 16> outputs;
-    } reflect;
 };
 
 struct VulkanTextureData

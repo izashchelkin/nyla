@@ -1,4 +1,5 @@
-#include <algorithm>
+#include "nyla/rhi/vulkan/rhi_vulkan_spirv_shader_manager.h"
+#inclfde < algorithm>
 #include <array>
 #include <cstdint>
 #include <vulkan/vulkan_core.h>
@@ -7,6 +8,7 @@
 #include "nyla/commons/containers/inline_string.h"
 #include "nyla/commons/containers/inline_vec.h"
 #include "nyla/rhi/rhi_pipeline.h"
+#include "nyla/rhi/rhi_shader.h"
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
 #include "nyla/spirview/spirview.h"
 
@@ -73,117 +75,10 @@ auto ConvertVulkanInputRate(RhiInputRate inputRate) -> VkVertexInputRate
 
 auto Rhi::Impl::CreateShader(const RhiShaderDesc &desc) -> RhiShader
 {
-    VulkanShaderData shaderData{.spv = InlineVec<uint32_t, 4096>{desc.code}};
+    const RhiShader handle = m_Shaders.Acquire(VulkanShaderData{.spv = InlineVec<uint32_t, 4096>{desc.code}});
+    VulkanShaderData &shaderData = m_Shaders.ResolveData(handle);
 
-    auto &locations = shaderData.reflect.locations;
-    auto &semantics = shaderData.reflect.semantics;
-    auto &inputs = shaderData.reflect.inputs;
-    auto &outputs = shaderData.reflect.outputs;
-
-    auto view = Spirview{shaderData.spv};
-    auto it = view.begin();
-    auto end = view.end();
-
-    for (; it != end; ++it)
-    {
-        auto operandIt = it.Operands().begin();
-
-        switch (it.Op())
-        {
-
-        case spv::OpEntryPoint: {
-            switch (spv::ExecutionModel(*operandIt++))
-            {
-            case spv::ExecutionModel::ExecutionModelVertex:
-                NYLA_ASSERT(desc.stage == RhiShaderStage::Vertex);
-                break;
-            case spv::ExecutionModel::ExecutionModelFragment:
-                NYLA_ASSERT(desc.stage == RhiShaderStage::Pixel);
-                break;
-            default:
-                NYLA_ASSERT(false);
-                break;
-            }
-            break;
-        }
-
-        case spv::OpExtension: {
-            InlineString<32> name;
-            Spirview::ParseStringLiteral(operandIt, name);
-
-            if (name == "SPV_GOOGLE_hlsl_functionality1" || name == "SPV_GOOGLE_user_type")
-                it.MakeNop();
-
-            break;
-        }
-
-        case spv::OpDecorate: {
-
-            uint32_t targetId = *operandIt++;
-
-            auto decoration = spv::Decoration(*operandIt++);
-            switch (decoration)
-            {
-            case spv::Decoration::DecorationLocation: {
-                locations.emplace_back(VulkanShaderData::IdLocation{.id = targetId, .location = *operandIt++});
-                break;
-            }
-            }
-
-            break;
-        }
-
-        case spv::OpDecorateString: {
-
-            uint32_t targetId = *operandIt++;
-
-            auto decoration = spv::Decoration(*operandIt++);
-            switch (decoration)
-            {
-
-            case spv::Decoration::DecorationUserTypeGOOGLE: {
-                it.MakeNop();
-                break;
-            }
-
-            case spv::Decoration::DecorationUserSemantic: {
-                InlineString<16> semantic;
-                Spirview::ParseStringLiteral(operandIt, semantic);
-                semantic.AsciiToUpper();
-
-                semantics.emplace_back(VulkanShaderData::IdSemantic{.id = targetId, .semantic = semantic});
-
-                it.MakeNop();
-                break;
-            }
-            }
-
-            break;
-        }
-
-        case spv::OpVariable: {
-            uint32_t resultType = *operandIt++;
-            uint32_t resultId = *operandIt++;
-            auto storageClass = static_cast<spv::StorageClass>(*operandIt++);
-
-            switch (storageClass)
-            {
-            case spv::StorageClass::StorageClassInput:
-                inputs.emplace_back(resultId);
-                break;
-            case spv::StorageClass::StorageClassOutput:
-                outputs.emplace_back(resultId);
-                break;
-            default:
-                break;
-            }
-
-            break;
-        }
-        }
-    }
-
-    return m_Shaders.Acquire(shaderData);
+    return handle;
 }
 
 void Rhi::Impl::DestroyShader(RhiShader shader)
@@ -221,29 +116,18 @@ auto Rhi::Impl::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> R
     NYLA_ASSERT(desc.vertexAttributeCount == vertexShaderData.reflect.inputs.size());
     NYLA_ASSERT(vertexShaderData.reflect.outputs.size() >= pixelShaderData.reflect.inputs.size());
 
+    SpirvShaderManager vsMan(vertexShaderData.spv, RhiShaderStage::Vertex);
+    vsMan.Process();
+
     for (uint32_t i = 0; i < desc.vertexAttributeCount; ++i)
     {
         const auto &attribute = desc.vertexAttributes[i];
 
-        const auto id = [&] -> uint32_t {
-            auto it = vertexShaderData.reflect.semantics.begin();
-            auto end = vertexShaderData.reflect.semantics.end();
-            for (; it != end; ++it)
-                if (attribute.semantic == it->semantic)
-                    break;
-            NYLA_ASSERT(it != end);
-            return it->id;
-        }();
-
-        const auto location = [&] -> uint32_t {
-            auto it = vertexShaderData.reflect.locations.begin();
-            auto end = vertexShaderData.reflect.locations.end();
-            for (; it != end; ++it)
-                if (id == it->id)
-                    break;
-            NYLA_ASSERT(it != end);
-            return it->location;
-        }();
+        uint32_t location;
+        if (!vsMan.QuerySemanticLocation(attribute.semantic.StringView(), true, &location))
+        {
+            NYLA_ASSERT(false && "could not query semantic location");
+        }
 
         vertexAttributes.emplace_back(VkVertexInputAttributeDescription{
             .location = location,
@@ -252,6 +136,9 @@ auto Rhi::Impl::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> R
             .offset = attribute.offset,
         });
     }
+
+    SpirvShaderManager psMan(pixelShaderData.spv, RhiShaderStage::Pixel);
+    psMan.Process();
 
     for (uint32_t outputId : vertexShaderData.reflect.outputs)
     {
@@ -297,17 +184,17 @@ auto Rhi::Impl::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> R
             if (it.Op() != spv::OpDecorate)
                 continue;
 
-            auto operandIt = it.Operands().begin();
+            auto operandReader = it.GetOperandReader();
 
-            const uint32_t targetId = *operandIt++;
+            const uint32_t targetId = operandReader.Word();
             if (targetId != id)
                 continue;
 
-            const auto decoration = spv::Decoration(*operandIt++);
+            const auto decoration = spv::Decoration(operandReader.Word());
             if (decoration != spv::DecorationLocation)
                 continue;
 
-            *operandIt = location;
+            operandReader.Word() = location;
             break;
         }
         NYLA_ASSERT(it != end);

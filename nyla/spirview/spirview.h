@@ -1,13 +1,48 @@
 #pragma once
 
-#include <array>
 #include <cstdint>
 #include <span>
+#include <string_view>
 
 #include "nyla/commons/assert.h"
 
 namespace nyla
 {
+
+template <class WordT> class SpvOperandReader
+{
+  public:
+    explicit SpvOperandReader(std::span<WordT> data) : m_Data{data}
+    {
+    }
+
+    [[nodiscard]]
+    auto Word() -> WordT &
+    {
+        WordT &ret = m_Data.front();
+        m_Data = m_Data.subspan(1);
+        return ret;
+    }
+
+    [[nodiscard]]
+    auto String() -> std::string_view
+    {
+        auto *strStart = reinterpret_cast<const char *>(m_Data.data());
+        uint32_t strLen = 0;
+        for (;;)
+        {
+            uint32_t word = Word();
+            for (uint32_t i = 0; i < 32; i += 8, ++strLen)
+            {
+                if (!((word >> i) & 0xFF))
+                    return std::string_view{strStart, strLen};
+            }
+        }
+    }
+
+  private:
+    std::span<WordT> m_Data;
+};
 
 class Spirview
 {
@@ -16,22 +51,6 @@ class Spirview
     static inline const unsigned int kWordCountShift = 16;
 
   public:
-    static auto ParseStringLiteral(auto& it, auto& out)
-    {
-        for (;;)
-        {
-            uint32_t word = *it++;
-            for (uint32_t i = 0; i < 32; i += 8)
-            {
-                uint32_t ch = (word >> i) & 0xFF;
-                if (ch)
-                    out.AppendChar(ch);
-                else
-                    return;
-            }
-        }
-    }
-
     explicit Spirview(std::span<uint32_t> words) : m_Words(words)
     {
         NYLA_ASSERT(m_Words.size() >= 5);
@@ -81,11 +100,11 @@ class Spirview
         }
 
         [[nodiscard]]
-        auto Operands() const -> span_type
+        auto GetOperandReader() const -> SpvOperandReader<WordT>
         {
             auto w = Words();
             NYLA_ASSERT(w.size() >= 1);
-            return w.subspan(1);
+            return SpvOperandReader{w.subspan(1)};
         }
 
         auto operator++() -> BasicIterator &
@@ -113,7 +132,6 @@ class Spirview
 
         void MakeNop() const
         {
-            NYLA_DEBUGBREAK();
             memset(m_At, 1 << 16, m_WordCount);
         }
 
