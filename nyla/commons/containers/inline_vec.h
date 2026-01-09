@@ -94,6 +94,16 @@ template <typename T, uint32_t N> class InlineVec
         return GetPtr();
     }
 
+    auto GetSpan() -> std::span<value_type>
+    {
+        return {GetPtr(), m_Size};
+    }
+
+    auto GetSpan() const -> std::span<const value_type>
+    {
+        return {GetPtr(), m_Size};
+    }
+
     [[nodiscard]] auto size() const -> size_type
     {
         return m_Size;
@@ -232,18 +242,82 @@ template <typename T, uint32_t N> class InlineVec
         }
     }
 
+    auto erase(const_iterator pos) -> iterator
+    {
+        NYLA_ASSERT(pos >= begin() && pos < end());
+        return erase(pos, pos + 1);
+    }
+
+    auto erase(const_iterator first, const_iterator last) -> iterator
+    {
+        NYLA_ASSERT(first >= begin() && first <= end());
+        NYLA_ASSERT(last >= begin() && last <= end());
+        NYLA_ASSERT(first <= last);
+
+        auto *b = begin();
+        auto *e = end();
+        auto *f = const_cast<iterator>(first);
+        auto *l = const_cast<iterator>(last);
+
+        const size_type removeCount = static_cast<size_type>(l - f);
+        if (removeCount == 0)
+            return f;
+
+        auto *tailFirst = l;
+        auto *tailLast = e;
+        const size_type tailCount = static_cast<size_type>(tailLast - tailFirst);
+
+        // Move the tail down to cover the erased range.
+        if constexpr (std::is_trivially_copyable_v<T>)
+        {
+            // byte move is fine for trivially copyable
+            std::memmove(f, tailFirst, sizeof(T) * tailCount);
+        }
+        else
+        {
+            // Move-assign into existing elements [f, f+tailCount)
+            // Safe because f..l are existing constructed objects.
+            std::move(tailFirst, tailLast, f);
+        }
+
+        // Destroy the now-duplicate tail at the end.
+        if constexpr (!std::is_trivially_destructible_v<T>)
+        {
+            std::destroy_n(b + (m_Size - removeCount), removeCount);
+        }
+
+        m_Size -= removeCount;
+        return f;
+    }
+
   private:
     alignas(T) std::array<std::byte, sizeof(T) * kCapacity> m_Storage;
     size_type m_Size;
 
     auto GetPtr() -> T *
     {
-        return reinterpret_cast<T *>(m_Storage.data());
+        return std::launder(reinterpret_cast<T *>(m_Storage.data()));
     }
     auto GetPtr() const -> const T *
     {
-        return reinterpret_cast<const T *>(m_Storage.data());
+        return std::launder(reinterpret_cast<const T *>(m_Storage.data()));
     }
 };
+
+template <class T, uint32_t N, class U>
+auto Erase(InlineVec<T, N> &c, const U &value) -> typename InlineVec<T, N>::size_type
+{
+    auto old = c.size();
+    c.erase(std::remove(c.begin(), c.end(), value), c.end());
+    return old - c.size();
+}
+
+template <class T, uint32_t N, class Pred>
+auto EraseIf(InlineVec<T, N> &c, Pred pred) -> typename InlineVec<T, N>::size_type
+{
+    auto old = c.size();
+    c.erase(std::remove_if(c.begin(), c.end(), pred), c.end());
+    return old - c.size();
+}
 
 } // namespace nyla

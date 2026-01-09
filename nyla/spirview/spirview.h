@@ -35,7 +35,10 @@ template <class WordT> class SpvOperandReader
             for (uint32_t i = 0; i < 32; i += 8, ++strLen)
             {
                 if (!((word >> i) & 0xFF))
-                    return std::string_view{strStart, strLen};
+                {
+                    std::string_view ret{strStart, strLen};
+                    return ret;
+                }
             }
         }
     }
@@ -46,11 +49,12 @@ template <class WordT> class SpvOperandReader
 
 class Spirview
 {
-    static inline const unsigned int kMagicNumber = 0x07230203;
-    static inline const unsigned int kOpCodeMask = 0xffff;
-    static inline const unsigned int kWordCountShift = 16;
-
   public:
+    static inline const uint32_t kMagicNumber = 0x07230203;
+    static inline const uint32_t kOpCodeMask = 0xffff;
+    static inline const uint32_t kWordCountShift = 16;
+    static inline const uint32_t kNop = 1 << kWordCountShift;
+
     explicit Spirview(std::span<uint32_t> words) : m_Words(words)
     {
         NYLA_ASSERT(m_Words.size() >= 5);
@@ -132,7 +136,8 @@ class Spirview
 
         void MakeNop() const
         {
-            memset(m_At, 1 << 16, m_WordCount);
+            for (uint32_t i = 0; i < m_WordCount; ++i)
+                *(m_At + i) = kNop;
         }
 
       private:

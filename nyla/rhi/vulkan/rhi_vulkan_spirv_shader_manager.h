@@ -22,11 +22,13 @@ namespace nyla
 class SpirvShaderManager
 {
   public:
-    SpirvShaderManager(std::span<uint32_t> view, RhiShaderStage stage) : m_SpvView{view}, m_Stage{stage}
+    enum class StorageClass
     {
-    }
+        Input,
+        Output,
+    };
 
-    void Process()
+    SpirvShaderManager(std::span<uint32_t> view, RhiShaderStage stage) : m_SpvView{view}, m_Stage{stage}
     {
         auto end = m_SpvView.end();
         for (auto it = m_SpvView.begin(); it != end; ++it)
@@ -50,31 +52,57 @@ class SpirvShaderManager
         }
     }
 
-    auto QuerySemanticLocation(std::string_view semantic, bool input, uint32_t *outLocation) -> bool
+    auto FindLocationBySemantic(std::string_view semantic, StorageClass storageClass, uint32_t *outLocation) -> bool
     {
         uint32_t id;
-        if (!FindSemanticId(semantic, id))
+        if (!FindIdBySemantic(semantic, storageClass, &id))
             return false;
 
         uint32_t location;
         for (uint32_t i = 0; i < m_Locations.size(); ++i)
-            if (m_Locations[i].id == id)
+        {
+            if (m_Locations[i].id == id && CheckStorageClass(id, storageClass))
             {
-                if (!CheckIOClass(id, input))
-                    continue;
-
                 *outLocation = m_Locations[i].location;
                 return true;
             }
+        }
 
         return false;
     }
 
-    auto SetSemanticLocation(std::string_view semantic, bool input, uint32_t aLocation) -> bool
+    auto FindIdBySemantic(std::string_view semantic, StorageClass storageClass, uint32_t *outId) -> bool
+    {
+        for (uint32_t i = 0; i < m_SemanticDataNames.size(); ++i)
+        {
+            if (m_SemanticDataNames[i] == semantic && CheckStorageClass(m_SemanticDataIds[i], storageClass))
+            {
+                *outId = m_SemanticDataIds[i];
+                return true;
+            }
+        }
+        return false;
+    }
+
+    auto FindSemanticById(uint32_t id, std::string_view *outSemantic) -> bool
+    {
+        for (uint32_t i = 0; i < m_SemanticDataIds.size(); ++i)
+        {
+            if (m_SemanticDataIds[i] == id)
+            {
+                *outSemantic = m_SemanticDataNames[i].StringView();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    auto RewriteLocationForSemantic(std::string_view semantic, StorageClass storageClass, uint32_t aLocation) -> bool
     {
         uint32_t oldLocation;
-        if (!QuerySemanticLocation(semantic, input, &oldLocation))
+        if (!FindLocationBySemantic(semantic, storageClass, &oldLocation))
             return false;
+
         if (oldLocation == aLocation)
             return true;
 
@@ -83,74 +111,66 @@ class SpirvShaderManager
         {
             auto op = spv::Op(it.Op());
 
-            if (op == spv::OpDecorate)
+            if (op != spv::OpDecorate)
+                continue;
+
+            SpvOperandReader operandReader = it.GetOperandReader();
+
+            uint32_t id = operandReader.Word();
+
+            if (spv::Decoration(operandReader.Word()) != spv::DecorationLocation)
+                continue;
+            if (!CheckStorageClass(id, storageClass))
+                continue;
+
+            uint32_t &location = operandReader.Word();
+            if (location == oldLocation)
             {
-                SpvOperandReader operandReader = it.GetOperandReader();
-
-                uint32_t id = operandReader.Word();
-                if (!CheckIOClass(id, input))
-                    continue;
-
-                uint32_t &location = operandReader.Word();
-                if (location == oldLocation)
-                {
-                    location = aLocation;
-                    return true;
-                }
+                location = aLocation;
+                return true;
             }
         }
 
         return false;
     }
 
-    auto CheckIOClass(uint32_t id, bool input) -> bool
+    auto CheckStorageClass(uint32_t id, StorageClass storageClass) -> bool
     {
-        if (input)
-            return IsInputStorage(id);
-        else
-            return IsOutputStorage(id);
-    }
-
-    auto IsInputStorage(std::string_view semantic) -> bool
-    {
-        uint32_t id;
-        if (!FindSemanticId(semantic, id))
+        switch (storageClass)
+        {
+        case StorageClass::Input: {
+            for (uint32_t i = 0; i < m_InputVariables.size(); ++i)
+                if (id == m_InputVariables[i])
+                    return true;
             return false;
-
-        return IsInputStorage(id);
+        }
+        case StorageClass::Output: {
+            for (uint32_t i = 0; i < m_OutputVariables.size(); ++i)
+                if (id == m_OutputVariables[i])
+                    return true;
+            return false;
+        }
+        default: {
+            NYLA_ASSERT(false);
+        }
+        }
     }
 
-    auto IsInputStorage(uint32_t id) -> bool
+    auto CheckStorageClass(std::string_view semantic, StorageClass storageClass) -> bool
     {
-        for (uint32_t i = 0; i < m_InputVariables.size(); ++i)
-            if (id == m_InputVariables[i])
-                return true;
+        if (uint32_t id; FindIdBySemantic(semantic, storageClass, &id))
+            return CheckStorageClass(id, storageClass);
         return false;
     }
 
-    auto IsOutputStorage(std::string_view semantic) -> bool
+    auto GetInputIds() -> std::span<const uint32_t>
     {
-        uint32_t id;
-        if (!FindSemanticId(semantic, id))
-            return false;
-        return IsInputStorage(id);
+        return m_InputVariables;
     }
 
-    auto IsOutputStorage(uint32_t id) -> bool
+    auto GetSemantics() -> std::span<InlineString<16>>
     {
-        for (uint32_t i = 0; i < m_OutputVariables.size(); ++i)
-            if (id == m_OutputVariables[i])
-                return true;
-        return false;
-    }
-
-    auto FindSemanticId(std::string_view semantic, uint32_t &id) -> bool
-    {
-        uint32_t i;
-        for (i = 0; i < m_SemanticDataNames.size(); ++i)
-            if (m_SemanticDataNames[i] == semantic)
-                id = m_SemanticDataIds[i];
-        return i != m_SemanticDataNames.size();
+        return m_SemanticDataNames;
     }
 
   private:
@@ -201,6 +221,15 @@ class SpirvShaderManager
             m_Locations.emplace_back(LocationData{
                 .id = targetId,
                 .location = location,
+            });
+            break;
+        }
+
+        case spv::Decoration::DecorationBuiltIn: {
+            const uint32_t builtin = operandReader.Word();
+            m_Builtin.emplace_back(BuiltinData{
+                .id = targetId,
+                .builtin = builtin,
             });
             break;
         }
@@ -256,6 +285,13 @@ class SpirvShaderManager
         uint32_t location;
     };
     InlineVec<LocationData, 16> m_Locations;
+
+    struct BuiltinData
+    {
+        uint32_t id;
+        uint32_t builtin;
+    };
+    InlineVec<BuiltinData, 16> m_Builtin;
 
     InlineVec<uint32_t, 16> m_SemanticDataIds;
     InlineVec<InlineString<16>, 16> m_SemanticDataNames;

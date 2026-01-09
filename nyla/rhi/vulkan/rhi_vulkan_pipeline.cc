@@ -1,7 +1,9 @@
+#include "nyla/commons/containers/inline_vec.h"
+#include "nyla/commons/log.h"
 #include "nyla/rhi/vulkan/rhi_vulkan_spirv_shader_manager.h"
-#inclfde < algorithm>
 #include <array>
 #include <cstdint>
+#include <string_view>
 #include <vulkan/vulkan_core.h>
 
 #include "nyla/commons/assert.h"
@@ -75,7 +77,7 @@ auto ConvertVulkanInputRate(RhiInputRate inputRate) -> VkVertexInputRate
 
 auto Rhi::Impl::CreateShader(const RhiShaderDesc &desc) -> RhiShader
 {
-    const RhiShader handle = m_Shaders.Acquire(VulkanShaderData{.spv = InlineVec<uint32_t, 4096>{desc.code}});
+    const RhiShader handle = m_Shaders.Acquire(VulkanShaderData{.spv = new InlineVec<uint32_t, 1 << 18>{desc.code}});
     VulkanShaderData &shaderData = m_Shaders.ResolveData(handle);
 
     return handle;
@@ -113,21 +115,27 @@ auto Rhi::Impl::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> R
 
     InlineVec<VkVertexInputAttributeDescription, std::size(desc.vertexAttributes)> vertexAttributes;
     NYLA_ASSERT(desc.vertexAttributeCount <= std::size(desc.vertexAttributes));
-    NYLA_ASSERT(desc.vertexAttributeCount == vertexShaderData.reflect.inputs.size());
-    NYLA_ASSERT(vertexShaderData.reflect.outputs.size() >= pixelShaderData.reflect.inputs.size());
 
-    SpirvShaderManager vsMan(vertexShaderData.spv, RhiShaderStage::Vertex);
-    vsMan.Process();
+    SpirvShaderManager vsMan(vertexShaderData.spv->GetSpan(), RhiShaderStage::Vertex);
+    for (auto semantic : vsMan.GetSemantics())
+    {
+        NYLA_LOG("%s", semantic.CString());
+    }
+
+    SpirvShaderManager psMan(pixelShaderData.spv->GetSpan(), RhiShaderStage::Pixel);
+    for (auto semantic : psMan.GetSemantics())
+    {
+        NYLA_LOG("%s", semantic.CString());
+    }
 
     for (uint32_t i = 0; i < desc.vertexAttributeCount; ++i)
     {
         const auto &attribute = desc.vertexAttributes[i];
 
         uint32_t location;
-        if (!vsMan.QuerySemanticLocation(attribute.semantic.StringView(), true, &location))
-        {
-            NYLA_ASSERT(false && "could not query semantic location");
-        }
+        if (!vsMan.FindLocationBySemantic(attribute.semantic.StringView(), SpirvShaderManager::StorageClass::Input,
+                                          &location))
+            NYLA_ASSERT(false);
 
         vertexAttributes.emplace_back(VkVertexInputAttributeDescription{
             .location = location,
@@ -137,67 +145,21 @@ auto Rhi::Impl::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> R
         });
     }
 
-    SpirvShaderManager psMan(pixelShaderData.spv, RhiShaderStage::Pixel);
-    psMan.Process();
-
-    for (uint32_t outputId : vertexShaderData.reflect.outputs)
+    for (uint32_t id : psMan.GetInputIds())
     {
+        std::string_view semantic;
+        if (!psMan.FindSemanticById(id, &semantic))
+            NYLA_ASSERT(false);
+
+        if (semantic.starts_with("SV_"))
+            continue;
+
         uint32_t location;
-        {
-            auto it = vertexShaderData.reflect.locations.begin();
-            auto end = vertexShaderData.reflect.locations.end();
-            for (; it != end; ++it)
-                if (outputId == it->id)
-                    break;
-            if (it == end)
-                continue;
-            location = it->location;
-        }
+        if (!vsMan.FindLocationBySemantic(semantic, SpirvShaderManager::StorageClass::Output, &location))
+            NYLA_ASSERT(false);
 
-        const auto semantic = [&] -> const InlineString<16> & {
-            auto it = vertexShaderData.reflect.semantics.begin();
-            auto end = vertexShaderData.reflect.semantics.end();
-            for (; it != end; ++it)
-                if (it->id == outputId)
-                    break;
-            NYLA_ASSERT(it != end);
-            return it->semantic;
-        }();
-
-        uint32_t id;
-        {
-            auto it = pixelShaderData.reflect.semantics.begin();
-            auto end = pixelShaderData.reflect.semantics.end();
-            for (; it != end; ++it)
-                if (it->semantic == semantic)
-                    break;
-            if (it == end)
-                continue;
-            id = it->id;
-        }
-
-        auto view = Spirview{pixelShaderData.spv};
-        auto it = view.begin();
-        auto end = view.end();
-        for (; it != end; ++it)
-        {
-            if (it.Op() != spv::OpDecorate)
-                continue;
-
-            auto operandReader = it.GetOperandReader();
-
-            const uint32_t targetId = operandReader.Word();
-            if (targetId != id)
-                continue;
-
-            const auto decoration = spv::Decoration(operandReader.Word());
-            if (decoration != spv::DecorationLocation)
-                continue;
-
-            operandReader.Word() = location;
-            break;
-        }
-        NYLA_ASSERT(it != end);
+        if (!psMan.RewriteLocationForSemantic(semantic, SpirvShaderManager::StorageClass::Input, location))
+            NYLA_ASSERT(false);
     }
 
     auto createShaderModule = [dev = this->m_Dev](std::span<const uint32_t> spv) -> VkShaderModule {
@@ -213,17 +175,20 @@ auto Rhi::Impl::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> R
         return shaderModule;
     };
 
+    Erase(*vertexShaderData.spv, Spirview::kNop);
+    Erase(*pixelShaderData.spv, Spirview::kNop);
+
     const std::array<VkPipelineShaderStageCreateInfo, 2> stages{
         VkPipelineShaderStageCreateInfo{
             .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
             .stage = VK_SHADER_STAGE_VERTEX_BIT,
-            .module = createShaderModule(vertexShaderData.spv),
+            .module = createShaderModule(vertexShaderData.spv->GetSpan()),
             .pName = "main",
         },
         VkPipelineShaderStageCreateInfo{
             .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
             .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-            .module = createShaderModule(pixelShaderData.spv),
+            .module = createShaderModule(pixelShaderData.spv->GetSpan()),
             .pName = "main",
         },
     };

@@ -103,7 +103,7 @@ struct VulkanPipelineData
 
 struct VulkanShaderData
 {
-    InlineVec<uint32_t, 4096> spv;
+    InlineVec<uint32_t, 1 << 18>* spv;
 };
 
 struct VulkanTextureData

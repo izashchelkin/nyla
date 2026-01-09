@@ -12,6 +12,7 @@ Checks: >
   modernize-*,
   -modernize-use-std-print,
   -modernize-use-ranges,
+  -modernize-loop-convert,
 
   readability-identifier-naming
 
@@ -61,7 +62,7 @@ CheckOptions:
     value: k
  
   - key: readability-identifier-naming.MethodIgnoredRegexp
-    value: '^(data|size|begin|end|cbegin|cend|empty|max_size|resize|clear|push_back|pop_back|emplace_back|front|back)$'
+    value: '^(data|size|begin|end|cbegin|cend|empty|max_size|resize|clear|push_back|pop_back|emplace_back|front|back|erase)$'
 
 HeaderFilterRegex: 'nyla/nyla/.*'
 FormatStyle: none
