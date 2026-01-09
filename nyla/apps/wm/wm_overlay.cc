@@ -29,7 +29,6 @@ namespace nyla
 
 auto PlatformMain() -> int
 {
-    LoggingInit();
     SigIntCoreDump();
 
     g_Platform->Init({});
@@ -39,6 +38,8 @@ auto PlatformMain() -> int
                                                true, XCB_EVENT_MASK_EXPOSURE);
     xcb_configure_window(x11->GetConn(), window, XCB_CONFIG_WINDOW_STACK_MODE, (uint32_t[]){XCB_STACK_MODE_BELOW});
     x11->Flush();
+
+    x11->SetWindow(window);
 
     g_Rhi->Init(RhiInitDesc{
         .window = {window},
@@ -76,9 +77,9 @@ auto PlatformMain() -> int
                 if (!x11->PollEvent(event))
                     break;
 
-                if (event.type == PlatformEventType::ShouldRedraw)
+                if (event.type == PlatformEventType::Repaint)
                     shouldRedraw = true;
-                if (event.type == PlatformEventType::ShouldExit)
+                if (event.type == PlatformEventType::Quit)
                     exit(0);
             }
         };

@@ -92,11 +92,11 @@ void WindowManager::Init()
     };
 
     grabKey(1, 0, 0, 0, KeyPhysical::W);
-    grabKey(1, 0, 0, 0, KeyPhysical::X);
+    grabKey(0, 1, 0, 0, KeyPhysical::F4);
     grabKey(1, 0, 0, 0, KeyPhysical::S);
-    grabKey(1, 0, 0, 0, KeyPhysical::D);
+    grabKey(0, 1, 0, 1, KeyPhysical::Tab);
     grabKey(0, 1, 0, 0, KeyPhysical::Tab);
-    grabKey(1, 0, 0, 0, KeyPhysical::G);
+    grabKey(0, 0, 0, 0, KeyPhysical::F11);
     grabKey(1, 0, 0, 0, KeyPhysical::V);
     grabKey(1, 0, 0, 0, KeyPhysical::T);
     grabKey(1, 0, 1, 0, KeyPhysical::ArrowLeft);
@@ -414,11 +414,6 @@ void WindowManager::Process(bool &isRunning)
             const bool alt = keypress->state & XCB_MOD_MASK_1;
             const bool shift = keypress->state & XCB_MOD_MASK_SHIFT;
 
-            NYLA_LOG("keypress meta=%d alt=%d shift=%d", meta, alt, shift);
-
-            if (!meta && !alt && !control)
-                break;
-
             KeyPhysical key;
             if (!m_X11->KeyCodeToKeyPhysical(keypress->detail, &key))
                 break;
@@ -435,7 +430,7 @@ void WindowManager::Process(bool &isRunning)
                 break;
             }
 
-            if (meta && (key == KeyPhysical::D))
+            if (alt && shift && (key == KeyPhysical::Tab))
             {
                 MoveLocalPrev(keypress->time);
                 break;
@@ -447,7 +442,7 @@ void WindowManager::Process(bool &isRunning)
                 break;
             }
 
-            if (meta && (key == KeyPhysical::G))
+            if (key == KeyPhysical::F11)
             {
                 ToggleZoom();
                 break;
@@ -477,7 +472,7 @@ void WindowManager::Process(bool &isRunning)
                 break;
             }
 
-            if (meta && (key == KeyPhysical::X))
+            if (alt && (key == KeyPhysical::F4))
             {
                 CloseActive();
                 break;

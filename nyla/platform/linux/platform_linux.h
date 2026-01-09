@@ -96,6 +96,11 @@ class Platform::Impl
         xcb_flush(m_Conn);
     }
 
+    void SetWindow(xcb_window_t window)
+    {
+        m_Win = window;
+    }
+
     auto KeyPhysicalToKeyCode(KeyPhysical key) -> uint32_t
     {
         return m_KeyPhysicalCodes[static_cast<uint32_t>(key)];
