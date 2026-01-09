@@ -136,6 +136,46 @@ void Platform::Impl::Init(const PlatformInitDesc &desc)
     }
 }
 
+void Platform::Impl::SendConfigureNotify(xcb_window_t window, xcb_window_t parent, int16_t x, int16_t y, uint16_t width,
+                                         uint16_t height, uint16_t borderWidth)
+{
+    const xcb_configure_notify_event_t event = {
+        .response_type = XCB_CONFIGURE_NOTIFY,
+        .window = window,
+        .x = x,
+        .y = y,
+        .width = width,
+        .height = height,
+        .border_width = borderWidth,
+    };
+
+    xcb_send_event(m_Conn, false, window, XCB_EVENT_MASK_STRUCTURE_NOTIFY, reinterpret_cast<const char *>(&event));
+}
+
+void Platform::Impl::SendClientMessage32(xcb_window_t window, xcb_atom_t type, xcb_atom_t arg1, uint32_t arg2,
+                                         uint32_t arg3, uint32_t arg4)
+{
+    const xcb_client_message_event_t event = {
+        .response_type = XCB_CLIENT_MESSAGE,
+        .format = 32,
+        .window = window,
+        .type = type,
+        .data = {.data32 = {arg1, arg2, arg3, arg4}},
+    };
+
+    xcb_send_event(m_Conn, false, window, XCB_EVENT_MASK_NO_EVENT, reinterpret_cast<const char *>(&event));
+}
+
+void Platform::Impl::SendWmTakeFocus(xcb_window_t window, uint32_t time)
+{
+    SendClientMessage32(window, m_Atoms.wm_protocols, m_Atoms.wm_take_focus, time, 0, 0);
+}
+
+void Platform::Impl::SendWmDeleteWindow(xcb_window_t window)
+{
+    SendClientMessage32(window, m_Atoms.wm_protocols, m_Atoms.wm_delete_window, XCB_CURRENT_TIME, 0, 0);
+}
+
 void Platform::Impl::WinOpen()
 {
     if (m_Win)

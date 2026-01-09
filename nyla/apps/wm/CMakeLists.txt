@@ -3,11 +3,8 @@ add_executable(wm)
 target_sources(wm
     PRIVATE
         layout.cc
-        layout.h
         main.cc
-        palette.h
         window_manager.cc
-        window_manager.h
 )
 
 target_include_directories(wm

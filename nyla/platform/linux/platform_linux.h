@@ -1,11 +1,12 @@
 #pragma once
 
-#include "nyla/commons/containers/inline_vec.h"
+#include <array>
+#include <cstdint>
+#include <string_view>
+
 #include "nyla/platform/platform.h"
 #include "xcb/xcb.h"
 #include "xcb/xproto.h"
-#include <cstdint>
-#include <string_view>
 #include <xkbcommon/xkbcommon-x11.h>
 
 #ifdef __clang__
@@ -80,10 +81,47 @@ class Platform::Impl
         return m_ExtensionXInput2MajorOpCode;
     }
 
+    void Grab()
+    {
+        xcb_grab_server(m_Conn);
+    }
+
+    void Ungrab()
+    {
+        xcb_ungrab_server(m_Conn);
+    }
+
     void Flush()
     {
         xcb_flush(m_Conn);
     }
+
+    auto KeyPhysicalToKeyCode(KeyPhysical key) -> uint32_t
+    {
+        return m_KeyPhysicalCodes[static_cast<uint32_t>(key)];
+    }
+
+    auto KeyCodeToKeyPhysical(uint32_t keyCode, KeyPhysical *outKeyPhysical) -> bool
+    {
+        for (uint32_t i = 1; i < m_KeyPhysicalCodes.size(); ++i)
+        {
+            if (m_KeyPhysicalCodes[i] == keyCode)
+            {
+                *outKeyPhysical = static_cast<KeyPhysical>(i);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    //
+
+    void SendClientMessage32(xcb_window_t window, xcb_atom_t type, xcb_atom_t arg1, uint32_t arg2, uint32_t arg3,
+                             uint32_t arg4);
+    void SendWmTakeFocus(xcb_window_t window, uint32_t time);
+    void SendWmDeleteWindow(xcb_window_t window);
+    void SendConfigureNotify(xcb_window_t window, xcb_window_t parent, int16_t x, int16_t y, uint16_t width,
+                             uint16_t height, uint16_t borderWidth);
 
   private:
     int m_ScreenIndex{};

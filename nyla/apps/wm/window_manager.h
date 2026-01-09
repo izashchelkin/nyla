@@ -1,38 +1,109 @@
 #pragma once
 
 #include <cstdint>
-#include <variant>
+#include <string>
+#include <unordered_map>
 #include <vector>
 
+#include "nyla/apps/wm/layout.h"
+#include "nyla/platform/linux/platform_linux.h"
 #include "xcb/xproto.h"
 
 namespace nyla
 {
 
-using KeybindHandler = std::variant<void (*)(xcb_timestamp_t timestamp), void (*)()>;
-using Keybind = std::tuple<xcb_keycode_t, int, KeybindHandler>;
+enum class Color : uint32_t
+{
+    KNone = 0x000000,
+    KActive = 0x95A3B3,
+    KReserved0 = 0xC0FF1F,
+    KActiveFollow = 0x84DCC6,
+    KReserved1 = 0x5E1FFF,
+};
 
-//
+struct WindowStack
+{
+    LayoutType layoutType;
+    bool zoom;
 
-void InitializeWM();
-void ProcessWMEvents(const bool &isRunning, uint16_t modifier, std::vector<Keybind> keybinds);
+    std::vector<xcb_window_t> windows;
+    xcb_window_t activeWindow;
+};
 
-void ProcessWM();
-void UpdateBackground();
+struct Client
+{
+    Rect rect;
+    uint32_t borderWidth;
+    std::string name;
 
-void ManageClientsStartup();
+    bool wmHintsInput;
+    bool wmTakeFocus;
+    bool wmDeleteWindow;
 
-void CloseActive();
+    uint32_t maxWidth;
+    uint32_t maxHeight;
 
-void ToggleZoom();
-void ToggleFollow();
+    bool urgent;
+    bool wantsConfigureNotify;
 
-void MoveLocalNext(xcb_timestamp_t time);
-void MoveLocalPrev(xcb_timestamp_t time);
+    xcb_window_t transientFor;
+    std::vector<xcb_window_t> subwindows;
 
-void MoveStackNext(xcb_timestamp_t time);
-void MoveStackPrev(xcb_timestamp_t time);
+    std::unordered_map<xcb_atom_t, xcb_get_property_cookie_t> propertyCookies;
+};
 
-void NextLayout();
+class WindowManager
+{
+  public:
+    void Init();
+
+    void Process(bool &outIsRunning);
+
+    void MoveLocalNext(xcb_timestamp_t time);
+    void MoveLocalPrev(xcb_timestamp_t time);
+
+    void MoveStackNext(xcb_timestamp_t time);
+    void MoveStackPrev(xcb_timestamp_t time);
+
+    void ToggleZoom();
+    void ToggleFollow();
+
+    void NextLayout();
+
+    void CloseActive();
+
+  private:
+    auto GetActiveStack() -> WindowStack &;
+    void FetchClientProperty(xcb_window_t clientWindow, Client &client, xcb_atom_t property);
+    void ManageClient(xcb_window_t clientWindow);
+    void UnmanageClient(xcb_window_t clientWindow);
+    void Activate(const WindowStack &stack, xcb_timestamp_t time);
+    void Activate(WindowStack &stack, xcb_window_t clientWindow, xcb_timestamp_t time);
+    void ApplyBorder(xcb_connection_t *conn, xcb_window_t window, Color color);
+    void CheckFocusTheft();
+    void MaybeActivateUnderPointer(WindowStack &stack, xcb_timestamp_t ts);
+    void ClearZoom(WindowStack &stack);
+    void ConfigureClientIfNeeded(xcb_connection_t *conn, xcb_window_t clientWindow, Client &client, const Rect &newRect,
+                                 uint32_t newBorderWidth);
+    void MoveStack(xcb_timestamp_t time, auto computeIdx);
+    void MoveLocal(xcb_timestamp_t time, auto computeIdx);
+
+    uint32_t m_BarHeight = 20;
+
+    bool m_LayoutDirty;
+    bool m_Follow;
+    bool m_BorderDirty;
+
+    std::unordered_map<xcb_window_t, Client> m_Clients;
+    std::vector<xcb_window_t> m_PendingClients;
+
+    std::vector<WindowStack> m_Stacks;
+    uint64_t m_ActiveStackIdx;
+
+    xcb_timestamp_t m_LastRawmotionTs = 0;
+    xcb_window_t m_LastEnteredWindow = 0;
+
+    Platform::Impl *m_X11;
+};
 
 } // namespace nyla
