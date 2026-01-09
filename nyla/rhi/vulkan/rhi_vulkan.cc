@@ -247,6 +247,7 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
     std::vector<const char *> deviceExtensions;
     deviceExtensions.emplace_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
     deviceExtensions.emplace_back(VK_EXT_PRESENT_MODE_FIFO_LATEST_READY_EXTENSION_NAME);
+    deviceExtensions.emplace_back(VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME);
 
     if constexpr (kRhiCheckpoints)
     {
@@ -404,9 +405,15 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
         .pNext = &v12,
     };
 
+    VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT vertexInputDynamicStateFeatures{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_INPUT_DYNAMIC_STATE_FEATURES_EXT,
+        .pNext = &v11,
+        .vertexInputDynamicState = true,
+    };
+
     VkPhysicalDevicePresentModeFifoLatestReadyFeaturesKHR fifoLatestReadyFeatures = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRESENT_MODE_FIFO_LATEST_READY_FEATURES_KHR,
-        .pNext = &v11,
+        .pNext = &vertexInputDynamicStateFeatures,
         .presentModeFifoLatestReady = true,
     };
 

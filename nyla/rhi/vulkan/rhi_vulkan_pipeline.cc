@@ -117,16 +117,7 @@ auto Rhi::Impl::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> R
     NYLA_ASSERT(desc.vertexAttributeCount <= std::size(desc.vertexAttributes));
 
     SpirvShaderManager vsMan(vertexShaderData.spv->GetSpan(), RhiShaderStage::Vertex);
-    for (auto semantic : vsMan.GetSemantics())
-    {
-        NYLA_LOG("%s", semantic.CString());
-    }
-
     SpirvShaderManager psMan(pixelShaderData.spv->GetSpan(), RhiShaderStage::Pixel);
-    for (auto semantic : psMan.GetSemantics())
-    {
-        NYLA_LOG("%s", semantic.CString());
-    }
 
     for (uint32_t i = 0; i < desc.vertexAttributeCount; ++i)
     {
