@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <cstring>
 #include <memory>
 #include <span>
 #include <type_traits>
@@ -98,7 +99,6 @@ template <typename T, uint32_t N> class InlineVec
     {
         return {GetPtr(), m_Size};
     }
-
     auto GetSpan() const -> std::span<const value_type>
     {
         return {GetPtr(), m_Size};
@@ -122,7 +122,6 @@ template <typename T, uint32_t N> class InlineVec
         NYLA_ASSERT(i < m_Size);
         return GetPtr()[i];
     }
-
     [[nodiscard]] auto operator[](size_type i) const -> const_reference
     {
         NYLA_ASSERT(i < m_Size);
@@ -159,7 +158,6 @@ template <typename T, uint32_t N> class InlineVec
         NYLA_ASSERT(m_Size);
         return GetPtr()[0];
     }
-
     auto front() const -> const_reference
     {
         NYLA_ASSERT(m_Size);
@@ -171,7 +169,6 @@ template <typename T, uint32_t N> class InlineVec
         NYLA_ASSERT(m_Size);
         return GetPtr()[m_Size - 1];
     }
-
     auto back() const -> const_reference
     {
         NYLA_ASSERT(m_Size);
@@ -254,33 +251,35 @@ template <typename T, uint32_t N> class InlineVec
         NYLA_ASSERT(last >= begin() && last <= end());
         NYLA_ASSERT(first <= last);
 
-        auto *b = begin();
-        auto *e = end();
-        auto *f = const_cast<iterator>(first);
-        auto *l = const_cast<iterator>(last);
+        iterator b = begin();
+        iterator e = end();
+        iterator f = const_cast<iterator>(first);
+        iterator l = const_cast<iterator>(last);
 
         const size_type removeCount = static_cast<size_type>(l - f);
         if (removeCount == 0)
             return f;
 
-        auto *tailFirst = l;
-        auto *tailLast = e;
+        iterator tailFirst = l;
+        iterator tailLast = e;
         const size_type tailCount = static_cast<size_type>(tailLast - tailFirst);
 
-        // Move the tail down to cover the erased range.
+        // Shift tail down to cover the erased range.
         if constexpr (std::is_trivially_copyable_v<T>)
         {
-            // byte move is fine for trivially copyable
             std::memmove(f, tailFirst, sizeof(T) * tailCount);
         }
         else
         {
-            // Move-assign into existing elements [f, f+tailCount)
-            // Safe because f..l are existing constructed objects.
-            std::move(tailFirst, tailLast, f);
+            static_assert(std::is_move_assignable_v<T>,
+                          "InlineVec::erase requires T to be move-assignable (or trivially copyable).");
+
+            // Overlap-safe because destination is always below source (shifting down).
+            for (size_type i = 0; i < tailCount; ++i)
+                f[i] = std::move(tailFirst[i]);
         }
 
-        // Destroy the now-duplicate tail at the end.
+        // Destroy the now-duplicate elements at the end.
         if constexpr (!std::is_trivially_destructible_v<T>)
         {
             std::destroy_n(b + (m_Size - removeCount), removeCount);
@@ -296,11 +295,12 @@ template <typename T, uint32_t N> class InlineVec
 
     auto GetPtr() -> T *
     {
-        return std::launder(reinterpret_cast<T *>(m_Storage.data()));
+        // For "inline vector of T objects", this is enough and usually debugger-friendlier than std::launder.
+        return reinterpret_cast<T *>(m_Storage.data());
     }
     auto GetPtr() const -> const T *
     {
-        return std::launder(reinterpret_cast<const T *>(m_Storage.data()));
+        return reinterpret_cast<const T *>(m_Storage.data());
     }
 };
 

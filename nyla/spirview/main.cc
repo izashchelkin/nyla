@@ -30,7 +30,6 @@ auto Main() -> int
         return 1;
     }
 
-
     NYLA_LOG("=====================");
 
     for (const IdLocation &idLocation : locations)

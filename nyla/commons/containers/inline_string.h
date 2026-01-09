@@ -72,7 +72,7 @@ template <uint32_t N> class InlineString
     {
         for (uint32_t i = 0; i < m_Size; ++i)
         {
-            char& ch = m_Data[i];
+            char &ch = m_Data[i];
             if (ch >= 'a' && ch <= 'z')
                 ch = ch - ('a' - 'A');
             else
