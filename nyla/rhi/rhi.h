@@ -4,7 +4,7 @@
 #include <string_view>
 
 #include "nyla/commons/bitenum.h"
-#include "nyla/commons/memory/charview.h"
+#include "nyla/commons/byteview.h"
 #include "nyla/platform/platform.h"
 
 #include "rhi_buffer.h"

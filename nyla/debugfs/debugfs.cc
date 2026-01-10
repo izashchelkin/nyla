@@ -13,7 +13,6 @@
 #include <string_view>
 
 #include "fuse_lowlevel.h"
-#include "nyla/commons/os/clock.h"
 
 namespace nyla
 {

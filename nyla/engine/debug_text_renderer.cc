@@ -1,6 +1,6 @@
 #include "nyla/engine/debug_text_renderer.h"
+#include "nyla/commons/byteview.h"
 #include "nyla/commons/containers/inline_vec.h"
-#include "nyla/commons/memory/charview.h"
 #include "nyla/engine/engine0_internal.h"
 
 #include <cstdint>

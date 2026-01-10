@@ -16,8 +16,6 @@
 #include "nyla/commons/cleanup.h"
 #include "nyla/commons/containers/inline_vec.h"
 #include "nyla/commons/log.h"
-#include "nyla/commons/os/clock.h"
-#include "nyla/commons/os/spawn.h"
 #include "nyla/platform/linux/platform_linux.h"
 #include "nyla/platform/linux/x11_wm_hints.h"
 #include "nyla/platform/platform.h"

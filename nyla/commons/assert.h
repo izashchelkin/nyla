@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdio>
-#include <cstdlib>
 
 #if defined(_MSC_VER)
 #define NYLA_DEBUGBREAK() __debugbreak()

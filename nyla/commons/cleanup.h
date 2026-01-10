@@ -9,7 +9,7 @@ namespace nyla
 template <class F> class Cleanup
 {
   public:
-    explicit Cleanup(F fn) noexcept(std::is_nothrow_move_constructible_v<F>) : m_fn(std::move(fn))
+    explicit Cleanup(F fn) noexcept(std::is_nothrow_move_constructible_v<F>) : m_Fn(std::move(fn))
     {
     }
 
@@ -21,18 +21,18 @@ template <class F> class Cleanup
 
     ~Cleanup() noexcept
     {
-        if (m_active)
-            m_fn();
+        if (m_Active)
+            m_Fn();
     }
 
-    void dismiss() noexcept
+    void Dismiss() noexcept
     {
-        m_active = false;
+        m_Active = false;
     }
 
   private:
-    F m_fn;
-    bool m_active{true};
+    F m_Fn;
+    bool m_Active{true};
 };
 
 template <class F> Cleanup(F) -> Cleanup<F>;

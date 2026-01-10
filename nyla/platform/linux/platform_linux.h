@@ -44,6 +44,14 @@ class Platform::Impl
     auto WinGetSize() -> PlatformWindowSize;
     auto PollEvent(PlatformEvent &outEvent) -> bool;
 
+    auto Spawn(std::span<const char *const> cmd) -> bool;
+
+    auto PageAlloc(uint32_t &inOutSize, void *&outBase) -> bool;
+
+    auto GetMonotonicTimeMillis() -> uint64_t;
+    auto GetMonotonicTimeMicros() -> uint64_t;
+    auto GetMonotonicTimeNanos() -> uint64_t;
+
     auto WinGetHandle() -> xcb_window_t
     {
         return m_Win;

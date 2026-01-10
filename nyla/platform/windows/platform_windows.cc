@@ -5,7 +5,7 @@
 #include "nyla/platform/platform.h"
 #include <cstdint>
 
-LRESULT CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+auto CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) -> LRESULT;
 
 namespace nyla
 {

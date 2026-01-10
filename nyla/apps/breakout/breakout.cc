@@ -8,7 +8,6 @@
 
 #include "nyla/commons/color.h"
 #include "nyla/commons/math/vec.h"
-#include "nyla/commons/os/clock.h"
 #include "nyla/engine/debug_text_renderer.h"
 #include "nyla/engine/engine.h"
 #include "nyla/engine/renderer2d.h"
@@ -225,7 +224,7 @@ void GameRender(RhiCmdList cmd, RhiRenderTargetView rtv)
                        assets.bricks[i % assets.bricks.size()].index);
     }
 
-    uint64_t second = GetMonotonicTimeMillis() / 1000;
+    uint64_t second = g_Platform->GetMonotonicTimeMillis() / 1000;
     if (second % 2)
     {
         Renderer2DRect(cmd, renderer2d, playerPosX, kPlayerPosY, playerWidth, kPlayerHeight, float4{1.f, 1.f, 1.f, 1},

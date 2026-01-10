@@ -3,11 +3,11 @@
 #include <cstdint>
 #include <string_view>
 
+#include "nyla/commons/align.h"
 #include "nyla/commons/assert.h"
 #include "nyla/commons/containers/inline_vec.h"
 #include "nyla/commons/handle_pool.h"
 #include "nyla/commons/log.h"
-#include "nyla/commons/memory/align.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"

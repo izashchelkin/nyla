@@ -1,5 +1,4 @@
 #include "nyla/apps/breakout/breakout.h"
-#include "nyla/commons/signal/signal.h"
 #include "nyla/engine/debug_text_renderer.h"
 #include "nyla/engine/engine.h"
 #include "nyla/platform/platform.h"
@@ -13,8 +12,6 @@ namespace nyla
 
 auto PlatformMain() -> int
 {
-    SigIntCoreDump();
-
     g_Platform->Init({
         .enabledFeatures = PlatformFeature::KeyboardInput,
     });

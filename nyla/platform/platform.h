@@ -1,7 +1,11 @@
 #pragma once
 
+#include "nyla/commons/assert.h"
 #include "nyla/commons/bitenum.h"
 #include <cstdint>
+#include <fstream>
+#include <string>
+#include <vector>
 
 namespace nyla
 {
@@ -67,6 +71,12 @@ class Platform
     auto WinGetSize() -> PlatformWindowSize;
     auto PollEvent(PlatformEvent &outEvent) -> bool;
 
+    auto PageAlloc(uint32_t &inOutSize, void *&outBase) -> bool;
+
+    auto GetMonotonicTimeMillis() -> uint64_t;
+    auto GetMonotonicTimeMicros() -> uint64_t;
+    auto GetMonotonicTimeNanos() -> uint64_t;
+
     class Impl;
 
     void SetImpl(Impl *impl)
@@ -79,12 +89,35 @@ class Platform
         return m_Impl;
     }
 
+    // TODO: move this
+
+    static auto ReadFileInternal(std::ifstream &file) -> std::vector<std::byte>
+    {
+        NYLA_ASSERT(file.is_open());
+
+        std::vector<std::byte> buffer(file.tellg());
+
+        file.seekg(0);
+        file.read(reinterpret_cast<char *>(buffer.data()), static_cast<long>(buffer.size()));
+
+        file.close();
+        return buffer;
+    }
+
+    auto ReadFile(const std::string &filename) -> std::vector<std::byte>
+    {
+        std::ifstream file(filename, std::ios::ate | std::ios::binary);
+        return ReadFileInternal(file);
+    }
+
+    //
+
   private:
     Impl *m_Impl;
 };
 extern Platform *g_Platform;
 
-int PlatformMain();
+auto PlatformMain() -> int;
 
 enum class KeyPhysical
 {

@@ -2,7 +2,6 @@
 
 #include "nyla/commons/assert.h"
 #include "nyla/commons/containers/inline_vec.h"
-#include "nyla/commons/os/readfile.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_shader.h"
 #include "nyla/spirview/spirview.h"
@@ -23,7 +22,7 @@ auto GetShader(const char *name, RhiShaderStage stage) -> RhiShader
     // TODO: directory watch
     // PlatformFsWatchFile(path);
 
-    std::vector<std::byte> code = ReadFile(path);
+    std::vector<std::byte> code = g_Platform->ReadFile(path);
     const auto spirv = std::span{reinterpret_cast<uint32_t *>(code.data()), code.size() / 4};
 
     RhiShader shader = g_Rhi->CreateShader(RhiShaderDesc{

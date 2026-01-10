@@ -15,8 +15,11 @@ namespace nyla
 
 auto PlatformMain() -> int
 {
-    SigIntCoreDump();
-    SigSegvExitZero();
+    struct sigaction sa;
+    sa.sa_handler = [](int signum) -> void { std::abort(); };
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART;
+    NYLA_ASSERT(sigaction(SIGINT, &sa, NULL) != -1);
 
     g_Platform->Init({.enabledFeatures = PlatformFeature::KeyboardInput | PlatformFeature::MouseInput});
 

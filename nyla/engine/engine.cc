@@ -1,7 +1,6 @@
 #include "nyla/engine/engine.h"
 #include "nyla/commons/assert.h"
 #include "nyla/commons/bitenum.h"
-#include "nyla/commons/os/clock.h"
 #include "nyla/engine/asset_manager.h"
 #include "nyla/engine/frame_arena.h"
 #include "nyla/engine/input_manager.h"
@@ -58,7 +57,7 @@ void Engine::Impl::Init(const EngineInitDesc &desc)
     g_StagingBuffer = CreateStagingBuffer(1 << 22);
     g_AssetManager->Init();
 
-    m_LastFrameStart = GetMonotonicTimeMicros();
+    m_LastFrameStart = g_Platform->GetMonotonicTimeMicros();
 }
 
 auto Engine::Impl::ShouldExit() -> bool
@@ -70,7 +69,7 @@ auto Engine::Impl::FrameBegin() -> EngineFrameBeginResult
 {
     RhiCmdList cmd = g_Rhi->FrameBegin();
 
-    const uint64_t frameStart = GetMonotonicTimeMicros();
+    const uint64_t frameStart = g_Platform->GetMonotonicTimeMicros();
 
     const uint64_t dtUs = frameStart - m_LastFrameStart;
     m_DtUsAccum += dtUs;
@@ -146,7 +145,7 @@ auto Engine::Impl::FrameEnd() -> void
 {
     g_Rhi->FrameEnd();
 
-    uint64_t frameEnd = GetMonotonicTimeMicros();
+    uint64_t frameEnd = g_Platform->GetMonotonicTimeMicros();
     uint64_t frameDurationUs = frameEnd - m_LastFrameStart;
 
     if (m_TargetFrameDurationUs > frameDurationUs)

@@ -25,7 +25,13 @@ class Platform::Impl
 
     auto PollEvent(PlatformEvent &outEvent) -> bool;
 
-    LRESULT MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+    auto MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) -> LRESULT;
+
+    auto PageAlloc(uint32_t &inOutSize, void *&outBase) -> bool;
+
+    auto GetMonotonicTimeMillis() -> uint64_t;
+    auto GetMonotonicTimeMicros() -> uint64_t;
+    auto GetMonotonicTimeNanos() -> uint64_t;
 
   private:
     HINSTANCE m_HInstance{};
