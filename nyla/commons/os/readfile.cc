@@ -1,17 +1,16 @@
 #include "nyla/commons/os/readfile.h"
+#include "nyla/commons/assert.h"
 
 #include <fstream>
 #include <string>
 #include <vector>
-
-#include "absl/log/check.h"
 
 namespace nyla
 {
 
 static auto ReadFileInternal(std::ifstream &file) -> std::vector<std::byte>
 {
-    CHECK(file.is_open());
+    NYLA_ASSERT(file.is_open());
 
     std::vector<std::byte> buffer(file.tellg());
 

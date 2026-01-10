@@ -1,5 +1,11 @@
 /bazel-*
 /.gdb_history
 *.spv
+*.dxil
 
 /build
+/.vs
+/vcpkg_installed
+/tags
+/.cache
+/compile_commands.json

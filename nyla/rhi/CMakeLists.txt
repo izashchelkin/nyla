@@ -1,60 +1,38 @@
-find_package(Vulkan REQUIRED)
-
-file(GLOB_RECURSE RHI_SOURCES CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/*.cc"
-)
-
-file(GLOB_RECURSE RHI_HEADERS CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/*.h"
-)
-
 set(TARGET nyla_rhi)
-add_library(${TARGET})
+add_library(${TARGET} INTERFACE)
 add_library(nyla::rhi ALIAS ${TARGET})
 
 target_sources(${TARGET}
-    PRIVATE
-        ${RHI_SOURCES}
-    PUBLIC
-        ${RHI_HEADERS}
+    INTERFACE
+        rhi.h
+        rhi_buffer.h
+        rhi_cmdlist.h
+        rhi_descriptor.h
+        rhi_pass.h
+        rhi_pipeline.h
+        rhi_sampler.h
+        rhi_shader.h
+        rhi_texture.h
 )
 
-target_include_directories(${TARGET}
-    PUBLIC
-        ${PROJECT_SOURCE_DIR}  
-)
+if (WIN32)
 
-target_link_libraries(${TARGET}
-    PUBLIC
-        nyla::commons
-        nyla::platform
-        Vulkan::Vulkan        
-)
+    add_subdirectory(d3d12)
+    add_subdirectory(vulkan)
 
-set(TARGET_NDEBUG nyla_rhi_ndebug)
-add_library(${TARGET_NDEBUG})
-add_library(nyla::rhi_ndebug ALIAS ${TARGET_NDEBUG})
+    target_link_libraries(${TARGET}
+        INTERFACE
+            nyla::rhi::vulkan
+            # nyla::rhi::d3d12
+    )
 
-target_sources(${TARGET_NDEBUG}
-    PRIVATE
-        ${RHI_SOURCES}
-    PUBLIC
-        ${RHI_HEADERS}
-)
+else()
 
-target_include_directories(${TARGET_NDEBUG}
-    PUBLIC
-        ${PROJECT_SOURCE_DIR}
-)
+    add_subdirectory(vulkan)
 
-target_link_libraries(${TARGET_NDEBUG}
-    PUBLIC
-        nyla::commons
-        nyla::platform
-        Vulkan::Vulkan
-)
+    target_link_libraries(${TARGET}
+        INTERFACE
+            nyla::rhi::vulkan
+    )
 
-target_compile_definitions(${TARGET_NDEBUG}
-    PRIVATE
-        NDEBUG
-)
+endif()

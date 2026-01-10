@@ -9,6 +9,7 @@ namespace nyla
 {
 
 struct GpuStagingBuffer;
+extern GpuStagingBuffer *g_StagingBuffer;
 
 auto CreateStagingBuffer(uint32_t size) -> GpuStagingBuffer *;
 auto StagingBufferCopyIntoBuffer(RhiCmdList cmd, GpuStagingBuffer *stagingBuffer, RhiBuffer dst, uint32_t dstOffset,

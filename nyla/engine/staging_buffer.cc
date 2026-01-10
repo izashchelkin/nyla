@@ -1,5 +1,5 @@
 #include "nyla/engine/staging_buffer.h"
-#include "absl/log/check.h"
+#include "nyla/commons/assert.h"
 #include "nyla/commons/memory/align.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_buffer.h"
@@ -20,7 +20,7 @@ auto CreateStagingBuffer(uint32_t size) -> GpuStagingBuffer *
 {
     auto *stagingBuffer = new GpuStagingBuffer{};
 
-    stagingBuffer->buffer = RhiCreateBuffer(RhiBufferDesc{
+    stagingBuffer->buffer = g_Rhi->CreateBuffer(RhiBufferDesc{
         .size = size,
         .bufferUsage = RhiBufferUsage::CopySrc,
         .memoryUsage = RhiMemoryUsage::CpuToGpu,
@@ -34,12 +34,12 @@ namespace
 
 auto BeforeCopy(GpuStagingBuffer *stagingBuffer, uint32_t copySize) -> char *
 {
-    AlignUp(stagingBuffer->written, RhiGetOptimalBufferCopyOffsetAlignment());
+    AlignUp(stagingBuffer->written, g_Rhi->GetOptimalBufferCopyOffsetAlignment());
 
-    CHECK_LE(stagingBuffer->written + copySize, RhiGetBufferSize(stagingBuffer->buffer));
-    char *ret = RhiMapBuffer(stagingBuffer->buffer) + stagingBuffer->written;
+    NYLA_ASSERT(stagingBuffer->written + copySize <= g_Rhi->GetBufferSize(stagingBuffer->buffer));
+    char *ret = g_Rhi->MapBuffer(stagingBuffer->buffer) + stagingBuffer->written;
 
-    RhiBufferMarkWritten(stagingBuffer->buffer, stagingBuffer->written, copySize);
+    g_Rhi->BufferMarkWritten(stagingBuffer->buffer, stagingBuffer->written, copySize);
     return ret;
 }
 
@@ -50,7 +50,7 @@ auto StagingBufferCopyIntoBuffer(RhiCmdList cmd, GpuStagingBuffer *stagingBuffer
 {
     char *ret = BeforeCopy(stagingBuffer, size);
 
-    RhiCmdCopyBuffer(cmd, dst, dstOffset, stagingBuffer->buffer, stagingBuffer->written, size);
+    g_Rhi->CmdCopyBuffer(cmd, dst, dstOffset, stagingBuffer->buffer, stagingBuffer->written, size);
 
     stagingBuffer->written += size;
     return ret;
@@ -61,7 +61,7 @@ auto StagingBufferCopyIntoTexture(RhiCmdList cmd, GpuStagingBuffer *stagingBuffe
 {
     char *ret = BeforeCopy(stagingBuffer, size);
 
-    RhiCmdCopyTexture(cmd, dst, stagingBuffer->buffer, stagingBuffer->written, size);
+    g_Rhi->CmdCopyTexture(cmd, dst, stagingBuffer->buffer, stagingBuffer->written, size);
 
     stagingBuffer->written += size;
     return ret;

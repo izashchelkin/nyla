@@ -40,4 +40,6 @@ class TweenManager
     float m_now;
 };
 
+extern TweenManager *g_TweenManager;
+
 } // namespace nyla

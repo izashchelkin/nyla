@@ -17,7 +17,7 @@ ConstantBuffer<EntityUbo> entity;
 
 struct VSInput
 {
-    float4 position : POSITION;
+    float4 position : POSITION0;
     float4 color : Color0;
 };
 

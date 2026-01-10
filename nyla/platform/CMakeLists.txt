@@ -1,33 +1,48 @@
-file(GLOB_RECURSE PLATFORM_SOURCES CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/*.cc"
+set(target_platform nyla_platform)
+add_library(${target_platform} INTERFACE)
+add_library(nyla::platform ALIAS ${target_platform})
+
+target_sources(${target_platform}
+    INTERFACE
+        platform.h
 )
 
-file(GLOB_RECURSE PLATFORM_HEADERS CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/*.h"
+set(target_dir_watch nyla_platform_dir_watch)
+add_library(${target_dir_watch} INTERFACE)
+add_library(nyla::platform::dir_watch ALIAS ${target_dir_watch})
+
+target_sources(${target_dir_watch}
+    INTERFACE
+        platform_dir_watch.h
 )
 
-add_library(nyla_platform)
-add_library(nyla::platform ALIAS nyla_platform)
+set(target_audio nyla_platform_audio)
+add_library(${target_audio} INTERFACE)
+add_library(nyla::platform::audio ALIAS ${target_audio})
 
-target_sources(nyla_platform
-    PRIVATE
-        ${PLATFORM_SOURCES}
-    PUBLIC
-        ${PLATFORM_HEADERS}
+target_sources(${target_audio}
+    INTERFACE
+        platform_audio.h
 )
 
-target_include_directories(nyla_platform
-    PUBLIC
-        ${PROJECT_SOURCE_DIR}
-)
-
-target_link_libraries(nyla_platform
-    PUBLIC
-        nyla::commons
-        xcb
-        xcb-util
-        xcb-xkb
-        xkbcommon
-        xkbcommon-x11
-        xcb-xinput
-)
+if (WIN32)
+    add_subdirectory(windows)
+    target_link_libraries(${target_platform}
+        INTERFACE
+            nyla::platform::windows
+    )
+elseif (UNIX AND NOT APPLE)
+    add_subdirectory(linux)
+    target_link_libraries(${target_platform}
+        INTERFACE
+            nyla::platform::linux
+    )
+    target_link_libraries(${target_dir_watch}
+        INTERFACE
+            nyla::platform::linux::dir_watch
+    )
+    target_link_libraries(${target_audio}
+        INTERFACE
+            nyla::platform::linux::audio
+    )
+endif()

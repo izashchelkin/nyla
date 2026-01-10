@@ -1,6 +1,6 @@
 #pragma once
 
-#include "absl/log/check.h"
+#include "nyla/commons/assert.h"
 #include "nyla/commons/math/vec.h"
 
 #include <algorithm>
@@ -19,7 +19,7 @@ template <typename T, uint32_t N> class Mat
 
     Mat(std::initializer_list<T> elems)
     {
-        CHECK_EQ(elems.size(), static_cast<size_t>(N * N));
+        NYLA_ASSERT(elems.size() == static_cast<size_t>(N * N));
         auto it = elems.begin();
         for (uint32_t col = 0; col < N; ++col)
         {
@@ -30,7 +30,7 @@ template <typename T, uint32_t N> class Mat
 
     Mat(std::initializer_list<Vec<T, N>> cols)
     {
-        CHECK_EQ(cols.size(), static_cast<size_t>(N));
+        NYLA_ASSERT(cols.size() == static_cast<size_t>(N));
         auto it = cols.begin();
         for (uint32_t col = 0; col < N; ++col, ++it)
         {
@@ -63,12 +63,12 @@ template <typename T, uint32_t N> class Mat
 
     [[nodiscard]] auto operator[](uint32_t col) -> std::array<T, N> &
     {
-        CHECK_LT(col, N);
+        NYLA_ASSERT(col < N);
         return m_data[col];
     }
     [[nodiscard]] auto operator[](uint32_t col) const -> const std::array<T, N> &
     {
-        CHECK_LT(col, N);
+        NYLA_ASSERT(col < N);
         return m_data[col];
     }
 
@@ -118,7 +118,7 @@ template <typename T, uint32_t N> class Mat
                 }
             }
 
-            CHECK(maxAbs > static_cast<T>(1e-8)) << "Mat is singular or nearly singular in Inversed()";
+            NYLA_ASSERT(maxAbs > static_cast<T>(1e-8));
 
             if (pivotRow != col)
             {

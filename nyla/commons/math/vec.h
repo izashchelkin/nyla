@@ -1,8 +1,10 @@
 #pragma once
 
-#include "absl/log/check.h"
+#include "nyla/commons/assert.h"
+
 #include <algorithm>
 #include <array>
+#include <complex>
 #include <cstddef>
 #include <cstdint>
 #include <initializer_list>
@@ -17,7 +19,7 @@ template <typename T, uint32_t N> class Vec
 
     constexpr Vec(std::initializer_list<T> elems)
     {
-        CHECK_LE(elems.size(), N);
+        NYLA_ASSERT(elems.size() <= N);
         std::ranges::copy(elems.begin(), elems.end(), m_data.begin());
     }
 
@@ -50,14 +52,14 @@ template <typename T, uint32_t N> class Vec
     [[nodiscard]]
     auto operator[](size_t i) const -> const T &
     {
-        CHECK_LT(i, N);
+        NYLA_ASSERT(i < N);
         return m_data[i];
     }
 
     [[nodiscard]]
     auto operator[](size_t i) -> T &
     {
-        CHECK_LT(i, N);
+        NYLA_ASSERT(i < N);
         return m_data[i];
     }
 
@@ -190,5 +192,7 @@ using float3 = Vec<float, 3>;
 using float2 = Vec<float, 2>;
 
 using uint4 = Vec<uint32_t, 4>;
+
+using short2 = Vec<int16_t, 2>;
 
 } // namespace nyla

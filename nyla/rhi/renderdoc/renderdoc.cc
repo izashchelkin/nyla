@@ -2,9 +2,6 @@
 
 #if !defined(NDEBUG)
 
-#include <dlfcn.h>
-
-#include "absl/log/log.h"
 #include "nyla/commons/debug/debugger.h"
 #include "nyla/rhi/renderdoc/renderdoc_app.h"
 
@@ -25,12 +22,12 @@ static auto GetRenderDocAPI() -> RENDERDOC_API_1_6_0 *
         pRENDERDOC_GetAPI renderdocGetApi = reinterpret_cast<pRENDERDOC_GetAPI>(dlsym(mod, "RENDERDOC_GetAPI"));
         if (renderdocGetApi && renderdocGetApi(eRENDERDOC_API_Version_1_6_0, (void **)&renderdocApi) == 1)
         {
-            LOG(INFO) << "got renderdoc api";
+            NYLA_LOG("got renderdoc api");
             return renderdocApi;
         }
 
-        LOG(ERROR) << "failed to get renderdoc api";
-        DebugBreak;
+        NYLA_LOG("failed to get renderdoc api");
+        DebugBreak();
     }
 
     return nullptr;

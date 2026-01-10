@@ -1,6 +1,6 @@
 #include "nyla/commons/color.h"
+#include "nyla/commons/assert.h"
 
-#include "absl/log/check.h"
 #include "nyla/commons/math/vec.h"
 
 namespace nyla
@@ -52,7 +52,7 @@ auto ConvertHsvToRgb(float3 hsv) -> float3
         b = q;
         break;
     default:
-        CHECK(false);
+        NYLA_ASSERT(false);
     }
 
     return {r, g, b};

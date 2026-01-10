@@ -1,17 +1,16 @@
 #include "nyla/engine/debug_text_renderer.h"
 #include "nyla/commons/containers/inline_vec.h"
-#include "nyla/commons/memory/align.h"
+#include "nyla/commons/memory/charview.h"
 #include "nyla/engine/engine0_internal.h"
 
 #include <cstdint>
 
 #include "nyla/commons/math/vec.h"
 #include "nyla/rhi/rhi.h"
-#include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
-#include "nyla/rhi/rhi_descriptor.h"
 #include "nyla/rhi/rhi_pipeline.h"
 #include "nyla/rhi/rhi_shader.h"
+#include "nyla/rhi/rhi_texture.h"
 
 namespace nyla
 {
@@ -31,17 +30,13 @@ struct DrawData
     std::array<float, 4> fg;
     std::array<float, 4> bg;
 };
-InlineVec<DrawData, 4> pendingDebugTextDraws;
+InlineVec<DrawData, 4> g_PendingDebugTextDraws;
 
 } // namespace
 
 struct DebugTextRenderer
 {
     RhiGraphicsPipeline pipeline;
-    RhiDescriptorSetLayout bindGroupLayout;
-    std::array<RhiDescriptorSet, kRhiMaxNumFramesInFlight> bindGroup;
-    std::array<RhiBuffer, kRhiMaxNumFramesInFlight> dynamicUniformBuffer;
-    uint32_t dymamicUniformBufferWritten;
 };
 
 auto CreateDebugTextRenderer() -> DebugTextRenderer *
@@ -51,57 +46,17 @@ auto CreateDebugTextRenderer() -> DebugTextRenderer *
 
     auto *renderer = new DebugTextRenderer{};
 
-    const RhiDescriptorLayoutDesc descriptorLayout{
-        .binding = 0,
-        .type = RhiBindingType::UniformBuffer,
-        .flags = RhiDescriptorFlags::Dynamic,
-        .arraySize = 1,
-        .stageFlags = RhiShaderStage::Pixel,
-    };
-    renderer->bindGroupLayout = RhiCreateDescriptorSetLayout(RhiDescriptorSetLayoutDesc{
-        .descriptors = std::span{&descriptorLayout, 1},
-    });
-
     const RhiGraphicsPipelineDesc pipelineDesc{
         .debugName = "Renderer2D",
         .vs = vs,
         .ps = ps,
-        .bindGroupLayoutsCount = 1,
-        .bindGroupLayouts =
-            {
-                renderer->bindGroupLayout,
-            },
         .colorTargetFormatsCount = 1,
         .colorTargetFormats =
             {
-                RhiGetTextureInfo(RhiGetBackbufferTexture()).format,
+                RhiTextureFormat::B8G8R8A8_sRGB,
             },
     };
-    renderer->pipeline = RhiCreateGraphicsPipeline(pipelineDesc);
-
-    for (uint32_t i = 0; i < RhiGetNumFramesInFlight(); ++i)
-    {
-        constexpr uint32_t kDynamicUniformBufferSize = 1 << 10;
-        renderer->dynamicUniformBuffer[i] = RhiCreateBuffer(RhiBufferDesc{
-            .size = kDynamicUniformBufferSize,
-            .bufferUsage = RhiBufferUsage::Uniform,
-            .memoryUsage = RhiMemoryUsage::CpuToGpu,
-        });
-
-        renderer->bindGroup[i] = RhiCreateDescriptorSet(renderer->bindGroupLayout);
-
-        const RhiDescriptorWriteDesc descriptorWrite{
-            .set = renderer->bindGroup[i],
-            .binding = 0,
-            .arrayIndex = 0,
-            .type = RhiBindingType::UniformBuffer,
-            .resourceBinding = {.buffer = RhiBufferBinding{.buffer = renderer->dynamicUniformBuffer[i],
-                                                           .size = kDynamicUniformBufferSize,
-                                                           .offset = 0,
-                                                           .range = sizeof(DrawData)}},
-        };
-        RhiWriteDescriptors(std::span{&descriptorWrite, 1});
-    }
+    renderer->pipeline = g_Rhi->CreateGraphicsPipeline(pipelineDesc);
 
     return renderer;
 }
@@ -130,33 +85,24 @@ void DebugText(int32_t x, int32_t y, std::string_view text)
         drawData.words[i / 4][i % 4] = word;
     }
 
-    pendingDebugTextDraws.emplace_back(drawData);
+    g_PendingDebugTextDraws.emplace_back(drawData);
 }
 
 void DebugTextRendererDraw(RhiCmdList cmd, DebugTextRenderer *renderer)
 {
-    if (pendingDebugTextDraws.empty())
+    if (g_PendingDebugTextDraws.empty())
         return;
 
-    const uint32_t frameIndex = RhiGetFrameIndex();
+    const uint32_t frameIndex = g_Rhi->GetFrameIndex();
 
-    RhiCmdBindGraphicsPipeline(cmd, renderer->pipeline);
+    g_Rhi->CmdBindGraphicsPipeline(cmd, renderer->pipeline);
 
-    for (const DrawData &drawData : pendingDebugTextDraws)
+    for (const DrawData &drawData : g_PendingDebugTextDraws)
     {
-        AlignUp(renderer->dymamicUniformBufferWritten, RhiGetMinUniformBufferOffsetAlignment());
-        new (RhiMapBuffer(renderer->dynamicUniformBuffer[frameIndex]) + renderer->dymamicUniformBufferWritten)
-            DrawData{drawData};
-
-        const uint32_t offset = renderer->dymamicUniformBufferWritten;
-        renderer->dymamicUniformBufferWritten += sizeof(DrawData);
-
-        RhiCmdBindGraphicsBindGroup(cmd, 0, renderer->bindGroup[frameIndex], {&offset, 1});
-        RhiCmdDraw(cmd, 3, 1, 0, 0);
+        g_Rhi->SetLargeDrawConstant(cmd, ByteViewPtr(&drawData));
+        g_Rhi->CmdDraw(cmd, 3, 1, 0, 0);
     }
-    pendingDebugTextDraws.clear();
-
-    renderer->dymamicUniformBufferWritten = 0;
+    g_PendingDebugTextDraws.clear();
 }
 
 } // namespace nyla

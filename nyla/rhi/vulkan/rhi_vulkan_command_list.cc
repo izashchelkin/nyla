@@ -1,6 +1,7 @@
 #include <cstdint>
 
 #include "nyla/rhi/rhi.h"
+#include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
 
 namespace nyla
@@ -8,24 +9,20 @@ namespace nyla
 
 using namespace rhi_vulkan_internal;
 
-namespace
-{
-
-auto GetDeviceQueue(RhiQueueType queueType) -> DeviceQueue &
+auto Rhi::Impl::GetDeviceQueue(RhiQueueType queueType) -> DeviceQueue &
 {
     switch (queueType)
     {
     case RhiQueueType::Graphics:
-        return vk.graphicsQueue;
+        return m_GraphicsQueue;
     case RhiQueueType::Transfer:
-        return vk.transferQueue;
+        return m_TransferQueue;
     }
-    CHECK(false);
+    NYLA_ASSERT(false);
+    return m_GraphicsQueue;
 }
 
-} // namespace
-
-auto RhiCreateCmdList(RhiQueueType queueType) -> RhiCmdList
+auto Rhi::Impl::CreateCmdList(RhiQueueType queueType) -> RhiCmdList
 {
     VkCommandPool cmdPool = GetDeviceQueue(queueType).cmdPool;
     const VkCommandBufferAllocateInfo allocInfo{
@@ -36,38 +33,59 @@ auto RhiCreateCmdList(RhiQueueType queueType) -> RhiCmdList
     };
 
     VkCommandBuffer commandBuffer;
-    VK_CHECK(vkAllocateCommandBuffers(vk.dev, &allocInfo, &commandBuffer));
+    VK_CHECK(vkAllocateCommandBuffers(m_Dev, &allocInfo, &commandBuffer));
 
-    const VulkanCmdListData cmdData{
+    VulkanCmdListData cmdData{
         .cmdbuf = commandBuffer,
         .queueType = queueType,
     };
 
-    RhiCmdList cmd = rhiHandles.cmdLists.Acquire(cmdData);
+    RhiCmdList cmd = m_CmdLists.Acquire(cmdData);
     return cmd;
 }
 
-void RhiNameCmdList(RhiCmdList cmd, std::string_view name)
+void Rhi::Impl::ResetCmdList(RhiCmdList cmd)
 {
-    VulkanCmdListData cmdData = rhiHandles.cmdLists.ResolveData(cmd);
+    VulkanCmdListData &cmdData = m_CmdLists.ResolveData(cmd);
+    VkCommandBuffer cmdbuf = cmdData.cmdbuf;
+
+    VK_CHECK(vkResetCommandBuffer(cmdbuf, 0));
+
+    cmdData.frameConstantHead = GetFrameIndex() * (CbvOffset(m_Limits.frameConstantSize) +
+                                                   m_Limits.maxPassCount * CbvOffset(m_Limits.passConstantSize) +
+                                                   m_Limits.maxDrawCount * CbvOffset(m_Limits.drawConstantSize) +
+                                                   m_Limits.maxDrawCount * CbvOffset(m_Limits.largeDrawConstantSize));
+
+    cmdData.passConstantHead = cmdData.frameConstantHead + m_Limits.frameConstantSize;
+
+    cmdData.drawConstantHead =
+        cmdData.passConstantHead + (m_Limits.maxPassCount * CbvOffset(m_Limits.passConstantSize));
+
+    cmdData.largeDrawConstantHead =
+        cmdData.drawConstantHead + (m_Limits.maxDrawCount * CbvOffset(m_Limits.drawConstantSize));
+}
+
+void Rhi::Impl::NameCmdList(RhiCmdList cmd, std::string_view name)
+{
+    const VulkanCmdListData &cmdData = m_CmdLists.ResolveData(cmd);
     VulkanNameHandle(VK_OBJECT_TYPE_COMMAND_BUFFER, (uint64_t)cmdData.cmdbuf, name);
 }
 
-void RhiDestroyCmdList(RhiCmdList cmd)
+void Rhi::Impl::DestroyCmdList(RhiCmdList cmd)
 {
-    VulkanCmdListData cmdData = rhiHandles.cmdLists.ReleaseData(cmd);
+    VulkanCmdListData cmdData = m_CmdLists.ReleaseData(cmd);
     VkCommandPool cmdPool = GetDeviceQueue(cmdData.queueType).cmdPool;
-    vkFreeCommandBuffers(vk.dev, cmdPool, 1, &cmdData.cmdbuf);
+    vkFreeCommandBuffers(m_Dev, cmdPool, 1, &cmdData.cmdbuf);
 }
 
-auto RhiCmdSetCheckpoint(RhiCmdList cmd, uint64_t data) -> uint64_t
+auto Rhi::Impl::CmdSetCheckpoint(RhiCmdList cmd, uint64_t data) -> uint64_t
 {
     if constexpr (!kRhiCheckpoints)
     {
         return data;
     }
 
-    VulkanCmdListData cmdData = rhiHandles.cmdLists.ResolveData(cmd);
+    const VulkanCmdListData &cmdData = m_CmdLists.ResolveData(cmd);
 
     static auto fn = VK_GET_INSTANCE_PROC_ADDR(vkCmdSetCheckpointNV);
     fn(cmdData.cmdbuf, reinterpret_cast<void *>(data));
@@ -75,7 +93,7 @@ auto RhiCmdSetCheckpoint(RhiCmdList cmd, uint64_t data) -> uint64_t
     return data;
 }
 
-auto RhiGetLastCheckpointData(RhiQueueType queueType) -> uint64_t
+auto Rhi::Impl::GetLastCheckpointData(RhiQueueType queueType) -> uint64_t
 {
     if constexpr (!kRhiCheckpoints)
     {
@@ -91,6 +109,33 @@ auto RhiGetLastCheckpointData(RhiQueueType queueType) -> uint64_t
     fn(queue, &dataCount, &data);
 
     return (uint64_t)data.pCheckpointMarker;
+}
+
+//
+
+auto Rhi::CreateCmdList(RhiQueueType queueType) -> RhiCmdList
+{
+    return m_Impl->CreateCmdList(queueType);
+}
+
+void Rhi::NameCmdList(RhiCmdList cmd, std::string_view name)
+{
+    m_Impl->NameCmdList(cmd, name);
+}
+
+void Rhi::DestroyCmdList(RhiCmdList cmd)
+{
+    m_Impl->DestroyCmdList(cmd);
+}
+
+auto Rhi::CmdSetCheckpoint(RhiCmdList cmd, uint64_t data) -> uint64_t
+{
+    return m_Impl->CmdSetCheckpoint(cmd, data);
+}
+
+auto Rhi::GetLastCheckpointData(RhiQueueType queueType) -> uint64_t
+{
+    return m_Impl->GetLastCheckpointData(queueType);
 }
 
 } // namespace nyla

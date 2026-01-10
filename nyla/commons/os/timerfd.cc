@@ -1,5 +1,7 @@
 #include "nyla/commons/os/timerfd.h"
 
+#if defined(__linux__) // TODO: do we still need this?
+
 #include <sys/timerfd.h>
 #include <unistd.h>
 
@@ -29,3 +31,17 @@ auto MakeTimerFd(std::chrono::duration<double> interval) -> int
 }
 
 } // namespace nyla
+
+#else
+
+namespace nyla
+{
+
+auto MakeTimerFd(std::chrono::duration<double> interval) -> int
+{
+    return -1;
+}
+
+} // namespace nyla
+
+#endif

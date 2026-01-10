@@ -2,19 +2,27 @@
 
 #include <cstdint>
 #include <cstring>
+#include <limits>
 #include <vector>
 
-#include "absl/log/check.h"
-#include "absl/log/log.h"
+#include "nyla/commons/assert.h"
+#include "nyla/commons/bitenum.h"
 #include "nyla/commons/containers/inline_vec.h"
-#include "nyla/commons/debug/debugger.h"
+#include "nyla/commons/log.h"
+#include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
+#include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_pipeline.h"
 #include "vulkan/vulkan_core.h"
 
 // clang-format off
-#include "xcb/xcb.h"
+#if defined(__linux__)
+#include "nyla/platform/linux/platform_linux.h"
 #include "vulkan/vulkan_xcb.h"
+#else
+#include "nyla/platform/windows/platform_windows.h"
+#include "vulkan/vulkan_win32.h"
+#endif
 // clang-format on
 
 namespace nyla
@@ -22,13 +30,7 @@ namespace nyla
 
 using namespace rhi_vulkan_internal;
 
-namespace rhi_vulkan_internal
-{
-
-VulkanData vk;
-RhiHandles rhiHandles;
-
-auto ConvertRhiVertexFormatIntoVkFormat(RhiVertexFormat format) -> VkFormat
+auto Rhi::Impl::ConvertVertexFormatIntoVkFormat(RhiVertexFormat format) -> VkFormat
 {
     switch (format)
     {
@@ -39,11 +41,11 @@ auto ConvertRhiVertexFormatIntoVkFormat(RhiVertexFormat format) -> VkFormat
     case RhiVertexFormat::R32G32Float:
         return VK_FORMAT_R32G32_SFLOAT;
     }
-    CHECK(false);
+    NYLA_ASSERT(false);
     return static_cast<VkFormat>(0);
 }
 
-auto ConvertRhiShaderStageIntoVkShaderStageFlags(RhiShaderStage stageFlags) -> VkShaderStageFlags
+auto Rhi::Impl::ConvertShaderStageIntoVkShaderStageFlags(RhiShaderStage stageFlags) -> VkShaderStageFlags
 {
     VkShaderStageFlags ret = 0;
     if (Any(stageFlags & RhiShaderStage::Vertex))
@@ -57,58 +59,51 @@ auto ConvertRhiShaderStageIntoVkShaderStageFlags(RhiShaderStage stageFlags) -> V
     return ret;
 }
 
-auto DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-                            VkDebugUtilsMessageTypeFlagsEXT messageType,
-                            const VkDebugUtilsMessengerCallbackDataEXT *callbackData, void *userData) -> VkBool32
+auto Rhi::Impl::DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+                                       VkDebugUtilsMessageTypeFlagsEXT messageType,
+                                       const VkDebugUtilsMessengerCallbackDataEXT *callbackData) -> VkBool32
 {
     switch (messageSeverity)
     {
     case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT: {
-        LOG(ERROR) << callbackData->pMessage;
-        DebugBreak;
+        NYLA_LOG("%s", callbackData->pMessage);
+        NYLA_DEBUGBREAK();
+        break;
     }
     case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT: {
-        LOG(WARNING) << callbackData->pMessage;
+        NYLA_LOG("%s", callbackData->pMessage);
+        break;
     }
     default: {
-        LOG(INFO) << callbackData->pMessage;
+        NYLA_LOG("%s", callbackData->pMessage);
+        break;
     }
     }
     return VK_FALSE;
 }
 
-void VulkanNameHandle(VkObjectType type, uint64_t handle, std::string_view name)
+void Rhi::Impl::VulkanNameHandle(VkObjectType type, uint64_t handle, std::string_view name)
 {
     auto nameCopy = std::string{name};
     const VkDebugUtilsObjectNameInfoEXT nameInfo{
         .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
         .objectType = type,
-        .objectHandle = reinterpret_cast<uint64_t>(handle),
+        .objectHandle = handle,
         .pObjectName = nameCopy.c_str(),
     };
 
     static auto fn = VK_GET_INSTANCE_PROC_ADDR(vkSetDebugUtilsObjectNameEXT);
-    fn(vk.dev, &nameInfo);
+    fn(m_Dev, &nameInfo);
 }
 
-} // namespace rhi_vulkan_internal
-
-void RhiInit(const RhiDesc &rhiDesc)
+void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
 {
     constexpr uint32_t kInvalidIndex = std::numeric_limits<uint32_t>::max();
 
-    CHECK_LE(rhiDesc.numFramesInFlight, kRhiMaxNumFramesInFlight);
-    if (rhiDesc.numFramesInFlight)
-    {
-        vk.numFramesInFlight = rhiDesc.numFramesInFlight;
-    }
-    else
-    {
-        vk.numFramesInFlight = 2;
-    }
+    NYLA_ASSERT(rhiDesc.limits.numFramesInFlight <= kRhiMaxNumFramesInFlight);
 
-    vk.flags = rhiDesc.flags;
-    vk.window = rhiDesc.window;
+    m_Flags = rhiDesc.flags;
+    m_Limits = rhiDesc.limits;
 
     const VkApplicationInfo appInfo{
         .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
@@ -121,7 +116,11 @@ void RhiInit(const RhiDesc &rhiDesc)
 
     InlineVec<const char *, 4> enabledInstanceExtensions;
     enabledInstanceExtensions.emplace_back(VK_KHR_SURFACE_EXTENSION_NAME);
+#if defined(__linux__)
     enabledInstanceExtensions.emplace_back(VK_KHR_XCB_SURFACE_EXTENSION_NAME);
+#else
+    enabledInstanceExtensions.emplace_back(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
+#endif
 
     InlineVec<const char *, 2> instanceLayers;
     if (kRhiValidations)
@@ -147,7 +146,12 @@ void RhiInit(const RhiDesc &rhiDesc)
                            VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
         .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
                        VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
-        .pfnUserCallback = DebugMessengerCallback,
+        .pfnUserCallback = [](VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+                              VkDebugUtilsMessageTypeFlagsEXT messageType,
+                              const VkDebugUtilsMessengerCallbackDataEXT *callbackData, void *userData) -> VkBool32 {
+            return ((Rhi::Impl *)userData)->DebugMessengerCallback(messageSeverity, messageType, callbackData);
+        },
+        .pUserData = this,
     };
 
     std::vector<VkLayerProperties> layers;
@@ -165,21 +169,21 @@ void RhiInit(const RhiDesc &rhiDesc)
         instanceExtensions.resize(instanceExtensionsCount);
         vkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionsCount, instanceExtensions.data());
 
-        LOG(INFO);
-        LOG(INFO) << instanceExtensionsCount << " Instance Extensions available";
+        NYLA_LOG("");
+        NYLA_LOG("%d Instance Extensions available", instanceExtensionsCount);
         for (uint32_t i = 0; i < instanceExtensionsCount; ++i)
         {
             const auto &extension = instanceExtensions[i];
-            LOG(INFO) << "" << extension.extensionName;
+            NYLA_LOG("%s", extension.extensionName);
         }
     }
 
-    LOG(INFO);
-    LOG(INFO) << layers.size() << " Layers available";
+    NYLA_LOG("");
+    NYLA_LOG("%zd Layers available", layers.size());
     for (uint32_t i = 0; i < layerCount; ++i)
     {
         const auto &layer = layers[i];
-        LOG(INFO) << "    " << layer.layerName;
+        NYLA_LOG("    %s", layer.layerName);
 
         std::vector<VkExtensionProperties> layerExtensions;
         uint32_t layerExtensionProperties;
@@ -191,7 +195,7 @@ void RhiInit(const RhiDesc &rhiDesc)
         for (uint32_t i = 0; i < layerExtensionProperties; ++i)
         {
             const auto &extension = layerExtensions[i];
-            LOG(INFO) << "        " << extension.extensionName;
+            NYLA_LOG("        %s", extension.extensionName);
         }
     }
 
@@ -226,23 +230,24 @@ void RhiInit(const RhiDesc &rhiDesc)
         .enabledExtensionCount = static_cast<uint32_t>(enabledInstanceExtensions.size()),
         .ppEnabledExtensionNames = enabledInstanceExtensions.data(),
     };
-    VK_CHECK(vkCreateInstance(&instanceCreateInfo, nullptr, &vk.instance));
+    VK_CHECK(vkCreateInstance(&instanceCreateInfo, nullptr, &m_Instance));
 
     if constexpr (kRhiValidations)
     {
         auto createDebugUtilsMessenger = VK_GET_INSTANCE_PROC_ADDR(vkCreateDebugUtilsMessengerEXT);
-        VK_CHECK(createDebugUtilsMessenger(vk.instance, &debugMessengerCreateInfo, nullptr, &debugMessenger));
+        VK_CHECK(createDebugUtilsMessenger(m_Instance, &debugMessengerCreateInfo, nullptr, &debugMessenger));
     }
 
     uint32_t numPhysDevices = 0;
-    VK_CHECK(vkEnumeratePhysicalDevices(vk.instance, &numPhysDevices, nullptr));
+    VK_CHECK(vkEnumeratePhysicalDevices(m_Instance, &numPhysDevices, nullptr));
 
     std::vector<VkPhysicalDevice> physDevs(numPhysDevices);
-    VK_CHECK(vkEnumeratePhysicalDevices(vk.instance, &numPhysDevices, physDevs.data()));
+    VK_CHECK(vkEnumeratePhysicalDevices(m_Instance, &numPhysDevices, physDevs.data()));
 
     std::vector<const char *> deviceExtensions;
     deviceExtensions.emplace_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
     deviceExtensions.emplace_back(VK_EXT_PRESENT_MODE_FIFO_LATEST_READY_EXTENSION_NAME);
+    deviceExtensions.emplace_back(VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME);
 
     if constexpr (kRhiCheckpoints)
     {
@@ -263,7 +268,7 @@ void RhiInit(const RhiDesc &rhiDesc)
             {
                 if (strcmp(extensions[i].extensionName, deviceExtension) == 0)
                 {
-                    LOG(INFO) << "Found device extension: " << deviceExtension;
+                    NYLA_LOG("Found device extension: %s", deviceExtension);
                     --missingExtensions;
                     break;
                 }
@@ -272,7 +277,7 @@ void RhiInit(const RhiDesc &rhiDesc)
 
         if (missingExtensions)
         {
-            LOG(WARNING) << "Missing " << missingExtensions << " extensions";
+            NYLA_LOG("Missing %d extensions", missingExtensions);
             continue;
         }
 
@@ -329,24 +334,24 @@ void RhiInit(const RhiDesc &rhiDesc)
         }
 
         // TODO: pick best device
-        vk.physDev = physDev;
-        vk.physDevProps = props;
-        vk.physDevMemProps = memProps;
-        vk.graphicsQueue.queueFamilyIndex = graphicsQueueIndex;
-        vk.transferQueue.queueFamilyIndex = transferQueueIndex;
+        m_PhysDev = physDev;
+        m_PhysDevProps = props;
+        m_PhysDevMemProps = memProps;
+        m_GraphicsQueue.queueFamilyIndex = graphicsQueueIndex;
+        m_TransferQueue.queueFamilyIndex = transferQueueIndex;
 
         break;
     }
 
-    CHECK(vk.physDev);
+    NYLA_ASSERT(m_PhysDev);
 
     const float queuePriority = 1.0f;
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-    if (vk.transferQueue.queueFamilyIndex == kInvalidIndex)
+    if (m_TransferQueue.queueFamilyIndex == kInvalidIndex)
     {
         queueCreateInfos.emplace_back(VkDeviceQueueCreateInfo{
             .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-            .queueFamilyIndex = vk.graphicsQueue.queueFamilyIndex,
+            .queueFamilyIndex = m_GraphicsQueue.queueFamilyIndex,
             .queueCount = 1,
             .pQueuePriorities = &queuePriority,
         });
@@ -357,14 +362,14 @@ void RhiInit(const RhiDesc &rhiDesc)
 
         queueCreateInfos.emplace_back(VkDeviceQueueCreateInfo{
             .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-            .queueFamilyIndex = vk.graphicsQueue.queueFamilyIndex,
+            .queueFamilyIndex = m_GraphicsQueue.queueFamilyIndex,
             .queueCount = 1,
             .pQueuePriorities = &queuePriority,
         });
 
         queueCreateInfos.emplace_back(VkDeviceQueueCreateInfo{
             .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-            .queueFamilyIndex = vk.transferQueue.queueFamilyIndex,
+            .queueFamilyIndex = m_TransferQueue.queueFamilyIndex,
             .queueCount = 1,
             .pQueuePriorities = &queuePriority,
         });
@@ -400,9 +405,15 @@ void RhiInit(const RhiDesc &rhiDesc)
         .pNext = &v12,
     };
 
+    VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT vertexInputDynamicStateFeatures{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_INPUT_DYNAMIC_STATE_FEATURES_EXT,
+        .pNext = &v11,
+        .vertexInputDynamicState = true,
+    };
+
     VkPhysicalDevicePresentModeFifoLatestReadyFeaturesKHR fifoLatestReadyFeatures = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRESENT_MODE_FIFO_LATEST_READY_FEATURES_KHR,
-        .pNext = &v11,
+        .pNext = &vertexInputDynamicStateFeatures,
         .presentModeFifoLatestReady = true,
     };
 
@@ -420,87 +431,281 @@ void RhiInit(const RhiDesc &rhiDesc)
         .enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size()),
         .ppEnabledExtensionNames = deviceExtensions.data(),
     };
-    VK_CHECK(vkCreateDevice(vk.physDev, &deviceCreateInfo, nullptr, &vk.dev));
+    VK_CHECK(vkCreateDevice(m_PhysDev, &deviceCreateInfo, nullptr, &m_Dev));
 
-    vkGetDeviceQueue(vk.dev, vk.graphicsQueue.queueFamilyIndex, 0, &vk.graphicsQueue.queue);
+    vkGetDeviceQueue(m_Dev, m_GraphicsQueue.queueFamilyIndex, 0, &m_GraphicsQueue.queue);
 
-    if (vk.transferQueue.queueFamilyIndex == kInvalidIndex)
+    if (m_TransferQueue.queueFamilyIndex == kInvalidIndex)
     {
-        vk.transferQueue.queueFamilyIndex = vk.graphicsQueue.queueFamilyIndex;
-        vk.transferQueue.queue = vk.graphicsQueue.queue;
+        m_TransferQueue.queueFamilyIndex = m_GraphicsQueue.queueFamilyIndex;
+        m_TransferQueue.queue = m_GraphicsQueue.queue;
     }
     else
     {
-        vkGetDeviceQueue(vk.dev, vk.transferQueue.queueFamilyIndex, 0, &vk.transferQueue.queue);
+        vkGetDeviceQueue(m_Dev, m_TransferQueue.queueFamilyIndex, 0, &m_TransferQueue.queue);
     }
 
-    auto initQueue = [](DeviceQueue &queue, RhiQueueType queueType, std::span<RhiCmdList> cmd) -> void {
+    auto initQueue = [this](DeviceQueue &queue, RhiQueueType queueType, std::span<RhiCmdList> cmd) -> void {
         const VkCommandPoolCreateInfo commandPoolCreateInfo{
             .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
             .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
             .queueFamilyIndex = queue.queueFamilyIndex,
         };
-        VK_CHECK(vkCreateCommandPool(vk.dev, &commandPoolCreateInfo, nullptr, &queue.cmdPool));
+        VK_CHECK(vkCreateCommandPool(m_Dev, &commandPoolCreateInfo, nullptr, &queue.cmdPool));
 
         queue.timeline = CreateTimeline(0);
         queue.timelineNext = 1;
 
         for (auto &i : cmd)
         {
-            i = RhiCreateCmdList(queueType);
+            i = CreateCmdList(queueType);
         }
     };
-    initQueue(vk.graphicsQueue, RhiQueueType::Graphics, std::span{vk.graphicsQueueCmd.data(), vk.numFramesInFlight});
-    initQueue(vk.transferQueue, RhiQueueType::Transfer, std::span{&vk.transferQueueCmd, 1});
+    initQueue(m_GraphicsQueue, RhiQueueType::Graphics,
+              std::span{m_GraphicsQueueCmd.data(), m_Limits.numFramesInFlight});
+    initQueue(m_TransferQueue, RhiQueueType::Transfer, std::span{&m_TransferQueueCmd, 1});
 
     const VkSemaphoreCreateInfo semaphoreCreateInfo{
         .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
     };
-    for (size_t i = 0; i < vk.numFramesInFlight; ++i)
+    for (size_t i = 0; i < m_Limits.numFramesInFlight; ++i)
     {
-        VK_CHECK(vkCreateSemaphore(vk.dev, &semaphoreCreateInfo, nullptr, vk.swapchainAcquireSemaphores.data() + i));
+        VK_CHECK(vkCreateSemaphore(m_Dev, &semaphoreCreateInfo, nullptr, m_SwapchainAcquireSemaphores.data() + i));
     }
     for (size_t i = 0; i < kRhiMaxNumSwapchainTextures; ++i)
     {
-        VK_CHECK(vkCreateSemaphore(vk.dev, &semaphoreCreateInfo, nullptr, vk.renderFinishedSemaphores.data() + i));
+        VK_CHECK(vkCreateSemaphore(m_Dev, &semaphoreCreateInfo, nullptr, m_RenderFinishedSemaphores.data() + i));
     }
 
+#if defined(__linux__)
+    const VkXcbSurfaceCreateInfoKHR surfaceCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR,
+        .connection = xcb_connect(nullptr, nullptr),
+        .window = g_Platform->GetImpl()->WinGetHandle(),
+    };
+    VK_CHECK(vkCreateXcbSurfaceKHR(m_Instance, &surfaceCreateInfo, m_Alloc, &m_Surface));
+#else
+    const VkWin32SurfaceCreateInfoKHR surfaceCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
+        .hinstance = g_Platform->GetImpl()->GetHInstance(),
+        .hwnd = g_Platform->GetImpl()->WinGetHandle(),
+    };
+    vkCreateWin32SurfaceKHR(m_Instance, &surfaceCreateInfo, m_Alloc, &m_Surface);
+#endif
+
+    CreateSwapchain();
+
+    //
+
     const std::array<VkDescriptorPoolSize, 4> descriptorPoolSizes{
-        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 256},
-        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 256},
+        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 16},
+        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 16},
         VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 256},
-        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_SAMPLER, 256},
+        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_SAMPLER, 8},
     };
 
     const VkDescriptorPoolCreateInfo descriptorPoolCreateInfo{
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-        .flags =
-            VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT /* | VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT */,
-        .maxSets = 256,
+        .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT | VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT,
+        .maxSets = 16,
         .poolSizeCount = static_cast<uint32_t>(descriptorPoolSizes.size()),
         .pPoolSizes = descriptorPoolSizes.data(),
     };
-    vkCreateDescriptorPool(vk.dev, &descriptorPoolCreateInfo, nullptr, &vk.descriptorPool);
+    vkCreateDescriptorPool(m_Dev, &descriptorPoolCreateInfo, nullptr, &m_DescriptorPool);
 
-    const VkXcbSurfaceCreateInfoKHR surfaceCreateInfo{
-        .sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR,
-        .connection = xcb_connect(nullptr, nullptr),
-        .window = vk.window.handle,
+    auto initDescriptorTable = [this](DescriptorTable &table,
+                                      const VkDescriptorSetLayoutCreateInfo &layoutCreateInfo) -> void {
+        VK_CHECK(vkCreateDescriptorSetLayout(m_Dev, &layoutCreateInfo, m_Alloc, &table.layout));
+
+        const VkDescriptorSetAllocateInfo descriptorSetAllocInfo{
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+            .descriptorPool = m_DescriptorPool,
+            .descriptorSetCount = 1,
+            .pSetLayouts = &table.layout,
+        };
+
+        VK_CHECK(vkAllocateDescriptorSets(m_Dev, &descriptorSetAllocInfo, &table.set));
     };
-    VK_CHECK(vkCreateXcbSurfaceKHR(vk.instance, &surfaceCreateInfo, nullptr, &vk.surface));
 
-    CreateSwapchain();
+    { // Constants
+
+        const std::array<VkDescriptorSetLayoutBinding, 4> descriptorLayoutBindings{
+            VkDescriptorSetLayoutBinding{
+                .binding = 0,
+                .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+                .descriptorCount = 1,
+                .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+            },
+            VkDescriptorSetLayoutBinding{
+                .binding = 1,
+                .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+                .descriptorCount = 1,
+                .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+            },
+            VkDescriptorSetLayoutBinding{
+                .binding = 2,
+                .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+                .descriptorCount = 1,
+                .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+            },
+            VkDescriptorSetLayoutBinding{
+                .binding = 3,
+                .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+                .descriptorCount = 1,
+                .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+            },
+        };
+
+        const VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+            .bindingCount = descriptorLayoutBindings.size(),
+            .pBindings = descriptorLayoutBindings.data(),
+        };
+
+        initDescriptorTable(m_ConstantsDescriptorTable, descriptorSetLayoutCreateInfo);
+
+        const uint32_t bufferSize =
+            m_Limits.numFramesInFlight *
+            (CbvOffset(m_Limits.frameConstantSize) + m_Limits.maxPassCount * CbvOffset(m_Limits.passConstantSize) +
+             m_Limits.maxDrawCount * CbvOffset(m_Limits.drawConstantSize) +
+             m_Limits.maxDrawCount * CbvOffset(m_Limits.largeDrawConstantSize));
+        NYLA_LOG("Constants Buffer Size: %fmb", (double)bufferSize / 1024.0 / 1024.0);
+
+        m_ConstantsUniformBuffer = CreateBuffer(RhiBufferDesc{
+            .size = bufferSize,
+            .bufferUsage = RhiBufferUsage::Uniform,
+            .memoryUsage = RhiMemoryUsage::CpuToGpu,
+        });
+        const VkBuffer &vulkanBuffer = m_Buffers.ResolveData(m_ConstantsUniformBuffer).buffer;
+
+        const std::array<VkDescriptorBufferInfo, 4> bufferInfos{
+            VkDescriptorBufferInfo{
+                .buffer = vulkanBuffer,
+                .range = CbvOffset(m_Limits.frameConstantSize),
+            },
+            VkDescriptorBufferInfo{
+                .buffer = vulkanBuffer,
+                .range = CbvOffset(m_Limits.passConstantSize),
+            },
+            VkDescriptorBufferInfo{
+                .buffer = vulkanBuffer,
+                .range = CbvOffset(m_Limits.drawConstantSize),
+            },
+            VkDescriptorBufferInfo{
+                .buffer = vulkanBuffer,
+                .range = CbvOffset(m_Limits.largeDrawConstantSize),
+            },
+        };
+
+        InlineVec<VkWriteDescriptorSet, bufferInfos.size()> descriptorWrites;
+        for (uint32_t i = 0; i < bufferInfos.size(); ++i)
+        {
+            const VkDescriptorBufferInfo &bufferInfo = bufferInfos[i];
+            if (bufferInfo.range)
+            {
+                descriptorWrites.emplace_back(VkWriteDescriptorSet{
+                    .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                    .dstSet = m_ConstantsDescriptorTable.set,
+                    .dstBinding = i,
+                    .descriptorCount = 1,
+                    .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+                    .pBufferInfo = &bufferInfo,
+                });
+            }
+        }
+
+        vkUpdateDescriptorSets(m_Dev, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
+    }
+
+    { // Textures
+
+        const VkDescriptorBindingFlags bindingFlags =
+            VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT;
+
+        const VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
+            .bindingCount = 1,
+            .pBindingFlags = &bindingFlags,
+        };
+
+        const VkDescriptorSetLayoutBinding descriptorLayoutBinding{
+            .binding = 0,
+            .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+            .descriptorCount = m_Limits.numTextureViews,
+            .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+        };
+
+        const VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+            .pNext = &bindingFlagsCreateInfo,
+            .flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT,
+            .bindingCount = 1,
+            .pBindings = &descriptorLayoutBinding,
+        };
+
+        initDescriptorTable(m_TexturesDescriptorTable, descriptorSetLayoutCreateInfo);
+    }
+
+    { // Samplers
+
+        const VkDescriptorBindingFlags bindingFlags =
+            VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT;
+
+        const VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
+            .bindingCount = 1,
+            .pBindingFlags = &bindingFlags,
+        };
+
+        const VkDescriptorSetLayoutBinding descriptorLayoutBinding{
+            .binding = 0,
+            .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
+            .descriptorCount = m_Limits.numSamplers,
+            .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+        };
+
+        const VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+            .pNext = &bindingFlagsCreateInfo,
+            .flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT,
+            .bindingCount = 1,
+            .pBindings = &descriptorLayoutBinding,
+        };
+
+        initDescriptorTable(m_SamplersDescriptorTable, descriptorSetLayoutCreateInfo);
+    }
 }
 
-auto RhiGetMinUniformBufferOffsetAlignment() -> uint32_t
+auto Rhi::Impl::GetMinUniformBufferOffsetAlignment() -> uint32_t
 {
-    return vk.physDevProps.limits.minUniformBufferOffsetAlignment;
+    return m_PhysDevProps.limits.minUniformBufferOffsetAlignment;
 }
 
-auto RhiGetOptimalBufferCopyOffsetAlignment() -> uint32_t
+auto Rhi::Impl::GetOptimalBufferCopyOffsetAlignment() -> uint32_t
 {
-    return vk.physDevProps.limits.optimalBufferCopyOffsetAlignment;
+    return m_PhysDevProps.limits.optimalBufferCopyOffsetAlignment;
 }
+
+//
+
+void Rhi::Init(const RhiInitDesc &rhiDesc)
+{
+    NYLA_ASSERT(!m_Impl);
+    m_Impl = new Impl{};
+    m_Impl->Init(rhiDesc);
+}
+
+auto Rhi::GetMinUniformBufferOffsetAlignment() -> uint32_t
+{
+    return m_Impl->GetMinUniformBufferOffsetAlignment();
+}
+
+auto Rhi::GetOptimalBufferCopyOffsetAlignment() -> uint32_t
+{
+    return m_Impl->GetOptimalBufferCopyOffsetAlignment();
+}
+
+Rhi *g_Rhi = new Rhi{};
 
 } // namespace nyla
 

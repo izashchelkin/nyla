@@ -3,8 +3,6 @@
 #include <cstdint>
 #include <vector>
 
-#include "absl/strings/str_format.h"
-
 namespace nyla
 {
 
@@ -37,8 +35,6 @@ class Rect
     {
         return !(*this == rhs);
     }
-
-    template <typename Sink> friend void AbslStringify(Sink &sink, const Rect &rect);
 
     auto X() -> int32_t &
     {
@@ -83,11 +79,6 @@ class Rect
     uint32_t height;
 };
 static_assert(sizeof(Rect) == 16);
-
-template <typename Sink> void AbslStringify(Sink &sink, const Rect &rect)
-{
-    absl::Format(&sink, "%dx%d at (%d, %d)", rect.width, rect.height, rect.x, rect.y);
-}
 
 inline auto IsSameWH(const Rect &lhs, const Rect &rhs) -> bool
 {

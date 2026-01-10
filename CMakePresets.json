@@ -1,15 +1,50 @@
 {
-  "version": 3,
-  "cmakeMinimumRequired": {
-    "major": 4,
-    "minor": 2
-  },
+  "version": 6,
+  "cmakeMinimumRequired": { "major": 3, "minor": 25 },
+
   "configurePresets": [
     {
-      "name": "debug",
-      "displayName": "Debug (Ninja)",
+      "name": "windows-vs",
+      "hidden": true,
+      "displayName": "Windows (Visual Studio)",
+      "generator": "Visual Studio 18 2026",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/build/windows-vs",
+      "cacheVariables": {
+      }
+    },
+
+    {
+      "name": "windows-ninja-debug",
+      "displayName": "Windows (Ninja + MSVC Debug)",
       "generator": "Ninja",
-      "binaryDir": "build/debug",
+      "binaryDir": "${sourceDir}/build/windows-ninja-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_COMPILER": "cl",
+        "CMAKE_CXX_COMPILER": "cl",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+
+    {
+      "name": "clangd-db",
+      "displayName": "Clangd compile DB only (clang-cl)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/clangd-db",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CMAKE_C_COMPILER": "clang-cl",
+        "CMAKE_CXX_COMPILER": "clang-cl"
+      }
+    },
+
+    {
+      "name": "linux-debug",
+      "displayName": "Linux (Ninja Debug)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/linux-debug",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
@@ -17,25 +52,30 @@
       }
     },
     {
-      "name": "release",
-      "displayName": "Release (Ninja)",
+      "name": "linux-release",
+      "displayName": "Linux (Ninja Release)",
       "generator": "Ninja",
-      "binaryDir": "build/release",
+      "binaryDir": "${sourceDir}/build/linux-release",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_EXPORT_COMPILE_COMMANDS": "OFF",
         "CMAKE_CXX_COMPILER": "clang++"
       }
     }
   ],
+
   "buildPresets": [
     {
-      "name": "debug",
-      "configurePreset": "debug"
+      "name": "windows-ninja-debug",
+      "configurePreset": "windows-ninja-debug"
+    },
+
+    {
+      "name": "linux-debug",
+      "configurePreset": "linux-debug"
     },
     {
-      "name": "release",
-      "configurePreset": "release"
+      "name": "linux-release",
+      "configurePreset": "linux-release"
     }
   ]
 }

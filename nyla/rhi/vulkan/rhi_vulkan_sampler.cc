@@ -20,7 +20,7 @@ auto ConvertFilter(RhiFilter filter) -> VkFilter
     case RhiFilter::Nearest:
         return VK_FILTER_NEAREST;
     }
-    CHECK(false);
+    NYLA_ASSERT(false);
     return {};
 }
 
@@ -33,13 +33,13 @@ auto ConvertSamplerAddressMode(RhiSamplerAddressMode addressMode) -> VkSamplerAd
     case RhiSamplerAddressMode::ClampToEdge:
         return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
     }
-    CHECK(false);
+    NYLA_ASSERT(false);
     return {};
 }
 
 } // namespace
 
-auto RhiCreateSampler(const RhiSamplerDesc &desc) -> RhiSampler
+auto Rhi::Impl::CreateSampler(const RhiSamplerDesc &desc) -> RhiSampler
 {
     const VkSamplerCreateInfo createInfo{
         .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
@@ -56,16 +56,28 @@ auto RhiCreateSampler(const RhiSamplerDesc &desc) -> RhiSampler
         .maxLod = 0.f,
     };
 
-    VulkanSamplerData samplerData;
-    VK_CHECK(vkCreateSampler(vk.dev, &createInfo, vk.alloc, &samplerData.sampler));
+    VulkanSamplerData samplerData{};
+    VK_CHECK(vkCreateSampler(m_Dev, &createInfo, m_Alloc, &samplerData.sampler));
 
-    return rhiHandles.samplers.Acquire(samplerData);
+    return m_Samplers.Acquire(samplerData);
 }
 
-void RhiDestroySampler(RhiSampler sampler)
+void Rhi::Impl::DestroySampler(RhiSampler sampler)
 {
-    VulkanSamplerData samplerData = rhiHandles.samplers.ReleaseData(sampler);
-    vkDestroySampler(vk.dev, samplerData.sampler, vk.alloc);
+    VulkanSamplerData samplerData = m_Samplers.ReleaseData(sampler);
+    vkDestroySampler(m_Dev, samplerData.sampler, m_Alloc);
+}
+
+//
+
+auto Rhi::CreateSampler(const RhiSamplerDesc &desc) -> RhiSampler
+{
+    return m_Impl->CreateSampler(desc);
+}
+
+void Rhi::DestroySampler(RhiSampler sampler)
+{
+    m_Impl->DestroySampler(sampler);
 }
 
 } // namespace nyla

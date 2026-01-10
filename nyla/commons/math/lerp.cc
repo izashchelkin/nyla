@@ -1,9 +1,9 @@
 #include "nyla/commons/math/lerp.h"
 
 #include <algorithm>
+#include <cmath>
+#include <numbers>
 #include <span>
-
-#include "absl/log/check.h"
 
 namespace nyla
 {

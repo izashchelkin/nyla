@@ -12,8 +12,6 @@
 #include <span>
 #include <string_view>
 
-#include "absl/log/check.h"
-#include "absl/log/log.h"
 #include "fuse_lowlevel.h"
 #include "nyla/commons/os/clock.h"
 
@@ -34,7 +32,6 @@ void FuseReplyBufSlice(fuse_req_t req, std::span<const char> buf, off_t offset, 
         FuseReplyEmptyBuf(req);
     else
     {
-        // LOG(INFO) << "bufsize=" << buf.size() << " offset=" << offset;
         fuse_reply_buf(req, buf.data() + offset, std::min(size, buf.size() - offset));
     }
 }
@@ -70,7 +67,6 @@ static auto MakeFileEntryParam(ino_t inode, DebugFsFile &file) -> fuse_entry_par
 
 static void HandleInit(void *userdata, struct fuse_conn_info *conn)
 {
-    // LOG(INFO) << "init";
 
     conn->want = FUSE_CAP_ASYNC_READ;
     conn->want &= ~FUSE_CAP_ASYNC_READ;
@@ -78,8 +74,6 @@ static void HandleInit(void *userdata, struct fuse_conn_info *conn)
 
 static void HandleLookup(fuse_req_t req, fuse_ino_t parentInode, const char *name)
 {
-    // LOG(INFO) << "lookup " << parent_inode << " " << name;
-
     if (parentInode != 1)
     {
         fuse_reply_err(req, ENOENT);
@@ -104,8 +98,6 @@ static void HandleLookup(fuse_req_t req, fuse_ino_t parentInode, const char *nam
 
 static void HandleGetAttr(fuse_req_t req, fuse_ino_t inode, fuse_file_info *fileInfo)
 {
-    // LOG(INFO) << "get attr " << inode;
-
     if (inode == 1)
     {
         const fuse_entry_param entryParam{
@@ -133,30 +125,22 @@ static void HandleGetAttr(fuse_req_t req, fuse_ino_t inode, fuse_file_info *file
 
 static void HandleGetXAttr(fuse_req_t req, fuse_ino_t inode, const char *name, size_t size)
 {
-    // LOG(INFO) << "get x attr";
-
     fuse_reply_err(req, ENOTSUP);
 }
 
 static void HandleSetXAttr(fuse_req_t req, fuse_ino_t inode, const char *name, const char *value, size_t size,
                            int flags)
 {
-    // LOG(INFO) << "set x attr";
-
     fuse_reply_err(req, ENOTSUP);
 }
 
 static void HandleRemoveXAttr(fuse_req_t req, fuse_ino_t inode, const char *name)
 {
-    // LOG(INFO) << "remove x attr";
-
     fuse_reply_err(req, ENOTSUP);
 }
 
 static void HandleOpen(fuse_req_t req, fuse_ino_t inode, fuse_file_info *fileInfo)
 {
-    // LOG(INFO) << "open " << inode;
-
     if (inode == 1)
     {
         fuse_reply_err(req, EISDIR);
@@ -181,8 +165,6 @@ static void HandleOpen(fuse_req_t req, fuse_ino_t inode, fuse_file_info *fileInf
 
 static void HandleRead(fuse_req_t req, fuse_ino_t inode, size_t size, off_t offset, fuse_file_info *fileInfo)
 {
-    // LOG(INFO) << "read " << inode << " " << size << " " << offset;
-
     auto it = debugfs.files.find(inode);
     if (it == debugfs.files.end())
     {
@@ -201,8 +183,6 @@ static void HandleRead(fuse_req_t req, fuse_ino_t inode, size_t size, off_t offs
 
 static void HandleReadDir(fuse_req_t req, fuse_ino_t inode, size_t size, off_t offset, fuse_file_info *fileInfo)
 {
-    // LOG(INFO) << "read dir " << inode << " " << size << " " << offset;
-
     if (inode != 1)
     {
         fuse_reply_err(req, ENOTDIR);
@@ -266,18 +246,18 @@ void DebugFsInitialize(const std::string &path)
     }
 
     debugfs.session = fuse_session_new(&args, &op, sizeof(op), nullptr);
-    CHECK(debugfs.session);
-    CHECK(!fuse_session_mount(debugfs.session, pathCstr));
+    NYLA_ASSERT(debugfs.session);
+    NYLA_ASSERT(!fuse_session_mount(debugfs.session, pathCstr));
 
     debugfs.fd = fuse_session_fd(debugfs.session);
 
-    LOG(INFO) << "initialized debugfs";
+    NYLA_LOG("initialized debugfs");
 }
 
 void DebugFsRegister(const char *name, void *data, void (*setContentHandler)(DebugFsFile &),
                      void (*readNotifyHandler)(DebugFsFile &))
 {
-    LOG(INFO) << "registering debugfs file " << name;
+    NYLA_LOG("registering debugfs file %s", name);
 
     CHECK(setContentHandler);
     debugfs.files.emplace(nextInode++, DebugFsFile{

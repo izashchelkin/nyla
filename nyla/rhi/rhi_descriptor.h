@@ -10,6 +10,7 @@
 namespace nyla
 {
 
+#if 0
 struct RhiDescriptorSetLayout : Handle
 {
 };
@@ -45,17 +46,11 @@ struct RhiDescriptorSetLayoutDesc
     std::span<const RhiDescriptorLayoutDesc> descriptors;
 };
 
-auto RhiCreateDescriptorSetLayout(const RhiDescriptorSetLayoutDesc &) -> RhiDescriptorSetLayout;
-void RhiDestroyDescriptorSetLayout(RhiDescriptorSetLayout);
-
 //
 
 struct RhiDescriptorSet : Handle
 {
 };
-
-auto RhiCreateDescriptorSet(RhiDescriptorSetLayout) -> RhiDescriptorSet;
-void RhiDestroyDescriptorSet(RhiDescriptorSet);
 
 //
 
@@ -74,7 +69,7 @@ struct RhiSamplerBinding
 
 struct RhiTextureBinding
 {
-    RhiTexture texture;
+    RhiTextureView textureView;
 };
 
 union RhiDescriptorResourceBinding {
@@ -91,7 +86,6 @@ struct RhiDescriptorWriteDesc
     RhiBindingType type;
     RhiDescriptorResourceBinding resourceBinding;
 };
-
-void RhiWriteDescriptors(std::span<const RhiDescriptorWriteDesc>);
+#endif
 
 } // namespace nyla

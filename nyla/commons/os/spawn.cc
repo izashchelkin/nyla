@@ -1,4 +1,8 @@
 #include "nyla/commons/os/spawn.h"
+#include "nyla/commons/assert.h"
+#include "nyla/commons/log.h"
+
+#if defined(__linux__) // TODO: move to platform
 
 #include <fcntl.h>
 #include <linux/close_range.h>
@@ -7,8 +11,6 @@
 #include <unistd.h>
 
 #include <span>
-
-#include "absl/log/log.h"
 
 namespace nyla
 {
@@ -30,7 +32,7 @@ auto Spawn(std::span<const char *const> cmd) -> bool
             sa.sa_flags = SA_RESTART;
             if (sigaction(SIGCHLD, &sa, NULL) == -1)
             {
-                LOG(ERROR) << "sigaction failed";
+                NYLA_LOG("sigaction failed");
                 return false;
             }
             else
@@ -75,3 +77,13 @@ failure:
 }
 
 } // namespace nyla
+
+#else
+
+auto Spawn(std::span<const char *const> cmd) -> bool
+{
+    NYLA_ASSERT(false);
+    return false;
+}
+
+#endif

@@ -5,10 +5,35 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "audio_main",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/linux-debug/nyla/audio/nyla_audio_main",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "audio_main build",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
             "name": "wm_overlay",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/debug/nyla/apps/wm/wm_overlay",
+            "program": "${workspaceFolder}/build/linux-debug/nyla/apps/wm/wm_overlay",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
@@ -33,7 +58,7 @@
             "name": "spirview",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/debug/nyla/spirview/nyla_spirview_bin",
+            "program": "${workspaceFolder}/build/linux-debug/nyla/spirview/nyla_spirview_bin",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
@@ -58,7 +83,7 @@
             "name": "breakout",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/debug/nyla/apps/breakout/breakout",
+            "program": "${workspaceFolder}/build/linux-debug/nyla/apps/breakout/breakout",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
@@ -83,7 +108,7 @@
             "name": "shipgame",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/debug/nyla/apps/shipgame/shipgame",
+            "program": "${workspaceFolder}/build/linux-debug/nyla/apps/shipgame/shipgame",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

@@ -2,9 +2,7 @@
 
 #include "nyla/commons/bitenum.h"
 #include "nyla/commons/handle.h"
-#include "nyla/rhi/rhi_cmdlist.h"
 #include <cstdint>
-#include <string_view>
 
 namespace nyla
 {
@@ -52,20 +50,5 @@ struct RhiBufferDesc
     RhiBufferUsage bufferUsage;
     RhiMemoryUsage memoryUsage;
 };
-
-auto RhiCreateBuffer(const RhiBufferDesc &) -> RhiBuffer;
-void RhiNameBuffer(RhiBuffer, std::string_view name);
-void RhiDestroyBuffer(RhiBuffer);
-
-auto RhiGetBufferSize(RhiBuffer) -> uint32_t;
-
-auto RhiMapBuffer(RhiBuffer) -> char *;
-void RhiUnmapBuffer(RhiBuffer);
-void RhiBufferMarkWritten(RhiBuffer, uint32_t offset, uint32_t size);
-
-void RhiCmdCopyBuffer(RhiCmdList cmd, RhiBuffer dst, uint32_t dstOffset, RhiBuffer src, uint32_t srcOffset,
-                      uint32_t size);
-void RhiCmdTransitionBuffer(RhiCmdList cmd, RhiBuffer buffer, RhiBufferState newState);
-void RhiCmdUavBarrierBuffer(RhiCmdList cmd, RhiBuffer buffer);
 
 } // namespace nyla

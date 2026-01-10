@@ -13,14 +13,9 @@ struct Entity
     uint32_t samplerIndex;
 };
 
-[[vk::binding(0, 0)]]
-ConstantBuffer<Entity> entity;
-
-[[vk::binding(0, 1)]]
-SamplerState samplers[];
-
-[[vk::binding(1, 1)]]
-Texture2D textures[];
+ConstantBuffer<Entity> entity : register(b2, space0);
+Texture2D textures[] : register(s0, space1);
+SamplerState samplers[] : register(t0, space2);
 
 struct PSOutput
 {

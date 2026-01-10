@@ -3,12 +3,21 @@
 	"tasks": [
 		{
 			"type": "cmake",
+			"label": "audio_main build",
+			"command": "build",
+			"targets": [
+				"nyla_audio_main"
+			],
+			"group": "build",
+			"problemMatcher": [],
+		},
+		{
+			"type": "cmake",
 			"label": "wm_overlay build",
 			"command": "build",
 			"targets": [
 				"wm_overlay"
 			],
-			"preset": "debug",
 			"group": "build",
 			"problemMatcher": [],
 		},
@@ -19,7 +28,6 @@
 			"targets": [
 				"nyla_spirview_bin"
 			],
-			"preset": "debug",
 			"group": "build",
 			"problemMatcher": [],
 		},
@@ -30,7 +38,6 @@
 			"targets": [
 				"breakout"
 			],
-			"preset": "debug",
 			"group": "build",
 			"problemMatcher": [],
 		},
@@ -41,7 +48,6 @@
 			"targets": [
 				"shipgame"
 			],
-			"preset": "debug",
 			"group": "build",
 			"problemMatcher": [],
 		}

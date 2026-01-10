@@ -8,18 +8,19 @@ namespace nyla
 
 using namespace rhi_vulkan_internal;
 
-void RhiPassBegin(RhiPassDesc desc)
+void Rhi::Impl::PassBegin(RhiPassDesc desc)
 {
-    RhiCmdList cmd = vk.graphicsQueueCmd[vk.frameIndex];
-    VkCommandBuffer cmdbuf = rhiHandles.cmdLists.ResolveData(cmd).cmdbuf;
+    RhiCmdList cmd = m_GraphicsQueueCmd[m_FrameIndex];
+    const VkCommandBuffer &cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
 
-    RhiCmdTransitionTexture(cmd, desc.colorTarget, desc.state);
+    const VulkanTextureViewData &colorTargetViewData = m_RenderTargetViews.ResolveData(desc.renderTarget);
+    const VulkanTextureData &colorTargetData = m_Textures.ResolveData(colorTargetViewData.texture);
 
-    const VulkanTextureData colorTargetData = rhiHandles.textures.ResolveData(desc.colorTarget);
+    CmdTransitionTexture(cmd, colorTargetViewData.texture, desc.state);
 
     const VkRenderingAttachmentInfo colorAttachmentInfo{
         .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-        .imageView = colorTargetData.imageView,
+        .imageView = colorTargetViewData.imageView,
         .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
         .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
@@ -57,13 +58,30 @@ void RhiPassBegin(RhiPassDesc desc)
     vkCmdSetScissor(cmdbuf, 0, 1, &scissor);
 }
 
-void RhiPassEnd(RhiPassDesc desc)
+void Rhi::Impl::PassEnd(RhiPassDesc desc)
 {
-    RhiCmdList cmd = vk.graphicsQueueCmd[vk.frameIndex];
-    VkCommandBuffer cmdbuf = rhiHandles.cmdLists.ResolveData(cmd).cmdbuf;
+    RhiCmdList cmd = m_GraphicsQueueCmd[m_FrameIndex];
+    VulkanCmdListData &cmdData = m_CmdLists.ResolveData(cmd);
+    VkCommandBuffer cmdbuf = cmdData.cmdbuf;
     vkCmdEndRendering(cmdbuf);
 
-    RhiCmdTransitionTexture(cmd, desc.colorTarget, desc.state);
+    const VulkanTextureViewData &rtvData = m_RenderTargetViews.ResolveData(desc.renderTarget);
+
+    CmdTransitionTexture(cmd, rtvData.texture, desc.state);
+
+    cmdData.passConstantHead += CbvOffset(m_Limits.passConstantSize);
+}
+
+//
+
+void Rhi::PassBegin(RhiPassDesc desc)
+{
+    m_Impl->PassBegin(desc);
+}
+
+void Rhi::PassEnd(RhiPassDesc desc)
+{
+    m_Impl->PassEnd(desc);
 }
 
 } // namespace nyla

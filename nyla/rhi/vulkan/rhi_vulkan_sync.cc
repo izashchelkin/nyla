@@ -1,15 +1,12 @@
 #include <cstdint>
 
-#include "nyla/commons/debug/debugger.h"
+#include "nyla/commons/assert.h"
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
 
 namespace nyla
 {
 
-namespace rhi_vulkan_internal
-{
-
-auto CreateTimeline(uint64_t initialValue) -> VkSemaphore
+auto Rhi::Impl::CreateTimeline(uint64_t initialValue) -> VkSemaphore
 {
     const VkSemaphoreTypeCreateInfo timelineCreateInfo{
         .sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO,
@@ -23,11 +20,11 @@ auto CreateTimeline(uint64_t initialValue) -> VkSemaphore
     };
 
     VkSemaphore semaphore;
-    vkCreateSemaphore(vk.dev, &semaphoreCreateInfo, nullptr, &semaphore);
+    vkCreateSemaphore(m_Dev, &semaphoreCreateInfo, nullptr, &semaphore);
     return semaphore;
 }
 
-void WaitTimeline(VkSemaphore timeline, uint64_t waitValue)
+void Rhi::Impl::WaitTimeline(VkSemaphore timeline, uint64_t waitValue)
 {
     const VkSemaphoreWaitInfo waitInfo{
         .sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO,
@@ -38,24 +35,25 @@ void WaitTimeline(VkSemaphore timeline, uint64_t waitValue)
         .pValues = &waitValue,
     };
 
-    if (vkWaitSemaphores(vk.dev, &waitInfo, 1e9) != VK_SUCCESS)
+    VK_CHECK(vkWaitSemaphores(m_Dev, &waitInfo, 1e9));
+
+#if 0
     {
         uint64_t currentValue = -1;
-        vkGetSemaphoreCounterValue(vk.dev, timeline, &currentValue);
-        DebugBreak;
+        vkGetSemaphoreCounterValue(m_Dev, timeline, &currentValue);
+        DebugBreak();
 
         VkSemaphoreSignalInfo info{
             .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO,
             .semaphore = timeline,
             .value = waitValue,
         };
-        VK_CHECK(vkSignalSemaphore(vk.dev, &info));
+        VK_CHECK(vkSignalSemaphore(m_Dev, &info));
 
-        vkGetSemaphoreCounterValue(vk.dev, vk.graphicsQueue.timeline, &currentValue);
-        DebugBreak;
+        vkGetSemaphoreCounterValue(m_Dev, m_GraphicsQueue.timeline, &currentValue);
+        DebugBreak();
     }
+#endif
 }
-
-} // namespace rhi_vulkan_internal
 
 } // namespace nyla

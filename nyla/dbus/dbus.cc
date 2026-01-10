@@ -1,8 +1,5 @@
 #include "nyla/dbus/dbus.h"
 
-#include "absl/cleanup/cleanup.h"
-#include "absl/log/check.h"
-#include "absl/log/log.h"
 #include "dbus/dbus.h"
 #include "nyla/commons/containers/set.h"
 
@@ -17,7 +14,7 @@ void DBusInitialize()
     dbus.conn = dbus_bus_get(DBUS_BUS_SESSION, err);
     if (err.Bad() || !dbus.conn)
     {
-        LOG(ERROR) << "could not connect to dbus: " << err.inner.message;
+        NYLA_LOG("could not connect to dbus: %s", err.inner.message);
         dbus.conn = nullptr;
         return;
     }
@@ -47,7 +44,7 @@ void DBusProcess()
     if (!dbus.conn)
         return;
 
-    dbus_connection_read_write(dbus.conn, 0);
+    dbus_connection_read_write(dbus.conn, 1);
 
     for (;;)
     {
@@ -55,7 +52,7 @@ void DBusProcess()
         if (!msg)
             break;
 
-        absl::Cleanup unrefMsg = [=] -> void { dbus_message_unref(msg); };
+        Cleanup unrefMsg([=] -> void { dbus_message_unref(msg); });
 
         if (dbus_message_is_signal(msg, "org.freedesktop.DBus", "NameOwnerChanged"))
         {
@@ -70,7 +67,7 @@ void DBusProcess()
                                        DBUS_TYPE_STRING, &newOwner, //
                                        DBUS_TYPE_INVALID))
             {
-                LOG(ERROR) << err.Message();
+                NYLA_LOG("%s", err.Message());
                 continue;
             }
 
@@ -113,19 +110,19 @@ void DBusRegisterHandler(const char *bus, const char *path, DBusObjectPathHandle
     if (!dbus.conn)
         return;
 
-    CHECK(handler);
+    NYLA_ASSERT(handler);
 
     DBusErrorWrapper err;
 
     int ret = dbus_bus_request_name(dbus.conn, bus, DBUS_NAME_FLAG_DO_NOT_QUEUE, err);
     if (err.Bad() || (ret != DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER && ret != DBUS_REQUEST_NAME_REPLY_ALREADY_OWNER))
     {
-        LOG(ERROR) << "could not become owner of the bus " << bus;
+        NYLA_LOG("could not become owner of the bus %s", bus);
         return;
     }
 
     auto [_, ok] = dbus.handlers.try_emplace(path, handler);
-    CHECK(ok);
+    NYLA_ASSERT(ok);
 }
 
 void DBusReplyInvalidArguments(DBusMessage *msg, const DBusErrorWrapper &err)

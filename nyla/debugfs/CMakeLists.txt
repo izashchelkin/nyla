@@ -16,8 +16,5 @@ target_include_directories(nyla_debugfs
 target_link_libraries(nyla_debugfs
     PUBLIC
         nyla::commons
-        absl::check
-        absl::log_initialize
-        absl::log
         ${FUSE_LIBRARIES}
 )
