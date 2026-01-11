@@ -1,23 +1,28 @@
-file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/*.cc"
-)
-
-file(GLOB_RECURSE HEADERS CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/*.h"
-)
-
 set(TARGET nyla_commons)
 add_library(${TARGET})
 add_library(nyla::commons ALIAS ${TARGET})
 
 target_sources(${TARGET}
     PRIVATE
-        ${SOURCES}
-    PUBLIC
-        ${HEADERS}
+        color.cc
+    INTERFACE
+        align.h
+        assert.h
+        bitenum.h
+        byteliterals.h
+        byteview.h
+        cleanup.h
+        color.h
+        future.h
+        handle.h
+        handle_pool.h
+        log.h
+        string.h
 )
 
 target_include_directories(${TARGET}
     PUBLIC
         ${PROJECT_SOURCE_DIR}
 )
+
+add_subdirectory(memory)

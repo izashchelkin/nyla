@@ -1,25 +1,65 @@
+#include "nyla/commons/align.h"
+#include "nyla/commons/assert.h"
+#include "nyla/commons/log.h"
 #include "nyla/platform/windows/platform_windows.h"
 #include <cstdint>
 
 namespace nyla
 {
 
-auto Platform::Impl::PageAlloc(uint32_t &inOutSize, void *&outBase) -> bool
+auto Platform::Impl::GetMemPageSize() -> uint32_t
 {
-    SYSTEM_INFO sysInfo;
-    GetSystemInfo(&sysInfo);
-
-    inOutSize = (inOutSize / sysInfo.dwPageSize);
-    if (inOutSize % sysInfo.dwPageSize)
-        inOutSize += sysInfo.dwPageSize;
-
-    outBase = VirtualAlloc(nullptr, inOutSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-    return outBase != nullptr;
+    return m_SysInfo.dwPageSize;
 }
 
-auto Platform::PageAlloc(uint32_t &inOutSize, void *&outBase) -> bool
+auto Platform::Impl::ReserveMemPages(uint32_t size) -> char *
 {
-    return m_Impl->PageAlloc(inOutSize, outBase);
+    char *ret = m_AddressSpaceAt;
+    m_AddressSpaceAt += AlignedUp(size, m_SysInfo.dwPageSize);
+    return ret;
+}
+
+void Platform::Impl::CheckPageBoundary(char *page, uint32_t size)
+{
+    NYLA_ASSERT(size);
+    NYLA_ASSERT((size % m_SysInfo.dwPageSize) == 0);
+    NYLA_ASSERT(((page - m_AddressSpaceBase) % m_SysInfo.dwPageSize) == 0);
+}
+
+void Platform::Impl::CommitMemPages(char *page, uint32_t size)
+{
+    NYLA_LOG("Commiting %d", size);
+
+    CheckPageBoundary(page, size);
+    VirtualAlloc(page, size, MEM_COMMIT, PAGE_READWRITE);
+}
+
+void Platform::Impl::DecommitMemPages(char *page, uint32_t size)
+{
+    CheckPageBoundary(page, size);
+    VirtualAlloc(page, size, MEM_DECOMMIT, PAGE_NOACCESS);
+}
+
+//
+
+auto Platform::GetMemPageSize() -> uint32_t
+{
+    return m_Impl->GetMemPageSize();
+}
+
+auto Platform::ReserveMemPages(uint32_t size) -> char *
+{
+    return m_Impl->ReserveMemPages(size);
+}
+
+void Platform::CommitMemPages(char *page, uint32_t size)
+{
+    return m_Impl->CommitMemPages(page, size);
+}
+
+void Platform::DecommitMemPages(char *page, uint32_t size)
+{
+    return m_Impl->DecommitMemPages(page, size);
 }
 
 } // namespace nyla

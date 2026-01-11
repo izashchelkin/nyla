@@ -27,13 +27,23 @@ class Platform::Impl
 
     auto MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) -> LRESULT;
 
-    auto PageAlloc(uint32_t &inOutSize, void *&outBase) -> bool;
+    auto GetMemPageSize() -> uint32_t;
+    auto ReserveMemPages(uint32_t size) -> char *;
+    void CommitMemPages(char *page, uint32_t size);
+    void DecommitMemPages(char *page, uint32_t size);
 
     auto GetMonotonicTimeMillis() -> uint64_t;
     auto GetMonotonicTimeMicros() -> uint64_t;
     auto GetMonotonicTimeNanos() -> uint64_t;
 
   private:
+    void CheckPageBoundary(char *page, uint32_t size);
+
+    char *m_AddressSpaceBase;
+    char *m_AddressSpaceAt;
+    uint64_t m_AddressSpaceSize;
+
+    SYSTEM_INFO m_SysInfo{};
     HINSTANCE m_HInstance{};
     HWND m_HWnd{};
     RECT m_WinRect{};

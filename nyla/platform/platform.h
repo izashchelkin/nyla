@@ -2,6 +2,7 @@
 
 #include "nyla/commons/assert.h"
 #include "nyla/commons/bitenum.h"
+#include "nyla/commons/byteliterals.h"
 #include <cstdint>
 #include <fstream>
 #include <string>
@@ -66,12 +67,17 @@ struct PlatformInitDesc
 class Platform
 {
   public:
+    static constexpr inline uint64_t kPageAllocMinSize = 64_KiB;
+
     void Init(const PlatformInitDesc &desc);
     void WinOpen();
     auto WinGetSize() -> PlatformWindowSize;
     auto PollEvent(PlatformEvent &outEvent) -> bool;
 
-    auto PageAlloc(uint32_t &inOutSize, void *&outBase) -> bool;
+    auto GetMemPageSize() -> uint32_t;
+    auto ReserveMemPages(uint32_t size) -> char *;
+    void CommitMemPages(char *page, uint32_t size);
+    void DecommitMemPages(char *page, uint32_t size);
 
     auto GetMonotonicTimeMillis() -> uint64_t;
     auto GetMonotonicTimeMicros() -> uint64_t;

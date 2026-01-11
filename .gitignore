@@ -3,6 +3,8 @@
 *.spv
 *.dxil
 
+/Testing
+
 /build
 /.vs
 /vcpkg_installed

@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 4.0)
 project(nyla LANGUAGES CXX)
+enable_testing()
 
 if(MSVC)
  add_compile_options( /MP )
