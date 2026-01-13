@@ -59,8 +59,8 @@ class WindowManager
 
     void Process(bool &outIsRunning);
 
-    void MoveLocalNext(xcb_timestamp_t time);
-    void MoveLocalPrev(xcb_timestamp_t time);
+    void MoveLocalNext(xcb_timestamp_t time, bool clearZoom);
+    void MoveLocalPrev(xcb_timestamp_t time, bool clearZoom);
 
     void MoveStackNext(xcb_timestamp_t time);
     void MoveStackPrev(xcb_timestamp_t time);
@@ -86,7 +86,7 @@ class WindowManager
     void ConfigureClientIfNeeded(xcb_connection_t *conn, xcb_window_t clientWindow, Client &client, const Rect &newRect,
                                  uint32_t newBorderWidth);
     void MoveStack(xcb_timestamp_t time, auto computeIdx);
-    void MoveLocal(xcb_timestamp_t time, auto computeIdx);
+    void MoveLocal(xcb_timestamp_t time, auto computeIdx, bool clearZoom);
 
     uint32_t m_BarHeight = 20;
 

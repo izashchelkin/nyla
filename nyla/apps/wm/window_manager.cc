@@ -92,9 +92,13 @@ void WindowManager::Init()
     grabKey(1, 0, 0, 0, KeyPhysical::W);
     grabKey(0, 1, 0, 0, KeyPhysical::F4);
     grabKey(1, 0, 0, 0, KeyPhysical::S);
+    grabKey(1, 0, 0, 0, KeyPhysical::D);
+    grabKey(1, 0, 0, 0, KeyPhysical::E);
+    grabKey(1, 0, 0, 0, KeyPhysical::R);
+    grabKey(1, 0, 0, 0, KeyPhysical::F);
     grabKey(0, 1, 0, 1, KeyPhysical::Tab);
     grabKey(0, 1, 0, 0, KeyPhysical::Tab);
-    grabKey(0, 0, 0, 0, KeyPhysical::F11);
+    grabKey(1, 0, 0, 0, KeyPhysical::G);
     grabKey(1, 0, 0, 0, KeyPhysical::V);
     grabKey(1, 0, 0, 0, KeyPhysical::T);
     grabKey(1, 0, 1, 0, KeyPhysical::ArrowLeft);
@@ -428,19 +432,43 @@ void WindowManager::Process(bool &isRunning)
                 break;
             }
 
+            if (meta && (key == KeyPhysical::E))
+            {
+                MoveStackPrev(keypress->time);
+                break;
+            }
+
+            if (meta && (key == KeyPhysical::R))
+            {
+                MoveStackNext(keypress->time);
+                break;
+            }
+
             if (alt && shift && (key == KeyPhysical::Tab))
             {
-                MoveLocalPrev(keypress->time);
+                MoveLocalPrev(keypress->time, false);
                 break;
             }
 
             if (alt && (key == KeyPhysical::Tab))
             {
-                MoveLocalNext(keypress->time);
+                MoveLocalNext(keypress->time, false);
                 break;
             }
 
-            if (key == KeyPhysical::F11)
+            if (meta && (key == KeyPhysical::D))
+            {
+                MoveLocalPrev(keypress->time, true);
+                break;
+            }
+
+            if (meta && (key == KeyPhysical::F))
+            {
+                MoveLocalNext(keypress->time, true);
+                break;
+            }
+
+            if (meta && key == KeyPhysical::G)
             {
                 ToggleZoom();
                 break;
@@ -970,10 +998,11 @@ void WindowManager::MoveStackPrev(xcb_timestamp_t time)
     MoveStack(time, [](auto idx) -> auto { return idx - 1; });
 }
 
-void WindowManager::MoveLocal(xcb_timestamp_t time, auto computeIdx)
+void WindowManager::MoveLocal(xcb_timestamp_t time, auto computeIdx, bool clearZoom)
 {
     WindowStack &stack = GetActiveStack();
-    ClearZoom(stack);
+    if (clearZoom)
+        ClearZoom(stack);
 
     if (stack.windows.empty())
         return;
@@ -1003,6 +1032,9 @@ void WindowManager::MoveLocal(xcb_timestamp_t time, auto computeIdx)
         else
         {
             Activate(stack, stack.windows.at(inew), time);
+
+            if (!clearZoom)
+                m_LayoutDirty = true;
         }
     }
     else
@@ -1014,14 +1046,14 @@ void WindowManager::MoveLocal(xcb_timestamp_t time, auto computeIdx)
     }
 }
 
-void WindowManager::MoveLocalNext(xcb_timestamp_t time)
+void WindowManager::MoveLocalNext(xcb_timestamp_t time, bool clearZoom)
 {
-    MoveLocal(time, [](auto idx) -> auto { return idx + 1; });
+    MoveLocal(time, [](auto idx) -> auto { return idx + 1; }, clearZoom);
 }
 
-void WindowManager::MoveLocalPrev(xcb_timestamp_t time)
+void WindowManager::MoveLocalPrev(xcb_timestamp_t time, bool clearZoom)
 {
-    MoveLocal(time, [](auto idx) -> auto { return idx - 1; });
+    MoveLocal(time, [](auto idx) -> auto { return idx - 1; }, clearZoom);
 }
 
 void WindowManager::NextLayout()
