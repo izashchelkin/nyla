@@ -657,7 +657,7 @@ void WindowManager::Process(bool &isRunning)
                 if (!reply)
                 {
                     NYLA_LOG("property fetch error");
-                    return;
+                    break;
                 }
 
                 client.name = {static_cast<char *>(xcb_get_property_value(reply)),
@@ -668,12 +668,12 @@ void WindowManager::Process(bool &isRunning)
 
             case XCB_ATOM_WM_TRANSIENT_FOR: {
                 if (!reply || !reply->length)
-                    return;
+                    break;
                 if (reply->type != XCB_ATOM_WINDOW)
-                    return;
+                    break;
 
                 if (client.transientFor != 0)
-                    return;
+                    break;
 
                 client.transientFor = *reinterpret_cast<xcb_window_t *>(xcb_get_property_value(reply));
                 break;
@@ -683,9 +683,9 @@ void WindowManager::Process(bool &isRunning)
                 if (property == m_X11->GetAtoms().wm_protocols)
                 {
                     if (!reply)
-                        return;
+                        break;
                     if (reply->type != XCB_ATOM_ATOM)
-                        return;
+                        break;
 
                     client.wmDeleteWindow = false;
                     client.wmTakeFocus = false;
