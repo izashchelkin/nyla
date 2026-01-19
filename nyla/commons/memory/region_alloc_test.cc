@@ -19,7 +19,6 @@ void Test()
     RegionAlloc scratch = rootAlloc.PushSubAlloc(1_MiB);
     {
         scratch.PushBytes(1_MiB, 1);
-        scratch.PushBytes(1_MiB, 1);
     }
     rootAlloc.Pop(scratch.GetBase());
 

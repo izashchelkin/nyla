@@ -78,11 +78,12 @@ class RegionAlloc
         return m_Used;
     }
 
-    template <typename T> auto Push() -> T *
+    template <typename T> auto Push(const T &initializer) -> T *
     {
         static_assert(std::is_trivially_destructible_v<T>);
 
         T *const p = reinterpret_cast<T *>(PushBytes(sizeof(T), alignof(T)));
+        *p = initializer;
         return p;
     }
 
