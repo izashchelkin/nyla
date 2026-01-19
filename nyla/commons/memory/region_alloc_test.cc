@@ -8,26 +8,37 @@
 namespace nyla
 {
 
+#if 0
+cmake --build build/linux-debug --target nyla_commons_memory_region_alloc_test && ctest --test-dir build/linux-debug region_alloc_test
+#endif
+
 void Test()
 {
-    RegionAllocator alloc(8_MiB);
+    RegionAlloc rootAlloc(g_Platform->ReserveMemPages(64_MiB), 0, 64_MiB, RegionAllocCommitPageGrowth::GetInstance());
 
-    const uint32_t startMemoryUsed = alloc.GetBytesUsed();
+    RegionAlloc scratch = rootAlloc.PushSubAlloc(1_MiB);
+    {
+        scratch.PushBytes(1_MiB, 1);
+        scratch.PushBytes(1_MiB, 1);
+    }
+    rootAlloc.Pop(scratch.GetBase());
+
+    const uint32_t startMemoryUsed = rootAlloc.GetBytesUsed();
 
     std::array<void *, 100> pushed;
 
     for (uint32_t i = 0; i < pushed.size(); ++i)
     {
-        pushed[i] = alloc.PushBytes(1_KiB, 1);
+        pushed[i] = rootAlloc.PushBytes(1_KiB, 1);
         *((char *)pushed[i]) = '\0';
     }
 
     for (uint32_t i = pushed.size(); i > 0; --i)
     {
-        alloc.Pop(pushed[i - 1]);
+        rootAlloc.Pop(pushed[i - 1]);
     }
 
-    const uint32_t endMemoryUsed = alloc.GetBytesUsed();
+    const uint32_t endMemoryUsed = rootAlloc.GetBytesUsed();
     NYLA_ASSERT(startMemoryUsed == endMemoryUsed);
 }
 

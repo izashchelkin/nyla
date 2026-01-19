@@ -1,55 +1,65 @@
 {
-	"version": "2.0.0",
-	"tasks": [
-		{
-			"type": "cmake",
-			"label": "audio_main build",
-			"command": "build",
-			"targets": [
-				"nyla_audio_main"
-			],
-			"group": "build",
-			"problemMatcher": [],
-		},
-		{
-			"type": "cmake",
-			"label": "wm_overlay build",
-			"command": "build",
-			"targets": [
-				"wm_overlay"
-			],
-			"group": "build",
-			"problemMatcher": [],
-		},
-		{
-			"type": "cmake",
-			"label": "spirview build",
-			"command": "build",
-			"targets": [
-				"nyla_spirview_bin"
-			],
-			"group": "build",
-			"problemMatcher": [],
-		},
-		{
-			"type": "cmake",
-			"label": "breakout build",
-			"command": "build",
-			"targets": [
-				"breakout"
-			],
-			"group": "build",
-			"problemMatcher": [],
-		},
-		{
-			"type": "cmake",
-			"label": "shipgame build",
-			"command": "build",
-			"targets": [
-				"shipgame"
-			],
-			"group": "build",
-			"problemMatcher": [],
-		}
-	]
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "type": "cmake",
+            "label": "region_alloc_test build",
+            "command": "build",
+            "targets": [
+                "nyla_commons_memory_region_alloc_test"
+            ],
+            "group": "build",
+            "problemMatcher": [],
+        },
+        {
+            "type": "cmake",
+            "label": "audio_main build",
+            "command": "build",
+            "targets": [
+                "nyla_audio_main"
+            ],
+            "group": "build",
+            "problemMatcher": [],
+        },
+        {
+            "type": "cmake",
+            "label": "wm_overlay build",
+            "command": "build",
+            "targets": [
+                "wm_overlay"
+            ],
+            "group": "build",
+            "problemMatcher": [],
+        },
+        {
+            "type": "cmake",
+            "label": "spirview build",
+            "command": "build",
+            "targets": [
+                "nyla_spirview_bin"
+            ],
+            "group": "build",
+            "problemMatcher": [],
+        },
+        {
+            "type": "cmake",
+            "label": "breakout build",
+            "command": "build",
+            "targets": [
+                "breakout"
+            ],
+            "group": "build",
+            "problemMatcher": [],
+        },
+        {
+            "type": "cmake",
+            "label": "shipgame build",
+            "command": "build",
+            "targets": [
+                "shipgame"
+            ],
+            "group": "build",
+            "problemMatcher": [],
+        }
+    ]
 }
