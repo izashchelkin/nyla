@@ -1,5 +1,6 @@
 #include "nyla/platform/windows/platform_windows.h"
 
+#include "nyla/commons/align.h"
 #include "nyla/commons/assert.h"
 #include "nyla/commons/byteliterals.h"
 #include "nyla/commons/containers/inline_ring.h"
@@ -17,7 +18,8 @@ void Platform::Impl::Init(const PlatformInitDesc &desc)
 {
     GetSystemInfo(&m_SysInfo);
 
-    m_AddressSpaceSize = AlignedUp(16_GiB, m_SysInfo.dwAllocationGranularity);
+    m_AddressSpaceSize = AlignedUp<uint64_t>(16_GiB, m_SysInfo.dwAllocationGranularity);
+
     m_AddressSpaceBase = (char *)VirtualAlloc(nullptr, m_AddressSpaceSize, MEM_RESERVE, PAGE_NOACCESS);
     m_AddressSpaceAt = m_AddressSpaceBase;
 }

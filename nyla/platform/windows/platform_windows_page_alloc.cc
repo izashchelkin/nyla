@@ -1,6 +1,5 @@
 #include "nyla/commons/align.h"
 #include "nyla/commons/assert.h"
-#include "nyla/commons/log.h"
 #include "nyla/platform/windows/platform_windows.h"
 #include <cstdint>
 
@@ -15,7 +14,7 @@ auto Platform::Impl::GetMemPageSize() -> uint32_t
 auto Platform::Impl::ReserveMemPages(uint32_t size) -> char *
 {
     char *ret = m_AddressSpaceAt;
-    m_AddressSpaceAt += AlignedUp(size, m_SysInfo.dwPageSize);
+    m_AddressSpaceAt += AlignedUp<uint32_t>(size, m_SysInfo.dwPageSize);
     return ret;
 }
 
@@ -23,7 +22,7 @@ void Platform::Impl::CommitMemPages(char *page, uint32_t size)
 {
     NYLA_ASSERT(((page - m_AddressSpaceBase) % m_SysInfo.dwPageSize) == 0);
 
-    AlignUp(size, m_SysInfo.dwPageSize);
+    AlignUp<uint32_t>(size, m_SysInfo.dwPageSize);
 
     VirtualAlloc(page, size, MEM_COMMIT, PAGE_READWRITE);
 }
@@ -32,7 +31,7 @@ void Platform::Impl::DecommitMemPages(char *page, uint32_t size)
 {
     NYLA_ASSERT(((page - m_AddressSpaceBase) % m_SysInfo.dwPageSize) == 0);
 
-    AlignUp(size, m_SysInfo.dwPageSize);
+    AlignUp<uint32_t>(size, m_SysInfo.dwPageSize);
 
     VirtualAlloc(page, size, MEM_DECOMMIT, PAGE_NOACCESS);
 }

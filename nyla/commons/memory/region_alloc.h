@@ -20,7 +20,11 @@ class RegionAllocGrowthHandler
 class RegionAllocBumpOnlyGrowth : public RegionAllocGrowthHandler
 {
   public:
-    static auto GetInstance() -> RegionAllocGrowthHandler &;
+    static auto GetInstance() -> RegionAllocGrowthHandler &
+    {
+        static RegionAllocBumpOnlyGrowth handler{};
+        return handler;
+    }
 
     auto TryGrow(RegionAlloc &alloc, uint32_t neededSize) -> bool final;
 };
@@ -28,7 +32,11 @@ class RegionAllocBumpOnlyGrowth : public RegionAllocGrowthHandler
 class RegionAllocCommitPageGrowth : public RegionAllocGrowthHandler
 {
   public:
-    static auto GetInstance() -> RegionAllocGrowthHandler &;
+    static auto GetInstance() -> RegionAllocGrowthHandler &
+    {
+        static RegionAllocCommitPageGrowth handler{};
+        return handler;
+    }
 
     auto TryGrow(RegionAlloc &alloc, uint32_t neededSize) -> bool final;
 };
@@ -110,28 +118,16 @@ class RegionAlloc
     uint32_t m_Used{};
 };
 
-auto RegionAllocBumpOnlyGrowth::GetInstance() -> RegionAllocGrowthHandler &
-{
-    static RegionAllocBumpOnlyGrowth handler{};
-    return handler;
-}
-
 [[nodiscard]]
-auto RegionAllocBumpOnlyGrowth::TryGrow(RegionAlloc &alloc, uint32_t neededSize) -> bool
+inline auto RegionAllocBumpOnlyGrowth::TryGrow(RegionAlloc &alloc, uint32_t neededSize) -> bool
 {
     alloc.m_Size = neededSize;
 
     return true;
 }
 
-auto RegionAllocCommitPageGrowth::GetInstance() -> RegionAllocGrowthHandler &
-{
-    static RegionAllocCommitPageGrowth handler{};
-    return handler;
-}
-
 [[nodiscard]]
-auto RegionAllocCommitPageGrowth::TryGrow(RegionAlloc &alloc, uint32_t neededSize) -> bool
+inline auto RegionAllocCommitPageGrowth::TryGrow(RegionAlloc &alloc, uint32_t neededSize) -> bool
 {
     AlignUp(neededSize, g_Platform->GetMemPageSize());
     NYLA_ASSERT(neededSize <= alloc.m_MaxSize);
