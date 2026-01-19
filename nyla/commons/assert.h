@@ -1,6 +1,7 @@
 #pragma once
 
-#include <cstdio>
+#include <cstdio>  // IWYU pragma: keep
+#include <cstdlib> // IWYU pragma: keep
 
 #if defined(_MSC_VER)
 #define NYLA_DEBUGBREAK() __debugbreak()

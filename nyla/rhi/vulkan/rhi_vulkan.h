@@ -308,7 +308,7 @@ class Rhi::Impl
 
     auto CbvOffset(uint32_t offset) -> uint32_t
     {
-        return AlignedUp(offset, m_PhysDevProps.limits.minUniformBufferOffsetAlignment);
+        return AlignedUp<uint32_t>(offset, m_PhysDevProps.limits.minUniformBufferOffsetAlignment);
     }
 
     VkInstance m_Instance;

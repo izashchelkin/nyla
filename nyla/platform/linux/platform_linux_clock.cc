@@ -5,25 +5,40 @@
 namespace nyla
 {
 
-auto GetMonotonicTimeMillis() -> uint64_t
+auto Platform::Impl::GetMonotonicTimeMillis() -> uint64_t
 {
     timespec ts{};
     NYLA_ASSERT(clock_gettime(CLOCK_MONOTONIC_RAW, &ts) == 0);
-    return ts.tv_sec * 1e3 + ts.tv_nsec / 1e6;
+    return ts.tv_sec * 1'000 + ts.tv_nsec / 1'000'000;
 }
 
-auto GetMonotonicTimeMicros() -> uint64_t
+auto Platform::Impl::GetMonotonicTimeMicros() -> uint64_t
 {
     timespec ts{};
     NYLA_ASSERT(clock_gettime(CLOCK_MONOTONIC_RAW, &ts) == 0);
-    return ts.tv_sec * 1e6 + ts.tv_nsec / 1e3;
+    return ts.tv_sec * 1'000'000 + ts.tv_nsec / 1'000;
 }
 
-auto GetMonotonicTimeNanos() -> uint64_t
+auto Platform::Impl::GetMonotonicTimeNanos() -> uint64_t
 {
     timespec ts{};
     NYLA_ASSERT(clock_gettime(CLOCK_MONOTONIC_RAW, &ts) == 0);
-    return ts.tv_sec * 1e9 + ts.tv_nsec;
+    return ts.tv_sec * 1'000'000'000 + ts.tv_nsec;
+}
+
+auto Platform::GetMonotonicTimeMillis() -> uint64_t
+{
+    return m_Impl->GetMonotonicTimeMillis();
+}
+
+auto Platform::GetMonotonicTimeMicros() -> uint64_t
+{
+    return m_Impl->GetMonotonicTimeMicros();
+}
+
+auto Platform::GetMonotonicTimeNanos() -> uint64_t
+{
+    return m_Impl->GetMonotonicTimeNanos();
 }
 
 } // namespace nyla
