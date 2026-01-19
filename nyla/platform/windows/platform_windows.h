@@ -37,8 +37,6 @@ class Platform::Impl
     auto GetMonotonicTimeNanos() -> uint64_t;
 
   private:
-    void CheckPageBoundary(char *page, uint32_t size);
-
     char *m_AddressSpaceBase;
     char *m_AddressSpaceAt;
     uint64_t m_AddressSpaceSize;

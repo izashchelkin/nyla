@@ -52,6 +52,11 @@ class Platform::Impl
     auto GetMonotonicTimeMicros() -> uint64_t;
     auto GetMonotonicTimeNanos() -> uint64_t;
 
+    auto GetMemPageSize() -> uint32_t;
+    auto ReserveMemPages(uint32_t size) -> char *;
+    void CommitMemPages(char *page, uint32_t size);
+    void DecommitMemPages(char *page, uint32_t size);
+
     auto WinGetHandle() -> xcb_window_t
     {
         return m_Win;
@@ -137,6 +142,11 @@ class Platform::Impl
                              uint16_t height, uint16_t borderWidth);
 
   private:
+    uint32_t m_PageSize;
+    char *m_AddressSpaceBase;
+    char *m_AddressSpaceAt;
+    uint64_t m_AddressSpaceSize;
+
     int m_ScreenIndex{};
     xcb_connection_t *m_Conn{};
     xcb_screen_t *m_Screen{};

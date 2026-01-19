@@ -1,4 +1,6 @@
 #include "nyla/platform/linux/platform_linux.h"
+#include "nyla/commons/align.h"
+#include "nyla/commons/byteliterals.h"
 #include "nyla/platform/platform.h"
 
 #include "nyla/commons/assert.h"
@@ -12,6 +14,8 @@
 #include "xcb/xproto.h"
 #include <array>
 #include <cstdint>
+#include <sys/mman.h>
+#include <unistd.h>
 #include <xkbcommon/xkbcommon-x11.h>
 #include <xkbcommon/xkbcommon.h>
 
@@ -134,6 +138,18 @@ void Platform::Impl::Init(const PlatformInitDesc &desc)
 
         m_ExtensionXInput2MajorOpCode = ext->major_opcode;
     }
+
+    //
+
+    m_PageSize = sysconf(_SC_PAGESIZE);
+    if (!m_PageSize)
+        m_PageSize = 4096;
+
+    m_AddressSpaceSize = AlignedUp<uint64_t>(16_GiB, m_PageSize);
+    m_AddressSpaceBase = (char *)mmap(nullptr, m_AddressSpaceSize, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    NYLA_ASSERT(m_AddressSpaceBase != MAP_FAILED);
+
+    m_AddressSpaceAt = m_AddressSpaceBase;
 }
 
 void Platform::Impl::SendConfigureNotify(xcb_window_t window, xcb_window_t parent, int16_t x, int16_t y, uint16_t width,

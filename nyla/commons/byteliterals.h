@@ -5,19 +5,19 @@
 namespace nyla
 {
 
-constexpr auto operator""_KiB(uint64_t v) -> uint64_t
+constexpr auto operator""_KiB(unsigned long long v) -> uint64_t
 {
-    return v * (1 << 10);
+    return static_cast<uint64_t>(v) * (1 << 10);
 }
 
-constexpr auto operator""_MiB(uint64_t v) -> uint64_t
+constexpr auto operator""_MiB(unsigned long long v) -> uint64_t
 {
-    return v * (1 << 20);
+    return static_cast<uint64_t>(v) * (1 << 20);
 }
 
-constexpr auto operator""_GiB(uint64_t v) -> uint64_t
+constexpr auto operator""_GiB(unsigned long long v) -> uint64_t
 {
-    return v * (1 << 30);
+    return static_cast<uint64_t>(v) * (1 << 30);
 }
 
 } // namespace nyla

@@ -1,40 +1,42 @@
 #include "nyla/commons/align.h"
 #include "nyla/commons/assert.h"
-#include "nyla/commons/log.h"
-#include "nyla/platform/windows/platform_windows.h"
+#include "nyla/platform/linux/platform_linux.h"
 #include <cstdint>
+#include <sys/mman.h>
+#include <unistd.h>
 
 namespace nyla
 {
 
 auto Platform::Impl::GetMemPageSize() -> uint32_t
 {
-    return m_SysInfo.dwPageSize;
+    return m_PageSize;
 }
 
 auto Platform::Impl::ReserveMemPages(uint32_t size) -> char *
 {
     char *ret = m_AddressSpaceAt;
-    m_AddressSpaceAt += AlignedUp(size, m_SysInfo.dwPageSize);
+    m_AddressSpaceAt += AlignedUp(size, m_PageSize);
     return ret;
 }
 
 void Platform::Impl::CommitMemPages(char *page, uint32_t size)
 {
-    NYLA_ASSERT(((page - m_AddressSpaceBase) % m_SysInfo.dwPageSize) == 0);
+    NYLA_ASSERT(((page - m_AddressSpaceBase) % m_PageSize) == 0);
 
-    AlignUp(size, m_SysInfo.dwPageSize);
+    AlignUp(size, GetMemPageSize());
 
-    VirtualAlloc(page, size, MEM_COMMIT, PAGE_READWRITE);
+    mprotect(page, size, PROT_READ | PROT_WRITE);
 }
 
 void Platform::Impl::DecommitMemPages(char *page, uint32_t size)
 {
-    NYLA_ASSERT(((page - m_AddressSpaceBase) % m_SysInfo.dwPageSize) == 0);
+    NYLA_ASSERT(((page - m_AddressSpaceBase) % m_PageSize) == 0);
 
-    AlignUp(size, m_SysInfo.dwPageSize);
+    AlignUp(size, GetMemPageSize());
 
-    VirtualAlloc(page, size, MEM_DECOMMIT, PAGE_NOACCESS);
+    mprotect(page, size, PROT_NONE);
+    madvise(page, size, MADV_DONTNEED);
 }
 
 //

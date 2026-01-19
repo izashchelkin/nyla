@@ -17,7 +17,7 @@ void Platform::Impl::Init(const PlatformInitDesc &desc)
 {
     GetSystemInfo(&m_SysInfo);
 
-    m_AddressSpaceSize = (16_GiB + m_SysInfo.dwAllocationGranularity - 1) / m_SysInfo.dwAllocationGranularity;
+    m_AddressSpaceSize = AlignedUp(16_GiB, m_SysInfo.dwAllocationGranularity);
     m_AddressSpaceBase = (char *)VirtualAlloc(nullptr, m_AddressSpaceSize, MEM_RESERVE, PAGE_NOACCESS);
     m_AddressSpaceAt = m_AddressSpaceBase;
 }
