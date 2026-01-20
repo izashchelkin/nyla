@@ -1,6 +1,6 @@
-set(TARGET_PARSER nyla_json_parser)
+set(TARGET_PARSER nyla_formats_json_parser)
 add_library(${TARGET_PARSER})
-add_library(nyla::json::parser ALIAS ${TARGET_PARSER})
+add_library(nyla::formats::json::parser ALIAS ${TARGET_PARSER})
 
 target_sources(${TARGET_PARSER}
     PRIVATE
@@ -20,7 +20,7 @@ target_link_libraries(${TARGET_PARSER}
 )
 
 
-set(TARGET_PARSER_TEST nyla_json_parser_test)
+set(TARGET_PARSER_TEST nyla_formats_json_parser_test)
 add_executable(${TARGET_PARSER_TEST} WIN32)
 
 target_sources(${TARGET_PARSER_TEST}
@@ -35,7 +35,6 @@ target_include_directories(${TARGET_PARSER_TEST}
 
 target_link_libraries(${TARGET_PARSER_TEST}
     PUBLIC
-        nyla::json::parser
+        nyla::formats::json::parser
         nyla::platform
 )
-

@@ -1,6 +1,6 @@
 #include "nyla/commons/log.h"
 #include "nyla/commons/memory/region_alloc.h"
-#include "nyla/json/json_parser.h"
+#include "nyla/formats/json/json_parser.h"
 #include "nyla/platform/platform.h"
 
 namespace nyla
@@ -21,7 +21,7 @@ void LogJsonValue(JsonParser::Value *val)
         return;
     }
     case Tag::Integer: {
-        NYLA_LOG("Integer: %llu", val->i);
+        NYLA_LOG("Integer: %lu", val->i);
         return;
     }
     case Tag::Float: {
