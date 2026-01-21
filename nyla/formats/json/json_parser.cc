@@ -1,6 +1,7 @@
 #include "nyla/formats/json/json_parser.h"
 #include "nyla/commons/assert.h"
 #include "nyla/commons/memory/region_alloc.h"
+#include "nyla/formats/json/json_value.h"
 #include <cstdint>
 
 namespace nyla
@@ -21,7 +22,7 @@ auto IsAlpha(unsigned char ch) -> bool
 
 } // namespace
 
-auto JsonParser::ParseNext() -> Value *
+auto JsonParser::ParseNext() -> JsonValue *
 {
     SkipWhitespace();
 
@@ -42,7 +43,7 @@ auto JsonParser::ParseNext() -> Value *
     NYLA_ASSERT(false);
 }
 
-auto JsonParser::ParseLiteral() -> Value *
+auto JsonParser::ParseLiteral() -> JsonValue *
 {
     switch (Pop())
     {
@@ -50,20 +51,20 @@ auto JsonParser::ParseLiteral() -> Value *
         NYLA_ASSERT(Pop() == 'u');
         NYLA_ASSERT(Pop() == 'l');
         NYLA_ASSERT(Pop() == 'l');
-        return m_Alloc.Push(Value{.tag = Value::Tag::Null});
+        return m_Alloc.Push(JsonValue{.tag = JsonValue::Tag::Null});
 
     case 't':
         NYLA_ASSERT(Pop() == 'r');
         NYLA_ASSERT(Pop() == 'u');
         NYLA_ASSERT(Pop() == 'e');
-        return m_Alloc.Push(Value{.tag = Value::Tag::Bool, .b = true});
+        return m_Alloc.Push(JsonValue{.tag = JsonValue::Tag::Bool, .b = true});
 
     case 'f':
         NYLA_ASSERT(Pop() == 'a');
         NYLA_ASSERT(Pop() == 'l');
         NYLA_ASSERT(Pop() == 's');
         NYLA_ASSERT(Pop() == 'e');
-        return m_Alloc.Push(Value{.tag = Value::Tag::Bool, .b = false});
+        return m_Alloc.Push(JsonValue{.tag = JsonValue::Tag::Bool, .b = false});
 
     default:
         NYLA_ASSERT(false);
@@ -71,7 +72,7 @@ auto JsonParser::ParseLiteral() -> Value *
     }
 }
 
-auto JsonParser::ParseNumber() -> Value *
+auto JsonParser::ParseNumber() -> JsonValue *
 {
     uint32_t sign = 1;
     if (Peek() == '-')
@@ -106,21 +107,21 @@ auto JsonParser::ParseNumber() -> Value *
 
         f += static_cast<double>(integer);
 
-        return m_Alloc.Push(Value{
-            .tag = Value::Tag::Float,
+        return m_Alloc.Push(JsonValue{
+            .tag = JsonValue::Tag::Float,
             .f = sign * f,
         });
     }
     else
     {
-        return m_Alloc.Push(Value{
-            .tag = Value::Tag::Integer,
+        return m_Alloc.Push(JsonValue{
+            .tag = JsonValue::Tag::Integer,
             .i = sign * integer,
         });
     }
 }
 
-auto JsonParser::ParseString() -> Value *
+auto JsonParser::ParseString() -> JsonValue *
 {
     const char *base = m_At;
     uint32_t count = 0;
@@ -138,17 +139,16 @@ auto JsonParser::ParseString() -> Value *
     }
 
     std::string_view s{base, count};
-    return m_Alloc.Push(Value{
-        .tag = Value::Tag::String,
+    return m_Alloc.Push(JsonValue{
+        .tag = JsonValue::Tag::String,
         .s = s,
     });
 }
 
-auto JsonParser::ParseArray() -> Value *
+auto JsonParser::ParseArray() -> JsonValue *
 {
-    Value *value = m_Alloc.Push(Value{
-        .tag = Value::Tag::ArrayBegin,
-        .len = 0,
+    JsonValue *value = m_Alloc.Push(JsonValue{
+        .tag = JsonValue::Tag::ArrayBegin,
     });
 
     for (;;)
@@ -159,9 +159,9 @@ auto JsonParser::ParseArray() -> Value *
             break;
         }
 
-        ++value->len;
+        ++value->col.len;
 
-        Value *elem = ParseNext();
+        JsonValue *elem = ParseNext();
 
         SkipWhitespace();
         const char ch = Pop();
@@ -171,14 +171,17 @@ auto JsonParser::ParseArray() -> Value *
         NYLA_ASSERT(ch == ',');
     }
 
+    value->col.end = m_Alloc.Push(JsonValue{
+        .tag = JsonValue::Tag::ArrayEnd,
+    });
+
     return value;
 }
 
-auto JsonParser::ParseObject() -> Value *
+auto JsonParser::ParseObject() -> JsonValue *
 {
-    Value *value = m_Alloc.Push(Value{
-        .tag = Value::Tag::ObjectBegin,
-        .len = 0,
+    JsonValue *value = m_Alloc.Push(JsonValue{
+        .tag = JsonValue::Tag::ObjectBegin,
     });
 
     for (;;)
@@ -189,15 +192,15 @@ auto JsonParser::ParseObject() -> Value *
             break;
         }
 
-        ++value->len;
+        ++value->col.len;
 
-        Value *key = ParseNext();
-        NYLA_ASSERT(key->tag == Value::Tag::String);
+        JsonValue *key = ParseNext();
+        NYLA_ASSERT(key->tag == JsonValue::Tag::String);
 
         SkipWhitespace();
         NYLA_ASSERT(Pop() == ':');
 
-        Value *val = ParseNext();
+        JsonValue *val = ParseNext();
 
         SkipWhitespace();
         const char ch = Pop();
@@ -206,6 +209,10 @@ auto JsonParser::ParseObject() -> Value *
 
         NYLA_ASSERT(ch == ',');
     }
+
+    value->col.end = m_Alloc.Push(JsonValue{
+        .tag = JsonValue::Tag::ObjectEnd,
+    });
 
     return value;
 }

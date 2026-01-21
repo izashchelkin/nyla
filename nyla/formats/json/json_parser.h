@@ -1,52 +1,32 @@
+#pragma once
+
 #include "nyla/commons/memory/region_alloc.h"
 #include <cstdint>
-#include <string_view>
 
 namespace nyla
 {
 
+class JsonValue;
+
 class JsonParser
 {
   public:
-    struct Value
-    {
-        enum class Tag
-        {
-            Null,
-            Bool,
-            Integer,
-            Float,
-            String,
-            ArrayBegin,
-            ObjectBegin,
-        };
-
-        Tag tag;
-        union {
-            bool b;
-            uint64_t i;
-            double f;
-            std::string_view s;
-            uint32_t len;
-        };
-    };
-
     JsonParser(RegionAlloc &alloc, const char *base, uint32_t size) : m_Alloc{alloc}, m_At{base}, m_Left{size}
     {
     }
 
-    auto ParseNext() -> Value *;
+    auto ParseNext() -> JsonValue *;
 
   private:
     auto Peek() -> char;
     void Advance();
     auto Pop() -> char;
 
-    auto ParseNumber() -> Value *;
-    auto ParseLiteral() -> Value *;
-    auto ParseString() -> Value *;
-    auto ParseArray() -> Value *;
-    auto ParseObject() -> Value *;
+    auto ParseNumber() -> JsonValue *;
+    auto ParseLiteral() -> JsonValue *;
+    auto ParseString() -> JsonValue *;
+    auto ParseArray() -> JsonValue *;
+    auto ParseObject() -> JsonValue *;
     void SkipWhitespace();
 
     RegionAlloc &m_Alloc;

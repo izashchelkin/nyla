@@ -27,7 +27,7 @@ auto GltfParser::Parse() -> bool
         return false;
 
     JsonParser jsonParser{m_Alloc, (const char *)m_At, jsonChunkLength};
-    jsonParser.ParseNext();
+    JsonParser::Value *json = jsonParser.ParseNext();
 
     return true;
 }

@@ -5,8 +5,10 @@ add_library(nyla::formats::json::parser ALIAS ${TARGET_PARSER})
 target_sources(${TARGET_PARSER}
     PRIVATE
         json_parser.cc
+        json_visitor.cc
     PUBLIC
         json_parser.h
+        json_value.h
 )
 
 target_include_directories(${TARGET_PARSER}
