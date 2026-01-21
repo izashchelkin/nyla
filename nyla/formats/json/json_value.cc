@@ -1,5 +1,7 @@
-#include "nyla/formats/json/json_parser.h"
 #include "nyla/formats/json/json_value.h"
+#include "nyla/commons/log.h"
+#include "nyla/formats/json/json_parser.h"
+#include <cinttypes>
 #include <cstdint>
 #include <string_view>
 
@@ -97,6 +99,106 @@ auto JsonValue::TryInteger(std::span<std::string_view> path, uint64_t &out) -> b
         else
             return false;
     });
+}
+
+//
+
+auto JsonValueIter::operator==(const JsonValueIter &rhs) const -> bool
+{
+    return at == rhs.at;
+}
+
+auto JsonValueIter::operator++() -> JsonValueIter &
+{
+    switch (at->tag)
+    {
+    case JsonValue::Tag::ArrayBegin:
+    case JsonValue::Tag::ObjectBegin: {
+        at = at->col.end + 1;
+        break;
+    }
+
+    default: {
+        ++at;
+        break;
+    }
+    }
+
+    return *this;
+}
+
+auto JsonValueIter::operator+=(uint32_t i) -> JsonValueIter &
+{
+    while (i-- > 0)
+        ++(*this);
+    return *this;
+}
+
+auto JsonValueIter::operator*() -> JsonValue *
+{
+    return at;
+}
+
+//
+
+void LogJsonValue(JsonValue *val, uint32_t indent)
+{
+    using Tag = JsonValue::Tag;
+
+    switch (val->tag)
+    {
+    case Tag::Null: {
+        NYLA_LOG("%*snull", indent, " ");
+        return;
+    }
+    case Tag::Bool: {
+        NYLA_LOG("%*s%d", indent, " ", val->b);
+        return;
+    }
+    case Tag::Integer: {
+        NYLA_LOG("%*s%" PRIu64, indent, " ", val->i);
+        return;
+    }
+    case Tag::Float: {
+        NYLA_LOG("%*s%f", indent, " ", val->f);
+        return;
+    }
+    case Tag::String: {
+        NYLA_LOG("%*s\"" NYLA_SV_FMT "\"", indent, " ", NYLA_SV_ARG(val->s));
+        return;
+    }
+    case Tag::ArrayBegin: {
+        NYLA_LOG("%*s[", indent, " ");
+
+        auto end = val->end();
+        for (auto it = val->begin(); it != end; ++it)
+            LogJsonValue(*it, indent + 2);
+
+        // Fallthrough
+    }
+    case Tag::ArrayEnd: {
+        NYLA_LOG("%*s]", indent, " ");
+        return;
+    }
+    case Tag::ObjectBegin: {
+        NYLA_LOG("%*s{", indent, " ");
+
+        auto end = val->end();
+        for (auto it = val->begin(); it != end; ++it)
+        {
+            LogJsonValue(*it, indent + 2);
+        }
+
+        // Fallthrough
+    }
+    case Tag::ObjectEnd: {
+        NYLA_LOG("%*s}", indent, " ");
+        return;
+    }
+    default: {
+        NYLA_ASSERT(false);
+    }
+    }
 }
 
 } // namespace nyla

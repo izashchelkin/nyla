@@ -10,64 +10,6 @@
 namespace nyla
 {
 
-void LogJsonValue(JsonValue *val, uint32_t indent = 0)
-{
-    using Tag = JsonValue::Tag;
-
-    switch (val->tag)
-    {
-    case Tag::Null: {
-        NYLA_LOG("%*snull", indent, " ");
-        return;
-    }
-    case Tag::Bool: {
-        NYLA_LOG("%*sBool: %b", indent, " ", val->b);
-        return;
-    }
-    case Tag::Integer: {
-        NYLA_LOG("%*sInteger: %" PRIu64, indent, " ", val->i);
-        return;
-    }
-    case Tag::Float: {
-        NYLA_LOG("%*sFloat: %f", indent, " ", val->f);
-        return;
-    }
-    case Tag::String: {
-        NYLA_LOG("%*sString: " NYLA_SV_FMT, indent, " ", NYLA_SV_ARG(val->s));
-        return;
-    }
-    case Tag::ArrayBegin: {
-        NYLA_LOG("%*sArrayBegin of %d elems", indent, " ", val->col.len);
-
-        auto end = val->end();
-        for (auto it = val->begin(); it != end; ++it)
-            LogJsonValue(*it, indent + 2);
-
-        return;
-    }
-    case Tag::ArrayEnd: {
-        NYLA_LOG("%*sArrayEnd", indent, " ");
-        return;
-    }
-    case Tag::ObjectBegin: {
-        NYLA_LOG("%*sObject of %d elems", indent, " ", val->col.len);
-
-        auto end = val->end();
-        for (auto it = val->begin(); it != end; ++it)
-            LogJsonValue(*it, indent + 2);
-
-        return;
-    }
-    case Tag::ObjectEnd: {
-        NYLA_LOG("%*sObjectEnd", indent, " ");
-        return;
-    }
-    default: {
-        NYLA_ASSERT(false);
-    }
-    }
-}
-
 auto PlatformMain() -> int
 {
     g_Platform->Init({});
