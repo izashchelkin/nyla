@@ -8,6 +8,14 @@
 namespace nyla
 {
 
+struct JsonValue;
+
+struct JsonValueIter
+{
+    JsonValue *at;
+    JsonValue *end;
+};
+
 struct JsonValue
 {
     enum class Tag
@@ -51,9 +59,7 @@ struct JsonValue
     }                                                                                                                  \
     auto name(std::string_view path) -> out                                                                            \
     {                                                                                                                  \
-        out ret;                                                                                                       \
-        NYLA_ASSERT(Try##name(std::span{&path, 1}, ret));                                                              \
-        return ret;                                                                                                    \
+        return name(std::span{&path, 1});                                                                              \
     }
 
     DECL(Any, JsonValue *);
@@ -63,6 +69,9 @@ struct JsonValue
     DECL(Integer, uint64_t);
 
 #undef DECL
+
+    auto begin() -> JsonValueIter;
+    auto end() -> JsonValueIter;
 };
 
 } // namespace nyla

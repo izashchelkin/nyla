@@ -31,7 +31,15 @@ auto JsonVisit(JsonValue *value, std::span<std::string_view> path, auto &&handle
 
 } // namespace
 
-auto JsonValue::TryVisitAny(std::span<std::string_view> path, JsonValue *&out) -> bool
+auto JsonValue::begin() -> JsonValueIter
+{
+}
+
+auto JsonValue::end() -> JsonValueIter
+{
+}
+
+auto JsonValue::TryAny(std::span<std::string_view> path, JsonValue *&out) -> bool
 {
     return JsonVisit(this, path, [&out](JsonValue *value) -> bool {
         out = value;
@@ -39,7 +47,7 @@ auto JsonValue::TryVisitAny(std::span<std::string_view> path, JsonValue *&out) -
     });
 }
 
-auto JsonValue::TryVisitObject(std::span<std::string_view> path, JsonValue *&out) -> bool
+auto JsonValue::TryObject(std::span<std::string_view> path, JsonValue *&out) -> bool
 {
     return JsonVisit(this, path, [&out](JsonValue *value) -> bool {
         if (value->tag == Tag::ObjectBegin)
@@ -52,7 +60,7 @@ auto JsonValue::TryVisitObject(std::span<std::string_view> path, JsonValue *&out
     });
 }
 
-auto JsonValue::TryVisitArray(std::span<std::string_view> path, JsonValue *&out) -> bool
+auto JsonValue::TryArray(std::span<std::string_view> path, JsonValue *&out) -> bool
 {
     return JsonVisit(this, path, [&out](JsonValue *value) -> bool {
         if (value->tag == Tag::ArrayBegin)
@@ -65,7 +73,7 @@ auto JsonValue::TryVisitArray(std::span<std::string_view> path, JsonValue *&out)
     });
 }
 
-auto JsonValue::TryVisitString(std::span<std::string_view> path, std::string_view &out) -> bool
+auto JsonValue::TryString(std::span<std::string_view> path, std::string_view &out) -> bool
 {
     return JsonVisit(this, path, [&out](JsonValue *value) -> bool {
         if (value->tag == Tag::String)
@@ -78,7 +86,7 @@ auto JsonValue::TryVisitString(std::span<std::string_view> path, std::string_vie
     });
 }
 
-auto JsonValue::TryVisitInteger(std::span<std::string_view> path, uint64_t &out) -> bool
+auto JsonValue::TryInteger(std::span<std::string_view> path, uint64_t &out) -> bool
 {
     return JsonVisit(this, path, [&out](JsonValue *value) -> bool {
         if (value->tag == Tag::Integer)
