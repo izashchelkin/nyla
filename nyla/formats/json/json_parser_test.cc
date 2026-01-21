@@ -3,59 +3,63 @@
 #include "nyla/formats/json/json_parser.h"
 #include "nyla/formats/json/json_value.h"
 #include "nyla/platform/platform.h"
+#include <cinttypes>
+#include <cstdint>
 #include <string_view>
 
 namespace nyla
 {
 
-void LogJsonValue(JsonValue *val)
+void LogJsonValue(JsonValue *val, uint32_t indent = 0)
 {
     using Tag = JsonValue::Tag;
 
     switch (val->tag)
     {
     case Tag::Null: {
-        NYLA_LOG("null");
+        NYLA_LOG("%*snull", indent, " ");
         return;
     }
     case Tag::Bool: {
-        NYLA_LOG("Bool: %b", val->b);
+        NYLA_LOG("%*sBool: %b", indent, " ", val->b);
         return;
     }
     case Tag::Integer: {
-        NYLA_LOG("Integer: %lu", val->i);
+        NYLA_LOG("%*sInteger: %" PRIu64, indent, " ", val->i);
         return;
     }
     case Tag::Float: {
-        NYLA_LOG("Float: %f", val->f);
+        NYLA_LOG("%*sFloat: %f", indent, " ", val->f);
         return;
     }
     case Tag::String: {
-        NYLA_LOG("String: " NYLA_SV_FMT, NYLA_SV_ARG(val->s));
+        NYLA_LOG("%*sString: " NYLA_SV_FMT, indent, " ", NYLA_SV_ARG(val->s));
         return;
     }
     case Tag::ArrayBegin: {
-        NYLA_LOG("ArrayBegin of %d elems", val->col.len);
+        NYLA_LOG("%*sArrayBegin of %d elems", indent, " ", val->col.len);
 
-        for (uint32_t i = 0; i < val->col.len; ++i)
-            LogJsonValue(val + 1 + i);
+        auto end = val->end();
+        for (auto it = val->begin(); it != end; ++it)
+            LogJsonValue(*it, indent + 2);
 
         return;
     }
     case Tag::ArrayEnd: {
-        NYLA_LOG("ArrayEnd");
+        NYLA_LOG("%*sArrayEnd", indent, " ");
         return;
     }
     case Tag::ObjectBegin: {
-        NYLA_LOG("Object of %d elems", val->col.len);
+        NYLA_LOG("%*sObject of %d elems", indent, " ", val->col.len);
 
-        for (uint32_t i = 0; i < val->col.len * 2; ++i)
-            LogJsonValue(val + 1 + i);
+        auto end = val->end();
+        for (auto it = val->begin(); it != end; ++it)
+            LogJsonValue(*it, indent + 2);
 
         return;
     }
     case Tag::ObjectEnd: {
-        NYLA_LOG("ObjectEnd");
+        NYLA_LOG("%*sObjectEnd", indent, " ");
         return;
     }
     default: {
@@ -144,21 +148,21 @@ test6: {
     JsonParser parser{regionAlloc, json, sizeof(json)};
     JsonValue *value = parser.ParseNext();
 
-    value->Object("asset")->String("generator");
-
-    value = value->Object("asset");
+    JsonValue *asset = value->Object("asset");
 
     {
-        std::string_view sv = value->String("generator");
+        std::string_view sv = asset->String("generator");
         NYLA_LOG("" NYLA_SV_FMT, NYLA_SV_ARG(sv));
     }
 
     {
-        std::string_view sv = value->String("version");
+        std::string_view sv = asset->String("version");
         NYLA_LOG("" NYLA_SV_FMT, NYLA_SV_ARG(sv));
     }
 
-    // LogJsonValue(value);
+    LogJsonValue(value);
+
+    JsonValue *buffers = value->Array("buffers");
 }
     regionAlloc.Reset();
 

@@ -17,13 +17,11 @@ auto JsonVisit(JsonValue *value, std::span<std::string_view> path, auto &&handle
     if (value->tag != JsonValue::Tag::ObjectBegin)
         return false;
 
-    JsonValue *const end = value->col.end;
-    ++value;
-
-    for (; value != end; value += 2)
+    auto end = value->end();
+    for (auto it = value->begin(); it != end; it += 2)
     {
-        if (value->s == path.front())
-            return JsonVisit(value + 1, path.subspan(1), handler);
+        if ((*it)->s == path.front())
+            return JsonVisit((*it) + 1, path.subspan(1), handler);
     }
 
     return false;
@@ -33,10 +31,12 @@ auto JsonVisit(JsonValue *value, std::span<std::string_view> path, auto &&handle
 
 auto JsonValue::begin() -> JsonValueIter
 {
+    return {.at = this + 1};
 }
 
 auto JsonValue::end() -> JsonValueIter
 {
+    return {.at = col.end};
 }
 
 auto JsonValue::TryAny(std::span<std::string_view> path, JsonValue *&out) -> bool
