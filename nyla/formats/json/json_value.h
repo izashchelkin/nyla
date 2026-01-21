@@ -37,45 +37,32 @@ struct JsonValue
         } col;
     };
 
-    auto TryVisitAny(std::span<std::string_view> path, JsonValue *&out) -> bool;
-    auto VisitAny(std::span<std::string_view> path) -> JsonValue *
-    {
-        JsonValue *out;
-        NYLA_ASSERT(TryVisitAny(path, out));
-        return out;
+#define DECL(name, out)                                                                                                \
+    auto TryVisit##name(std::span<std::string_view>, out &) -> bool;                                                   \
+    auto Visit##name(std::span<std::string_view> path) -> out                                                          \
+    {                                                                                                                  \
+        out ret;                                                                                                       \
+        NYLA_ASSERT(TryVisit##name(path, ret));                                                                        \
+        return ret;                                                                                                    \
+    }                                                                                                                  \
+    auto TryVisit##name(std::string_view path, out &ret) -> bool                                                       \
+    {                                                                                                                  \
+        return TryVisit##name(std::span{&path, 1}, ret);                                                               \
+    }                                                                                                                  \
+    auto Visit##name(std::string_view path) -> out                                                                     \
+    {                                                                                                                  \
+        out ret;                                                                                                       \
+        NYLA_ASSERT(TryVisit##name(std::span{&path, 1}, ret));                                                         \
+        return ret;                                                                                                    \
     }
 
-    auto TryVisitObject(std::span<std::string_view> path, JsonValue *&out) -> bool;
-    auto VisitObject(std::span<std::string_view> path) -> JsonValue *
-    {
-        JsonValue *out;
-        NYLA_ASSERT(TryVisitObject(path, out));
-        return out;
-    }
+    DECL(Any, JsonValue *);
+    DECL(Object, JsonValue *);
+    DECL(Array, JsonValue *);
+    DECL(String, std::string_view);
+    DECL(Integer, uint64_t);
 
-    auto TryVisitArray(std::span<std::string_view> path, JsonValue *&out) -> bool;
-    auto VisitArray(std::span<std::string_view> path) -> JsonValue *
-    {
-        JsonValue *out;
-        NYLA_ASSERT(TryVisitArray(path, out));
-        return out;
-    }
-
-    auto TryVisitString(std::span<std::string_view> path, std::string_view &out) -> bool;
-    auto VisitString(std::span<std::string_view> path) -> std::string_view
-    {
-        std::string_view out;
-        NYLA_ASSERT(TryVisitString(path, out));
-        return out;
-    }
-
-    auto TryVisitInteger(std::span<std::string_view> path, uint64_t &out) -> bool;
-    auto VisitInteger(std::span<std::string_view> path) -> uint64_t
-    {
-        uint64_t out;
-        NYLA_ASSERT(TryVisitInteger(path, out));
-        return out;
-    }
+#undef DECL
 };
 
 } // namespace nyla
