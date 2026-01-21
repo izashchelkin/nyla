@@ -38,21 +38,21 @@ struct JsonValue
     };
 
 #define DECL(name, out)                                                                                                \
-    auto TryVisit##name(std::span<std::string_view>, out &) -> bool;                                                   \
-    auto Visit##name(std::span<std::string_view> path) -> out                                                          \
+    auto Try##name(std::span<std::string_view>, out &) -> bool;                                                        \
+    auto name(std::span<std::string_view> path) -> out                                                                 \
     {                                                                                                                  \
         out ret;                                                                                                       \
-        NYLA_ASSERT(TryVisit##name(path, ret));                                                                        \
+        NYLA_ASSERT(Try##name(path, ret));                                                                             \
         return ret;                                                                                                    \
     }                                                                                                                  \
-    auto TryVisit##name(std::string_view path, out &ret) -> bool                                                       \
+    auto Try##name(std::string_view path, out &ret) -> bool                                                            \
     {                                                                                                                  \
-        return TryVisit##name(std::span{&path, 1}, ret);                                                               \
+        return Try##name(std::span{&path, 1}, ret);                                                                    \
     }                                                                                                                  \
-    auto Visit##name(std::string_view path) -> out                                                                     \
+    auto name(std::string_view path) -> out                                                                            \
     {                                                                                                                  \
         out ret;                                                                                                       \
-        NYLA_ASSERT(TryVisit##name(std::span{&path, 1}, ret));                                                         \
+        NYLA_ASSERT(Try##name(std::span{&path, 1}, ret));                                                              \
         return ret;                                                                                                    \
     }
 

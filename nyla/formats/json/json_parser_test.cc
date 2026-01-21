@@ -144,15 +144,17 @@ test6: {
     JsonParser parser{regionAlloc, json, sizeof(json)};
     JsonValue *value = parser.ParseNext();
 
-    value = value->VisitObject("asset");
+    value->Object("asset")->String("generator");
+
+    value = value->Object("asset");
 
     {
-        std::string_view sv = value->VisitString("generator");
+        std::string_view sv = value->String("generator");
         NYLA_LOG("" NYLA_SV_FMT, NYLA_SV_ARG(sv));
     }
 
     {
-        std::string_view sv = value->VisitString("version");
+        std::string_view sv = value->String("version");
         NYLA_LOG("" NYLA_SV_FMT, NYLA_SV_ARG(sv));
     }
 
