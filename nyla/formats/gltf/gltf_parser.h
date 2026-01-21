@@ -1,6 +1,6 @@
 #pragma once
 
-#include "nyla/commons/word.h"
+#include "nyla/commons/memory/region_alloc.h"
 #include <cstdint>
 
 namespace nyla
@@ -8,16 +8,18 @@ namespace nyla
 
 class GltfParser
 {
-    static constexpr uint32_t kMagic = Word("glTF");
-
   public:
-    GltfParser(void *data, uint32_t byteLength): m_At{data}, m_BytesLeft{byteLength}
+    GltfParser(RegionAlloc &alloc, void *data, uint32_t byteLength)
+        : m_Alloc{alloc}, m_At{data}, m_BytesLeft{byteLength}
     {
     }
 
     auto Parse() -> bool;
 
+    auto PopDWord() -> uint32_t;
+
   private:
+    RegionAlloc &m_Alloc;
     void *m_At;
     uint32_t m_BytesLeft;
 };

@@ -26,7 +26,7 @@ auto JsonParser::ParseNext() -> Value *
     SkipWhitespace();
 
     char ch = Peek();
-    if (IsNumber(ch))
+    if (IsNumber(ch) || ch == '-')
         return ParseNumber();
     if (IsAlpha(ch))
         return ParseLiteral();
@@ -73,6 +73,13 @@ auto JsonParser::ParseLiteral() -> Value *
 
 auto JsonParser::ParseNumber() -> Value *
 {
+    uint32_t sign = 1;
+    if (Peek() == '-')
+    {
+        sign = -1;
+        Advance();
+    }
+
     uint64_t integer = 0;
     uint64_t fraction = 0;
     uint64_t fractionCount = 0;
@@ -101,14 +108,14 @@ auto JsonParser::ParseNumber() -> Value *
 
         return m_Alloc.Push(Value{
             .tag = Value::Tag::Float,
-            .f = f,
+            .f = sign * f,
         });
     }
     else
     {
         return m_Alloc.Push(Value{
             .tag = Value::Tag::Integer,
-            .i = integer,
+            .i = sign * integer,
         });
     }
 }
@@ -117,12 +124,23 @@ auto JsonParser::ParseString() -> Value *
 {
     const char *base = m_At;
     uint32_t count = 0;
-    while (m_Left > 0 && Pop() != '"')
-        ++count;
 
+    char prevch = 0;
+    while (m_Left > 0)
+    {
+        const char ch = Pop();
+        if (ch == '"' /*  && prevch != '\\' */)
+            break;
+
+        prevch = ch;
+
+        ++count;
+    }
+
+    std::string_view s{base, count};
     return m_Alloc.Push(Value{
         .tag = Value::Tag::String,
-        .s = std::string_view{base, count},
+        .s = s,
     });
 }
 
@@ -136,7 +154,10 @@ auto JsonParser::ParseArray() -> Value *
     for (;;)
     {
         if (Peek() == ']')
+        {
+            Advance();
             break;
+        }
 
         ++value->len;
 
@@ -150,7 +171,6 @@ auto JsonParser::ParseArray() -> Value *
         NYLA_ASSERT(ch == ',');
     }
 
-    Advance();
     return value;
 }
 
@@ -164,7 +184,10 @@ auto JsonParser::ParseObject() -> Value *
     for (;;)
     {
         if (Peek() == '}')
+        {
+            Advance();
             break;
+        }
 
         ++value->len;
 
@@ -177,7 +200,6 @@ auto JsonParser::ParseObject() -> Value *
         Value *val = ParseNext();
 
         SkipWhitespace();
-
         const char ch = Pop();
         if (ch == '}')
             break;
@@ -185,7 +207,6 @@ auto JsonParser::ParseObject() -> Value *
         NYLA_ASSERT(ch == ',');
     }
 
-    Advance();
     return value;
 }
 

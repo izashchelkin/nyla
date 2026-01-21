@@ -13,8 +13,9 @@ Checks: >
   -modernize-use-std-print,
   -modernize-use-ranges,
   -modernize-loop-convert,
+  -modernize-avoid-c-arrays,
 
-  readability-identifier-naming
+  readability-identifier-naming,
 
 CheckOptions:
   - key: readability-identifier-naming.ClassCase
