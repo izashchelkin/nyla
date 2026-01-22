@@ -41,7 +41,7 @@ auto GltfParser::Parse() -> bool
         for (auto it = buffers->begin(); it != end; ++it)
         {
             auto &buffer = m_Buffers.emplace_back(GltfBuffer{});
-            buffer.byteLength = (*it)->Integer("byteLength");
+            buffer.byteLength = it->Integer("byteLength");
         }
     }
 
@@ -51,9 +51,9 @@ auto GltfParser::Parse() -> bool
         for (auto it = bufferViews->begin(); it != end; ++it)
         {
             auto &bufferView = m_BufferViews.emplace_back(GltfBufferView{});
-            bufferView.buffer = (*it)->Integer("buffer");
-            bufferView.byteOffset = (*it)->Integer("byteOffset");
-            bufferView.byteLength = (*it)->Integer("byteLength");
+            bufferView.buffer = it->Integer("buffer");
+            bufferView.byteOffset = it->Integer("byteOffset");
+            bufferView.byteLength = it->Integer("byteLength");
         }
     }
 
@@ -63,15 +63,15 @@ auto GltfParser::Parse() -> bool
         for (auto it = accessors->begin(); it != end; ++it)
         {
             auto &accessor = m_Accessors.emplace_back(GltfAccessor{});
-            accessor.bufferView = (*it)->Integer("bufferView");
+            accessor.bufferView = it->Integer("bufferView");
 
             uint64_t byteOffset = 0;
             (*it)->TryInteger("byteOffset", byteOffset);
             accessor.byteOffset = byteOffset;
 
-            accessor.componentType = (*it)->Integer("componentType");
-            accessor.count = (*it)->Integer("count");
-            accessor.type = (*it)->String("type");
+            accessor.componentType = it->Integer("componentType");
+            accessor.count = it->Integer("count");
+            accessor.type = it->String("type");
         }
     }
 

@@ -1,4 +1,5 @@
 #include "nyla/formats/json/json_value.h"
+#include "nyla/commons/assert.h"
 #include "nyla/commons/log.h"
 #include "nyla/formats/json/json_parser.h"
 #include <cinttypes>
@@ -8,166 +9,152 @@
 namespace nyla
 {
 
-namespace
+auto JsonValue::Skip() -> JsonValue *
 {
+    switch (m_Tag)
+    {
+    case JsonTag::ArrayBegin:
+    case JsonTag::ObjectBegin:
+        return m_Val.valHeader.end + 1;
 
-auto JsonVisit(JsonValue *value, std::span<std::string_view> path, auto &&handler) -> bool
+    default:
+        return this + 1;
+    }
+}
+
+auto JsonValue::TryAny(std::span<std::string_view> path, JsonValue *&out) -> bool
 {
     if (path.empty())
-        return handler(value);
+    {
+        out = this;
+        return true;
+    }
 
-    if (value->tag != JsonValue::Tag::ObjectBegin)
+    if (m_Tag != JsonTag::ObjectBegin)
         return false;
 
-    auto end = value->end();
-    for (auto it = value->begin(); it != end; it += 2)
+    auto end = this->end();
+    for (auto it = begin(); it != end;)
     {
-        if ((*it)->s == path.front())
-            return JsonVisit((*it) + 1, path.subspan(1), handler);
+        auto key = it->String();
+        ++it;
+        auto val = it->Any();
+        ++it;
+
+        if (key == path.front())
+            return val->TryAny(path.subspan(1), out);
     }
 
     return false;
 }
 
-} // namespace
-
-auto JsonValue::begin() -> JsonValueIter
-{
-    return {.at = this + 1};
-}
-
-auto JsonValue::end() -> JsonValueIter
-{
-    return {.at = col.end};
-}
-
-auto JsonValue::TryAny(std::span<std::string_view> path, JsonValue *&out) -> bool
-{
-    return JsonVisit(this, path, [&out](JsonValue *value) -> bool {
-        out = value;
-        return true;
-    });
-}
-
 auto JsonValue::TryObject(std::span<std::string_view> path, JsonValue *&out) -> bool
 {
-    return JsonVisit(this, path, [&out](JsonValue *value) -> bool {
-        if (value->tag == Tag::ObjectBegin)
-        {
-            out = value;
-            return true;
-        }
-        else
-            return false;
-    });
+    JsonValue *tmp;
+    if (!TryAny(path, tmp))
+        return false;
+    if (tmp->m_Tag != JsonTag::ObjectBegin)
+        return false;
+
+    out = tmp;
+    return true;
 }
 
 auto JsonValue::TryArray(std::span<std::string_view> path, JsonValue *&out) -> bool
 {
-    return JsonVisit(this, path, [&out](JsonValue *value) -> bool {
-        if (value->tag == Tag::ArrayBegin)
-        {
-            out = value;
-            return true;
-        }
-        else
-            return false;
-    });
+    JsonValue *tmp;
+    if (!TryAny(path, tmp))
+        return false;
+    if (tmp->m_Tag != JsonTag::ArrayBegin)
+        return false;
+
+    out = tmp;
+    return true;
 }
 
 auto JsonValue::TryString(std::span<std::string_view> path, std::string_view &out) -> bool
 {
-    return JsonVisit(this, path, [&out](JsonValue *value) -> bool {
-        if (value->tag == Tag::String)
-        {
-            out = value->s;
-            return true;
-        }
-        else
-            return false;
-    });
+    JsonValue *tmp;
+    if (!TryAny(path, tmp))
+        return false;
+    if (tmp->m_Tag != JsonTag::String)
+        return false;
+
+    out = tmp->m_Val.valSv;
+    return true;
 }
 
 auto JsonValue::TryInteger(std::span<std::string_view> path, uint64_t &out) -> bool
 {
-    return JsonVisit(this, path, [&out](JsonValue *value) -> bool {
-        if (value->tag == Tag::Integer)
-        {
-            out = value->i;
-            return true;
-        }
-        else
-            return false;
-    });
+    JsonValue *tmp;
+    if (!TryAny(path, tmp))
+        return false;
+    if (tmp->m_Tag != JsonTag::Integer)
+        return false;
+
+    out = tmp->m_Val.valInt;
+    return true;
+}
+
+auto JsonValue::TryDouble(std::span<std::string_view> path, double &out) -> bool
+{
+    JsonValue *tmp;
+    if (!TryAny(path, tmp))
+        return false;
+    if (tmp->m_Tag != JsonTag::Double)
+        return false;
+
+    out = tmp->m_Val.valDouble;
+    return true;
+}
+
+auto JsonValue::TryBool(std::span<std::string_view> path, bool &out) -> bool
+{
+    JsonValue *tmp;
+    if (!TryAny(path, tmp))
+        return false;
+    if (tmp->m_Tag != JsonTag::Bool)
+        return false;
+
+    out = tmp->m_Val.valBool;
+    return true;
 }
 
 //
 
-auto JsonValueIter::operator==(const JsonValueIter &rhs) const -> bool
-{
-    return at == rhs.at;
-}
-
 auto JsonValueIter::operator++() -> JsonValueIter &
 {
-    switch (at->tag)
-    {
-    case JsonValue::Tag::ArrayBegin:
-    case JsonValue::Tag::ObjectBegin: {
-        at = at->col.end + 1;
-        break;
-    }
-
-    default: {
-        ++at;
-        break;
-    }
-    }
-
+    m_At = m_At->Skip();
     return *this;
-}
-
-auto JsonValueIter::operator+=(uint32_t i) -> JsonValueIter &
-{
-    while (i-- > 0)
-        ++(*this);
-    return *this;
-}
-
-auto JsonValueIter::operator*() -> JsonValue *
-{
-    return at;
 }
 
 //
 
 void LogJsonValue(JsonValue *val, uint32_t indent)
 {
-    using Tag = JsonValue::Tag;
-
-    switch (val->tag)
+    switch (val->GetTag())
     {
-    case Tag::Null: {
+    case JsonTag::Null: {
         NYLA_LOG("%*snull", indent, " ");
         return;
     }
-    case Tag::Bool: {
-        NYLA_LOG("%*s%d", indent, " ", val->b);
+    case JsonTag::Bool: {
+        NYLA_LOG("%*s%d", indent, " ", val->Bool());
         return;
     }
-    case Tag::Integer: {
-        NYLA_LOG("%*s%" PRIu64, indent, " ", val->i);
+    case JsonTag::Integer: {
+        NYLA_LOG("%*s%" PRIu64, indent, " ", val->Integer());
         return;
     }
-    case Tag::Float: {
-        NYLA_LOG("%*s%f", indent, " ", val->f);
+    case JsonTag::Double: {
+        NYLA_LOG("%*s%f", indent, " ", val->Double());
         return;
     }
-    case Tag::String: {
-        NYLA_LOG("%*s\"" NYLA_SV_FMT "\"", indent, " ", NYLA_SV_ARG(val->s));
+    case JsonTag::String: {
+        NYLA_LOG("%*s\"" NYLA_SV_FMT "\"", indent, " ", NYLA_SV_ARG(val->String()));
         return;
     }
-    case Tag::ArrayBegin: {
+    case JsonTag::ArrayBegin: {
         NYLA_LOG("%*s[", indent, " ");
 
         auto end = val->end();
@@ -176,11 +163,11 @@ void LogJsonValue(JsonValue *val, uint32_t indent)
 
         // Fallthrough
     }
-    case Tag::ArrayEnd: {
+    case JsonTag::ArrayEnd: {
         NYLA_LOG("%*s]", indent, " ");
         return;
     }
-    case Tag::ObjectBegin: {
+    case JsonTag::ObjectBegin: {
         NYLA_LOG("%*s{", indent, " ");
 
         auto end = val->end();
@@ -191,7 +178,7 @@ void LogJsonValue(JsonValue *val, uint32_t indent)
 
         // Fallthrough
     }
-    case Tag::ObjectEnd: {
+    case JsonTag::ObjectEnd: {
         NYLA_LOG("%*s}", indent, " ");
         return;
     }

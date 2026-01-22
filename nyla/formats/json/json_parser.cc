@@ -51,20 +51,20 @@ auto JsonParser::ParseLiteral() -> JsonValue *
         NYLA_ASSERT(Pop() == 'u');
         NYLA_ASSERT(Pop() == 'l');
         NYLA_ASSERT(Pop() == 'l');
-        return m_Alloc.Push(JsonValue{.tag = JsonValue::Tag::Null});
+        return m_Alloc.Push(JsonValue{JsonTag::Null});
 
     case 't':
         NYLA_ASSERT(Pop() == 'r');
         NYLA_ASSERT(Pop() == 'u');
         NYLA_ASSERT(Pop() == 'e');
-        return m_Alloc.Push(JsonValue{.tag = JsonValue::Tag::Bool, .b = true});
+        return m_Alloc.Push(JsonValue{true});
 
     case 'f':
         NYLA_ASSERT(Pop() == 'a');
         NYLA_ASSERT(Pop() == 'l');
         NYLA_ASSERT(Pop() == 's');
         NYLA_ASSERT(Pop() == 'e');
-        return m_Alloc.Push(JsonValue{.tag = JsonValue::Tag::Bool, .b = false});
+        return m_Alloc.Push(JsonValue{false});
 
     default:
         NYLA_ASSERT(false);
@@ -107,17 +107,11 @@ auto JsonParser::ParseNumber() -> JsonValue *
 
         f += static_cast<double>(integer);
 
-        return m_Alloc.Push(JsonValue{
-            .tag = JsonValue::Tag::Float,
-            .f = sign * f,
-        });
+        return m_Alloc.Push(JsonValue{sign * f});
     }
     else
     {
-        return m_Alloc.Push(JsonValue{
-            .tag = JsonValue::Tag::Integer,
-            .i = sign * integer,
-        });
+        return m_Alloc.Push(JsonValue{sign * integer});
     }
 }
 
@@ -139,17 +133,13 @@ auto JsonParser::ParseString() -> JsonValue *
     }
 
     std::string_view s{base, count};
-    return m_Alloc.Push(JsonValue{
-        .tag = JsonValue::Tag::String,
-        .s = s,
-    });
+    return m_Alloc.Push(JsonValue{s});
 }
 
 auto JsonParser::ParseArray() -> JsonValue *
 {
-    JsonValue *value = m_Alloc.Push(JsonValue{
-        .tag = JsonValue::Tag::ArrayBegin,
-    });
+    JsonValue *begin = m_Alloc.Push(JsonValue{});
+    uint32_t count = 0;
 
     for (;;)
     {
@@ -159,7 +149,7 @@ auto JsonParser::ParseArray() -> JsonValue *
             break;
         }
 
-        ++value->col.len;
+        ++count;
 
         JsonValue *elem = ParseNext();
 
@@ -171,18 +161,16 @@ auto JsonParser::ParseArray() -> JsonValue *
         NYLA_ASSERT(ch == ',');
     }
 
-    value->col.end = m_Alloc.Push(JsonValue{
-        .tag = JsonValue::Tag::ArrayEnd,
-    });
+    JsonValue *end = m_Alloc.Push(JsonValue{JsonTag::ArrayEnd});
+    *begin = JsonValue{JsonTag::ArrayBegin, count, end};
 
-    return value;
+    return begin;
 }
 
 auto JsonParser::ParseObject() -> JsonValue *
 {
-    JsonValue *value = m_Alloc.Push(JsonValue{
-        .tag = JsonValue::Tag::ObjectBegin,
-    });
+    JsonValue *begin = m_Alloc.Push(JsonValue{});
+    uint32_t count = 0;
 
     for (;;)
     {
@@ -192,10 +180,10 @@ auto JsonParser::ParseObject() -> JsonValue *
             break;
         }
 
-        ++value->col.len;
+        ++count;
 
         JsonValue *key = ParseNext();
-        NYLA_ASSERT(key->tag == JsonValue::Tag::String);
+        NYLA_ASSERT(key->GetTag() == JsonTag::String);
 
         SkipWhitespace();
         NYLA_ASSERT(Pop() == ':');
@@ -210,11 +198,10 @@ auto JsonParser::ParseObject() -> JsonValue *
         NYLA_ASSERT(ch == ',');
     }
 
-    value->col.end = m_Alloc.Push(JsonValue{
-        .tag = JsonValue::Tag::ObjectEnd,
-    });
+    JsonValue *end = m_Alloc.Push(JsonValue{JsonTag::ObjectEnd});
+    *begin = JsonValue{JsonTag::ObjectBegin, count, end};
 
-    return value;
+    return begin;
 }
 
 auto JsonParser::Peek() -> char

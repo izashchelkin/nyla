@@ -10,44 +10,77 @@ namespace nyla
 
 struct JsonValue;
 
-struct JsonValueIter
+class JsonValueIter
 {
-    JsonValue *at;
+  public:
+    explicit JsonValueIter(JsonValue *at) : m_At{at}
+    {
+    }
+
+    auto operator*() const -> JsonValue *
+    {
+        return m_At;
+    }
+    auto operator->() const -> JsonValue *
+    {
+        return m_At;
+    }
+    auto operator==(const JsonValueIter &other) const -> bool
+    {
+        return m_At == other.m_At;
+    }
 
     auto operator++() -> JsonValueIter &;
-    auto operator+=(uint32_t i) -> JsonValueIter &;
-    auto operator*() -> JsonValue *;
-    auto operator==(const JsonValueIter &other) const -> bool;
+
+  private:
+    JsonValue *m_At;
 };
 
-struct JsonValue
+enum class JsonTag
 {
-    enum class Tag
+    Invalid = 0,
+    Null,
+    Bool,
+    Integer,
+    Double,
+    String,
+    ArrayBegin,
+    ArrayEnd,
+    ObjectBegin,
+    ObjectEnd,
+};
+
+class JsonValue
+{
+  public:
+    JsonValue() : m_Tag{JsonTag::Invalid}, m_Val{}
     {
-        Null,
-        Bool,
-        Integer,
-        Float,
-        String,
-        ArrayBegin,
-        ArrayEnd,
-        ObjectBegin,
-        ObjectEnd,
-    };
+    }
 
-    Tag tag;
-    union {
-        bool b;
-        uint64_t i;
-        double f;
-        std::string_view s;
+    explicit JsonValue(JsonTag tag) : m_Tag{tag}, m_Val{}
+    {
+    }
 
-        struct
-        {
-            JsonValue *end;
-            uint32_t len;
-        } col;
-    };
+    explicit JsonValue(JsonTag tag, uint32_t count, JsonValue *end)
+        : m_Tag{tag}, m_Val{.valHeader = {.end = end, .count = count}}
+    {
+    }
+
+    explicit JsonValue(bool val) : m_Tag{JsonTag::Bool}, m_Val{.valBool = val}
+    {
+    }
+
+    explicit JsonValue(uint64_t val) : m_Tag{JsonTag::Integer}, m_Val{.valInt = val}
+    {
+    }
+
+    explicit JsonValue(double val) : m_Tag{JsonTag::Double}, m_Val{.valDouble = val}
+    {
+    }
+
+    explicit JsonValue(std::string_view val) : m_Tag{JsonTag::String}, m_Val{.valSv = val}
+    {
+    }
 
 #define DECL(name, out)                                                                                                \
     auto Try##name(std::span<std::string_view>, out &) -> bool;                                                        \
@@ -64,6 +97,14 @@ struct JsonValue
     auto name(std::string_view path) -> out                                                                            \
     {                                                                                                                  \
         return name(std::span{&path, 1});                                                                              \
+    }                                                                                                                  \
+    auto Try##name(out &ret) -> bool                                                                                   \
+    {                                                                                                                  \
+        return Try##name(std::span<std::string_view>{}, ret);                                                          \
+    }                                                                                                                  \
+    auto name() -> out                                                                                                 \
+    {                                                                                                                  \
+        return name(std::span<std::string_view>{});                                                                    \
     }
 
     DECL(Any, JsonValue *);
@@ -71,11 +112,44 @@ struct JsonValue
     DECL(Array, JsonValue *);
     DECL(String, std::string_view);
     DECL(Integer, uint64_t);
+    DECL(Double, double);
+    DECL(Bool, bool);
 
 #undef DECL
 
-    auto begin() -> JsonValueIter;
-    auto end() -> JsonValueIter;
+    auto GetTag()
+    {
+        return m_Tag;
+    }
+
+    auto Skip() -> JsonValue *;
+
+    auto begin() -> JsonValueIter
+    {
+        NYLA_ASSERT(m_Tag == JsonTag::ArrayBegin || m_Tag == JsonTag::ObjectBegin);
+        return JsonValueIter{this + 1};
+    }
+
+    auto end() -> JsonValueIter
+    {
+        NYLA_ASSERT(m_Tag == JsonTag::ArrayBegin || m_Tag == JsonTag::ObjectBegin);
+        return JsonValueIter{m_Val.valHeader.end};
+    }
+
+  private:
+    JsonTag m_Tag;
+    union {
+        bool valBool;
+        uint64_t valInt;
+        double valDouble;
+        std::string_view valSv;
+
+        struct
+        {
+            JsonValue *end;
+            uint32_t count;
+        } valHeader;
+    } m_Val;
 };
 
 void LogJsonValue(JsonValue *val, uint32_t indent = 0);
