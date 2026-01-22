@@ -23,6 +23,10 @@ class AssetManager
     {
     };
 
+    struct Mesh : Handle
+    {
+    };
+
     enum class SamplerType
     {
         LinearClamp = 0,
@@ -35,6 +39,7 @@ class AssetManager
     void Upload(RhiCmdList cmd);
 
     auto DeclareTexture(std::string_view path) -> Texture;
+    auto DeclareMesh(std::string_view path) -> Mesh;
 
   private:
     struct TextureData
@@ -48,6 +53,11 @@ class AssetManager
         bool needsUpload;
     };
     HandlePool<Texture, TextureData, 128> m_Textures;
+
+    struct MeshData
+    {
+    };
+    HandlePool<Texture, MeshData, 128> m_Meshes;
 };
 
 extern AssetManager *g_AssetManager;

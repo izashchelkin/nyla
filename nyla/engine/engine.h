@@ -1,6 +1,6 @@
 #pragma once
 
-#include "nyla/platform/platform.h"
+#include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include <cstdint>
 
@@ -31,9 +31,20 @@ class Engine
     auto FrameBegin() -> EngineFrameBeginResult;
     auto FrameEnd() -> void;
 
+    auto AllocStaticMeshBuffer(uint32_t size) -> ;
+
   private:
-    class Impl;
-    Impl *m_Impl{};
+    RhiBuffer m_BufferStaticMesh;
+    uint32_t m_BufferStaticMeshSize{};
+    uint32_t m_BufferStaticMeshAt{};
+
+    uint64_t m_TargetFrameDurationUs{};
+
+    uint64_t m_LastFrameStart{};
+    uint32_t m_DtUsAccum{};
+    uint32_t m_FramesCounted{};
+    uint32_t m_Fps{};
+    bool m_ShouldExit{};
 };
 extern Engine *g_Engine;
 

@@ -8,7 +8,6 @@ target_sources(${TARGET}
         debug_text_renderer.cc
         engine.cc
         engine0_internal.cc
-        frame_arena.cc
         renderer2d.cc
         staging.cc
         staging_buffer.cc
@@ -27,6 +26,7 @@ target_link_libraries(${TARGET}
         nyla::platform::dir_watch
         nyla::rhi
         nyla::spirview
+        nyla::formats::gltf::parser
         stb_image
 )
 

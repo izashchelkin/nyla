@@ -2,12 +2,12 @@
 #include "nyla/commons/assert.h"
 #include "nyla/commons/bitenum.h"
 #include "nyla/engine/asset_manager.h"
-#include "nyla/engine/frame_arena.h"
 #include "nyla/engine/input_manager.h"
 #include "nyla/engine/staging_buffer.h"
 #include "nyla/engine/tween_manager.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
+#include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include <chrono>
 #include <cmath>
@@ -17,26 +17,7 @@
 namespace nyla
 {
 
-class Engine::Impl
-{
-  public:
-    void Init(const EngineInitDesc &);
-    auto ShouldExit() -> bool;
-
-    auto FrameBegin() -> EngineFrameBeginResult;
-    auto FrameEnd() -> void;
-
-  private:
-    uint64_t m_TargetFrameDurationUs{};
-
-    uint64_t m_LastFrameStart{};
-    uint32_t m_DtUsAccum{};
-    uint32_t m_FramesCounted{};
-    uint32_t m_Fps{};
-    bool m_ShouldExit{};
-};
-
-void Engine::Impl::Init(const EngineInitDesc &desc)
+void Engine::Init(const EngineInitDesc &desc)
 {
     uint32_t maxFps = 144;
     if (desc.maxFps > 0)
@@ -52,20 +33,26 @@ void Engine::Impl::Init(const EngineInitDesc &desc)
         .flags = flags,
     });
 
-    FrameArenaInit();
-
     g_StagingBuffer = CreateStagingBuffer(1 << 22);
     g_AssetManager->Init();
 
     m_LastFrameStart = g_Platform->GetMonotonicTimeMicros();
+
+    m_BufferStaticMeshSize = 1_GiB;
+    m_BufferStaticMeshAt = 0;
+    m_BufferStaticMesh = g_Rhi->CreateBuffer({
+        .size = m_BufferStaticMeshSize,
+        .bufferUsage = RhiBufferUsage::Vertex,
+        .memoryUsage = RhiMemoryUsage::GpuOnly,
+    });
 }
 
-auto Engine::Impl::ShouldExit() -> bool
+auto Engine::ShouldExit() -> bool
 {
     return m_ShouldExit;
 }
 
-auto Engine::Impl::FrameBegin() -> EngineFrameBeginResult
+auto Engine::FrameBegin() -> EngineFrameBeginResult
 {
     RhiCmdList cmd = g_Rhi->FrameBegin();
 
@@ -141,7 +128,7 @@ auto Engine::Impl::FrameBegin() -> EngineFrameBeginResult
     };
 }
 
-auto Engine::Impl::FrameEnd() -> void
+auto Engine::FrameEnd() -> void
 {
     g_Rhi->FrameEnd();
 
@@ -155,31 +142,13 @@ auto Engine::Impl::FrameEnd() -> void
     }
 }
 
+auto Engine::AllocStaticMeshBuffer(uint32_t size)
+{
+}
+
 //
 
-void Engine::Init(const EngineInitDesc &desc)
-{
-    NYLA_ASSERT(!m_Impl);
-    m_Impl = new Impl{};
-    m_Impl->Init(desc);
-}
-
-auto Engine::ShouldExit() -> bool
-{
-    return m_Impl->ShouldExit();
-}
-
-auto Engine::FrameBegin() -> EngineFrameBeginResult
-{
-    return m_Impl->FrameBegin();
-}
-
-auto Engine::FrameEnd() -> void
-{
-    return m_Impl->FrameEnd();
-}
-
-GpuStagingBuffer *g_StagingBuffer;
 Engine *g_Engine = new Engine{};
+GpuStagingBuffer *g_StagingBuffer;
 
 } // namespace nyla
