@@ -111,18 +111,46 @@ class JsonValue
     DECL(Object, JsonValue *);
     DECL(Array, JsonValue *);
     DECL(String, std::string_view);
-    DECL(Integer, uint64_t);
+    DECL(DWord, uint32_t);
+    DECL(QWord, uint64_t);
     DECL(Double, double);
     DECL(Bool, bool);
 
 #undef DECL
+
+    auto Skip() -> JsonValue *;
+
+    //
 
     auto GetTag()
     {
         return m_Tag;
     }
 
-    auto Skip() -> JsonValue *;
+    auto GetCount()
+    {
+        NYLA_ASSERT(m_Tag == JsonTag::ArrayBegin || m_Tag == JsonTag::ObjectBegin);
+        return m_Val.valHeader.count;
+    }
+
+    auto GetFront() -> JsonValue *
+    {
+        NYLA_ASSERT(m_Tag == JsonTag::ArrayBegin || m_Tag == JsonTag::ObjectBegin);
+        return this + 1;
+    }
+
+#if 0
+    auto operator[](uint32_t i) -> JsonValue *
+    {
+        NYLA_ASSERT(m_Tag == JsonTag::ArrayBegin || m_Tag == JsonTag::ObjectBegin);
+
+        JsonValue *ret = this;
+        while (i-- > 0)
+            ret = ret->Skip();
+
+        return ret;
+    }
+#endif
 
     auto begin() -> JsonValueIter
     {

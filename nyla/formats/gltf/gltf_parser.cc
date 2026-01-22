@@ -1,5 +1,6 @@
 #include "nyla/formats/gltf/gltf_parser.h"
 #include "nyla/commons/align.h"
+#include "nyla/commons/log.h"
 #include "nyla/commons/word.h"
 #include "nyla/formats/json/json_parser.h"
 #include "nyla/formats/json/json_value.h"
@@ -37,41 +38,82 @@ auto GltfParser::Parse() -> bool
 
     {
         JsonValue *buffers = jsonChunk->Array("buffers");
-        auto end = buffers->end();
-        for (auto it = buffers->begin(); it != end; ++it)
+        for (auto it = buffers->begin(), end = buffers->end(); it != end; ++it)
         {
             auto &buffer = m_Buffers.emplace_back(GltfBuffer{});
-            buffer.byteLength = it->Integer("byteLength");
+            buffer.byteLength = it->DWord("byteLength");
         }
     }
 
     {
         JsonValue *bufferViews = jsonChunk->Array("bufferViews");
-        auto end = bufferViews->end();
-        for (auto it = bufferViews->begin(); it != end; ++it)
+        for (auto it = bufferViews->begin(), end = bufferViews->end(); it != end; ++it)
         {
             auto &bufferView = m_BufferViews.emplace_back(GltfBufferView{});
-            bufferView.buffer = it->Integer("buffer");
-            bufferView.byteOffset = it->Integer("byteOffset");
-            bufferView.byteLength = it->Integer("byteLength");
+            bufferView.buffer = it->DWord("buffer");
+
+            if (!it->TryDWord("byteOffset", bufferView.byteOffset))
+                bufferView.byteOffset = 0;
+
+            bufferView.byteLength = it->DWord("byteLength");
         }
     }
 
     {
         JsonValue *accessors = jsonChunk->Array("accessors");
-        auto end = accessors->end();
-        for (auto it = accessors->begin(); it != end; ++it)
+        for (auto it = accessors->begin(), end = accessors->end(); it != end; ++it)
         {
             auto &accessor = m_Accessors.emplace_back(GltfAccessor{});
-            accessor.bufferView = it->Integer("bufferView");
+            accessor.bufferView = it->DWord("bufferView");
 
-            uint64_t byteOffset = 0;
-            (*it)->TryInteger("byteOffset", byteOffset);
-            accessor.byteOffset = byteOffset;
+            if (!it->TryDWord("byteOffset", accessor.byteOffset))
+                accessor.byteOffset = 0;
 
-            accessor.componentType = it->Integer("componentType");
-            accessor.count = it->Integer("count");
+            accessor.componentType = it->DWord("componentType");
+            accessor.count = it->DWord("count");
             accessor.type = it->String("type");
+        }
+    }
+
+    {
+        JsonValue *meshes = jsonChunk->Array("meshes");
+        for (auto it = meshes->begin(), end = meshes->end(); it != end; ++it)
+        {
+            auto &mesh = m_Meshes.emplace_back(GltfMesh{});
+
+            if (!it->TryString("name", mesh.name))
+                mesh.name = {};
+
+            JsonValue *primitivesJson = it->Array("primitives");
+            uint32_t primitivesCount = primitivesJson->GetCount();
+            mesh.primitives = m_Alloc.PushArr<GltfMeshPrimitive>(primitivesCount);
+
+            JsonValue *primitiveJson = primitivesJson->GetFront();
+            for (uint32_t i = 0; i < primitivesCount; ++i, primitiveJson = primitiveJson->Skip())
+            {
+                auto &primitive = mesh.primitives[i] = GltfMeshPrimitive{};
+
+                primitive.indices = primitiveJson->DWord("indices");
+                primitive.material = primitiveJson->DWord("material");
+
+                JsonValue *attributesJson = primitiveJson->Object("attributes");
+                uint32_t attributesCount = attributesJson->GetCount();
+
+                primitive.attributes = m_Alloc.PushArr<GltfMeshPrimitiveAttribute>(attributesCount);
+
+                JsonValue *attributeJson = attributesJson->GetFront();
+                for (uint32_t j = 0; j < attributesCount; ++j)
+                {
+                    auto &attribute = primitive.attributes[j] = GltfMeshPrimitiveAttribute{};
+
+                    attribute.name = attributeJson->String();
+
+                    attributeJson = attributeJson->Skip();
+
+                    attribute.accessor = attributeJson->DWord();
+                    attributeJson = attributeJson->Skip();
+                }
+            }
         }
     }
 
@@ -81,11 +123,10 @@ auto GltfParser::Parse() -> bool
     m_At = (char *)m_Base + AlignedUp<uint32_t>((char *)m_At - (char *)m_Base, 4);
 
     const uint32_t binChunkLength = PopDWord();
-
-    uint32_t header = PopDWord();
-
-    if (header != DWord("BIN\0"))
+    if (PopDWord() != DWord("BIN\0"))
         return false;
+
+    m_BinChunk = {(char *)m_At, binChunkLength};
 
     return true;
 }

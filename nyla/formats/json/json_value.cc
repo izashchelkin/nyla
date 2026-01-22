@@ -84,7 +84,19 @@ auto JsonValue::TryString(std::span<std::string_view> path, std::string_view &ou
     return true;
 }
 
-auto JsonValue::TryInteger(std::span<std::string_view> path, uint64_t &out) -> bool
+auto JsonValue::TryQWord(std::span<std::string_view> path, uint64_t &out) -> bool
+{
+    JsonValue *tmp;
+    if (!TryAny(path, tmp))
+        return false;
+    if (tmp->m_Tag != JsonTag::Integer)
+        return false;
+
+    out = tmp->m_Val.valInt;
+    return true;
+}
+
+auto JsonValue::TryDWord(std::span<std::string_view> path, uint32_t &out) -> bool
 {
     JsonValue *tmp;
     if (!TryAny(path, tmp))
@@ -143,7 +155,7 @@ void LogJsonValue(JsonValue *val, uint32_t indent)
         return;
     }
     case JsonTag::Integer: {
-        NYLA_LOG("%*s%" PRIu64, indent, " ", val->Integer());
+        NYLA_LOG("%*s%" PRIu64, indent, " ", val->QWord());
         return;
     }
     case JsonTag::Double: {
