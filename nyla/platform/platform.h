@@ -62,6 +62,7 @@ struct PlatformEvent
 struct PlatformInitDesc
 {
     PlatformFeature enabledFeatures;
+    bool open;
 };
 
 class Platform
@@ -74,10 +75,10 @@ class Platform
     auto WinGetSize() -> PlatformWindowSize;
     auto PollEvent(PlatformEvent &outEvent) -> bool;
 
-    auto GetMemPageSize() -> uint32_t;
-    auto ReserveMemPages(uint32_t size) -> char *;
-    void CommitMemPages(char *page, uint32_t size);
-    void DecommitMemPages(char *page, uint32_t size);
+    auto GetMemPageSize() -> uint64_t;
+    auto ReserveMemPages(uint64_t size) -> char *;
+    void CommitMemPages(char *page, uint64_t size);
+    void DecommitMemPages(char *page, uint64_t size);
 
     auto GetMonotonicTimeMillis() -> uint64_t;
     auto GetMonotonicTimeMicros() -> uint64_t;

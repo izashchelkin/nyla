@@ -76,7 +76,7 @@ class Rhi
     void NameBuffer(RhiBuffer, std::string_view name);
     void DestroyBuffer(RhiBuffer);
 
-    auto GetBufferSize(RhiBuffer) -> uint32_t;
+    auto GetBufferSize(RhiBuffer) -> uint64_t;
 
     auto MapBuffer(RhiBuffer) -> char *;
     void UnmapBuffer(RhiBuffer);

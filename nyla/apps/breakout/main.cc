@@ -1,4 +1,5 @@
 #include "nyla/apps/breakout/breakout.h"
+#include "nyla/commons/memory/region_alloc.h"
 #include "nyla/engine/debug_text_renderer.h"
 #include "nyla/engine/engine.h"
 #include "nyla/platform/platform.h"
@@ -14,10 +15,19 @@ auto PlatformMain() -> int
 {
     g_Platform->Init({
         .enabledFeatures = PlatformFeature::KeyboardInput,
+        .open = true,
     });
-    g_Platform->WinOpen();
 
-    g_Engine->Init({});
+    RegionAlloc rootAlloc;
+    rootAlloc.Init(nullptr, 64_GiB, RegionAllocCommitPageGrowth::GetInstance());
+
+    CpuAllocs cpuAllocs{
+        .permanent = rootAlloc.PushSubAlloc(512_MiB),
+        .transient = rootAlloc.PushSubAlloc(512_MiB),
+    };
+
+    g_Engine = cpuAllocs.permanent.Push<Engine>();
+    g_Engine->Init({.cpuAllocs = cpuAllocs});
 
     GameInit();
 

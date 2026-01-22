@@ -14,7 +14,7 @@ class RegionAllocGrowthHandler
 {
   public:
     [[nodiscard]]
-    virtual auto TryGrow(RegionAlloc &alloc, uint32_t neededSize) -> bool = 0;
+    virtual auto TryGrow(RegionAlloc &alloc, uint64_t neededSize) -> bool = 0;
 };
 
 class RegionAllocBumpOnlyGrowth : public RegionAllocGrowthHandler
@@ -26,7 +26,7 @@ class RegionAllocBumpOnlyGrowth : public RegionAllocGrowthHandler
         return handler;
     }
 
-    auto TryGrow(RegionAlloc &alloc, uint32_t neededSize) -> bool final;
+    auto TryGrow(RegionAlloc &alloc, uint64_t neededSize) -> bool final;
 };
 
 class RegionAllocCommitPageGrowth : public RegionAllocGrowthHandler
@@ -38,7 +38,7 @@ class RegionAllocCommitPageGrowth : public RegionAllocGrowthHandler
         return handler;
     }
 
-    auto TryGrow(RegionAlloc &alloc, uint32_t neededSize) -> bool final;
+    auto TryGrow(RegionAlloc &alloc, uint64_t neededSize) -> bool final;
 };
 
 class RegionAlloc
@@ -47,19 +47,25 @@ class RegionAlloc
     friend class RegionAllocBumpOnlyGrowth;
 
   public:
-    RegionAlloc(void *base, uint32_t size, uint32_t maxSize, RegionAllocGrowthHandler &growthHandler)
-        : m_Base{(char *)base}, m_Size{size}, m_MaxSize{maxSize}, m_GrowthHandler{growthHandler}
+    void Init(void *base, uint64_t maxSize, RegionAllocGrowthHandler &growthHandler)
     {
+        m_Base = (char *)base;
+        if (!m_Base)
+            m_Base = g_Platform->ReserveMemPages(maxSize);
+
+        m_Size = 0;
+        m_MaxSize = maxSize;
+        m_GrowthHandler = &growthHandler;
     }
 
-    auto PushBytes(uint32_t size, uint32_t align) -> char *
+    auto PushBytes(uint64_t size, uint32_t align) -> char *
     {
-        AlignUp(m_Used, align);
+        AlignUp<uint64_t>(m_Used, align);
         char *const ret = m_Base + m_Used;
         m_Used += size;
 
         if (m_Used > m_Size)
-            NYLA_ASSERT(m_GrowthHandler.TryGrow(*this, m_Used));
+            NYLA_ASSERT(m_GrowthHandler->TryGrow(*this, m_Used));
 
         NYLA_ASSERT(m_Size <= m_MaxSize);
         return ret;
@@ -86,11 +92,17 @@ class RegionAlloc
         return m_Used;
     }
 
-    template <typename T> auto Push(const T &initializer) -> T *
+    template <typename T> auto Push() -> T *
     {
         static_assert(std::is_trivially_destructible_v<T>);
 
         T *const p = reinterpret_cast<T *>(PushBytes(sizeof(T), alignof(T)));
+        return p;
+    }
+
+    template <typename T> auto Push(const T &initializer) -> T *
+    {
+        T *const p = Push<T>();
         *p = initializer;
         return p;
     }
@@ -104,22 +116,26 @@ class RegionAlloc
         return std::span{p, n};
     }
 
-    auto PushSubAlloc(uint32_t size) -> RegionAlloc
+    auto PushSubAlloc(uint64_t size) -> RegionAlloc
     {
-        // TODO: improve alignment handling?
-        return RegionAlloc{PushBytes(size, 8), size, size, RegionAllocBumpOnlyGrowth::GetInstance()};
+        AlignUp(size, g_Platform->GetMemPageSize());
+
+        void *const p = PushBytes(size, g_Platform->GetMemPageSize());
+        RegionAlloc subAlloc{};
+        subAlloc.Init(p, size, RegionAllocCommitPageGrowth::GetInstance());
+        return subAlloc;
     }
 
   private:
     char *m_Base;
-    RegionAllocGrowthHandler &m_GrowthHandler;
-    uint32_t m_Size;
-    uint32_t m_MaxSize;
-    uint32_t m_Used{};
+    RegionAllocGrowthHandler *m_GrowthHandler;
+    uint64_t m_Size;
+    uint64_t m_MaxSize;
+    uint64_t m_Used{};
 };
 
 [[nodiscard]]
-inline auto RegionAllocBumpOnlyGrowth::TryGrow(RegionAlloc &alloc, uint32_t neededSize) -> bool
+inline auto RegionAllocBumpOnlyGrowth::TryGrow(RegionAlloc &alloc, uint64_t neededSize) -> bool
 {
     alloc.m_Size = neededSize;
 
@@ -127,7 +143,7 @@ inline auto RegionAllocBumpOnlyGrowth::TryGrow(RegionAlloc &alloc, uint32_t need
 }
 
 [[nodiscard]]
-inline auto RegionAllocCommitPageGrowth::TryGrow(RegionAlloc &alloc, uint32_t neededSize) -> bool
+inline auto RegionAllocCommitPageGrowth::TryGrow(RegionAlloc &alloc, uint64_t neededSize) -> bool
 {
     AlignUp(neededSize, g_Platform->GetMemPageSize());
     NYLA_ASSERT(neededSize <= alloc.m_MaxSize);

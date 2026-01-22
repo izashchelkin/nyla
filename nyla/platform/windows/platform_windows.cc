@@ -18,10 +18,13 @@ void Platform::Impl::Init(const PlatformInitDesc &desc)
 {
     GetSystemInfo(&m_SysInfo);
 
-    m_AddressSpaceSize = AlignedUp<uint64_t>(16_GiB, m_SysInfo.dwAllocationGranularity);
+    m_AddressSpaceSize = AlignedUp<uint64_t>(256_GiB, m_SysInfo.dwAllocationGranularity);
 
     m_AddressSpaceBase = (char *)VirtualAlloc(nullptr, m_AddressSpaceSize, MEM_RESERVE, PAGE_NOACCESS);
     m_AddressSpaceAt = m_AddressSpaceBase;
+
+    if (desc.open)
+        WinOpen();
 }
 
 auto Platform::Impl::PollEvent(PlatformEvent &outEvent) -> bool

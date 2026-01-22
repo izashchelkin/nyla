@@ -27,10 +27,10 @@ class Platform::Impl
 
     auto MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) -> LRESULT;
 
-    auto GetMemPageSize() -> uint32_t;
-    auto ReserveMemPages(uint32_t size) -> char *;
-    void CommitMemPages(char *page, uint32_t size);
-    void DecommitMemPages(char *page, uint32_t size);
+    auto GetMemPageSize() -> uint64_t;
+    auto ReserveMemPages(uint64_t size) -> char *;
+    void CommitMemPages(char *page, uint64_t size);
+    void DecommitMemPages(char *page, uint64_t size);
 
     auto GetMonotonicTimeMillis() -> uint64_t;
     auto GetMonotonicTimeMicros() -> uint64_t;

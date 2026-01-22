@@ -60,7 +60,7 @@ struct DeviceQueue
 struct VulkanBufferData
 {
     VkBuffer buffer;
-    uint32_t size;
+    uint64_t size;
     RhiMemoryUsage memoryUsage;
     VkDeviceMemory memory;
     char *mapped;
@@ -206,7 +206,7 @@ class Rhi::Impl
     auto CreateBuffer(const RhiBufferDesc &desc) -> RhiBuffer;
     void NameBuffer(RhiBuffer buf, std::string_view name);
     void DestroyBuffer(RhiBuffer buffer);
-    auto GetBufferSize(RhiBuffer buffer) -> uint32_t;
+    auto GetBufferSize(RhiBuffer buffer) -> uint64_t;
     auto MapBuffer(RhiBuffer buffer) -> char *;
     void UnmapBuffer(RhiBuffer buffer);
     void CmdTransitionBuffer(RhiCmdList cmd, RhiBuffer buffer, RhiBufferState newState);

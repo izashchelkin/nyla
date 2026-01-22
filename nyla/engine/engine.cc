@@ -1,4 +1,5 @@
 #include "nyla/engine/engine.h"
+#include "nyla/commons/align.h"
 #include "nyla/commons/assert.h"
 #include "nyla/commons/bitenum.h"
 #include "nyla/engine/asset_manager.h"
@@ -19,6 +20,8 @@ namespace nyla
 
 void Engine::Init(const EngineInitDesc &desc)
 {
+    m_CpuAllocs = &desc.cpuAllocs;
+
     uint32_t maxFps = 144;
     if (desc.maxFps > 0)
         maxFps = desc.maxFps;
@@ -38,13 +41,15 @@ void Engine::Init(const EngineInitDesc &desc)
 
     m_LastFrameStart = g_Platform->GetMonotonicTimeMicros();
 
-    m_BufferStaticMeshSize = 1_GiB;
-    m_BufferStaticMeshAt = 0;
-    m_BufferStaticMesh = g_Rhi->CreateBuffer({
-        .size = m_BufferStaticMeshSize,
+#if 0
+    m_StaticVertexBufferSize = 1_GiB;
+    m_StaticVertexBufferAt = 0;
+    m_StaticVertexBuffer = g_Rhi->CreateBuffer({
+        .size = m_StaticVertexBufferSize,
         .bufferUsage = RhiBufferUsage::Vertex,
         .memoryUsage = RhiMemoryUsage::GpuOnly,
     });
+#endif
 }
 
 auto Engine::ShouldExit() -> bool
@@ -142,13 +147,22 @@ auto Engine::FrameEnd() -> void
     }
 }
 
-auto Engine::AllocStaticMeshBuffer(uint32_t size)
+auto GpuLinearAllocBuffer::SubAlloc(uint32_t size) -> GpuBufferSubAlloc
 {
+    GpuBufferSubAlloc ret;
+    ret.size = size;
+
+    AlignUp<uint64_t>(m_At, 16);
+    ret.offset = m_At;
+    m_At += size;
+
+    NYLA_ASSERT(m_At <= g_Rhi->GetBufferSize(m_Buffer));
+    return ret;
 }
 
 //
 
-Engine *g_Engine = new Engine{};
+Engine *g_Engine;
 GpuStagingBuffer *g_StagingBuffer;
 
 } // namespace nyla

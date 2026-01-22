@@ -46,7 +46,7 @@ struct RhiBuffer : Handle
 
 struct RhiBufferDesc
 {
-    uint32_t size;
+    uint64_t size;
     RhiBufferUsage bufferUsage;
     RhiMemoryUsage memoryUsage;
 };

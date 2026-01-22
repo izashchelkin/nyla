@@ -1,5 +1,6 @@
 #pragma once
 
+#include "nyla/commons/memory/region_alloc.h"
 #include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include <cstdint>
@@ -9,10 +10,18 @@ namespace nyla
 
 class Engine;
 
+struct CpuAllocs
+{
+    RegionAlloc permanent;
+    RegionAlloc transient;
+};
+
 struct EngineInitDesc
 {
     uint32_t maxFps;
     bool vsync;
+
+    CpuAllocs &cpuAllocs;
 };
 
 struct EngineFrameBeginResult
@@ -20,6 +29,26 @@ struct EngineFrameBeginResult
     RhiCmdList cmd;
     float dt;
     uint32_t fps;
+};
+
+struct GpuBufferSubAlloc
+{
+    uint32_t offset;
+    uint32_t size;
+};
+
+class GpuLinearAllocBuffer
+{
+  public:
+    GpuLinearAllocBuffer(RhiBuffer buffer) : m_Buffer{buffer}
+    {
+    }
+
+    auto SubAlloc(uint32_t size) -> GpuBufferSubAlloc;
+
+  private:
+    RhiBuffer m_Buffer;
+    uint64_t m_At{};
 };
 
 class Engine
@@ -31,12 +60,13 @@ class Engine
     auto FrameBegin() -> EngineFrameBeginResult;
     auto FrameEnd() -> void;
 
-    auto AllocStaticMeshBuffer(uint32_t size) -> ;
+    auto SubAllocStaticVertexBuffer(uint32_t size) -> GpuBufferSubAlloc;
 
   private:
-    RhiBuffer m_BufferStaticMesh;
-    uint32_t m_BufferStaticMeshSize{};
-    uint32_t m_BufferStaticMeshAt{};
+    CpuAllocs *m_CpuAllocs{};
+
+    GpuLinearAllocBuffer *m_StaticVertex{};
+    GpuLinearAllocBuffer *m_StaticIndex{};
 
     uint64_t m_TargetFrameDurationUs{};
 
