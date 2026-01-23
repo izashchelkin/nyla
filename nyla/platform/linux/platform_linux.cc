@@ -150,6 +150,9 @@ void Platform::Impl::Init(const PlatformInitDesc &desc)
     NYLA_ASSERT(m_AddressSpaceBase != MAP_FAILED);
 
     m_AddressSpaceAt = m_AddressSpaceBase;
+
+    if (desc.open)
+        WinOpen();
 }
 
 void Platform::Impl::SendConfigureNotify(xcb_window_t window, xcb_window_t parent, int16_t x, int16_t y, uint16_t width,
