@@ -1,6 +1,5 @@
 #include "nyla/formats/gltf/gltf_parser.h"
 #include "nyla/commons/align.h"
-#include "nyla/commons/log.h"
 #include "nyla/commons/word.h"
 #include "nyla/formats/json/json_parser.h"
 #include "nyla/formats/json/json_value.h"
@@ -14,6 +13,14 @@ auto GltfParser::PopDWord() -> uint32_t
     const uint32_t ret = *(uint32_t *)m_At;
     m_At = (uint32_t *)m_At + 1;
     return ret;
+}
+
+void GltfParser::Init(RegionAlloc *alloc, void *data, uint32_t byteLength)
+{
+    m_Alloc = alloc;
+    m_Base = data;
+    m_At = data;
+    m_BytesLeft = byteLength;
 }
 
 auto GltfParser::Parse() -> bool
@@ -31,7 +38,8 @@ auto GltfParser::Parse() -> bool
     if (PopDWord() != DWord("JSON"))
         return false;
 
-    JsonParser jsonParser{m_Alloc, (const char *)m_At, jsonChunkLength};
+    JsonParser jsonParser;
+    jsonParser.Init(m_Alloc, (const char *)m_At, jsonChunkLength);
     JsonValue *jsonChunk = jsonParser.ParseNext();
 
     LogJsonValue(jsonChunk);
@@ -86,7 +94,7 @@ auto GltfParser::Parse() -> bool
 
             JsonValue *primitivesJson = it->Array("primitives");
             uint32_t primitivesCount = primitivesJson->GetCount();
-            mesh.primitives = m_Alloc.PushArr<GltfMeshPrimitive>(primitivesCount);
+            mesh.primitives = m_Alloc->PushArr<GltfMeshPrimitive>(primitivesCount);
 
             JsonValue *primitiveJson = primitivesJson->GetFront();
             for (uint32_t i = 0; i < primitivesCount; ++i, primitiveJson = primitiveJson->Skip())
@@ -99,7 +107,7 @@ auto GltfParser::Parse() -> bool
                 JsonValue *attributesJson = primitiveJson->Object("attributes");
                 uint32_t attributesCount = attributesJson->GetCount();
 
-                primitive.attributes = m_Alloc.PushArr<GltfMeshPrimitiveAttribute>(attributesCount);
+                primitive.attributes = m_Alloc->PushArr<GltfMeshPrimitiveAttribute>(attributesCount);
 
                 JsonValue *attributeJson = attributesJson->GetFront();
                 for (uint32_t j = 0; j < attributesCount; ++j)

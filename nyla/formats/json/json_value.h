@@ -53,33 +53,42 @@ enum class JsonTag
 class JsonValue
 {
   public:
-    JsonValue() : m_Tag{JsonTag::Invalid}, m_Val{}
+    void SetValue(JsonTag tag)
     {
+        m_Tag = tag;
     }
 
-    explicit JsonValue(JsonTag tag) : m_Tag{tag}, m_Val{}
+    void SetValue(bool val)
     {
+        m_Tag = JsonTag::Bool;
+        m_Val = {.valBool = val};
     }
 
-    explicit JsonValue(JsonTag tag, uint32_t count, JsonValue *end)
-        : m_Tag{tag}, m_Val{.valHeader = {.end = end, .count = count}}
+    void SetValue(uint64_t val)
     {
+        m_Tag = JsonTag::Integer;
+        m_Val = {.valInt = val};
     }
 
-    explicit JsonValue(bool val) : m_Tag{JsonTag::Bool}, m_Val{.valBool = val}
+    void SetValue(double val)
     {
+        m_Tag = JsonTag::Double;
+        m_Val = {.valDouble = val};
     }
 
-    explicit JsonValue(uint64_t val) : m_Tag{JsonTag::Integer}, m_Val{.valInt = val}
+    void SetValue(const char *str, uint32_t len)
     {
+        m_Tag = JsonTag::String;
+        m_Val = {.valStr = {.str = str, .len = len}};
     }
 
-    explicit JsonValue(double val) : m_Tag{JsonTag::Double}, m_Val{.valDouble = val}
+    void SetValue(JsonTag tag, uint32_t count, JsonValue *end)
     {
-    }
-
-    explicit JsonValue(std::string_view val) : m_Tag{JsonTag::String}, m_Val{.valSv = val}
-    {
+        m_Tag = tag;
+        m_Val.valHeader = {
+            .end = end,
+            .count = count,
+        };
     }
 
 #define DECL(name, out)                                                                                                \
@@ -170,7 +179,12 @@ class JsonValue
         bool valBool;
         uint64_t valInt;
         double valDouble;
-        std::string_view valSv;
+
+        struct
+        {
+            const char *str;
+            uint32_t len;
+        } valStr;
 
         struct
         {

@@ -80,7 +80,8 @@ auto JsonValue::TryString(std::span<std::string_view> path, std::string_view &ou
     if (tmp->m_Tag != JsonTag::String)
         return false;
 
-    out = tmp->m_Val.valSv;
+    const auto &valStr = tmp->m_Val.valStr;
+    out = std::string_view{valStr.str, valStr.len};
     return true;
 }
 

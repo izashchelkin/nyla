@@ -46,17 +46,20 @@ class AssetManager
     struct TextureData
     {
         std::string path;
+        bool needsUpload;
+
         RhiTexture texture;
         RhiSampledTextureView textureView;
         uint32_t width = 0;
         uint32_t height = 0;
         uint32_t channels = 0;
-        bool needsUpload;
     };
     HandlePool<Texture, TextureData, 128> m_Textures;
 
     struct MeshData
     {
+        std::string path;
+        bool needsUpload;
     };
     HandlePool<Mesh, MeshData, 128> m_Meshes;
 };

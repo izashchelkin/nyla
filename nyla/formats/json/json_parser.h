@@ -11,9 +11,7 @@ class JsonValue;
 class JsonParser
 {
   public:
-    JsonParser(RegionAlloc &alloc, const char *base, uint32_t size) : m_Alloc{alloc}, m_At{base}, m_Left{size}
-    {
-    }
+    void Init(RegionAlloc *alloc, const char *base, uint32_t size);
 
     auto ParseNext() -> JsonValue *;
 
@@ -29,7 +27,7 @@ class JsonParser
     auto ParseObject() -> JsonValue *;
     void SkipWhitespace();
 
-    RegionAlloc &m_Alloc;
+    RegionAlloc *m_Alloc;
     const char *m_At;
     uint32_t m_Left;
 };

@@ -10,6 +10,7 @@ namespace nyla
 {
 
 class RegionAlloc;
+
 class RegionAllocGrowthHandler
 {
   public:
@@ -49,13 +50,14 @@ class RegionAlloc
   public:
     void Init(void *base, uint64_t maxSize, RegionAllocGrowthHandler &growthHandler)
     {
-        m_Base = (char *)base;
-        if (!m_Base)
-            m_Base = g_Platform->ReserveMemPages(maxSize);
-
+        m_Used = 0;
         m_Size = 0;
         m_MaxSize = maxSize;
         m_GrowthHandler = &growthHandler;
+        m_Base = (char *)base;
+
+        if (!m_Base)
+            m_Base = g_Platform->ReserveMemPages(maxSize);
     }
 
     auto PushBytes(uint64_t size, uint32_t align) -> char *
@@ -131,10 +133,9 @@ class RegionAlloc
     RegionAllocGrowthHandler *m_GrowthHandler;
     uint64_t m_Size;
     uint64_t m_MaxSize;
-    uint64_t m_Used{};
+    uint64_t m_Used;
 };
 
-[[nodiscard]]
 inline auto RegionAllocBumpOnlyGrowth::TryGrow(RegionAlloc &alloc, uint64_t neededSize) -> bool
 {
     alloc.m_Size = neededSize;
@@ -142,7 +143,6 @@ inline auto RegionAllocBumpOnlyGrowth::TryGrow(RegionAlloc &alloc, uint64_t need
     return true;
 }
 
-[[nodiscard]]
 inline auto RegionAllocCommitPageGrowth::TryGrow(RegionAlloc &alloc, uint64_t neededSize) -> bool
 {
     AlignUp(neededSize, g_Platform->GetMemPageSize());

@@ -51,10 +51,7 @@ struct GltfMesh
 class GltfParser
 {
   public:
-    GltfParser(RegionAlloc &alloc, void *data, uint32_t byteLength)
-        : m_Alloc{alloc}, m_Base{data}, m_At{data}, m_BytesLeft{byteLength}
-    {
-    }
+    void Init(RegionAlloc *alloc, void *data, uint32_t byteLength);
 
     auto Parse() -> bool;
 
@@ -97,7 +94,7 @@ class GltfParser
     }
 
   private:
-    RegionAlloc &m_Alloc;
+    RegionAlloc *m_Alloc;
     void *m_Base;
     void *m_At;
     uint32_t m_BytesLeft;

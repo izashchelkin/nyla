@@ -8,6 +8,7 @@
 
 #include "nyla/commons/color.h"
 #include "nyla/commons/math/vec.h"
+#include "nyla/engine/asset_manager.h"
 #include "nyla/engine/debug_text_renderer.h"
 #include "nyla/engine/engine.h"
 #include "nyla/engine/renderer2d.h"
@@ -91,6 +92,12 @@ void GameInit()
             std::string path = std::format("{}/Brick{}_4.png", assetsBasePath, i + 1);
             g_State->assets.bricks[i] = g_AssetManager->DeclareTexture(path);
         }
+
+#ifndef WIN32
+        g_State->assets.cube = g_AssetManager->DeclareMesh("/home/izashchelkin/Documents/test.glb");
+#else
+        g_State->assets.cube = g_AssetManager->DeclareMesh("C:\\Users\\ihorz\\Desktop\\test.glb");
+#endif
     }
 
     //

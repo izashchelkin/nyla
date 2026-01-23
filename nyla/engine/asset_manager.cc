@@ -2,6 +2,7 @@
 #include "nyla/commons/handle_pool.h"
 #include "nyla/commons/log.h"
 #include "nyla/engine/staging_buffer.h"
+#include "nyla/formats/gltf/gltf_parser.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_sampler.h"
@@ -37,6 +38,20 @@ void AssetManager::Init()
 
 void AssetManager::Upload(RhiCmdList cmd)
 {
+
+    for (uint32_t i = 0; i < m_Meshes.size(); ++i)
+    {
+        auto &slot = *(m_Meshes.begin() + i);
+        if (!slot.used)
+            continue;
+
+        MeshData &meshData = slot.data;
+        if (!meshData.needsUpload)
+            continue;
+
+        GltfParser parser;
+    }
+
     for (uint32_t i = 0; i < m_Textures.size(); ++i)
     {
         auto &slot = *(m_Textures.begin() + i);
@@ -89,6 +104,14 @@ void AssetManager::Upload(RhiCmdList cmd)
 auto AssetManager::DeclareTexture(std::string_view path) -> Texture
 {
     return m_Textures.Acquire(TextureData{
+        .path = std::string{path},
+        .needsUpload = true,
+    });
+}
+
+auto AssetManager::DeclareMesh(std::string_view path) -> Mesh
+{
+    return m_Meshes.Acquire(MeshData{
         .path = std::string{path},
         .needsUpload = true,
     });
