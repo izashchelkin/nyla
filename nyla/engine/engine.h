@@ -1,6 +1,8 @@
 #pragma once
 
 #include "nyla/commons/memory/region_alloc.h"
+#include "nyla/engine/asset_manager.h"
+#include "nyla/engine/staging_buffer.h"
 #include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include <cstdint>
@@ -9,12 +11,6 @@ namespace nyla
 {
 
 class Engine;
-
-struct CpuAllocs
-{
-    RegionAlloc permanent;
-    RegionAlloc transient;
-};
 
 struct EngineInitDesc
 {
@@ -40,15 +36,24 @@ struct GpuBufferSubAlloc
 class GpuLinearAllocBuffer
 {
   public:
-    GpuLinearAllocBuffer(RhiBuffer buffer) : m_Buffer{buffer}
-    {
-    }
+    void Init(RhiBuffer buffer);
+    void Reset();
+    auto SubAlloc(uint32_t size, uint32_t align) -> GpuBufferSubAlloc;
 
-    auto SubAlloc(uint32_t size) -> GpuBufferSubAlloc;
+    auto GetBuffer() -> RhiBuffer
+    {
+        return m_Buffer;
+    }
 
   private:
     RhiBuffer m_Buffer;
-    uint64_t m_At{};
+    uint64_t m_At;
+};
+
+struct CpuAllocs
+{
+    RegionAlloc permanent;
+    RegionAlloc transient;
 };
 
 class Engine
@@ -62,11 +67,26 @@ class Engine
 
     auto SubAllocStaticVertexBuffer(uint32_t size) -> GpuBufferSubAlloc;
 
-  private:
-    CpuAllocs *m_CpuAllocs{};
+    auto UploadBuffer(RhiCmdList cmd, RhiBuffer dst, uint32_t dstOffset, uint32_t size) -> char *;
+    auto UploadTexture(RhiCmdList cmd, RhiTexture dst, uint32_t size) -> char *;
 
-    GpuLinearAllocBuffer *m_StaticVertex{};
-    GpuLinearAllocBuffer *m_StaticIndex{};
+    auto GetCpuAllocs() -> CpuAllocs &
+    {
+        return m_CpuAllocs;
+    }
+
+    auto GetAssetManager() -> AssetManager &
+    {
+        return m_AssetManager;
+    }
+
+  private:
+    CpuAllocs m_CpuAllocs;
+    AssetManager m_AssetManager;
+
+    GpuLinearAllocBuffer m_UploadBuffer;
+    GpuLinearAllocBuffer m_StaticVertex;
+    GpuLinearAllocBuffer m_StaticIndex;
 
     uint64_t m_TargetFrameDurationUs{};
 

@@ -2,7 +2,6 @@
 
 #include "nyla/commons/handle.h"
 #include "nyla/commons/handle_pool.h"
-#include "nyla/engine/engine.h"
 #include "nyla/rhi/rhi_texture.h"
 #include <cstdint>
 #include <string>
@@ -16,15 +15,15 @@ class AssetManager
     constexpr static uint32_t kTexturesDescriptorBinding = 1;
 
   public:
-    AssetManager() : m_Textures{}
-    {
-    }
-
     struct Texture : Handle
     {
     };
 
     struct Mesh : Handle
+    {
+    };
+
+    struct MeshPrimitive : Handle
     {
     };
 
@@ -59,11 +58,14 @@ class AssetManager
     struct MeshData
     {
         std::string path;
-        bool needsUpload;
     };
     HandlePool<Mesh, MeshData, 128> m_Meshes;
-};
 
-extern AssetManager *g_AssetManager;
+    struct MeshPrimitiveData
+    {
+        bool needsUpload;
+    };
+    HandlePool<Mesh, MeshData, 128> m_MeshPrimitives;
+};
 
 } // namespace nyla

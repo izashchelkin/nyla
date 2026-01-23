@@ -42,8 +42,6 @@ auto GltfParser::Parse() -> bool
     jsonParser.Init(m_Alloc, (const char *)m_At, jsonChunkLength);
     JsonValue *jsonChunk = jsonParser.ParseNext();
 
-    LogJsonValue(jsonChunk);
-
     {
         JsonValue *buffers = jsonChunk->Array("buffers");
         for (auto it = buffers->begin(), end = buffers->end(); it != end; ++it)

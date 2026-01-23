@@ -1,8 +1,12 @@
 #include "nyla/engine/asset_manager.h"
+#include "nyla/commons/assert.h"
 #include "nyla/commons/handle_pool.h"
 #include "nyla/commons/log.h"
+#include "nyla/commons/memory/region_alloc.h"
+#include "nyla/engine/engine.h"
 #include "nyla/engine/staging_buffer.h"
 #include "nyla/formats/gltf/gltf_parser.h"
+#include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_sampler.h"
@@ -49,7 +53,38 @@ void AssetManager::Upload(RhiCmdList cmd)
         if (!meshData.needsUpload)
             continue;
 
-        GltfParser parser;
+        std::vector<std::byte> data = g_Platform->ReadFile(meshData.path);
+
+        RegionAlloc &transientAlloc = g_Engine->GetCpuAllocs()->transient;
+        RegionAlloc scratchAlloc = transientAlloc.PushSubAlloc(16_KiB);
+        {
+            GltfParser parser;
+            parser.Init(&scratchAlloc, data.data(), data.size());
+            NYLA_ASSERT(parser.Parse());
+
+            for (auto mesh : parser.GetMeshes())
+            {
+                NYLA_LOG("Mesh: " NYLA_SV_FMT, NYLA_SV_ARG(mesh.name));
+
+                for (auto primitive : mesh.primitives)
+                {
+                    NYLA_LOG(" AttributesCount: %lu", primitive.attributes.size());
+                    for (auto attribute : primitive.attributes)
+                    {
+                        auto &accessor = parser.GetAccessor(attribute.accessor);
+                        auto &bufferView = parser.GetBufferView(accessor.bufferView);
+
+                        std::span<char> data = parser.GetBufferViewData(bufferView);
+
+                        NYLA_LOG("  Attribute: " NYLA_SV_FMT ": %d    BufferViewLength: %d",
+                                 NYLA_SV_ARG(attribute.name), attribute.accessor, bufferView.byteLength);
+                    }
+                }
+            }
+        }
+        transientAlloc.Pop(scratchAlloc.GetBase());
+
+        meshData.needsUpload = false;
     }
 
     for (uint32_t i = 0; i < m_Textures.size(); ++i)
@@ -116,7 +151,5 @@ auto AssetManager::DeclareMesh(std::string_view path) -> Mesh
         .needsUpload = true,
     });
 }
-
-AssetManager *g_AssetManager = new AssetManager{};
 
 } // namespace nyla

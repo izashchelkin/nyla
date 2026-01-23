@@ -147,6 +147,42 @@ auto Engine::FrameEnd() -> void
     }
 }
 
+namespace
+{
+
+auto BeforeUpload(Engine::GpuUploadBuffer &stagingBuffer, uint32_t copySize) -> char *
+{
+    AlignUp(stagingBuffer.written, g_Rhi->GetOptimalBufferCopyOffsetAlignment());
+
+    NYLA_ASSERT(stagingBuffer.written + copySize <= g_Rhi->GetBufferSize(stagingBuffer.buffer));
+    char *ret = g_Rhi->MapBuffer(stagingBuffer.buffer) + stagingBuffer.written;
+
+    g_Rhi->BufferMarkWritten(stagingBuffer.buffer, stagingBuffer.written, copySize);
+    return ret;
+}
+
+} // namespace
+
+auto Engine::UploadBuffer(RhiCmdList cmd, RhiBuffer dst, uint32_t dstOffset, uint32_t size) -> char *
+{
+    char *ret = BeforeUpload(m_UploadBuffer, size);
+
+    g_Rhi->CmdCopyBuffer(cmd, dst, dstOffset, m_UploadBuffer.buffer, m_UploadBuffer.written, size);
+
+    m_UploadBuffer.written += size;
+    return ret;
+}
+
+auto Engine::UploadTexture(RhiCmdList cmd, RhiTexture dst, uint32_t size) -> char *
+{
+    char *ret = BeforeUpload(m_UploadBuffer, size);
+
+    g_Rhi->CmdCopyTexture(cmd, dst, m_UploadBuffer.buffer, m_UploadBuffer.written, size);
+
+    m_UploadBuffer.written += size;
+    return ret;
+}
+
 auto GpuLinearAllocBuffer::SubAlloc(uint32_t size) -> GpuBufferSubAlloc
 {
     GpuBufferSubAlloc ret;
