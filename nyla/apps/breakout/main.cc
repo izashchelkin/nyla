@@ -21,27 +21,23 @@ auto PlatformMain() -> int
     RegionAlloc rootAlloc;
     rootAlloc.Init(nullptr, 64_GiB, RegionAllocCommitPageGrowth::GetInstance());
 
-    CpuAllocs cpuAllocs{
-        .permanent = rootAlloc.PushSubAlloc(512_MiB),
-        .transient = rootAlloc.PushSubAlloc(512_MiB),
-    };
-
-    g_Engine = cpuAllocs.permanent.Push<Engine>();
-    g_Engine->Init({.cpuAllocs = cpuAllocs});
+    g_Engine.Init({
+        .rootAlloc = rootAlloc,
+    });
 
     GameInit();
 
-    while (!g_Engine->ShouldExit())
+    while (!g_Engine.ShouldExit())
     {
-        const auto [cmd, dt, fps] = g_Engine->FrameBegin();
-        DebugText(500, 10, std::format("fps={}", fps));
+        const auto [cmd, dt, fps] = g_Engine.FrameBegin();
+        g_Engine.GetDebugTextRenderer().Text(500, 10, std::format("fps={}", fps));
 
         GameProcess(cmd, dt);
 
-        RhiRenderTargetView rtv = g_Rhi->GetBackbufferView();
+        RhiRenderTargetView rtv = g_Rhi.GetBackbufferView();
         GameRender(cmd, rtv);
 
-        g_Engine->FrameEnd();
+        g_Engine.FrameEnd();
     }
 
     return 0;

@@ -1,19 +1,50 @@
 #pragma once
 
+#include "nyla/commons/containers/inline_vec.h"
+#include "nyla/commons/math/mat.h"
 #include "nyla/commons/math/vec.h"
-#include "nyla/engine/staging_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
+#include "nyla/rhi/rhi_pipeline.h"
 #include <cstdint>
 
 namespace nyla
 {
 
-struct Renderer2D;
+class Renderer2D
+{
+  public:
+    void Init();
 
-auto CreateRenderer2D() -> Renderer2D *;
-void Renderer2DFrameBegin(RhiCmdList cmd, Renderer2D *renderer, GpuStagingBuffer *stagingBuffer);
-void Renderer2DRect(RhiCmdList cmd, Renderer2D *renderer, float x, float y, float width, float height, float4 color,
-                    uint32_t textureIndex);
-void Renderer2DDraw(RhiCmdList cmd, Renderer2D *renderer, uint32_t width, uint32_t height, float metersOnScreen);
+    void FrameBegin(RhiCmdList cmd);
+    void Rect(RhiCmdList cmd, float x, float y, float width, float height, float4 color, uint32_t textureIndex);
+    void Draw(RhiCmdList cmd, uint32_t width, uint32_t height, float metersOnScreen);
+
+  private:
+    RhiGraphicsPipeline m_Pipeline;
+    RhiBuffer m_VertexBuffer;
+
+    struct VSInput
+    {
+        float4 pos;
+        float4 color;
+        float2 uv;
+    };
+
+    struct EntityUbo // Per Draw
+    {
+        float4x4 model;
+        float4 color;
+        uint32_t textureIndex;
+        uint32_t samplerIndex;
+    };
+
+    struct Scene // Per Frame
+    {
+        float4x4 vp;
+        float4x4 invVp;
+    };
+
+    InlineVec<EntityUbo, 256> m_PendingDraws;
+};
 
 } // namespace nyla

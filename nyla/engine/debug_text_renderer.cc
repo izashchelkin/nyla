@@ -17,29 +17,7 @@ namespace nyla
 
 using namespace engine0_internal;
 
-namespace
-{
-
-struct DrawData
-{
-    std::array<uint4, 17> words;
-    int32_t originX;
-    int32_t originY;
-    uint32_t wordCount;
-    uint32_t pad;
-    std::array<float, 4> fg;
-    std::array<float, 4> bg;
-};
-InlineVec<DrawData, 4> g_PendingDebugTextDraws;
-
-} // namespace
-
-struct DebugTextRenderer
-{
-    RhiGraphicsPipeline pipeline;
-};
-
-auto CreateDebugTextRenderer() -> DebugTextRenderer *
+void DebugTextRenderer::Init()
 {
     const RhiShader vs = GetShader("fullscreen.vs", RhiShaderStage::Vertex);
     const RhiShader ps = GetShader("debug_text_renderer.ps", RhiShaderStage::Pixel);
@@ -56,12 +34,10 @@ auto CreateDebugTextRenderer() -> DebugTextRenderer *
                 RhiTextureFormat::B8G8R8A8_sRGB,
             },
     };
-    renderer->pipeline = g_Rhi->CreateGraphicsPipeline(pipelineDesc);
-
-    return renderer;
+    m_Pipeline = g_Rhi.CreateGraphicsPipeline(pipelineDesc);
 }
 
-void DebugText(int32_t x, int32_t y, std::string_view text)
+void DebugTextRenderer::Text(int32_t x, int32_t y, std::string_view text)
 {
     DrawData drawData{
         .originX = x,
@@ -85,24 +61,24 @@ void DebugText(int32_t x, int32_t y, std::string_view text)
         drawData.words[i / 4][i % 4] = word;
     }
 
-    g_PendingDebugTextDraws.emplace_back(drawData);
+    m_PendingDraws.emplace_back(drawData);
 }
 
-void DebugTextRendererDraw(RhiCmdList cmd, DebugTextRenderer *renderer)
+void DebugTextRenderer::Draw(RhiCmdList cmd)
 {
-    if (g_PendingDebugTextDraws.empty())
+    if (m_PendingDraws.empty())
         return;
 
-    const uint32_t frameIndex = g_Rhi->GetFrameIndex();
+    const uint32_t frameIndex = g_Rhi.GetFrameIndex();
 
-    g_Rhi->CmdBindGraphicsPipeline(cmd, renderer->pipeline);
+    g_Rhi.CmdBindGraphicsPipeline(cmd, m_Pipeline);
 
-    for (const DrawData &drawData : g_PendingDebugTextDraws)
+    for (const DrawData &drawData : m_PendingDraws)
     {
-        g_Rhi->SetLargeDrawConstant(cmd, ByteViewPtr(&drawData));
-        g_Rhi->CmdDraw(cmd, 3, 1, 0, 0);
+        g_Rhi.SetLargeDrawConstant(cmd, ByteViewPtr(&drawData));
+        g_Rhi.CmdDraw(cmd, 3, 1, 0, 0);
     }
-    g_PendingDebugTextDraws.clear();
+    m_PendingDraws.clear();
 }
 
 } // namespace nyla

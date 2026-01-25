@@ -27,9 +27,6 @@ GameState *g_State;
 namespace
 {
 
-Renderer2D *renderer2d;
-DebugTextRenderer *debugTextRenderer;
-
 struct Level
 {
     InlineVec<Brick, 256> bricks;
@@ -64,9 +61,6 @@ void GameInit()
     g_State->input.moveLeft = g_InputManager->NewId();
     g_State->input.moveRight = g_InputManager->NewId();
 
-    renderer2d = CreateRenderer2D();
-    debugTextRenderer = CreateDebugTextRenderer();
-
     //
 
     g_InputManager->Map(g_State->input.moveLeft, 1, uint32_t(KeyPhysical::S));
@@ -81,22 +75,23 @@ void GameInit()
         std::string assetsBasePath = "D:\\nyla\\assets\\BBreaker";
 #endif
 
-        g_State->assets.background = g_AssetManager->DeclareTexture(assetsBasePath + "/Background1.png");
-        g_State->assets.player = g_AssetManager->DeclareTexture(assetsBasePath + "/Player.png");
-        g_State->assets.playerFlash = g_AssetManager->DeclareTexture(assetsBasePath + "/Player_flash.png");
-        g_State->assets.ball = g_AssetManager->DeclareTexture(assetsBasePath + "/Ball_small-blue.png");
-        g_State->assets.brickUnbreackable = g_AssetManager->DeclareTexture(assetsBasePath + "/Brick_unbreakable2.png");
+        g_State->assets.background = g_Engine.GetAssetManager().DeclareTexture(assetsBasePath + "/Background1.png");
+        g_State->assets.player = g_Engine.GetAssetManager().DeclareTexture(assetsBasePath + "/Player.png");
+        g_State->assets.playerFlash = g_Engine.GetAssetManager().DeclareTexture(assetsBasePath + "/Player_flash.png");
+        g_State->assets.ball = g_Engine.GetAssetManager().DeclareTexture(assetsBasePath + "/Ball_small-blue.png");
+        g_State->assets.brickUnbreackable =
+            g_Engine.GetAssetManager().DeclareTexture(assetsBasePath + "/Brick_unbreakable2.png");
 
         for (uint32_t i = 0; i < g_State->assets.bricks.size(); ++i)
         {
             std::string path = std::format("{}/Brick{}_4.png", assetsBasePath, i + 1);
-            g_State->assets.bricks[i] = g_AssetManager->DeclareTexture(path);
+            g_State->assets.bricks[i] = g_Engine.GetAssetManager().DeclareTexture(path);
         }
 
 #ifndef WIN32
         g_State->assets.cube = g_AssetManager->DeclareMesh("/home/izashchelkin/Documents/test.glb");
 #else
-        g_State->assets.cube = g_AssetManager->DeclareMesh("C:\\Users\\ihorz\\Desktop\\test.glb");
+        g_State->assets.cube = g_Engine.GetAssetManager().DeclareMesh("C:\\Users\\ihorz\\Desktop\\test.glb");
 #endif
     }
 
@@ -137,8 +132,6 @@ static auto IsInside(float pos, float size, float2 boundary) -> bool
 
 void GameProcess(RhiCmdList cmd, float dt)
 {
-    Renderer2DFrameBegin(cmd, renderer2d, g_StagingBuffer);
-
     const int dx =
         g_InputManager->IsPressed(g_State->input.moveRight) - g_InputManager->IsPressed(g_State->input.moveLeft);
 
@@ -209,16 +202,17 @@ void GameProcess(RhiCmdList cmd, float dt)
 
 void GameRender(RhiCmdList cmd, RhiRenderTargetView rtv)
 {
-    RhiTextureInfo colorTargetInfo = g_Rhi->GetTextureInfo(g_Rhi->GetTexture(rtv));
+    RhiTextureInfo colorTargetInfo = g_Rhi.GetTextureInfo(g_Rhi.GetTexture(rtv));
 
-    g_Rhi->PassBegin({
+    g_Rhi.PassBegin({
         .renderTarget = rtv,
         .state = RhiTextureState::ColorTarget,
     });
 
     const auto &assets = g_State->assets;
 
-    Renderer2DRect(cmd, renderer2d, 0, 0, 100, 70, float4{}, assets.background.index);
+    auto &renderer2d = g_Engine.GetRenderer2D();
+    renderer2d.Rect(cmd, 0, 0, 100, 70, float4{}, assets.background.index);
 
     uint32_t i = 0;
     for (Brick &brick : level.bricks)
@@ -227,29 +221,30 @@ void GameRender(RhiCmdList cmd, RhiRenderTargetView rtv)
         if (brick.flags & Brick::kFlagDead)
             continue;
 
-        Renderer2DRect(cmd, renderer2d, brick.pos[0], brick.pos[1], brick.size[0], brick.size[1], float4{},
-                       assets.bricks[i % assets.bricks.size()].index);
+        renderer2d.Rect(cmd, brick.pos[0], brick.pos[1], brick.size[0], brick.size[1], float4{},
+                        assets.bricks[i % assets.bricks.size()].index);
     }
 
     uint64_t second = g_Platform->GetMonotonicTimeMillis() / 1000;
     if (second % 2)
     {
-        Renderer2DRect(cmd, renderer2d, playerPosX, kPlayerPosY, playerWidth, kPlayerHeight, float4{1.f, 1.f, 1.f, 1},
-                       assets.playerFlash.index);
+        renderer2d.Rect(cmd, playerPosX, kPlayerPosY, playerWidth, kPlayerHeight, float4{1.f, 1.f, 1.f, 1},
+                        assets.playerFlash.index);
     }
     else
     {
-        Renderer2DRect(cmd, renderer2d, playerPosX, kPlayerPosY, playerWidth, kPlayerHeight, float4{1.f, 1.f, 1.f, 1},
-                       assets.player.index);
+        renderer2d.Rect(cmd, playerPosX, kPlayerPosY, playerWidth, kPlayerHeight, float4{1.f, 1.f, 1.f, 1},
+                        assets.player.index);
     }
 
-    Renderer2DRect(cmd, renderer2d, ballPos[0], ballPos[1], kBallRadius * 2, kBallRadius * 2, float4{1.f, 1.f, 1.f, 1},
-                   assets.ball.index);
+    renderer2d.Rect(cmd, ballPos[0], ballPos[1], kBallRadius * 2, kBallRadius * 2, float4{1.f, 1.f, 1.f, 1},
+                    assets.ball.index);
 
-    Renderer2DDraw(cmd, renderer2d, colorTargetInfo.width, colorTargetInfo.height, 64);
-    DebugTextRendererDraw(cmd, debugTextRenderer);
+    renderer2d.Draw(cmd, colorTargetInfo.width, colorTargetInfo.height, 64);
 
-    g_Rhi->PassEnd({
+    g_Engine.GetDebugTextRenderer().Draw(cmd);
+
+    g_Rhi.PassEnd({
         .renderTarget = rtv,
         .state = RhiTextureState::Present,
     });

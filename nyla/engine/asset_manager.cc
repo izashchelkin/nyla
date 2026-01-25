@@ -4,7 +4,6 @@
 #include "nyla/commons/log.h"
 #include "nyla/commons/memory/region_alloc.h"
 #include "nyla/engine/engine.h"
-#include "nyla/engine/staging_buffer.h"
 #include "nyla/formats/gltf/gltf_parser.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
@@ -26,7 +25,7 @@ void AssetManager::Init()
     //
 
     auto addSampler = [this](SamplerType samplerType, RhiFilter filter, RhiSamplerAddressMode addressMode) -> void {
-        RhiSampler sampler = g_Rhi->CreateSampler({
+        RhiSampler sampler = g_Rhi.CreateSampler({
             .minFilter = filter,
             .magFilter = filter,
             .addressModeU = addressMode,
@@ -55,7 +54,7 @@ void AssetManager::Upload(RhiCmdList cmd)
 
         std::vector<std::byte> data = g_Platform->ReadFile(meshData.path);
 
-        RegionAlloc &transientAlloc = g_Engine->GetCpuAllocs()->transient;
+        RegionAlloc &transientAlloc = g_Engine.GetPerFrameAlloc();
         RegionAlloc scratchAlloc = transientAlloc.PushSubAlloc(16_KiB);
         {
             GltfParser parser;
@@ -105,7 +104,7 @@ void AssetManager::Upload(RhiCmdList cmd)
             NYLA_ASSERT(false);
         }
 
-        const RhiTexture texture = g_Rhi->CreateTexture(RhiTextureDesc{
+        const RhiTexture texture = g_Rhi.CreateTexture(RhiTextureDesc{
             .width = textureAssetData.width,
             .height = textureAssetData.height,
             .memoryUsage = RhiMemoryUsage::GpuOnly,
@@ -114,21 +113,22 @@ void AssetManager::Upload(RhiCmdList cmd)
         });
         textureAssetData.texture = texture;
 
-        const RhiSampledTextureView textureView = g_Rhi->CreateSampledTextureView(RhiTextureViewDesc{
+        const RhiSampledTextureView textureView = g_Rhi.CreateSampledTextureView(RhiTextureViewDesc{
             .texture = texture,
         });
         textureAssetData.textureView = textureView;
 
-        g_Rhi->CmdTransitionTexture(cmd, texture, RhiTextureState::TransferDst);
+        g_Rhi.CmdTransitionTexture(cmd, texture, RhiTextureState::TransferDst);
 
         const uint32_t size = textureAssetData.width * textureAssetData.height * textureAssetData.channels;
-        char *uploadMemory = StagingBufferCopyIntoTexture(cmd, g_StagingBuffer, texture, size);
+
+        char *uploadMemory = g_Engine.GetUploadManager().CmdCopyTexture(cmd, texture, size);
         memcpy(uploadMemory, data, size);
 
         free(data);
 
         // TODO: this barrier does not need to be here
-        g_Rhi->CmdTransitionTexture(cmd, texture, RhiTextureState::ShaderRead);
+        g_Rhi.CmdTransitionTexture(cmd, texture, RhiTextureState::ShaderRead);
 
         NYLA_LOG("Uploading '%s'", (const char *)textureAssetData.path.data());
 

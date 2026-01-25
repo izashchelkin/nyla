@@ -13,13 +13,13 @@ class GpuUploadManager
   public:
     void Init();
 
-    void Flush();
+    void FrameBegin();
 
     auto CmdCopyBuffer(RhiCmdList cmd, RhiBuffer dst, uint32_t dstOffset, uint32_t copySize) -> char *;
     auto CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, uint32_t size) -> char *;
 
   private:
-    auto PrepareCopySrc(uint64_t copySize) -> char *;
+    auto PrepareCopySrc(uint64_t copySize) -> uint64_t;
 
     RhiBuffer m_StagingBuffer;
     uint64_t m_StagingBufferWritten;

@@ -4,8 +4,8 @@
 #include "nyla/commons/math/mat.h"
 #include "nyla/commons/math/vec.h"
 #include "nyla/engine/asset_manager.h"
+#include "nyla/engine/engine.h"
 #include "nyla/engine/engine0_internal.h"
-#include "nyla/engine/staging_buffer.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
@@ -19,41 +19,7 @@ namespace nyla
 
 using namespace engine0_internal;
 
-namespace
-{
-
-struct VSInput
-{
-    float4 pos;
-    float4 color;
-    float2 uv;
-};
-
-struct EntityUbo // Per Draw
-{
-    float4x4 model;
-    float4 color;
-    uint32_t textureIndex;
-    uint32_t samplerIndex;
-};
-
-struct Scene // Per Frame
-{
-    float4x4 vp;
-    float4x4 invVp;
-};
-
-} // namespace
-
-struct Renderer2D
-{
-    RhiGraphicsPipeline pipeline;
-    RhiBuffer vertexBuffer;
-
-    InlineVec<EntityUbo, 256> pendingDraws;
-};
-
-auto CreateRenderer2D() -> Renderer2D *
+void Renderer2D::Init()
 {
     const RhiShader vs = GetShader("renderer2d.vs", RhiShaderStage::Vertex);
     const RhiShader ps = GetShader("renderer2d.ps", RhiShaderStage::Pixel);
@@ -101,29 +67,26 @@ auto CreateRenderer2D() -> Renderer2D *
         .frontFace = RhiFrontFace::CCW,
     };
 
-    renderer->pipeline = g_Rhi->CreateGraphicsPipeline(pipelineDesc);
+    m_Pipeline = g_Rhi.CreateGraphicsPipeline(pipelineDesc);
 
     constexpr uint32_t kVertexBufferSize = 1 << 20;
-    renderer->vertexBuffer = g_Rhi->CreateBuffer(RhiBufferDesc{
+    m_VertexBuffer = g_Rhi.CreateBuffer(RhiBufferDesc{
         .size = kVertexBufferSize,
         .bufferUsage = RhiBufferUsage::Vertex | RhiBufferUsage::CopyDst,
         .memoryUsage = RhiMemoryUsage::GpuOnly,
     });
-
-    return renderer;
 }
 
-void Renderer2DFrameBegin(RhiCmdList cmd, Renderer2D *renderer, GpuStagingBuffer *stagingBuffer)
+void Renderer2D::FrameBegin(RhiCmdList cmd)
 {
-    renderer->pendingDraws.clear();
+    m_PendingDraws.clear();
 
     static bool uploadedVertices = false;
     if (!uploadedVertices)
     {
-        g_Rhi->CmdTransitionBuffer(cmd, renderer->vertexBuffer, RhiBufferState::CopyDst);
+        g_Rhi.CmdTransitionBuffer(cmd, m_VertexBuffer, RhiBufferState::CopyDst);
 
-        char *uploadMemory =
-            StagingBufferCopyIntoBuffer(cmd, stagingBuffer, renderer->vertexBuffer, 0, 6 * sizeof(VSInput));
+        char *uploadMemory = g_Engine.GetUploadManager().CmdCopyBuffer(cmd, m_VertexBuffer, 0, 6 * sizeof(VSInput));
         new (uploadMemory) std::array<VSInput, 6>{
             VSInput{
                 .pos = {-.5f, .5f, .0f, 1.f},
@@ -157,16 +120,15 @@ void Renderer2DFrameBegin(RhiCmdList cmd, Renderer2D *renderer, GpuStagingBuffer
             },
         };
 
-        g_Rhi->CmdTransitionBuffer(cmd, renderer->vertexBuffer, RhiBufferState::ShaderRead);
+        g_Rhi.CmdTransitionBuffer(cmd, m_VertexBuffer, RhiBufferState::ShaderRead);
 
         uploadedVertices = true;
     }
 }
 
-void Renderer2DRect(RhiCmdList cmd, Renderer2D *renderer, float x, float y, float width, float height, float4 color,
-                    uint32_t textureIndex)
+void Renderer2D::Rect(RhiCmdList cmd, float x, float y, float width, float height, float4 color, uint32_t textureIndex)
 {
-    renderer->pendingDraws.emplace_back(EntityUbo{
+    m_PendingDraws.emplace_back(EntityUbo{
         .model = float4x4::Translate(float4{x, y, 0, 1}).Mult(float4x4::Scale(float4{width, height, 1, 1})),
         .color = color,
         .textureIndex = textureIndex,
@@ -174,9 +136,9 @@ void Renderer2DRect(RhiCmdList cmd, Renderer2D *renderer, float x, float y, floa
     });
 }
 
-void Renderer2DDraw(RhiCmdList cmd, Renderer2D *renderer, uint32_t width, uint32_t height, float metersOnScreen)
+void Renderer2D::Draw(RhiCmdList cmd, uint32_t width, uint32_t height, float metersOnScreen)
 {
-    g_Rhi->CmdBindGraphicsPipeline(cmd, renderer->pipeline);
+    g_Rhi.CmdBindGraphicsPipeline(cmd, m_Pipeline);
 
     float worldW;
     float worldH;
@@ -197,21 +159,21 @@ void Renderer2DDraw(RhiCmdList cmd, Renderer2D *renderer, uint32_t width, uint32
         .invVp = invVp,
     };
 
-    g_Rhi->SetPassConstant(cmd, ByteViewPtr(&scene));
+    g_Rhi.SetPassConstant(cmd, ByteViewPtr(&scene));
 
-    std::array<RhiBuffer, 1> buffers{renderer->vertexBuffer};
+    std::array<RhiBuffer, 1> buffers{m_VertexBuffer};
     std::array<uint32_t, 1> offsets{0};
 
-    g_Rhi->CmdBindVertexBuffers(cmd, 0, buffers, offsets);
+    g_Rhi.CmdBindVertexBuffers(cmd, 0, buffers, offsets);
 
-    const uint32_t frameIndex = g_Rhi->GetFrameIndex();
+    const uint32_t frameIndex = g_Rhi.GetFrameIndex();
 
-    for (const EntityUbo &entityUbo : renderer->pendingDraws)
+    for (const EntityUbo &entityUbo : m_PendingDraws)
     {
-        g_Rhi->SetDrawConstant(cmd, ByteViewPtr(&entityUbo));
-        g_Rhi->CmdDraw(cmd, 6, 1, 0, 0);
+        g_Rhi.SetDrawConstant(cmd, ByteViewPtr(&entityUbo));
+        g_Rhi.CmdDraw(cmd, 6, 1, 0, 0);
     }
-    renderer->pendingDraws.clear();
+    m_PendingDraws.clear();
 }
 
 } // namespace nyla

@@ -705,7 +705,7 @@ auto Rhi::GetOptimalBufferCopyOffsetAlignment() -> uint32_t
     return m_Impl->GetOptimalBufferCopyOffsetAlignment();
 }
 
-Rhi *g_Rhi = new Rhi{};
+Rhi g_Rhi{};
 
 } // namespace nyla
 

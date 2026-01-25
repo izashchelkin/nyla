@@ -1,6 +1,4 @@
 #include "nyla/engine/engine.h"
-#include "nyla/commons/align.h"
-#include "nyla/commons/assert.h"
 #include "nyla/commons/bitenum.h"
 #include "nyla/engine/asset_manager.h"
 #include "nyla/engine/input_manager.h"
@@ -8,7 +6,6 @@
 #include "nyla/engine/tween_manager.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
-#include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include <chrono>
 #include <cmath>
@@ -20,8 +17,6 @@ namespace nyla
 
 void Engine::Init(const EngineInitDesc &desc)
 {
-    m_CpuAllocs;
-
     uint32_t maxFps = 144;
     if (desc.maxFps > 0)
         maxFps = desc.maxFps;
@@ -32,14 +27,21 @@ void Engine::Init(const EngineInitDesc &desc)
     if (desc.vsync)
         flags |= RhiFlags::VSync;
 
-    g_Rhi->Init(RhiInitDesc{
+    g_Rhi.Init(RhiInitDesc{
         .flags = flags,
     });
 
-    g_StagingBuffer = CreateStagingBuffer(1 << 22);
-    g_AssetManager->Init();
+    m_GpuUploadManager.Init();
+    m_AssetManager.Init();
+
+    m_Renderer2d.Init();
+    m_DebugTextRenderer.Init();
 
     m_LastFrameStart = g_Platform->GetMonotonicTimeMicros();
+
+    m_RootAlloc = &desc.rootAlloc;
+    m_PermanentAlloc = m_RootAlloc->PushSubAlloc(16_MiB);
+    m_PerFrameAlloc = m_RootAlloc->PushSubAlloc(16_MiB);
 
 #if 0
     m_StaticVertexBufferSize = 1_GiB;
@@ -59,7 +61,7 @@ auto Engine::ShouldExit() -> bool
 
 auto Engine::FrameBegin() -> EngineFrameBeginResult
 {
-    RhiCmdList cmd = g_Rhi->FrameBegin();
+    RhiCmdList cmd = g_Rhi.FrameBegin();
 
     const uint64_t frameStart = g_Platform->GetMonotonicTimeMicros();
 
@@ -107,7 +109,7 @@ auto Engine::FrameBegin() -> EngineFrameBeginResult
         }
 
         case PlatformEventType::WinResize: {
-            g_Rhi->TriggerSwapchainRecreate();
+            g_Rhi.TriggerSwapchainRecreate();
             break;
         }
 
@@ -123,8 +125,11 @@ auto Engine::FrameBegin() -> EngineFrameBeginResult
     g_InputManager->Update();
 
     g_TweenManager->Update(dt);
-    StagingBufferReset(g_StagingBuffer);
-    g_AssetManager->Upload(cmd);
+
+    m_GpuUploadManager.FrameBegin();
+    m_AssetManager.Upload(cmd);
+
+    m_Renderer2d.FrameBegin(cmd);
 
     return {
         .cmd = cmd,
@@ -135,7 +140,7 @@ auto Engine::FrameBegin() -> EngineFrameBeginResult
 
 auto Engine::FrameEnd() -> void
 {
-    g_Rhi->FrameEnd();
+    g_Rhi.FrameEnd();
 
     uint64_t frameEnd = g_Platform->GetMonotonicTimeMicros();
     uint64_t frameDurationUs = frameEnd - m_LastFrameStart;
@@ -147,22 +152,8 @@ auto Engine::FrameEnd() -> void
     }
 }
 
-auto GpuLinearAllocBuffer::SubAlloc(uint32_t size) -> GpuBufferSubAlloc
-{
-    GpuBufferSubAlloc ret;
-    ret.size = size;
-
-    AlignUp<uint64_t>(m_At, 16);
-    ret.offset = m_At;
-    m_At += size;
-
-    NYLA_ASSERT(m_At <= g_Rhi->GetBufferSize(m_Buffer));
-    return ret;
-}
-
 //
 
-Engine *g_Engine;
-GpuUploadManager *g_StagingBuffer;
+Engine g_Engine{};
 
 } // namespace nyla

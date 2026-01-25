@@ -1,5 +1,6 @@
 #pragma once
 
+#if 0
 #include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_texture.h"
@@ -19,3 +20,4 @@ auto StagingBufferCopyIntoTexture(RhiCmdList cmd, GpuStagingBuffer *stagingBuffe
 void StagingBufferReset(GpuStagingBuffer *stagingBuffer);
 
 } // namespace nyla
+#endif

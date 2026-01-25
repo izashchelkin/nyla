@@ -58,6 +58,7 @@ class AssetManager
     struct MeshData
     {
         std::string path;
+        bool needsUpload;
     };
     HandlePool<Mesh, MeshData, 128> m_Meshes;
 

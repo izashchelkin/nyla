@@ -2,8 +2,11 @@
 
 #include "nyla/commons/memory/region_alloc.h"
 #include "nyla/engine/asset_manager.h"
-#include "nyla/engine/gpu_buffer_region_alloc.h"
+#include "nyla/engine/debug_text_renderer.h"
+#include "nyla/engine/gpu_upload_manager.h"
+#include "nyla/engine/renderer2d.h"
 #include "nyla/rhi/rhi_cmdlist.h"
+#include <concepts>
 #include <cstdint>
 
 namespace nyla
@@ -45,6 +48,21 @@ class Engine
         return m_GpuUploadManager;
     }
 
+    auto GetPerFrameAlloc() -> RegionAlloc &
+    {
+        return m_PerFrameAlloc;
+    }
+
+    auto GetRenderer2D() -> Renderer2D &
+    {
+        return m_Renderer2d;
+    }
+
+    auto GetDebugTextRenderer() -> DebugTextRenderer &
+    {
+        return m_DebugTextRenderer;
+    }
+
   private:
     RegionAlloc *m_RootAlloc;
     RegionAlloc m_PermanentAlloc;
@@ -56,6 +74,9 @@ class Engine
     GpuUploadManager m_GpuUploadManager;
     AssetManager m_AssetManager;
 
+    Renderer2D m_Renderer2d;
+    DebugTextRenderer m_DebugTextRenderer;
+
     uint64_t m_TargetFrameDurationUs;
 
     uint64_t m_LastFrameStart;
@@ -64,6 +85,6 @@ class Engine
     uint32_t m_Fps;
     bool m_ShouldExit;
 };
-extern Engine *g_Engine;
+extern Engine g_Engine;
 
 } // namespace nyla

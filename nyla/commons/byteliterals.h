@@ -22,7 +22,7 @@ constexpr auto operator""_GiB(unsigned long long v) -> uint64_t
 
 constexpr auto operator""_TiB(unsigned long long v) -> uint64_t
 {
-    return static_cast<uint64_t>(v) * (1 << 40);
+    return static_cast<uint64_t>(v) * (1ULL << 40);
 }
 
 } // namespace nyla
