@@ -162,6 +162,6 @@ class Rhi
     class Impl;
     Impl *m_Impl;
 };
-extern Rhi *g_Rhi;
+extern Rhi g_Rhi;
 
 } // namespace nyla

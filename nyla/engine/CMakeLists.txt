@@ -8,11 +8,12 @@ target_sources(${TARGET}
         debug_text_renderer.cc
         engine.cc
         engine0_internal.cc
+        gpu_buffer_region_alloc.cc
+        input_manager.cc
         renderer2d.cc
         staging.cc
         staging_buffer.cc
         tween_manager.cc
-        input_manager.cc
 )
 
 target_include_directories(${TARGET}
