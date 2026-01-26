@@ -6,6 +6,7 @@
 #include "nyla/engine/tween_manager.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
+#include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include <chrono>
 #include <cmath>
@@ -42,16 +43,6 @@ void Engine::Init(const EngineInitDesc &desc)
     m_RootAlloc = &desc.rootAlloc;
     m_PermanentAlloc = m_RootAlloc->PushSubAlloc(16_MiB);
     m_PerFrameAlloc = m_RootAlloc->PushSubAlloc(16_MiB);
-
-#if 0
-    m_StaticVertexBufferSize = 1_GiB;
-    m_StaticVertexBufferAt = 0;
-    m_StaticVertexBuffer = g_Rhi->CreateBuffer({
-        .size = m_StaticVertexBufferSize,
-        .bufferUsage = RhiBufferUsage::Vertex,
-        .memoryUsage = RhiMemoryUsage::GpuOnly,
-    });
-#endif
 }
 
 auto Engine::ShouldExit() -> bool

@@ -1,4 +1,5 @@
 #include "nyla/engine/asset_manager.h"
+#include "nyla/commons/align.h"
 #include "nyla/commons/assert.h"
 #include "nyla/commons/handle_pool.h"
 #include "nyla/commons/log.h"
@@ -7,6 +8,7 @@
 #include "nyla/formats/gltf/gltf_parser.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
+#include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_sampler.h"
 #include "nyla/rhi/rhi_texture.h"
@@ -63,20 +65,64 @@ void AssetManager::Upload(RhiCmdList cmd)
 
             for (auto mesh : parser.GetMeshes())
             {
-                NYLA_LOG("Mesh: " NYLA_SV_FMT, NYLA_SV_ARG(mesh.name));
-
                 for (auto primitive : mesh.primitives)
                 {
-                    NYLA_LOG(" AttributesCount: %lu", primitive.attributes.size());
-                    for (auto attribute : primitive.attributes)
+                    auto &attrs = primitive.attributes;
+
+                    uint32_t stride = 0;
+
+                    auto alignStride = [&](GltfAccessor accessor) -> void {
+                        const uint32_t componentSize = GetGltfAccessorComponentSize(accessor.componentType);
+                        AlignUp(stride, componentSize);
+                    };
+                    auto countStride = [&](GltfAccessor accessor) -> uint32_t {
+                        alignStride(accessor);
+                        const uint32_t offset = stride;
+                        stride += GetGltfAccessorSize(accessor);
+                        return offset;
+                    };
+
+                    GltfAccessor pos;
+                    NYLA_ASSERT(parser.FindAttributeAccessor(attrs, "POSITION", pos));
+                    NYLA_ASSERT(pos.type == GltfAccessorType::VEC3);
+                    NYLA_ASSERT(pos.componentType == GltfAccessorComponentType::FLOAT);
+                    const uint32_t posOffset = countStride(pos);
+
+                    GltfAccessor norm;
+                    NYLA_ASSERT(parser.FindAttributeAccessor(attrs, "NORMAL", norm));
+                    NYLA_ASSERT(norm.count == pos.count);
+                    const uint32_t normOffset = countStride(norm);
+
+                    GltfAccessor texCoord;
+                    NYLA_ASSERT(parser.FindAttributeAccessor(attrs, "TEXCOORD_0", texCoord));
+                    NYLA_ASSERT(texCoord.count == pos.count);
+                    const uint32_t texCoordOffset = countStride(texCoord);
+
+                    alignStride(pos);
+                    const uint32_t bufferSize = stride * pos.count;
+
+                    const auto posBufferView =
+                        parser.GetBufferViewData(parser.GetBufferView(pos.bufferView)).subspan(pos.byteOffset);
+                    const auto normBufferView =
+                        parser.GetBufferViewData(parser.GetBufferView(norm.bufferView)).subspan(norm.byteOffset);
+                    const auto texCoordBufferView = parser.GetBufferViewData(parser.GetBufferView(texCoord.bufferView))
+                                                        .subspan(texCoord.byteOffset);
+
+                    char *const uploadMemory = g_Engine.GetUploadManager().CmdCopyStaticVertices(cmd, bufferSize);
+
+                    for (uint32_t i = 0; i < pos.count; ++i)
                     {
-                        auto &accessor = parser.GetAccessor(attribute.accessor);
-                        auto &bufferView = parser.GetBufferView(accessor.bufferView);
+                        auto copyAttribute = [uploadMemory, i, stride](GltfAccessor accessor, uint32_t offset,
+                                                                       char *byteBufferViewData) -> void {
+                            void *const dst = uploadMemory + static_cast<uint64_t>(i * stride + offset);
+                            const void *const src =
+                                byteBufferViewData + static_cast<uint64_t>(i * GetGltfAccessorSize(accessor));
+                            memcpy(dst, src, GetGltfAccessorSize(accessor));
+                        };
 
-                        std::span<char> data = parser.GetBufferViewData(bufferView);
-
-                        NYLA_LOG("  Attribute: " NYLA_SV_FMT ": %d    BufferViewLength: %d",
-                                 NYLA_SV_ARG(attribute.name), attribute.accessor, bufferView.byteLength);
+                        copyAttribute(pos, posOffset, posBufferView.data());
+                        copyAttribute(norm, normOffset, normBufferView.data());
+                        copyAttribute(texCoord, texCoordOffset, texCoordBufferView.data());
                     }
                 }
             }

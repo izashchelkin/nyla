@@ -64,7 +64,6 @@ class AssetManager
 
     struct MeshPrimitiveData
     {
-        bool needsUpload;
     };
     HandlePool<Mesh, MeshData, 128> m_MeshPrimitives;
 };

@@ -19,14 +19,83 @@ struct GltfBufferView
     uint32_t byteLength;
 };
 
+enum class GltfAccessorComponentType
+{
+    BYTE = 5120,
+    UNSIGNED_BYTE = 5121,
+    SHORT = 5122,
+    UNSIGNED_SHORT = 5123,
+    UNSIGNED_INT = 5125,
+    FLOAT = 5126,
+};
+
+inline auto GetGltfAccessorComponentSize(GltfAccessorComponentType componentType) -> uint32_t
+{
+    switch (componentType)
+    {
+    case GltfAccessorComponentType::BYTE:
+    case GltfAccessorComponentType::UNSIGNED_BYTE:
+        return 1;
+
+    case GltfAccessorComponentType::SHORT:
+    case GltfAccessorComponentType::UNSIGNED_SHORT:
+        return 2;
+
+    case GltfAccessorComponentType::UNSIGNED_INT:
+    case GltfAccessorComponentType::FLOAT:
+        return 4;
+    }
+}
+
+enum class GltfAccessorType
+{
+    SCALAR,
+    VEC2,
+    VEC3,
+    VEC4,
+    MAT2,
+    MAT3,
+    MAT4,
+};
+
+inline auto GetGltfAccessorComponentCount(GltfAccessorType accessorType) -> uint32_t
+{
+    switch (accessorType)
+    {
+    case GltfAccessorType::SCALAR:
+        return 1;
+
+    case GltfAccessorType::VEC2:
+        return 2;
+
+    case GltfAccessorType::VEC3:
+        return 3;
+
+    case GltfAccessorType::VEC4:
+    case GltfAccessorType::MAT2:
+        return 4;
+
+    case GltfAccessorType::MAT3:
+        return 9;
+
+    case GltfAccessorType::MAT4:
+        return 16;
+    }
+}
+
 struct GltfAccessor
 {
     uint32_t bufferView;
     uint32_t byteOffset;
-    uint32_t componentType;
+    GltfAccessorComponentType componentType;
     uint32_t count;
-    std::string_view type;
+    GltfAccessorType type;
 };
+
+inline auto GetGltfAccessorSize(const GltfAccessor &accessor)
+{
+    return GetGltfAccessorComponentCount(accessor.type) * GetGltfAccessorComponentSize(accessor.componentType);
+}
 
 struct GltfMeshPrimitiveAttribute
 {
@@ -54,8 +123,9 @@ class GltfParser
     void Init(RegionAlloc *alloc, void *data, uint32_t byteLength);
 
     auto Parse() -> bool;
-
     auto PopDWord() -> uint32_t;
+    auto FindAttributeAccessor(std::span<GltfMeshPrimitiveAttribute> attributes, std::string_view attributeName,
+                               GltfAccessor &out) -> bool;
 
     auto GetBufferViews() -> std::span<GltfBufferView>
     {

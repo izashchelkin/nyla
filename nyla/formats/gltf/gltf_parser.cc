@@ -1,5 +1,6 @@
 #include "nyla/formats/gltf/gltf_parser.h"
 #include "nyla/commons/align.h"
+#include "nyla/commons/assert.h"
 #include "nyla/commons/word.h"
 #include "nyla/formats/json/json_parser.h"
 #include "nyla/formats/json/json_value.h"
@@ -21,6 +22,20 @@ void GltfParser::Init(RegionAlloc *alloc, void *data, uint32_t byteLength)
     m_Base = data;
     m_At = data;
     m_BytesLeft = byteLength;
+}
+
+auto GltfParser::FindAttributeAccessor(std::span<GltfMeshPrimitiveAttribute> attributes, std::string_view attributeName,
+                                       GltfAccessor &out) -> bool
+{
+    for (auto attribute : attributes)
+    {
+        if (attribute.name == attributeName)
+        {
+            out = GetAccessor(attribute.accessor);
+            return true;
+        }
+    }
+    return false;
 }
 
 auto GltfParser::Parse() -> bool
@@ -71,13 +86,43 @@ auto GltfParser::Parse() -> bool
         {
             auto &accessor = m_Accessors.emplace_back(GltfAccessor{});
             accessor.bufferView = it->DWord("bufferView");
+            accessor.count = it->DWord("count");
 
             if (!it->TryDWord("byteOffset", accessor.byteOffset))
                 accessor.byteOffset = 0;
 
-            accessor.componentType = it->DWord("componentType");
-            accessor.count = it->DWord("count");
-            accessor.type = it->String("type");
+            accessor.componentType = GltfAccessorComponentType(it->DWord("componentType"));
+            switch (accessor.componentType)
+            {
+            case GltfAccessorComponentType::BYTE:
+            case GltfAccessorComponentType::UNSIGNED_BYTE:
+            case GltfAccessorComponentType::SHORT:
+            case GltfAccessorComponentType::UNSIGNED_SHORT:
+            case GltfAccessorComponentType::UNSIGNED_INT:
+            case GltfAccessorComponentType::FLOAT:
+                break;
+
+            default:
+                NYLA_ASSERT(false);
+            };
+
+            std::string_view accessorType = it->String("type");
+            if (accessorType == "SCALAR")
+                accessor.type = GltfAccessorType::SCALAR;
+            else if (accessorType == "VEC2")
+                accessor.type = GltfAccessorType::VEC2;
+            else if (accessorType == "VEC3")
+                accessor.type = GltfAccessorType::VEC3;
+            else if (accessorType == "VEC4")
+                accessor.type = GltfAccessorType::VEC4;
+            else if (accessorType == "MAT2")
+                accessor.type = GltfAccessorType::MAT2;
+            else if (accessorType == "MAT3")
+                accessor.type = GltfAccessorType::MAT3;
+            else if (accessorType == "MAT4")
+                accessor.type = GltfAccessorType::MAT4;
+            else
+                NYLA_ASSERT(false);
         }
     }
 

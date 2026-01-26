@@ -1,4 +1,5 @@
 #include "nyla/engine/gpu_upload_manager.h"
+
 #include "nyla/commons/align.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_buffer.h"
@@ -11,27 +12,35 @@ constexpr uint64_t kPerFrameSize = 16_MiB;
 
 void GpuUploadManager::Init()
 {
-    m_StagingBufferWritten = 0;
+    m_StagingBufferAt = 0;
     m_StagingBuffer = g_Rhi.CreateBuffer(RhiBufferDesc{
         .size = kPerFrameSize * g_Rhi.GetNumFramesInFlight(),
         .bufferUsage = RhiBufferUsage::CopySrc,
         .memoryUsage = RhiMemoryUsage::CpuToGpu,
     });
+
+    m_StaticVertexBufferSize = 1_GiB;
+    m_StaticVertexBufferAt = 0;
+    m_StaticVertexBuffer = g_Rhi.CreateBuffer({
+        .size = m_StaticVertexBufferSize,
+        .bufferUsage = RhiBufferUsage::Vertex | RhiBufferUsage::CopyDst,
+        .memoryUsage = RhiMemoryUsage::GpuOnly,
+    });
 }
 
 void GpuUploadManager::FrameBegin()
 {
-    m_StagingBufferWritten = 0;
+    m_StagingBufferAt = 0;
 }
 
 auto GpuUploadManager::PrepareCopySrc(uint64_t copySize) -> uint64_t
 {
-    AlignUp<uint64_t>(m_StagingBufferWritten, g_Rhi.GetOptimalBufferCopyOffsetAlignment());
-    NYLA_ASSERT(m_StagingBufferWritten + copySize <= kPerFrameSize);
+    AlignUp<uint64_t>(m_StagingBufferAt, g_Rhi.GetOptimalBufferCopyOffsetAlignment());
+    NYLA_ASSERT(m_StagingBufferAt + copySize <= kPerFrameSize);
 
-    g_Rhi.BufferMarkWritten(m_StagingBuffer, m_StagingBufferWritten, copySize);
+    g_Rhi.BufferMarkWritten(m_StagingBuffer, m_StagingBufferAt, copySize);
 
-    const uint64_t ret = kPerFrameSize * g_Rhi.GetFrameIndex() + m_StagingBufferWritten;
+    const uint64_t ret = kPerFrameSize * g_Rhi.GetFrameIndex() + m_StagingBufferAt;
     return ret;
 }
 
@@ -40,7 +49,7 @@ auto GpuUploadManager::CmdCopyBuffer(RhiCmdList cmd, RhiBuffer dst, uint32_t dst
     uint64_t offset = PrepareCopySrc(copySize);
 
     g_Rhi.CmdCopyBuffer(cmd, dst, dstOffset, m_StagingBuffer, offset, copySize);
-    m_StagingBufferWritten += copySize;
+    m_StagingBufferAt += copySize;
 
     char *ret = g_Rhi.MapBuffer(m_StagingBuffer) + offset;
     return ret;
@@ -51,7 +60,7 @@ auto GpuUploadManager::CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, uint32_t c
     uint64_t offset = PrepareCopySrc(copySize);
 
     g_Rhi.CmdCopyTexture(cmd, dst, m_StagingBuffer, offset, copySize);
-    m_StagingBufferWritten += copySize;
+    m_StagingBufferAt += copySize;
 
     char *ret = g_Rhi.MapBuffer(m_StagingBuffer) + offset;
     return ret;

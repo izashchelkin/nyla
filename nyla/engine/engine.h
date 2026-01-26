@@ -5,6 +5,7 @@
 #include "nyla/engine/debug_text_renderer.h"
 #include "nyla/engine/gpu_upload_manager.h"
 #include "nyla/engine/renderer2d.h"
+#include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include <concepts>
 #include <cstdint>
@@ -67,9 +68,6 @@ class Engine
     RegionAlloc *m_RootAlloc;
     RegionAlloc m_PermanentAlloc;
     RegionAlloc m_PerFrameAlloc;
-
-    GpuUploadManager m_StaticVertex;
-    GpuUploadManager m_StaticIndex;
 
     GpuUploadManager m_GpuUploadManager;
     AssetManager m_AssetManager;
