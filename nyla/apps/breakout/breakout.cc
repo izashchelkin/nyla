@@ -89,7 +89,7 @@ void GameInit()
         }
 
 #ifndef WIN32
-        g_State->assets.cube = g_AssetManager->DeclareMesh("/home/izashchelkin/Documents/test.glb");
+        g_State->assets.cube = g_Engine.GetAssetManager().DeclareMesh("/home/izashchelkin/Documents/test.glb");
 #else
         g_State->assets.cube = g_Engine.GetAssetManager().DeclareMesh("C:\\Users\\ihorz\\Desktop\\test.glb");
 #endif
