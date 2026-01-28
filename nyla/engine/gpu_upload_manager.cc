@@ -8,13 +8,13 @@
 namespace nyla
 {
 
-constexpr uint64_t kPerFrameSize = 16_MiB;
+constexpr uint64_t kPerFrameUploadMaxSize = 16_MiB;
 
 void GpuUploadManager::Init()
 {
     m_StagingBufferAt = 0;
     m_StagingBuffer = g_Rhi.CreateBuffer(RhiBufferDesc{
-        .size = kPerFrameSize * g_Rhi.GetNumFramesInFlight(),
+        .size = kPerFrameUploadMaxSize * g_Rhi.GetNumFramesInFlight(),
         .bufferUsage = RhiBufferUsage::CopySrc,
         .memoryUsage = RhiMemoryUsage::CpuToGpu,
     });
@@ -24,6 +24,14 @@ void GpuUploadManager::Init()
     m_StaticVertexBuffer = g_Rhi.CreateBuffer({
         .size = m_StaticVertexBufferSize,
         .bufferUsage = RhiBufferUsage::Vertex | RhiBufferUsage::CopyDst,
+        .memoryUsage = RhiMemoryUsage::GpuOnly,
+    });
+
+    m_StaticIndexBufferSize = 256_MiB;
+    m_StaticIndexBufferAt = 0;
+    m_StaticIndexBuffer = g_Rhi.CreateBuffer({
+        .size = m_StaticIndexBufferSize,
+        .bufferUsage = RhiBufferUsage::Index | RhiBufferUsage::CopyDst,
         .memoryUsage = RhiMemoryUsage::GpuOnly,
     });
 }
@@ -36,11 +44,11 @@ void GpuUploadManager::FrameBegin()
 auto GpuUploadManager::PrepareCopySrc(uint64_t copySize) -> uint64_t
 {
     AlignUp<uint64_t>(m_StagingBufferAt, g_Rhi.GetOptimalBufferCopyOffsetAlignment());
-    NYLA_ASSERT(m_StagingBufferAt + copySize <= kPerFrameSize);
+    NYLA_ASSERT(m_StagingBufferAt + copySize <= kPerFrameUploadMaxSize);
 
     g_Rhi.BufferMarkWritten(m_StagingBuffer, m_StagingBufferAt, copySize);
 
-    const uint64_t ret = kPerFrameSize * g_Rhi.GetFrameIndex() + m_StagingBufferAt;
+    const uint64_t ret = kPerFrameUploadMaxSize * g_Rhi.GetFrameIndex() + m_StagingBufferAt;
     return ret;
 }
 

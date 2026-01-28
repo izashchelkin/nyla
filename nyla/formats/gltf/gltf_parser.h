@@ -143,6 +143,11 @@ class GltfParser
         return m_BinChunk.subspan(bufferView.byteOffset, bufferView.byteLength);
     }
 
+    auto GetAccessorData(const GltfAccessor &accessor) -> std::span<char>
+    {
+        return GetBufferViewData(GetBufferView(accessor.bufferView)).subspan(accessor.byteOffset);
+    }
+
     auto GetAccessors() -> std::span<GltfAccessor>
     {
         return m_Accessors;

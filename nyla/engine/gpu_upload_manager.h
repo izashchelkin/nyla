@@ -17,10 +17,15 @@ class GpuUploadManager
 
     auto CmdCopyStaticVertices(RhiCmdList cmd, uint32_t copySize) -> char *
     {
-        //
-
         char *ret = CmdCopyBuffer(cmd, m_StaticVertexBuffer, m_StaticVertexBufferAt, copySize);
         m_StaticVertexBufferAt += copySize;
+        return ret;
+    }
+
+    auto CmdCopyStaticIndices(RhiCmdList cmd, uint32_t copySize) -> char *
+    {
+        char *ret = CmdCopyBuffer(cmd, m_StaticIndexBuffer, m_StaticVertexBufferAt, copySize);
+        m_StaticIndexBufferAt += copySize;
         return ret;
     }
 
@@ -36,6 +41,10 @@ class GpuUploadManager
     uint64_t m_StaticVertexBufferSize;
     uint64_t m_StaticVertexBufferAt;
     RhiBuffer m_StaticVertexBuffer;
+
+    uint64_t m_StaticIndexBufferSize;
+    uint64_t m_StaticIndexBufferAt;
+    RhiBuffer m_StaticIndexBuffer;
 };
 
 } // namespace nyla
