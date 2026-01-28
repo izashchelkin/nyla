@@ -1,4 +1,4 @@
-#include "nyla/engine/renderer2d.h"
+#include "nyla/engine/renderer.h"
 #include "nyla/commons/byteview.h"
 #include "nyla/commons/containers/inline_vec.h"
 #include "nyla/commons/math/mat.h"
@@ -19,12 +19,12 @@ namespace nyla
 
 using namespace engine0_internal;
 
-void Renderer2D::Init()
+void Renderer::Init()
 {
     const RhiShader vs = GetShader("renderer2d.vs", RhiShaderStage::Vertex);
     const RhiShader ps = GetShader("renderer2d.ps", RhiShaderStage::Pixel);
 
-    auto *renderer = new Renderer2D{};
+    auto *renderer = new Renderer{};
 
     const RhiGraphicsPipelineDesc pipelineDesc{
         .debugName = "Renderer2D",
@@ -77,9 +77,9 @@ void Renderer2D::Init()
     });
 }
 
-void Renderer2D::FrameBegin(RhiCmdList cmd)
+void Renderer::FrameBegin(RhiCmdList cmd)
 {
-    m_PendingDraws.clear();
+    m_DrawQueue.clear();
 
     static bool uploadedVertices = false;
     if (!uploadedVertices)
@@ -126,17 +126,43 @@ void Renderer2D::FrameBegin(RhiCmdList cmd)
     }
 }
 
-void Renderer2D::Rect(RhiCmdList cmd, float x, float y, float width, float height, float4 color, uint32_t textureIndex)
+namespace
 {
-    m_PendingDraws.emplace_back(EntityUbo{
-        .model = float4x4::Translate(float4{x, y, 0, 1}).Mult(float4x4::Scale(float4{width, height, 1, 1})),
-        .color = color,
-        .textureIndex = textureIndex,
-        .samplerIndex = uint32_t(AssetManager::SamplerType::NearestClamp),
-    });
+
+auto GetRectTransform(float2 pos, float2 size)
+{
+    auto model = float4x4::Identity();
+    model = model.Mult(float4x4::Translate(float4{pos[0], pos[1], 0, 1}));
+    model = model.Mult(float4x4::Scale(float4{size[0], size[1], 1, 1}));
+    return model;
 }
 
-void Renderer2D::Draw(RhiCmdList cmd, uint32_t width, uint32_t height, float metersOnScreen)
+} // namespace
+
+void Renderer::Rect(float2 pos, float2 dimensions, AssetManager::Texture texture)
+{
+    auto &assetManager = g_Engine.GetAssetManager();
+
+    RhiTexture rhiTexture;
+    if (!assetManager.GetRhiTexture(texture, rhiTexture))
+        return;
+
+    auto &entity = m_DrawQueue.emplace_back(Entity{});
+    entity.model = GetRectTransform(pos, dimensions);
+
+    entity.textureIndex = rhiTexture.index;
+    entity.samplerIndex = uint32_t(AssetManager::SamplerType::NearestClamp);
+}
+
+void Renderer::Rect(float2 pos, float2 dimensions, float4 color)
+{
+    auto &entity = m_DrawQueue.emplace_back(Entity{});
+    entity.model = GetRectTransform(pos, dimensions);
+
+    entity.color = color;
+}
+
+void Renderer::CmdFlush(RhiCmdList cmd, uint32_t width, uint32_t height, float metersOnScreen)
 {
     g_Rhi.CmdBindGraphicsPipeline(cmd, m_Pipeline);
 
@@ -168,12 +194,12 @@ void Renderer2D::Draw(RhiCmdList cmd, uint32_t width, uint32_t height, float met
 
     const uint32_t frameIndex = g_Rhi.GetFrameIndex();
 
-    for (const EntityUbo &entityUbo : m_PendingDraws)
+    for (const Entity &entityUbo : m_DrawQueue)
     {
         g_Rhi.SetDrawConstant(cmd, ByteViewPtr(&entityUbo));
         g_Rhi.CmdDraw(cmd, 6, 1, 0, 0);
     }
-    m_PendingDraws.clear();
+    m_DrawQueue.clear();
 }
 
 } // namespace nyla

@@ -11,7 +11,7 @@
 #include "nyla/engine/asset_manager.h"
 #include "nyla/engine/debug_text_renderer.h"
 #include "nyla/engine/engine.h"
-#include "nyla/engine/renderer2d.h"
+#include "nyla/engine/renderer.h"
 #include "nyla/engine/tween_manager.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
@@ -212,7 +212,7 @@ void GameRender(RhiCmdList cmd, RhiRenderTargetView rtv)
     const auto &assets = g_State->assets;
 
     auto &renderer2d = g_Engine.GetRenderer2D();
-    renderer2d.Rect(cmd, 0, 0, 100, 70, float4{}, assets.background.index);
+    renderer2d.Rect(0, 0, 100, 70, float4{}, assets.background.index);
 
     uint32_t i = 0;
     for (Brick &brick : level.bricks)
@@ -221,26 +221,26 @@ void GameRender(RhiCmdList cmd, RhiRenderTargetView rtv)
         if (brick.flags & Brick::kFlagDead)
             continue;
 
-        renderer2d.Rect(cmd, brick.pos[0], brick.pos[1], brick.size[0], brick.size[1], float4{},
+        renderer2d.Rect(brick.pos[0], brick.pos[1], brick.size[0], brick.size[1], float4{},
                         assets.bricks[i % assets.bricks.size()].index);
     }
 
     uint64_t second = g_Platform->GetMonotonicTimeMillis() / 1000;
     if (second % 2)
     {
-        renderer2d.Rect(cmd, playerPosX, kPlayerPosY, playerWidth, kPlayerHeight, float4{1.f, 1.f, 1.f, 1},
+        renderer2d.Rect(playerPosX, kPlayerPosY, playerWidth, kPlayerHeight, float4{1.f, 1.f, 1.f, 1},
                         assets.playerFlash.index);
     }
     else
     {
-        renderer2d.Rect(cmd, playerPosX, kPlayerPosY, playerWidth, kPlayerHeight, float4{1.f, 1.f, 1.f, 1},
+        renderer2d.Rect(playerPosX, kPlayerPosY, playerWidth, kPlayerHeight, float4{1.f, 1.f, 1.f, 1},
                         assets.player.index);
     }
 
-    renderer2d.Rect(cmd, ballPos[0], ballPos[1], kBallRadius * 2, kBallRadius * 2, float4{1.f, 1.f, 1.f, 1},
+    renderer2d.Rect(ballPos[0], ballPos[1], kBallRadius * 2, kBallRadius * 2, float4{1.f, 1.f, 1.f, 1},
                     assets.ball.index);
 
-    renderer2d.Draw(cmd, colorTargetInfo.width, colorTargetInfo.height, 64);
+    renderer2d.CmdFlush(cmd, colorTargetInfo.width, colorTargetInfo.height, 64);
 
     g_Engine.GetDebugTextRenderer().Draw(cmd);
 

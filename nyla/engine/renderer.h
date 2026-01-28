@@ -10,18 +10,18 @@
 namespace nyla
 {
 
-class Renderer2D
+class Renderer
 {
   public:
     void Init();
 
-    void FrameBegin(RhiCmdList cmd);
-    void Rect(RhiCmdList cmd, float x, float y, float width, float height, float4 color, uint32_t textureIndex);
-    void Draw(RhiCmdList cmd, uint32_t width, uint32_t height, float metersOnScreen);
+    void Rect(float2 pos, float2 dimensions, float4 color);
+    void Rect(float2 pos, float2 dimensions, uint32_t textureIndex);
+
+    void CmdFlush(RhiCmdList cmd, uint32_t width, uint32_t height, float metersOnScreen);
 
   private:
     RhiGraphicsPipeline m_Pipeline;
-    RhiBuffer m_VertexBuffer;
 
     struct VSInput
     {
@@ -30,7 +30,13 @@ class Renderer2D
         float2 uv;
     };
 
-    struct EntityUbo // Per Draw
+    struct Scene // Per Frame
+    {
+        float4x4 vp;
+        float4x4 invVp;
+    };
+
+    struct Entity // Per Draw
     {
         float4x4 model;
         float4 color;
@@ -38,13 +44,7 @@ class Renderer2D
         uint32_t samplerIndex;
     };
 
-    struct Scene // Per Frame
-    {
-        float4x4 vp;
-        float4x4 invVp;
-    };
-
-    InlineVec<EntityUbo, 256> m_PendingDraws;
+    InlineVec<Entity, 256> m_DrawQueue;
 };
 
 } // namespace nyla

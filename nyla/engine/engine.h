@@ -4,7 +4,7 @@
 #include "nyla/engine/asset_manager.h"
 #include "nyla/engine/debug_text_renderer.h"
 #include "nyla/engine/gpu_upload_manager.h"
-#include "nyla/engine/renderer2d.h"
+#include "nyla/engine/renderer.h"
 #include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include <concepts>
@@ -54,7 +54,7 @@ class Engine
         return m_PerFrameAlloc;
     }
 
-    auto GetRenderer2D() -> Renderer2D &
+    auto GetRenderer2D() -> Renderer &
     {
         return m_Renderer2d;
     }
@@ -72,7 +72,7 @@ class Engine
     GpuUploadManager m_GpuUploadManager;
     AssetManager m_AssetManager;
 
-    Renderer2D m_Renderer2d;
+    Renderer m_Renderer2d;
     DebugTextRenderer m_DebugTextRenderer;
 
     uint64_t m_TargetFrameDurationUs;

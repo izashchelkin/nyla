@@ -1,6 +1,7 @@
 #include "nyla/engine/asset_manager.h"
 #include "nyla/commons/align.h"
 #include "nyla/commons/assert.h"
+#include "nyla/commons/handle.h"
 #include "nyla/commons/handle_pool.h"
 #include "nyla/commons/log.h"
 #include "nyla/commons/memory/region_alloc.h"
@@ -202,6 +203,18 @@ auto AssetManager::DeclareTexture(std::string_view path) -> Texture
         .path = std::string{path},
         .needsUpload = true,
     });
+}
+
+auto AssetManager::GetRhiTexture(Texture texture, RhiTexture &out) -> bool
+{
+    const auto &data = m_Textures.ResolveData(texture);
+    if (HandleIsSet(data.texture))
+    {
+        out = data.texture;
+        return true;
+    }
+
+    return false;
 }
 
 auto AssetManager::DeclareMesh(std::string_view path) -> Mesh

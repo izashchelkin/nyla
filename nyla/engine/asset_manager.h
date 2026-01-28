@@ -39,6 +39,8 @@ class AssetManager
     void Upload(RhiCmdList cmd);
 
     auto DeclareTexture(std::string_view path) -> Texture;
+    auto GetRhiTexture(Texture, RhiTexture &) -> bool;
+
     auto DeclareMesh(std::string_view path) -> Mesh;
 
   private:

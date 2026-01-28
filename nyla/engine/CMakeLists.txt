@@ -10,7 +10,7 @@ target_sources(${TARGET}
         engine0_internal.cc
         gpu_upload_manager.cc
         input_manager.cc
-        renderer2d.cc
+        renderer.cc
         staging.cc
         tween_manager.cc
 )
