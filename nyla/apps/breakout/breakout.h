@@ -39,7 +39,7 @@ struct GameState
         AssetManager::Texture texture;
     };
 };
-extern GameState *g_State;
+extern GameState g_State;
 
 struct Brick
 {

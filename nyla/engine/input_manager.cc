@@ -62,6 +62,4 @@ void InputManager::Update()
     }
 }
 
-InputManager *g_InputManager = new InputManager{};
-
 } // namespace nyla

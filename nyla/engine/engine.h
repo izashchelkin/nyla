@@ -5,6 +5,8 @@
 #include "nyla/engine/debug_text_renderer.h"
 #include "nyla/engine/gpu_upload_manager.h"
 #include "nyla/engine/renderer.h"
+#include "nyla/engine/tween_manager.h"
+#include "nyla/engine/input_manager.h"
 #include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include <concepts>
@@ -64,6 +66,16 @@ class Engine
         return m_DebugTextRenderer;
     }
 
+    auto GetInputManager() -> InputManager &
+    {
+        return m_InputManager;
+    }
+
+    auto GetTweenManager() -> TweenManager &
+    {
+        return m_TweenManager;
+    }
+
   private:
     RegionAlloc *m_RootAlloc;
     RegionAlloc m_PermanentAlloc;
@@ -71,6 +83,8 @@ class Engine
 
     GpuUploadManager m_GpuUploadManager;
     AssetManager m_AssetManager;
+    TweenManager m_TweenManager;
+    InputManager m_InputManager;
 
     Renderer m_Renderer2d;
     DebugTextRenderer m_DebugTextRenderer;

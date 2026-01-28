@@ -15,7 +15,7 @@ class TweenManager
   public:
     auto Now() -> float
     {
-        return m_now;
+        return m_Now;
     }
 
     void Update(float dt);
@@ -35,11 +35,9 @@ class TweenManager
         float startValue;
         float endValue;
     };
-    HandlePool<Tween, TweenData, 1024> m_tweens;
+    HandlePool<Tween, TweenData, 1024> m_Tweens;
 
-    float m_now;
+    float m_Now;
 };
-
-extern TweenManager *g_TweenManager;
 
 } // namespace nyla

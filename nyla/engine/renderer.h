@@ -3,6 +3,7 @@
 #include "nyla/commons/containers/inline_vec.h"
 #include "nyla/commons/math/mat.h"
 #include "nyla/commons/math/vec.h"
+#include "nyla/engine/asset_manager.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_pipeline.h"
 #include <cstdint>
@@ -16,7 +17,7 @@ class Renderer
     void Init();
 
     void Rect(float2 pos, float2 dimensions, float4 color);
-    void Rect(float2 pos, float2 dimensions, uint32_t textureIndex);
+    void Rect(float2 pos, float2 dimensions, AssetManager::Texture texture);
 
     void CmdFlush(RhiCmdList cmd, uint32_t width, uint32_t height, float metersOnScreen);
 

@@ -82,20 +82,20 @@ auto Engine::FrameBegin() -> EngineFrameBeginResult
         switch (event.type)
         {
         case PlatformEventType::KeyDown: {
-            g_InputManager->HandlePressed(1, uint32_t(event.key), frameStart);
+            m_InputManager.HandlePressed(1, uint32_t(event.key), frameStart);
             break;
         }
         case PlatformEventType::KeyUp: {
-            g_InputManager->HandleReleased(1, uint32_t(event.key), frameStart);
+            m_InputManager.HandleReleased(1, uint32_t(event.key), frameStart);
             break;
         }
 
         case PlatformEventType::MousePress: {
-            g_InputManager->HandlePressed(2, event.mouse.code, frameStart);
+            m_InputManager.HandlePressed(2, event.mouse.code, frameStart);
             break;
         }
         case PlatformEventType::MouseRelease: {
-            g_InputManager->HandleReleased(2, event.mouse.code, frameStart);
+            m_InputManager.HandleReleased(2, event.mouse.code, frameStart);
             break;
         }
 
@@ -113,14 +113,12 @@ auto Engine::FrameBegin() -> EngineFrameBeginResult
             break;
         }
     }
-    g_InputManager->Update();
 
-    g_TweenManager->Update(dt);
+    m_InputManager.Update();
+    m_TweenManager.Update(dt);
 
     m_GpuUploadManager.FrameBegin();
     m_AssetManager.Upload(cmd);
-
-    m_Renderer2d.FrameBegin(cmd);
 
     return {
         .cmd = cmd,
