@@ -28,7 +28,7 @@ namespace nyla
 
 void WindowManager::Init()
 {
-    m_X11 = g_Platform->GetImpl();
+    m_X11 = g_Platform.GetImpl();
 
     m_Stacks.resize(9);
 
@@ -346,7 +346,7 @@ void WindowManager::CheckFocusTheft()
     Activate(stack, XCB_CURRENT_TIME);
 }
 
-void WindowManager::MaybeActivateUnderPointer(WindowStack &stack, xcb_timestamp_t ts)
+void WindowManager::MaybeActivateLastEntered(WindowStack &stack, xcb_timestamp_t ts)
 {
     if (stack.zoom)
         return;
@@ -354,27 +354,14 @@ void WindowManager::MaybeActivateUnderPointer(WindowStack &stack, xcb_timestamp_
         return;
 
     if (!m_LastEnteredWindow)
-    {
         return;
-    }
     if (m_LastEnteredWindow == m_X11->GetRoot())
-    {
         return;
-    }
     if (m_LastEnteredWindow == stack.activeWindow)
-    {
-        return;
-    }
-
-    if (m_LastRawmotionTs > ts)
-        return;
-    if (ts - m_LastRawmotionTs > 3)
         return;
 
     if (m_Clients.find(m_LastEnteredWindow) != m_Clients.end())
-    {
         Activate(stack, m_LastEnteredWindow, ts);
-    }
 }
 
 void WindowManager::ClearZoom(WindowStack &stack)
@@ -482,13 +469,13 @@ void WindowManager::Process(bool &isRunning)
 
             if (meta && (key == KeyPhysical::T))
             {
-                Spawn({{"ghostty", nullptr}});
+                g_Platform.Spawn({{"ghostty", nullptr}});
                 break;
             }
 
             if (meta && (key == KeyPhysical::S))
             {
-                Spawn({{"dmenu_run", nullptr}});
+                g_Platform.Spawn({{"dmenu_run", nullptr}});
                 break;
             }
 
@@ -575,10 +562,15 @@ void WindowManager::Process(bool &isRunning)
             {
                 switch (ge->event_type)
                 {
-                case XCB_INPUT_RAW_MOTION: {
-                    auto rawmotion = reinterpret_cast<xcb_input_raw_motion_event_t *>(event);
-                    m_LastRawmotionTs = std::max(m_LastRawmotionTs, rawmotion->time);
-                    MaybeActivateUnderPointer(stack, m_LastRawmotionTs);
+                case XCB_INPUT_RAW_BUTTON_PRESS: {
+                    auto rawpress = reinterpret_cast<xcb_input_raw_button_press_event_t *>(event);
+                    if (rawpress->detail == XCB_BUTTON_INDEX_1)
+                        MaybeActivateLastEntered(stack, rawpress->time);
+
+                    break;
+                }
+
+                default: {
                     break;
                 }
                 }
@@ -590,7 +582,6 @@ void WindowManager::Process(bool &isRunning)
         case XCB_ENTER_NOTIFY: {
             auto enternotify = reinterpret_cast<xcb_enter_notify_event_t *>(event);
             m_LastEnteredWindow = enternotify->event;
-            MaybeActivateUnderPointer(stack, enternotify->time);
             break;
         }
 
@@ -1071,7 +1062,7 @@ void WindowManager::CloseActive()
         return;
 
     static uint64_t last = 0;
-    uint64_t now = GetMonotonicTimeMillis();
+    uint64_t now = g_Platform.GetMonotonicTimeMillis();
     if (now - last >= 100)
     {
         m_X11->SendWmDeleteWindow(stack.activeWindow);

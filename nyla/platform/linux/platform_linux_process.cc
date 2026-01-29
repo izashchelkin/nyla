@@ -1,4 +1,4 @@
-#include "nyla/commons/assert.h"
+#include "nyla/commons/log.h"
 #include "nyla/platform/linux/platform_linux.h"
 
 #include <fcntl.h>
@@ -27,7 +27,7 @@ auto Platform::Impl::Spawn(std::span<const char *const> cmd) -> bool
             };
             sigemptyset(&sa.sa_mask);
             sa.sa_flags = SA_RESTART;
-            if (sigaction(SIGCHLD, &sa, NULL) == -1)
+            if (sigaction(SIGCHLD, &sa, nullptr) == -1)
             {
                 NYLA_LOG("sigaction failed");
                 return false;
@@ -71,6 +71,11 @@ auto Platform::Impl::Spawn(std::span<const char *const> cmd) -> bool
 
 failure:
     _exit(127);
+}
+
+auto Platform::Spawn(std::span<const char *const> cmd) -> bool
+{
+    return m_Impl->Spawn(cmd);
 }
 
 } // namespace nyla

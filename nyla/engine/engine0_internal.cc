@@ -19,7 +19,7 @@ auto GetShader(const char *name, RhiShaderStage stage) -> RhiShader
     // TODO: directory watch
     // PlatformFsWatchFile(path);
 
-    std::vector<std::byte> code = g_Platform->ReadFile(path);
+    std::vector<std::byte> code = g_Platform.ReadFile(path);
     const auto spirv = std::span{reinterpret_cast<uint32_t *>(code.data()), code.size() / 4};
 
     RhiShader shader = g_Rhi.CreateShader(RhiShaderDesc{

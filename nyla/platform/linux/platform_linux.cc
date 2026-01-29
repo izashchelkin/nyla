@@ -95,7 +95,7 @@ void Platform::Impl::Init(const PlatformInitDesc &desc)
             xkb_context *ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
             NYLA_ASSERT(ctx);
 
-            xcb_connection_t *conn = g_Platform->GetImpl()->GetConn();
+            xcb_connection_t *conn = g_Platform.GetImpl()->GetConn();
 
             const int32_t deviceId = xkb_x11_get_core_keyboard_device_id(conn);
             NYLA_ASSERT(deviceId != -1);
@@ -130,8 +130,8 @@ void Platform::Impl::Init(const PlatformInitDesc &desc)
         } mask;
 
         mask.eventMask.deviceid = XCB_INPUT_DEVICE_ALL_MASTER;
-        mask.eventMask.mask_len = 1;
-        mask.maskBits = XCB_INPUT_XI_EVENT_MASK_RAW_MOTION;
+        mask.eventMask.mask_len = 2;
+        mask.maskBits = XCB_INPUT_XI_EVENT_MASK_RAW_MOTION | XCB_INPUT_XI_EVENT_MASK_RAW_BUTTON_PRESS;
 
         if (xcb_request_check(m_Conn, xcb_input_xi_select_events_checked(m_Conn, m_Screen->root, 1, &mask.eventMask)))
             NYLA_ASSERT(false && "could not setup XI2 extension");
@@ -544,6 +544,6 @@ auto Platform::PollEvent(PlatformEvent &outEvent) -> bool
     return m_Impl->PollEvent(outEvent);
 }
 
-Platform *g_Platform = new Platform();
+Platform g_Platform;
 
 } // namespace nyla

@@ -7,6 +7,7 @@ target_sources(${TARGET_PLATFORM}
         platform_linux.cc
         platform_linux_page_alloc.cc
         platform_linux_clock.cc
+        platform_linux_process.cc
 )
 
 target_include_directories(${TARGET_PLATFORM}

@@ -16,7 +16,7 @@ class DebugTextRenderer
   public:
     void Init();
     void Text(int32_t x, int32_t y, std::string_view text);
-    void Draw(RhiCmdList cmd);
+    void CmdFlush(RhiCmdList cmd);
 
   private:
     RhiGraphicsPipeline m_Pipeline;

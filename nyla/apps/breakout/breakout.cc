@@ -240,7 +240,7 @@ void GameRender(RhiCmdList cmd, RhiRenderTargetView rtv)
 
     renderer2d.CmdFlush(cmd, colorTargetInfo.width, colorTargetInfo.height, 64);
 
-    g_Engine.GetDebugTextRenderer().Draw(cmd);
+    g_Engine.GetDebugTextRenderer().CmdFlush(cmd);
 
     g_Rhi.PassEnd({
         .renderTarget = rtv,

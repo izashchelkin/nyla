@@ -2,6 +2,7 @@
 
 #include "nyla/commons/handle.h"
 #include "nyla/commons/handle_pool.h"
+#include "nyla/commons/memory/region_alloc.h"
 #include "nyla/rhi/rhi_texture.h"
 #include <cstdint>
 #include <string>
@@ -60,6 +61,7 @@ class AssetManager
     struct MeshData
     {
         std::string path;
+
         bool needsUpload;
     };
     HandlePool<Mesh, MeshData, 128> m_Meshes;
@@ -68,6 +70,14 @@ class AssetManager
     {
     };
     HandlePool<Mesh, MeshData, 128> m_MeshPrimitives;
+
+    //
+
+    struct GltfMeshUploadQueueEntry
+    {
+        char *path;
+    };
+    RegionAlloc m_GltfMeshUploadQueue;
 };
 
 } // namespace nyla

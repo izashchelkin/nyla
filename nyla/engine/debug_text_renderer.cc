@@ -5,7 +5,6 @@
 
 #include <cstdint>
 
-#include "nyla/commons/math/vec.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_pipeline.h"
@@ -64,7 +63,7 @@ void DebugTextRenderer::Text(int32_t x, int32_t y, std::string_view text)
     m_PendingDraws.emplace_back(drawData);
 }
 
-void DebugTextRenderer::Draw(RhiCmdList cmd)
+void DebugTextRenderer::CmdFlush(RhiCmdList cmd)
 {
     if (m_PendingDraws.empty())
         return;

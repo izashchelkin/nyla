@@ -1,11 +1,11 @@
 #include <cstring>
 #include <sys/poll.h>
 #include <sys/time.h>
+#include <sys/signal.h>
 #include <unistd.h>
 
 #include "nyla/apps/wm/window_manager.h"
 #include "nyla/commons/log.h"
-#include "nyla/commons/signal/signal.h"
 #include "nyla/platform/linux/platform_linux.h"
 #include "nyla/platform/platform.h"
 #include "xcb/xcb.h"
@@ -19,14 +19,14 @@ auto PlatformMain() -> int
     sa.sa_handler = [](int signum) -> void { std::abort(); };
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = SA_RESTART;
-    NYLA_ASSERT(sigaction(SIGINT, &sa, NULL) != -1);
+    NYLA_ASSERT(sigaction(SIGINT, &sa, nullptr) != -1);
 
-    g_Platform->Init({.enabledFeatures = PlatformFeature::KeyboardInput | PlatformFeature::MouseInput});
+    g_Platform.Init({.enabledFeatures = PlatformFeature::KeyboardInput | PlatformFeature::MouseInput});
 
     WindowManager wm{};
     wm.Init();
 
-    auto *x11 = g_Platform->GetImpl();
+    auto *x11 = g_Platform.GetImpl();
 
     bool isRunning = true;
     while (isRunning && !xcb_connection_has_error(x11->GetConn()))

@@ -481,7 +481,7 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
     const VkXcbSurfaceCreateInfoKHR surfaceCreateInfo{
         .sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR,
         .connection = xcb_connect(nullptr, nullptr),
-        .window = g_Platform->GetImpl()->WinGetHandle(),
+        .window = g_Platform.GetImpl()->WinGetHandle(),
     };
     VK_CHECK(vkCreateXcbSurfaceKHR(m_Instance, &surfaceCreateInfo, m_Alloc, &m_Surface));
 #else

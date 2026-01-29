@@ -84,6 +84,8 @@ class Platform
     auto GetMonotonicTimeMicros() -> uint64_t;
     auto GetMonotonicTimeNanos() -> uint64_t;
 
+    auto Spawn(std::span<const char *const> cmd) -> bool;
+
     class Impl;
 
     void SetImpl(Impl *impl)
@@ -122,7 +124,7 @@ class Platform
   private:
     Impl *m_Impl;
 };
-extern Platform *g_Platform;
+extern Platform g_Platform;
 
 auto PlatformMain() -> int;
 
