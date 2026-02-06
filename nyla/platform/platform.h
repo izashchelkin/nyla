@@ -5,6 +5,7 @@
 #include "nyla/commons/byteliterals.h"
 #include <cstdint>
 #include <fstream>
+#include <span>
 #include <string>
 #include <vector>
 

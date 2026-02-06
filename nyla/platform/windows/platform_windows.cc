@@ -390,7 +390,7 @@ constexpr auto ScanCodeToKeyPhysical(uint8_t scanCode, bool extended) -> KeyPhys
     }
 }
 
-Platform *g_Platform = new Platform();
+Platform g_Platform{};
 
 } // namespace nyla
 
