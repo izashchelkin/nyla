@@ -487,8 +487,8 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
 #else
     const VkWin32SurfaceCreateInfoKHR surfaceCreateInfo{
         .sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
-        .hinstance = g_Platform->GetImpl()->GetHInstance(),
-        .hwnd = g_Platform->GetImpl()->WinGetHandle(),
+        .hinstance = g_Platform.GetImpl()->GetHInstance(),
+        .hwnd = g_Platform.GetImpl()->WinGetHandle(),
     };
     vkCreateWin32SurfaceKHR(m_Instance, &surfaceCreateInfo, m_Alloc, &m_Surface);
 #endif

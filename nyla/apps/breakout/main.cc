@@ -13,7 +13,7 @@ namespace nyla
 
 auto PlatformMain() -> int
 {
-    g_Platform->Init({
+    g_Platform.Init({
         .enabledFeatures = PlatformFeature::KeyboardInput,
         .open = true,
     });

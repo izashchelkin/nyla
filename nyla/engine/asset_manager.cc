@@ -56,93 +56,112 @@ void AssetManager::Upload(RhiCmdList cmd)
         if (!meshData.needsUpload)
             continue;
 
-        std::vector<std::byte> data = g_Platform->ReadFile(meshData.path);
-
-        RegionAlloc &transientAlloc = g_Engine.GetPerFrameAlloc();
-        RegionAlloc scratchAlloc = transientAlloc.PushSubAlloc(16_KiB);
+        if (meshData.isStatic)
         {
-            GltfParser parser;
-            parser.Init(&scratchAlloc, data.data(), data.size());
-            NYLA_ASSERT(parser.Parse());
-
-            for (auto mesh : parser.GetMeshes())
             {
-                for (auto primitive : mesh.primitives)
+                char *const uploadMemory = uploadManager.CmdCopyStaticVertices(cmd, meshData.indices.size_bytes());
+                memcpy(uploadMemory, meshData.indices.data(), meshData.indices.size_bytes());
+            }
+
+            {
+                char *const uploadMemory = uploadManager.CmdCopyStaticVertices(cmd, meshData.vertexData.size_bytes());
+                memcpy(uploadMemory, meshData.vertexData.data(), meshData.vertexData.size_bytes());
+            }
+        }
+        else
+        {
+            std::vector<std::byte> data = g_Platform.ReadFile(meshData.path);
+
+            RegionAlloc &transientAlloc = g_Engine.GetPerFrameAlloc();
+            RegionAlloc scratchAlloc = transientAlloc.PushSubAlloc(16_KiB);
+            {
+                GltfParser parser;
+                parser.Init(&scratchAlloc, data.data(), data.size());
+                NYLA_ASSERT(parser.Parse());
+
+                for (auto mesh : parser.GetMeshes())
                 {
+                    for (auto primitive : mesh.primitives)
                     {
-                        GltfAccessor indices = parser.GetAccessor(primitive.indices);
-                        NYLA_ASSERT(indices.type == GltfAccessorType::SCALAR);
-                        NYLA_ASSERT(indices.componentType == GltfAccessorComponentType::UNSIGNED_SHORT);
-
-                        GltfBufferView bufferView = parser.GetBufferView(indices.bufferView);
-
-                        uint32_t bufferSize = indices.count * GetGltfAccessorSize(indices);
-                        char *const uploadMemory = uploadManager.CmdCopyStaticIndices(cmd, bufferSize);
-
-                        std::span<char> indicesData = parser.GetAccessorData(indices);
-                        memcpy(uploadMemory, indicesData.data(), indicesData.size_bytes());
-                    }
-
-                    {
-                        auto &attrs = primitive.attributes;
-
-                        uint32_t stride = 0;
-
-                        auto alignStride = [&](GltfAccessor accessor) -> void {
-                            const uint32_t componentSize = GetGltfAccessorComponentSize(accessor.componentType);
-                            AlignUp(stride, componentSize);
-                        };
-                        auto countStride = [&](GltfAccessor accessor) -> uint32_t {
-                            alignStride(accessor);
-                            const uint32_t offset = stride;
-                            stride += GetGltfAccessorSize(accessor);
-                            return offset;
-                        };
-
-                        GltfAccessor pos;
-                        NYLA_ASSERT(parser.FindAttributeAccessor(attrs, "POSITION", pos));
-                        NYLA_ASSERT(pos.type == GltfAccessorType::VEC3);
-                        NYLA_ASSERT(pos.componentType == GltfAccessorComponentType::FLOAT);
-                        const uint32_t posOffset = countStride(pos);
-
-                        GltfAccessor norm;
-                        NYLA_ASSERT(parser.FindAttributeAccessor(attrs, "NORMAL", norm));
-                        NYLA_ASSERT(norm.count == pos.count);
-                        const uint32_t normOffset = countStride(norm);
-
-                        GltfAccessor texCoord;
-                        NYLA_ASSERT(parser.FindAttributeAccessor(attrs, "TEXCOORD_0", texCoord));
-                        NYLA_ASSERT(texCoord.count == pos.count);
-                        const uint32_t texCoordOffset = countStride(texCoord);
-
-                        alignStride(pos);
-                        const uint32_t bufferSize = stride * pos.count;
-
-                        const auto posBufferView = parser.GetAccessorData(pos);
-                        const auto normBufferView = parser.GetAccessorData(norm);
-                        const auto texCoordBufferView = parser.GetAccessorData(texCoord);
-
-                        char *const uploadMemory = uploadManager.CmdCopyStaticVertices(cmd, bufferSize);
-
-                        for (uint32_t i = 0; i < pos.count; ++i)
                         {
-                            auto copyAttribute = [uploadMemory, i, stride](GltfAccessor accessor, uint32_t offset,
-                                                                           char *byteBufferViewData) -> void {
-                                void *const dst = uploadMemory + static_cast<uint64_t>(i * stride + offset);
-                                const void *const src =
-                                    byteBufferViewData + static_cast<uint64_t>(i * GetGltfAccessorSize(accessor));
-                                memcpy(dst, src, GetGltfAccessorSize(accessor));
+                            GltfAccessor indices = parser.GetAccessor(primitive.indices);
+                            NYLA_ASSERT(indices.type == GltfAccessorType::SCALAR);
+                            NYLA_ASSERT(indices.componentType == GltfAccessorComponentType::UNSIGNED_SHORT);
+
+                            GltfBufferView bufferView = parser.GetBufferView(indices.bufferView);
+
+                            uint32_t bufferSize = indices.count * GetGltfAccessorSize(indices);
+                            char *const uploadMemory = uploadManager.CmdCopyStaticIndices(cmd, bufferSize);
+
+                            std::span<char> indicesData = parser.GetAccessorData(indices);
+                            memcpy(uploadMemory, indicesData.data(), indicesData.size_bytes());
+                        }
+
+                        {
+                            auto &attrs = primitive.attributes;
+
+                            uint32_t stride = 0;
+
+                            auto alignStride = [&](GltfAccessor accessor) -> void {
+                                const uint32_t componentSize = GetGltfAccessorComponentSize(accessor.componentType);
+                                AlignUp(stride, componentSize);
+                            };
+                            auto countStride = [&](GltfAccessor accessor) -> uint32_t {
+                                alignStride(accessor);
+                                const uint32_t offset = stride;
+                                stride += GetGltfAccessorSize(accessor);
+                                return offset;
                             };
 
-                            copyAttribute(pos, posOffset, posBufferView.data());
-                            copyAttribute(norm, normOffset, normBufferView.data());
-                            copyAttribute(texCoord, texCoordOffset, texCoordBufferView.data());
+                            GltfAccessor pos;
+                            NYLA_ASSERT(parser.FindAttributeAccessor(attrs, "POSITION", pos));
+                            NYLA_ASSERT(pos.type == GltfAccessorType::VEC3);
+                            NYLA_ASSERT(pos.componentType == GltfAccessorComponentType::FLOAT);
+                            const uint32_t posOffset = countStride(pos);
+
+                            GltfAccessor norm;
+                            NYLA_ASSERT(parser.FindAttributeAccessor(attrs, "NORMAL", norm));
+                            NYLA_ASSERT(pos.type == GltfAccessorType::VEC3);
+                            NYLA_ASSERT(pos.componentType == GltfAccessorComponentType::FLOAT);
+                            NYLA_ASSERT(norm.count == pos.count);
+                            const uint32_t normOffset = countStride(norm);
+
+                            GltfAccessor texCoord;
+                            NYLA_ASSERT(parser.FindAttributeAccessor(attrs, "TEXCOORD_0", texCoord));
+                            NYLA_ASSERT(pos.type == GltfAccessorType::VEC2);
+                            NYLA_ASSERT(pos.componentType == GltfAccessorComponentType::FLOAT);
+                            NYLA_ASSERT(texCoord.count == pos.count);
+                            const uint32_t texCoordOffset = countStride(texCoord);
+
+                            alignStride(pos);
+                            const uint32_t bufferSize = stride * pos.count;
+
+                            const auto posBufferView = parser.GetAccessorData(pos);
+                            const auto normBufferView = parser.GetAccessorData(norm);
+                            const auto texCoordBufferView = parser.GetAccessorData(texCoord);
+
+                            char *const uploadMemory = uploadManager.CmdCopyStaticVertices(cmd, bufferSize);
+
+                            for (uint32_t i = 0; i < pos.count; ++i)
+                            {
+                                auto copyAttribute = [uploadMemory, i, stride](GltfAccessor accessor, uint32_t offset,
+                                                                               char *byteBufferViewData) -> void {
+                                    void *const dst = uploadMemory + static_cast<uint64_t>(i * stride + offset);
+                                    const void *const src =
+                                        byteBufferViewData + static_cast<uint64_t>(i * GetGltfAccessorSize(accessor));
+                                    memcpy(dst, src, GetGltfAccessorSize(accessor));
+                                };
+
+                                copyAttribute(pos, posOffset, posBufferView.data());
+                                copyAttribute(norm, normOffset, normBufferView.data());
+                                copyAttribute(texCoord, texCoordOffset, texCoordBufferView.data());
+                            }
                         }
                     }
                 }
             }
+            transientAlloc.Pop(scratchAlloc.GetBase());
         }
-        transientAlloc.Pop(scratchAlloc.GetBase());
 
         meshData.needsUpload = false;
     }
@@ -220,7 +239,18 @@ auto AssetManager::GetRhiTexture(Texture texture, RhiTexture &out) -> bool
 auto AssetManager::DeclareMesh(std::string_view path) -> Mesh
 {
     return m_Meshes.Acquire(MeshData{
+        .isStatic = false,
         .path = std::string{path},
+        .needsUpload = true,
+    });
+}
+
+auto AssetManager::DeclareStaticMesh(std::span<const char> vertexData, std::span<const uint32_t> indices) -> Mesh
+{
+    return m_Meshes.Acquire(MeshData{
+        .isStatic = true,
+        .vertexData = vertexData,
+        .indices = indices,
         .needsUpload = true,
     });
 }

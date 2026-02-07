@@ -409,7 +409,7 @@ auto WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine
 
     auto *impl = new Platform::Impl{};
     impl->SetHInstance(hInstance);
-    g_Platform->SetImpl(impl);
+    g_Platform.SetImpl(impl);
 
     const int retCode = PlatformMain();
 
@@ -422,5 +422,5 @@ auto WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine
 
 auto CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) -> LRESULT
 {
-    return nyla::g_Platform->GetImpl()->MainWndProc(hwnd, uMsg, wParam, lParam);
+    return nyla::g_Platform.GetImpl()->MainWndProc(hwnd, uMsg, wParam, lParam);
 }

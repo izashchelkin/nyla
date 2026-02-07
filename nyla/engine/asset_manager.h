@@ -2,6 +2,7 @@
 
 #include "nyla/commons/handle.h"
 #include "nyla/commons/handle_pool.h"
+#include "nyla/commons/math/vec.h"
 #include "nyla/commons/memory/region_alloc.h"
 #include "nyla/rhi/rhi_texture.h"
 #include <cstdint>
@@ -43,6 +44,7 @@ class AssetManager
     auto GetRhiTexture(Texture, RhiTexture &) -> bool;
 
     auto DeclareMesh(std::string_view path) -> Mesh;
+    auto DeclareStaticMesh(std::span<const char> vertexData, std::span<const uint32_t> indices) -> Mesh;
 
   private:
     struct TextureData
@@ -60,7 +62,10 @@ class AssetManager
 
     struct MeshData
     {
+        bool isStatic;
         std::string path;
+        std::span<const char> vertexData;
+        std::span<const uint32_t> indices;
 
         bool needsUpload;
     };

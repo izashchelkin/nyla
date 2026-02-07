@@ -24,6 +24,8 @@ class Renderer
   private:
     RhiGraphicsPipeline m_Pipeline;
 
+    AssetManager::Mesh m_RectMesh;
+
     struct VSInput
     {
         float4 pos;

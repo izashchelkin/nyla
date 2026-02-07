@@ -225,7 +225,7 @@ void GameRender(RhiCmdList cmd, RhiRenderTargetView rtv)
             renderer2d.Rect(brick.pos, brick.size, assets.bricks[i % assets.bricks.size()]);
         }
 
-        uint64_t second = g_Platform->GetMonotonicTimeMillis() / 1000;
+        uint64_t second = g_Platform.GetMonotonicTimeMillis() / 1000;
         if (second % 2)
         {
             renderer2d.Rect({playerPosX, kPlayerPosY}, {playerWidth, kPlayerHeight}, assets.playerFlash);
