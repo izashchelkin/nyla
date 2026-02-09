@@ -63,7 +63,7 @@ void AssetManager::Upload(RhiCmdList cmd)
 
             {
                 char *const uploadMemory =
-                    uploadManager.CmdCopyStaticVertices(cmd, meshData.indices.size_bytes(), meshData.indexBufferOffset);
+                    uploadManager.CmdCopyStaticIndices(cmd, meshData.indices.size_bytes(), meshData.indexBufferOffset);
                 memcpy(uploadMemory, meshData.indices.data(), meshData.indices.size_bytes());
             }
 
