@@ -3,6 +3,7 @@
 #include "nyla/commons/assert.h"
 #include "nyla/commons/containers/inline_string.h"
 #include "nyla/commons/containers/inline_vec.h"
+#include "nyla/commons/log.h"
 #include "nyla/rhi/rhi_shader.h"
 #include "nyla/spirview/spirview.h"
 #include <cstdint>
@@ -71,11 +72,12 @@ class SpirvShaderManager
         return false;
     }
 
-    auto FindIdBySemantic(std::string_view semantic, StorageClass storageClass, uint32_t *outId) -> bool
+    auto FindIdBySemantic(std::string_view querySemantic, StorageClass storageClass, uint32_t *outId) -> bool
     {
         for (uint32_t i = 0; i < m_SemanticDataNames.size(); ++i)
         {
-            if (m_SemanticDataNames[i] == semantic && CheckStorageClass(m_SemanticDataIds[i], storageClass))
+            const auto &semantic = m_SemanticDataNames[i];
+            if (semantic == querySemantic && CheckStorageClass(m_SemanticDataIds[i], storageClass))
             {
                 *outId = m_SemanticDataIds[i];
                 return true;
@@ -249,6 +251,8 @@ class SpirvShaderManager
 
             auto &name = m_SemanticDataNames.emplace_back(operandReader.String());
             name.AsciiToUpper();
+
+            NYLA_LOG("" NYLA_SV_FMT, NYLA_SV_ARG(name.StringView()));
             break;
         }
         }

@@ -39,7 +39,7 @@ target_include_directories(${REGION_ALLOC_TEST}
 target_link_libraries(${REGION_ALLOC_TEST}
     PUBLIC
         nyla::commons
-        nyla::commons::memory
+        # nyla::commons::memory
         nyla::platform
 )
 

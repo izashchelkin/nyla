@@ -26,13 +26,6 @@ class Renderer
 
     AssetManager::Mesh m_RectMesh;
 
-    struct VSInput
-    {
-        float4 pos;
-        float4 color;
-        float2 uv;
-    };
-
     struct Scene // Per Frame
     {
         float4x4 vp;
@@ -43,7 +36,7 @@ class Renderer
     {
         float4x4 model;
         float4 color;
-        uint32_t textureIndex;
+        uint32_t srvTextureIndex;
         uint32_t samplerIndex;
     };
 

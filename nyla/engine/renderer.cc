@@ -21,108 +21,98 @@ using namespace engine0_internal;
 
 void Renderer::Init()
 {
-    const RhiShader vs = GetShader("renderer2d.vs", RhiShaderStage::Vertex);
-    const RhiShader ps = GetShader("renderer2d.ps", RhiShaderStage::Pixel);
+    const RhiShader vs = GetShader("renderer.vs", RhiShaderStage::Vertex);
+    const RhiShader ps = GetShader("renderer.ps", RhiShaderStage::Pixel);
 
     auto *renderer = new Renderer{};
 
     const RhiGraphicsPipelineDesc pipelineDesc{
-        .debugName = "Renderer2D",
+        .debugName = "Renderer",
         .vs = vs,
         .ps = ps,
         .vertexBindingsCount = 1,
-        .vertexBindings =
-            {
-                RhiVertexBindingDesc{
-                    .binding = 0,
-                    .stride = sizeof(VSInput),
-                    .inputRate = RhiInputRate::PerVertex,
-                },
-            },
+        .vertexBindings = AssetManager::GetMeshVertexBindings(),
         .vertexAttributeCount = 3,
-        .vertexAttributes =
-            {
-                RhiVertexAttributeDesc{
-                    .binding = 0,
-                    .semantic = "POSITION0",
-                    .format = RhiVertexFormat::R32G32B32A32Float,
-                    .offset = offsetof(VSInput, pos),
-                },
-                RhiVertexAttributeDesc{
-                    .binding = 0,
-                    .semantic = "COLOR0",
-                    .format = RhiVertexFormat::R32G32B32A32Float,
-                    .offset = offsetof(VSInput, color),
-                },
-                RhiVertexAttributeDesc{
-                    .binding = 0,
-                    .semantic = "TEXCOORD0",
-                    .format = RhiVertexFormat::R32G32Float,
-                    .offset = offsetof(VSInput, uv),
-                },
-            },
+        .vertexAttributes = AssetManager::GetMeshVertexAttributes(),
         .colorTargetFormatsCount = 1,
-        .colorTargetFormats = {RhiTextureFormat::B8G8R8A8_sRGB},
+        .colorTargetFormats = AssetManager::GetMeshPipelineColorTargetFormats(),
         .cullMode = RhiCullMode::None,
         .frontFace = RhiFrontFace::CCW,
     };
 
     m_Pipeline = g_Rhi.CreateGraphicsPipeline(pipelineDesc);
 
-    constexpr uint32_t kVertexBufferSize = 1 << 20;
-    m_VertexBuffer = g_Rhi.CreateBuffer(RhiBufferDesc{
-        .size = kVertexBufferSize,
-        .bufferUsage = RhiBufferUsage::Vertex | RhiBufferUsage::CopyDst,
-        .memoryUsage = RhiMemoryUsage::GpuOnly,
-    });
-}
+    auto &assetManager = g_Engine.GetAssetManager();
 
-void Renderer::FrameBegin(RhiCmdList cmd)
-{
-    m_DrawQueue.clear();
+    { // RECT MESH
+        auto &alloc = g_Engine.GetPermanentAlloc();
 
-    static bool uploadedVertices = false;
-    if (!uploadedVertices)
-    {
-        g_Rhi.CmdTransitionBuffer(cmd, m_VertexBuffer, RhiBufferState::CopyDst);
+        std::span<AssetManager::MeshVSInput> vertices = alloc.PushArr<AssetManager::MeshVSInput>(4);
 
-        char *uploadMemory = g_Engine.GetUploadManager().CmdCopyBuffer(cmd, m_VertexBuffer, 0, 6 * sizeof(VSInput));
-        new (uploadMemory) std::array<VSInput, 6>{
-            VSInput{
-                .pos = {-.5f, .5f, .0f, 1.f},
-                .color = {},
-                .uv = {1.f, 0.f},
-            },
-            VSInput{
-                .pos = {.5f, -.5f, .0f, 1.f},
-                .color = {},
-                .uv = {0.f, 1.f},
-            },
-            VSInput{
-                .pos = {.5f, .5f, .0f, 1.f},
-                .uv = {0.f, 0.f},
-            },
-
-            VSInput{
-                .pos = {-.5f, .5f, .0f, 1.f},
-                .color = {},
-                .uv = {1.f, 0.f},
-            },
-            VSInput{
-                .pos = {-.5f, -.5f, .0f, 1.f},
-                .color = {},
-                .uv = {1.f, 1.f},
-            },
-            VSInput{
-                .pos = {.5f, -.5f, .0f, 1.f},
-                .color = {},
-                .uv = {0.f, 1.f},
-            },
+        vertices[0] = AssetManager::MeshVSInput{
+            .pos = {-.5f, .5f, .0f},
+            .normal = {0.f, 0.f, -1.f},
+            .uv = {1.f, 0.f},
+        };
+        vertices[1] = AssetManager::MeshVSInput{
+            .pos = {.5f, -.5f, .0f},
+            .normal = {0.f, 0.f, -1.f},
+            .uv = {0.f, 1.f},
+        };
+        vertices[2] = AssetManager::MeshVSInput{
+            .pos = {.5f, .5f, .0f},
+            .normal = {0.f, 0.f, -1.f},
+            .uv = {0.f, 0.f},
+        };
+        vertices[3] = AssetManager::MeshVSInput{
+            .pos = {-.5f, -.5f, .0f},
+            .normal = {0.f, 0.f, -1.f},
+            .uv = {1.f, 1.f},
         };
 
-        g_Rhi.CmdTransitionBuffer(cmd, m_VertexBuffer, RhiBufferState::ShaderRead);
+        std::span<uint16_t> indices = alloc.PushArr<uint16_t>(6);
 
-        uploadedVertices = true;
+        indices[0] = 0;
+        indices[1] = 1;
+        indices[2] = 2;
+        indices[3] = 0;
+        indices[4] = 3;
+        indices[5] = 1;
+
+#if 0
+        VSInput{
+            .pos = {-.5f, .5f, .0f, 1.f},
+            .color = {},
+            .uv = {1.f, 0.f},
+        },
+        VSInput{
+            .pos = {.5f, -.5f, .0f, 1.f},
+            .color = {},
+            .uv = {0.f, 1.f},
+        },
+        VSInput{
+            .pos = {.5f, .5f, .0f, 1.f},
+            .uv = {0.f, 0.f},
+        },
+
+        VSInput{
+            .pos = {-.5f, .5f, .0f, 1.f},
+            .color = {},
+            .uv = {1.f, 0.f},
+        },
+        VSInput{
+            .pos = {-.5f, -.5f, .0f, 1.f},
+            .color = {},
+            .uv = {1.f, 1.f},
+        },
+        VSInput{
+            .pos = {.5f, -.5f, .0f, 1.f},
+            .color = {},
+            .uv = {0.f, 1.f},
+        },
+#endif
+
+        m_RectMesh = assetManager.DeclareStaticMesh({(char *)vertices.data(), vertices.size_bytes()}, indices);
     }
 }
 
@@ -143,14 +133,14 @@ void Renderer::Rect(float2 pos, float2 dimensions, AssetManager::Texture texture
 {
     auto &assetManager = g_Engine.GetAssetManager();
 
-    RhiTexture rhiTexture;
-    if (!assetManager.GetRhiTexture(texture, rhiTexture))
+    RhiSampledTextureView srv;
+    if (!assetManager.GetRhiSampledTextureView(texture, srv))
         return;
 
     auto &entity = m_DrawQueue.emplace_back(Entity{});
     entity.model = GetRectTransform(pos, dimensions);
 
-    entity.textureIndex = rhiTexture.index;
+    entity.srvTextureIndex = srv.index;
     entity.samplerIndex = uint32_t(AssetManager::SamplerType::NearestClamp);
 }
 
@@ -187,17 +177,15 @@ void Renderer::CmdFlush(RhiCmdList cmd, uint32_t width, uint32_t height, float m
 
     g_Rhi.SetPassConstant(cmd, ByteViewPtr(&scene));
 
-    std::array<RhiBuffer, 1> buffers{m_VertexBuffer};
-    std::array<uint32_t, 1> offsets{0};
-
-    g_Rhi.CmdBindVertexBuffers(cmd, 0, buffers, offsets);
+    auto &assetManager = g_Engine.GetAssetManager();
+    assetManager.CmdBindMesh(cmd, m_RectMesh);
 
     const uint32_t frameIndex = g_Rhi.GetFrameIndex();
 
     for (const Entity &entityUbo : m_DrawQueue)
     {
         g_Rhi.SetDrawConstant(cmd, ByteViewPtr(&entityUbo));
-        g_Rhi.CmdDraw(cmd, 6, 1, 0, 0);
+        g_Rhi.CmdDrawIndexed(cmd, 6, 0, 1, 0, 0);
     }
     m_DrawQueue.clear();
 }

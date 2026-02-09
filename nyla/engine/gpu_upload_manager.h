@@ -15,22 +15,14 @@ class GpuUploadManager
 
     void FrameBegin();
 
-    auto CmdCopyStaticVertices(RhiCmdList cmd, uint32_t copySize) -> char *
-    {
-        char *ret = CmdCopyBuffer(cmd, m_StaticVertexBuffer, m_StaticVertexBufferAt, copySize);
-        m_StaticVertexBufferAt += copySize;
-        return ret;
-    }
+    auto CmdCopyBuffer(RhiCmdList cmd, RhiBuffer dst, uint64_t dstOffset, uint64_t copySize) -> char *;
+    auto CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, uint64_t size) -> char *;
 
-    auto CmdCopyStaticIndices(RhiCmdList cmd, uint32_t copySize) -> char *
-    {
-        char *ret = CmdCopyBuffer(cmd, m_StaticIndexBuffer, m_StaticVertexBufferAt, copySize);
-        m_StaticIndexBufferAt += copySize;
-        return ret;
-    }
+    auto CmdCopyStaticVertices(RhiCmdList cmd, uint32_t copySize, uint64_t &outBufferOffset) -> char *;
+    auto CmdCopyStaticIndices(RhiCmdList cmd, uint32_t copySize, uint64_t &outBufferOffset) -> char *;
 
-    auto CmdCopyBuffer(RhiCmdList cmd, RhiBuffer dst, uint32_t dstOffset, uint32_t copySize) -> char *;
-    auto CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, uint32_t size) -> char *;
+    void CmdBindStaticMeshVertexBuffer(RhiCmdList cmd, uint64_t offset);
+    void CmdBindStaticMeshIndexBuffer(RhiCmdList cmd, uint64_t offset);
 
   private:
     auto PrepareCopySrc(uint64_t copySize) -> uint64_t;

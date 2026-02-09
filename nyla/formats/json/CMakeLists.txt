@@ -16,10 +16,10 @@ target_include_directories(${TARGET_PARSER}
         ${PROJECT_SOURCE_DIR}
 )
 
-target_link_libraries(${TARGET_PARSER}
-    PUBLIC
-        nyla::commons::memory
-)
+# target_link_libraries(${TARGET_PARSER}
+#     PUBLIC
+#         nyla::commons::memory
+# )
 
 
 set(TARGET_PARSER_TEST nyla_formats_json_parser_test)

@@ -18,6 +18,12 @@ namespace nyla
 
 void Engine::Init(const EngineInitDesc &desc)
 {
+    m_LastFrameStart = g_Platform.GetMonotonicTimeMicros();
+
+    m_RootAlloc = &desc.rootAlloc;
+    m_PermanentAlloc = m_RootAlloc->PushSubAlloc(16_MiB);
+    m_PerFrameAlloc = m_RootAlloc->PushSubAlloc(16_MiB);
+
     uint32_t maxFps = 144;
     if (desc.maxFps > 0)
         maxFps = desc.maxFps;
@@ -37,12 +43,6 @@ void Engine::Init(const EngineInitDesc &desc)
 
     m_Renderer2d.Init();
     m_DebugTextRenderer.Init();
-
-    m_LastFrameStart = g_Platform.GetMonotonicTimeMicros();
-
-    m_RootAlloc = &desc.rootAlloc;
-    m_PermanentAlloc = m_RootAlloc->PushSubAlloc(16_MiB);
-    m_PerFrameAlloc = m_RootAlloc->PushSubAlloc(16_MiB);
 }
 
 auto Engine::ShouldExit() -> bool

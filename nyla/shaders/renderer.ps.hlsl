@@ -1,7 +1,7 @@
 struct VSOutput
 {
     float4 position : SV_Position;
-    float4 color : COLOR0;
+    float3 normal : NORMAL0;
     float2 uv : TEXCOORD0;
 };
 
@@ -30,6 +30,6 @@ PSOutput main(VSOutput input)
     SamplerState samplerState = samplers[entity.samplerIndex];
 
     o.color = texture.Sample(samplerState, input.uv);
-    // o.color = input.color + entity.color;
+
     return o;
 }

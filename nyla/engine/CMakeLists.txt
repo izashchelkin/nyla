@@ -25,7 +25,7 @@ target_link_libraries(${TARGET}
         nyla::platform
         nyla::platform::dir_watch
         nyla::rhi
-        nyla::spirview
+        # nyla::spirview
         nyla::formats::gltf::parser
         stb_image
 )

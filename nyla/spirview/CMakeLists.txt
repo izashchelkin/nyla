@@ -37,6 +37,6 @@ target_link_libraries(${TARGET}_bin
     PUBLIC
         nyla::spirview
         nyla::commons
-        nyla::commons::memory
+        # nyla::commons::memory
         nyla::platform
 )

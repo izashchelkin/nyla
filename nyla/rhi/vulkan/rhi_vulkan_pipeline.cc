@@ -1,5 +1,6 @@
 #include "nyla/commons/containers/inline_vec.h"
 #include "nyla/commons/log.h"
+#include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/vulkan/rhi_vulkan_spirv_shader_manager.h"
 #include <array>
 #include <cstdint>
@@ -98,7 +99,7 @@ auto Rhi::Impl::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> R
         .bindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
     };
 
-    std::array<VkVertexInputBindingDescription, std::size(desc.vertexBindings)> vertexBindings;
+    std::array<VkVertexInputBindingDescription, 16> vertexBindings;
     NYLA_ASSERT(desc.vertexBindingsCount <= std::size(desc.vertexBindings));
     for (uint32_t i = 0; i < desc.vertexBindingsCount; ++i)
     {
@@ -113,7 +114,7 @@ auto Rhi::Impl::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> R
     VulkanShaderData &vertexShaderData = m_Shaders.ResolveData(desc.vs);
     VulkanShaderData &pixelShaderData = m_Shaders.ResolveData(desc.ps);
 
-    InlineVec<VkVertexInputAttributeDescription, std::size(desc.vertexAttributes)> vertexAttributes;
+    InlineVec<VkVertexInputAttributeDescription, 16> vertexAttributes;
     NYLA_ASSERT(desc.vertexAttributeCount <= std::size(desc.vertexAttributes));
 
     SpirvShaderManager vsMan(vertexShaderData.spv->GetSpan(), RhiShaderStage::Vertex);
@@ -254,7 +255,7 @@ auto Rhi::Impl::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> R
         .pDynamicStates = dynamicStates.data(),
     };
 
-    std::array<VkFormat, std::size(desc.colorTargetFormats)> colorTargetFormats;
+    std::array<VkFormat, 16> colorTargetFormats;
 
     NYLA_ASSERT(desc.colorTargetFormatsCount <= std::size(desc.colorTargetFormats));
     for (uint32_t i = 0; i < desc.colorTargetFormatsCount; ++i)
@@ -375,7 +376,7 @@ void Rhi::Impl::CmdPushGraphicsConstants(RhiCmdList cmd, uint32_t offset, RhiSha
 }
 
 void Rhi::Impl::CmdBindVertexBuffers(RhiCmdList cmd, uint32_t firstBinding, std::span<const RhiBuffer> buffers,
-                                     std::span<const uint32_t> offsets)
+                                     std::span<const uint64_t> offsets)
 {
     NYLA_ASSERT(buffers.size() == offsets.size());
     NYLA_ASSERT(buffers.size() <= 4U);
@@ -392,10 +393,16 @@ void Rhi::Impl::CmdBindVertexBuffers(RhiCmdList cmd, uint32_t firstBinding, std:
     vkCmdBindVertexBuffers(cmdData.cmdbuf, firstBinding, buffers.size(), vkBufs.data(), vkOffsets.data());
 }
 
-void Rhi::Impl::CmdDraw(RhiCmdList cmd, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
-                        uint32_t firstInstance)
+void Rhi::Impl::CmdBindIndexBuffer(RhiCmdList cmd, RhiBuffer buffer, uint64_t offset)
 {
-    VulkanCmdListData &cmdData = m_CmdLists.ResolveData(cmd);
+    const VulkanBufferData &bufferData = m_Buffers.ResolveData(buffer);
+
+    const VulkanCmdListData &cmdData = m_CmdLists.ResolveData(cmd);
+    vkCmdBindIndexBuffer(cmdData.cmdbuf, bufferData.buffer, offset, VkIndexType::VK_INDEX_TYPE_UINT16);
+}
+
+void Rhi::Impl::CmdDrawInternal(VulkanCmdListData &cmdData)
+{
     VkCommandBuffer cmdbuf = cmdData.cmdbuf;
     const VulkanPipelineData &pipelineData = m_GraphicsPipelines.ResolveData(cmdData.boundGraphicsPipeline);
 
@@ -409,10 +416,24 @@ void Rhi::Impl::CmdDraw(RhiCmdList cmd, uint32_t vertexCount, uint32_t instanceC
     vkCmdBindDescriptorSets(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineData.layout, 0, 1,
                             &m_ConstantsDescriptorTable.set, offsets.size(), offsets.data());
 
-    vkCmdDraw(cmdbuf, vertexCount, instanceCount, firstVertex, firstInstance);
-
     cmdData.drawConstantHead += CbvOffset(m_Limits.drawConstantSize);
     cmdData.largeDrawConstantHead += CbvOffset(m_Limits.largeDrawConstantSize);
+}
+
+void Rhi::Impl::CmdDraw(RhiCmdList cmd, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
+                        uint32_t firstInstance)
+{
+    VulkanCmdListData &cmdData = m_CmdLists.ResolveData(cmd);
+    CmdDrawInternal(cmdData);
+    vkCmdDraw(cmdData.cmdbuf, vertexCount, instanceCount, firstVertex, firstInstance);
+}
+
+void Rhi::Impl::CmdDrawIndexed(RhiCmdList cmd, uint32_t indexCount, uint32_t vertexOffset, uint32_t instanceCount,
+                               uint32_t firstIndex, uint32_t firstInstance)
+{
+    VulkanCmdListData &cmdData = m_CmdLists.ResolveData(cmd);
+    CmdDrawInternal(cmdData);
+    vkCmdDrawIndexed(cmdData.cmdbuf, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
 }
 
 auto Rhi::Impl::GetVertexFormatSize(RhiVertexFormat format) -> uint32_t
@@ -467,9 +488,14 @@ void Rhi::CmdBindGraphicsPipeline(RhiCmdList cmd, RhiGraphicsPipeline pipeline)
 }
 
 void Rhi::CmdBindVertexBuffers(RhiCmdList cmd, uint32_t firstBinding, std::span<const RhiBuffer> buffers,
-                               std::span<const uint32_t> offsets)
+                               std::span<const uint64_t> offsets)
 {
     m_Impl->CmdBindVertexBuffers(cmd, firstBinding, buffers, offsets);
+}
+
+void Rhi::CmdBindIndexBuffer(RhiCmdList cmd, RhiBuffer buffer, uint64_t offset)
+{
+    m_Impl->CmdBindIndexBuffer(cmd, buffer, offset);
 }
 
 #if 0
@@ -489,6 +515,12 @@ void Rhi::CmdDraw(RhiCmdList cmd, uint32_t vertexCount, uint32_t instanceCount, 
                   uint32_t firstInstance)
 {
     m_Impl->CmdDraw(cmd, vertexCount, instanceCount, firstVertex, firstInstance);
+}
+
+void Rhi::CmdDrawIndexed(RhiCmdList cmd, uint32_t indexCount, uint32_t vertexOffset, uint32_t instanceCount,
+                         uint32_t firstIndex, uint32_t firstInstance)
+{
+    m_Impl->CmdDrawIndexed(cmd, indexCount, vertexOffset, instanceCount, firstIndex, firstInstance);
 }
 
 } // namespace nyla

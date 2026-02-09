@@ -38,6 +38,8 @@ auto Rhi::Impl::ConvertVertexFormatIntoVkFormat(RhiVertexFormat format) -> VkFor
         break;
     case RhiVertexFormat::R32G32B32A32Float:
         return VK_FORMAT_R32G32B32A32_SFLOAT;
+    case RhiVertexFormat::R32G32B32Float:
+        return VK_FORMAT_R32G32B32_SFLOAT;
     case RhiVertexFormat::R32G32Float:
         return VK_FORMAT_R32G32_SFLOAT;
     }

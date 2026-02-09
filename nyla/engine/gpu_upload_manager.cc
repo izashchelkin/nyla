@@ -3,6 +3,7 @@
 #include "nyla/commons/align.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_buffer.h"
+#include "nyla/rhi/rhi_cmdlist.h"
 #include <cstdint>
 
 namespace nyla
@@ -52,7 +53,7 @@ auto GpuUploadManager::PrepareCopySrc(uint64_t copySize) -> uint64_t
     return ret;
 }
 
-auto GpuUploadManager::CmdCopyBuffer(RhiCmdList cmd, RhiBuffer dst, uint32_t dstOffset, uint32_t copySize) -> char *
+auto GpuUploadManager::CmdCopyBuffer(RhiCmdList cmd, RhiBuffer dst, uint64_t dstOffset, uint64_t copySize) -> char *
 {
     uint64_t offset = PrepareCopySrc(copySize);
 
@@ -63,7 +64,7 @@ auto GpuUploadManager::CmdCopyBuffer(RhiCmdList cmd, RhiBuffer dst, uint32_t dst
     return ret;
 }
 
-auto GpuUploadManager::CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, uint32_t copySize) -> char *
+auto GpuUploadManager::CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, uint64_t copySize) -> char *
 {
     uint64_t offset = PrepareCopySrc(copySize);
 
@@ -72,6 +73,34 @@ auto GpuUploadManager::CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, uint32_t c
 
     char *ret = g_Rhi.MapBuffer(m_StagingBuffer) + offset;
     return ret;
+}
+
+auto GpuUploadManager::CmdCopyStaticVertices(RhiCmdList cmd, uint32_t copySize, uint64_t &outBufferOffset) -> char *
+{
+    outBufferOffset = m_StaticVertexBufferAt;
+
+    char *ret = CmdCopyBuffer(cmd, m_StaticVertexBuffer, m_StaticVertexBufferAt, copySize);
+    m_StaticVertexBufferAt += copySize;
+    return ret;
+}
+
+auto GpuUploadManager::CmdCopyStaticIndices(RhiCmdList cmd, uint32_t copySize, uint64_t &outBufferOffset) -> char *
+{
+    outBufferOffset = m_StaticIndexBufferAt;
+
+    char *ret = CmdCopyBuffer(cmd, m_StaticIndexBuffer, m_StaticVertexBufferAt, copySize);
+    m_StaticIndexBufferAt += copySize;
+    return ret;
+}
+
+void GpuUploadManager::CmdBindStaticMeshVertexBuffer(RhiCmdList cmd, uint64_t offset)
+{
+    g_Rhi.CmdBindVertexBuffers(cmd, 0, {&m_StaticVertexBuffer, 1}, {&offset, 1});
+}
+
+void GpuUploadManager::CmdBindStaticMeshIndexBuffer(RhiCmdList cmd, uint64_t offset)
+{
+    g_Rhi.CmdBindIndexBuffer(cmd, m_StaticIndexBuffer, offset);
 }
 
 } // namespace nyla

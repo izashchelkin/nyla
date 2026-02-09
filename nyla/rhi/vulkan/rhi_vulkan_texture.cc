@@ -187,7 +187,7 @@ auto Rhi::Impl::CreateTexture(RhiTextureDesc desc) -> RhiTexture
     return m_Textures.Acquire(textureData);
 }
 
-auto Rhi::Impl::CreeteSampledTextureView(const RhiTextureViewDesc &desc) -> RhiSampledTextureView
+auto Rhi::Impl::CreateSampledTextureView(const RhiTextureViewDesc &desc) -> RhiSampledTextureView
 {
     VulkanTextureData &textureData = m_Textures.ResolveData(desc.texture);
 
@@ -438,7 +438,7 @@ auto Rhi::CreateTexture(const RhiTextureDesc &desc) -> RhiTexture
 
 auto Rhi::CreateSampledTextureView(const RhiTextureViewDesc &desc) -> RhiSampledTextureView
 {
-    return m_Impl->CreeteSampledTextureView(desc);
+    return m_Impl->CreateSampledTextureView(desc);
 }
 
 void Rhi::DestroySampledTextureView(RhiSampledTextureView srv)

@@ -58,13 +58,18 @@ void AssetManager::Upload(RhiCmdList cmd)
 
         if (meshData.isStatic)
         {
+            meshData.vertexCount = meshData.indices.size();
+            NYLA_ASSERT(meshData.vertexCount % 3 == 0);
+
             {
-                char *const uploadMemory = uploadManager.CmdCopyStaticVertices(cmd, meshData.indices.size_bytes());
+                char *const uploadMemory =
+                    uploadManager.CmdCopyStaticVertices(cmd, meshData.indices.size_bytes(), meshData.indexBufferOffset);
                 memcpy(uploadMemory, meshData.indices.data(), meshData.indices.size_bytes());
             }
 
             {
-                char *const uploadMemory = uploadManager.CmdCopyStaticVertices(cmd, meshData.vertexData.size_bytes());
+                char *const uploadMemory = uploadManager.CmdCopyStaticVertices(cmd, meshData.vertexData.size_bytes(),
+                                                                               meshData.vertexBufferOffset);
                 memcpy(uploadMemory, meshData.vertexData.data(), meshData.vertexData.size_bytes());
             }
         }
@@ -80,7 +85,7 @@ void AssetManager::Upload(RhiCmdList cmd)
                 NYLA_ASSERT(parser.Parse());
 
                 for (auto mesh : parser.GetMeshes())
-                {
+
                     for (auto primitive : mesh.primitives)
                     {
                         {
@@ -91,10 +96,15 @@ void AssetManager::Upload(RhiCmdList cmd)
                             GltfBufferView bufferView = parser.GetBufferView(indices.bufferView);
 
                             uint32_t bufferSize = indices.count * GetGltfAccessorSize(indices);
-                            char *const uploadMemory = uploadManager.CmdCopyStaticIndices(cmd, bufferSize);
+                            char *const uploadMemory =
+                                uploadManager.CmdCopyStaticIndices(cmd, bufferSize, meshData.indexBufferOffset);
 
                             std::span<char> indicesData = parser.GetAccessorData(indices);
                             memcpy(uploadMemory, indicesData.data(), indicesData.size_bytes());
+
+                            NYLA_ASSERT((indicesData.size_bytes() % sizeof(uint16_t)) == 0);
+                            meshData.vertexCount = indicesData.size_bytes() / sizeof(uint16_t);
+                            NYLA_ASSERT(meshData.vertexCount % 3 == 0);
                         }
 
                         {
@@ -121,15 +131,15 @@ void AssetManager::Upload(RhiCmdList cmd)
 
                             GltfAccessor norm;
                             NYLA_ASSERT(parser.FindAttributeAccessor(attrs, "NORMAL", norm));
-                            NYLA_ASSERT(pos.type == GltfAccessorType::VEC3);
-                            NYLA_ASSERT(pos.componentType == GltfAccessorComponentType::FLOAT);
+                            NYLA_ASSERT(norm.type == GltfAccessorType::VEC3);
+                            NYLA_ASSERT(norm.componentType == GltfAccessorComponentType::FLOAT);
                             NYLA_ASSERT(norm.count == pos.count);
                             const uint32_t normOffset = countStride(norm);
 
                             GltfAccessor texCoord;
                             NYLA_ASSERT(parser.FindAttributeAccessor(attrs, "TEXCOORD_0", texCoord));
-                            NYLA_ASSERT(pos.type == GltfAccessorType::VEC2);
-                            NYLA_ASSERT(pos.componentType == GltfAccessorComponentType::FLOAT);
+                            NYLA_ASSERT(texCoord.type == GltfAccessorType::VEC2);
+                            NYLA_ASSERT(texCoord.componentType == GltfAccessorComponentType::FLOAT);
                             NYLA_ASSERT(texCoord.count == pos.count);
                             const uint32_t texCoordOffset = countStride(texCoord);
 
@@ -140,7 +150,8 @@ void AssetManager::Upload(RhiCmdList cmd)
                             const auto normBufferView = parser.GetAccessorData(norm);
                             const auto texCoordBufferView = parser.GetAccessorData(texCoord);
 
-                            char *const uploadMemory = uploadManager.CmdCopyStaticVertices(cmd, bufferSize);
+                            char *const uploadMemory =
+                                uploadManager.CmdCopyStaticVertices(cmd, bufferSize, meshData.vertexBufferOffset);
 
                             for (uint32_t i = 0; i < pos.count; ++i)
                             {
@@ -158,7 +169,6 @@ void AssetManager::Upload(RhiCmdList cmd)
                             }
                         }
                     }
-                }
             }
             transientAlloc.Pop(scratchAlloc.GetBase());
         }
@@ -224,12 +234,12 @@ auto AssetManager::DeclareTexture(std::string_view path) -> Texture
     });
 }
 
-auto AssetManager::GetRhiTexture(Texture texture, RhiTexture &out) -> bool
+auto AssetManager::GetRhiSampledTextureView(Texture texture, RhiSampledTextureView &out) -> bool
 {
     const auto &data = m_Textures.ResolveData(texture);
     if (HandleIsSet(data.texture))
     {
-        out = data.texture;
+        out = data.textureView;
         return true;
     }
 
@@ -245,7 +255,7 @@ auto AssetManager::DeclareMesh(std::string_view path) -> Mesh
     });
 }
 
-auto AssetManager::DeclareStaticMesh(std::span<const char> vertexData, std::span<const uint32_t> indices) -> Mesh
+auto AssetManager::DeclareStaticMesh(std::span<const char> vertexData, std::span<const uint16_t> indices) -> Mesh
 {
     return m_Meshes.Acquire(MeshData{
         .isStatic = true,
@@ -253,6 +263,15 @@ auto AssetManager::DeclareStaticMesh(std::span<const char> vertexData, std::span
         .indices = indices,
         .needsUpload = true,
     });
+}
+
+void AssetManager::CmdBindMesh(RhiCmdList cmd, Mesh mesh)
+{
+    auto &uploadManager = g_Engine.GetUploadManager();
+
+    const auto &meshData = m_Meshes.ResolveData(mesh);
+    uploadManager.CmdBindStaticMeshVertexBuffer(cmd, meshData.vertexBufferOffset);
+    uploadManager.CmdBindStaticMeshIndexBuffer(cmd, meshData.indexBufferOffset);
 }
 
 } // namespace nyla

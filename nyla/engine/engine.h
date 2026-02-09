@@ -4,9 +4,9 @@
 #include "nyla/engine/asset_manager.h"
 #include "nyla/engine/debug_text_renderer.h"
 #include "nyla/engine/gpu_upload_manager.h"
+#include "nyla/engine/input_manager.h"
 #include "nyla/engine/renderer.h"
 #include "nyla/engine/tween_manager.h"
-#include "nyla/engine/input_manager.h"
 #include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include <concepts>
@@ -49,6 +49,11 @@ class Engine
     auto GetUploadManager() -> GpuUploadManager &
     {
         return m_GpuUploadManager;
+    }
+
+    auto GetPermanentAlloc() -> RegionAlloc &
+    {
+        return m_PermanentAlloc;
     }
 
     auto GetPerFrameAlloc() -> RegionAlloc &

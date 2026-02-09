@@ -1,7 +1,7 @@
 #include <cstring>
 #include <sys/poll.h>
-#include <sys/time.h>
 #include <sys/signal.h>
+#include <sys/time.h>
 #include <unistd.h>
 
 #include "nyla/apps/wm/window_manager.h"

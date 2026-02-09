@@ -6,6 +6,7 @@
 #include <format>
 #include <vector>
 
+#include "nyla/commons/assert.h"
 #include "nyla/commons/color.h"
 #include "nyla/commons/math/vec.h"
 #include "nyla/engine/asset_manager.h"
@@ -71,26 +72,27 @@ void GameInit()
 #if defined(__linux__) // TODO: deal with this
         std::string assetsBasePath = "assets/BBreaker";
 #else
-        std::string assetsBasePath = "D:\\nyla\\assets\\BBreaker";
+        std::string assetsBasePath = "C:\\nyla\\assets\\BBreaker";
 #endif
 
-        g_State.assets.background = g_Engine.GetAssetManager().DeclareTexture(assetsBasePath + "/Background1.png");
-        g_State.assets.player = g_Engine.GetAssetManager().DeclareTexture(assetsBasePath + "/Player.png");
-        g_State.assets.playerFlash = g_Engine.GetAssetManager().DeclareTexture(assetsBasePath + "/Player_flash.png");
-        g_State.assets.ball = g_Engine.GetAssetManager().DeclareTexture(assetsBasePath + "/Ball_small-blue.png");
-        g_State.assets.brickUnbreackable =
-            g_Engine.GetAssetManager().DeclareTexture(assetsBasePath + "/Brick_unbreakable2.png");
+        auto &assetManager = g_Engine.GetAssetManager();
+
+        g_State.assets.background = assetManager.DeclareTexture(assetsBasePath + "/Background1.png");
+        g_State.assets.player = assetManager.DeclareTexture(assetsBasePath + "/Player.png");
+        g_State.assets.playerFlash = assetManager.DeclareTexture(assetsBasePath + "/Player_flash.png");
+        g_State.assets.ball = assetManager.DeclareTexture(assetsBasePath + "/Ball_small-blue.png");
+        g_State.assets.brickUnbreackable = assetManager.DeclareTexture(assetsBasePath + "/Brick_unbreakable2.png");
 
         for (uint32_t i = 0; i < g_State.assets.bricks.size(); ++i)
         {
             std::string path = std::format("{}/Brick{}_4.png", assetsBasePath, i + 1);
-            g_State.assets.bricks[i] = g_Engine.GetAssetManager().DeclareTexture(path);
+            g_State.assets.bricks[i] = assetManager.DeclareTexture(path);
         }
 
 #ifndef WIN32
         g_State.assets.cube = g_Engine.GetAssetManager().DeclareMesh("/home/izashchelkin/Documents/test.glb");
 #else
-        g_State.assets.cube = g_Engine.GetAssetManager().DeclareMesh("C:\\Users\\ihorz\\Desktop\\test.glb");
+        g_State.assets.cube = assetManager.DeclareMesh("C:\\Users\\ihorz\\Desktop\\test.glb");
 #endif
     }
 

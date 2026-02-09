@@ -221,7 +221,7 @@ class Rhi::Impl
     void CmdTransitionTexture(RhiCmdList cmd, RhiTexture texture, RhiTextureState newState);
     void CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, uint32_t srcOffset, uint32_t size);
 
-    auto CreeteSampledTextureView(const RhiTextureViewDesc &desc) -> RhiSampledTextureView;
+    auto CreateSampledTextureView(const RhiTextureViewDesc &desc) -> RhiSampledTextureView;
     void DestroySampledTextureView(RhiSampledTextureView textureView);
     auto GetTexture(RhiSampledTextureView srv) -> RhiTexture;
 
@@ -251,9 +251,12 @@ class Rhi::Impl
     void CmdBindGraphicsPipeline(RhiCmdList cmd, RhiGraphicsPipeline pipeline);
     void CmdPushGraphicsConstants(RhiCmdList cmd, uint32_t offset, RhiShaderStage stage, ByteView data);
     void CmdBindVertexBuffers(RhiCmdList cmd, uint32_t firstBinding, std::span<const RhiBuffer> buffers,
-                              std::span<const uint32_t> offsets);
+                              std::span<const uint64_t> offsets);
+    void CmdBindIndexBuffer(RhiCmdList cmd, RhiBuffer buffer, uint64_t offset);
     void CmdDraw(RhiCmdList cmd, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
                  uint32_t firstInstance);
+    void CmdDrawIndexed(RhiCmdList cmd, uint32_t indexCount, uint32_t vertexOffset, uint32_t instanceCount,
+                        uint32_t firstIndex, uint32_t firstInstance);
     auto GetVertexFormatSize(RhiVertexFormat format) -> uint32_t;
 
 #if 0
@@ -282,6 +285,8 @@ class Rhi::Impl
     void SetLargeDrawConstant(RhiCmdList cmd, std::span<const std::byte> data);
 
   private:
+    void CmdDrawInternal(VulkanCmdListData &cmdData);
+
 #if 0
     HandlePool<RhiDescriptorSetLayout, VulkanDescriptorSetLayoutData, 16> m_DescriptorSetLayouts;
     HandlePool<RhiDescriptorSet, VulkanDescriptorSetData, 16> m_DescriptorSets;

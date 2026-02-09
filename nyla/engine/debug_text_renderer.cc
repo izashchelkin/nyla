@@ -1,6 +1,7 @@
 #include "nyla/engine/debug_text_renderer.h"
 #include "nyla/commons/byteview.h"
 #include "nyla/commons/containers/inline_vec.h"
+#include "nyla/engine/asset_manager.h"
 #include "nyla/engine/engine0_internal.h"
 
 #include <cstdint>
@@ -24,14 +25,11 @@ void DebugTextRenderer::Init()
     auto *renderer = new DebugTextRenderer{};
 
     const RhiGraphicsPipelineDesc pipelineDesc{
-        .debugName = "Renderer2D",
+        .debugName = "DebugTextRender",
         .vs = vs,
         .ps = ps,
         .colorTargetFormatsCount = 1,
-        .colorTargetFormats =
-            {
-                RhiTextureFormat::B8G8R8A8_sRGB,
-            },
+        .colorTargetFormats = AssetManager::GetMeshPipelineColorTargetFormats(),
     };
     m_Pipeline = g_Rhi.CreateGraphicsPipeline(pipelineDesc);
 }

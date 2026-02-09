@@ -16,7 +16,7 @@ target_include_directories(${TARGET_PARSER}
 
 target_link_libraries(${TARGET_PARSER}
     PUBLIC
-        nyla::commons::memory
+        # nyla::commons::memory
         nyla::formats::json::parser
 )
 
