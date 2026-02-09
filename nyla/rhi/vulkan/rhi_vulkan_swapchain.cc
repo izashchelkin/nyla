@@ -91,7 +91,7 @@ void Rhi::Impl::CreateSwapchain()
         if (surfaceCapabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
             return surfaceCapabilities.currentExtent;
 
-        const PlatformWindowSize windowSize = g_Platform->WinGetSize();
+        const PlatformWindowSize windowSize = g_Platform.WinGetSize();
         return VkExtent2D{
             .width = std::clamp(windowSize.width, surfaceCapabilities.minImageExtent.width,
                                 surfaceCapabilities.maxImageExtent.width),

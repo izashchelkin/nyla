@@ -6,9 +6,9 @@ namespace nyla
 
 void TweenManager::Update(float dt)
 {
-    m_now += dt;
+    m_Now += dt;
 
-    for (auto &slot : m_tweens)
+    for (auto &slot : m_Tweens)
     {
         if (!slot.used)
             continue;
@@ -16,17 +16,17 @@ void TweenManager::Update(float dt)
         TweenData &tweenData = slot.data;
         NYLA_ASSERT(tweenData.end > tweenData.begin);
 
-        if (m_now >= tweenData.end)
+        if (m_Now >= tweenData.end)
         {
             *tweenData.value = tweenData.endValue;
             slot.Free();
             continue;
         }
 
-        if (m_now >= tweenData.begin)
+        if (m_Now >= tweenData.begin)
         {
             float duration = tweenData.end - tweenData.begin;
-            float passed = m_now - tweenData.begin;
+            float passed = m_Now - tweenData.begin;
             float t = passed / duration;
 
             *tweenData.value = tweenData.endValue * t + tweenData.startValue * (1.f - t);
@@ -36,14 +36,14 @@ void TweenManager::Update(float dt)
 
 void TweenManager::Cancel(Tween tween)
 {
-    if (auto [ok, slot] = m_tweens.TryResolveSlot(tween); ok)
+    if (auto [ok, slot] = m_Tweens.TryResolveSlot(tween); ok)
         slot->Free();
 }
 
 auto TweenManager::Lerp(float &value, float endValue, float begin, float end) -> Tween
 {
     NYLA_ASSERT(end > begin);
-    return m_tweens.Acquire(TweenData{
+    return m_Tweens.Acquire(TweenData{
         .value = &value,
         .begin = begin,
         .end = end,
@@ -54,7 +54,7 @@ auto TweenManager::Lerp(float &value, float endValue, float begin, float end) ->
 
 auto TweenManager::BeginOf(Tween tween) -> float
 {
-    if (auto [ok, slot] = m_tweens.TryResolveSlot(tween); ok)
+    if (auto [ok, slot] = m_Tweens.TryResolveSlot(tween); ok)
         return slot->data.begin;
     else
         return 0.f;
@@ -62,12 +62,10 @@ auto TweenManager::BeginOf(Tween tween) -> float
 
 auto TweenManager::EndOf(Tween tween) -> float
 {
-    if (auto [ok, slot] = m_tweens.TryResolveSlot(tween); ok)
+    if (auto [ok, slot] = m_Tweens.TryResolveSlot(tween); ok)
         return slot->data.begin;
     else
         return 0.f;
 }
-
-TweenManager *g_TweenManager = new TweenManager{};
 
 } // namespace nyla

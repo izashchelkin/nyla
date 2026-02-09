@@ -4,7 +4,7 @@
 #include <string_view>
 
 #include "nyla/commons/bitenum.h"
-#include "nyla/commons/memory/charview.h"
+#include "nyla/commons/byteview.h"
 #include "nyla/platform/platform.h"
 
 #include "rhi_buffer.h"
@@ -76,7 +76,7 @@ class Rhi
     void NameBuffer(RhiBuffer, std::string_view name);
     void DestroyBuffer(RhiBuffer);
 
-    auto GetBufferSize(RhiBuffer) -> uint32_t;
+    auto GetBufferSize(RhiBuffer) -> uint64_t;
 
     auto MapBuffer(RhiBuffer) -> char *;
     void UnmapBuffer(RhiBuffer);
@@ -119,7 +119,8 @@ class Rhi
 
     void CmdBindGraphicsPipeline(RhiCmdList, RhiGraphicsPipeline);
     void CmdBindVertexBuffers(RhiCmdList cmd, uint32_t firstBinding, std::span<const RhiBuffer> buffers,
-                              std::span<const uint32_t> offsets);
+                              std::span<const uint64_t> offsets);
+    void CmdBindIndexBuffer(RhiCmdList cmd, RhiBuffer buffer, uint64_t offset);
 #if 0
     void CmdBindGraphicsBindGroup(RhiCmdList, uint32_t setIndex, RhiDescriptorSet bindGroup,
                                   std::span<const uint32_t> dynamicOffsets);
@@ -127,6 +128,8 @@ class Rhi
     void CmdPushGraphicsConstants(RhiCmdList cmd, uint32_t offset, RhiShaderStage stage, ByteView data);
     void CmdDraw(RhiCmdList cmd, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
                  uint32_t firstInstance);
+    void CmdDrawIndexed(RhiCmdList cmd, uint32_t indexCount, uint32_t vertexOffset, uint32_t instanceCount,
+                        uint32_t firstIndex, uint32_t firstInstance);
 
     auto CreateSampler(const RhiSamplerDesc &) -> RhiSampler;
     void DestroySampler(RhiSampler);
@@ -162,6 +165,6 @@ class Rhi
     class Impl;
     Impl *m_Impl;
 };
-extern Rhi *g_Rhi;
+extern Rhi g_Rhi;
 
 } // namespace nyla

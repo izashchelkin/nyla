@@ -1,6 +1,4 @@
 #include "nyla/apps/wm/wm_overlay.h"
-#include "nyla/commons/os/clock.h"
-#include "nyla/commons/signal/signal.h"
 #include "nyla/platform/linux/platform_linux.h"
 #include "nyla/platform/platform.h"
 
@@ -29,10 +27,8 @@ namespace nyla
 
 auto PlatformMain() -> int
 {
-    SigIntCoreDump();
-
-    g_Platform->Init({});
-    Platform::Impl *x11 = g_Platform->GetImpl();
+    g_Platform.Init({});
+    Platform::Impl *x11 = g_Platform.GetImpl();
 
     const xcb_window_t window = x11->CreateWin(x11->GetScreen()->width_in_pixels, x11->GetScreen()->height_in_pixels,
                                                true, XCB_EVENT_MASK_EXPOSURE);
@@ -41,7 +37,7 @@ auto PlatformMain() -> int
 
     x11->SetWindow(window);
 
-    g_Rhi->Init(RhiInitDesc{
+    g_Rhi.Init(RhiInitDesc{
         .window = {window},
         .flags = RhiFlags::VSync,
         .limits =
@@ -62,11 +58,12 @@ auto PlatformMain() -> int
             },
     });
 
-    DebugTextRenderer *debugTextRenderer = CreateDebugTextRenderer();
+    DebugTextRenderer debugTextRenderer;
+    debugTextRenderer.Init();
 
     for (;;)
     {
-        RhiCmdList cmd = g_Rhi->FrameBegin();
+        RhiCmdList cmd = g_Rhi.FrameBegin();
 
         bool shouldRedraw = false;
 
@@ -85,12 +82,12 @@ auto PlatformMain() -> int
         };
         processEvents();
 
-        static uint64_t prevUs = GetMonotonicTimeMicros();
+        static uint64_t prevUs = g_Platform.GetMonotonicTimeMicros();
         if (!shouldRedraw)
         {
             for (;;)
             {
-                const uint64_t now = GetMonotonicTimeMicros();
+                const uint64_t now = g_Platform.GetMonotonicTimeMicros();
                 const uint64_t diff = now - prevUs;
                 if (diff >= 500'000)
                 {
@@ -119,21 +116,21 @@ auto PlatformMain() -> int
         std::string barText =
             std::format("{:%H:%M:%S %d.%m.%Y}", std::chrono::zoned_time{std::chrono::current_zone(), now});
 
-        DebugText(1, 1, barText);
+        debugTextRenderer.Text(1, 1, barText);
 
-        g_Rhi->PassBegin({
-            .renderTarget = g_Rhi->GetBackbufferView(),
+        g_Rhi.PassBegin({
+            .renderTarget = g_Rhi.GetBackbufferView(),
             .state = RhiTextureState::ColorTarget,
         });
 
-        DebugTextRendererDraw(cmd, debugTextRenderer);
+        debugTextRenderer.CmdFlush(cmd);
 
-        g_Rhi->PassEnd({
-            .renderTarget = g_Rhi->GetBackbufferView(),
+        g_Rhi.PassEnd({
+            .renderTarget = g_Rhi.GetBackbufferView(),
             .state = RhiTextureState::Present,
         });
 
-        g_Rhi->FrameEnd();
+        g_Rhi.FrameEnd();
     }
 
     return 0;

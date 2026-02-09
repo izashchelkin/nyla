@@ -20,7 +20,7 @@ template <typename T, uint32_t N> class Vec
     constexpr Vec(std::initializer_list<T> elems)
     {
         NYLA_ASSERT(elems.size() <= N);
-        std::ranges::copy(elems.begin(), elems.end(), m_data.begin());
+        std::ranges::copy(elems.begin(), elems.end(), m_Data.begin());
     }
 
     template <typename K, uint32_t M>
@@ -29,38 +29,38 @@ template <typename T, uint32_t N> class Vec
     {
         auto count = std::min<uint32_t>(N, M);
         for (uint32_t i = 0; i < count; ++i)
-            m_data[i] = static_cast<T>(v[i]);
+            m_Data[i] = static_cast<T>(v[i]);
     }
 
     explicit Vec(std::complex<T> c)
         requires(N == 2)
-        : m_data{c.imag(), c.real()}
+        : m_Data{c.imag(), c.real()}
     {
     }
 
     explicit operator std::complex<T>() const
         requires(N == 2)
     {
-        return std::complex{m_data[1], m_data[0]};
+        return std::complex{m_Data[1], m_Data[0]};
     }
 
     [[nodiscard]] auto data() const -> const T *
     {
-        return m_data.data();
+        return m_Data.data();
     }
 
     [[nodiscard]]
     auto operator[](size_t i) const -> const T &
     {
         NYLA_ASSERT(i < N);
-        return m_data[i];
+        return m_Data[i];
     }
 
     [[nodiscard]]
     auto operator[](size_t i) -> T &
     {
         NYLA_ASSERT(i < N);
-        return m_data[i];
+        return m_Data[i];
     }
 
     [[nodiscard]]
@@ -68,7 +68,7 @@ template <typename T, uint32_t N> class Vec
     {
         Vec ret;
         for (uint32_t i = 0; i < N; ++i)
-            ret.m_data[i] = -m_data[i];
+            ret.m_Data[i] = -m_Data[i];
         return ret;
     }
 
@@ -77,7 +77,7 @@ template <typename T, uint32_t N> class Vec
     {
         for (uint32_t i = 0; i < N; ++i)
         {
-            if (m_data[i] != rhs.m_data[i])
+            if (m_Data[i] != rhs.m_Data[i])
                 return false;
         }
         return true;
@@ -88,7 +88,7 @@ template <typename T, uint32_t N> class Vec
     {
         T sum{};
         for (uint32_t i = 0; i < N; ++i)
-            sum += m_data[i] * m_data[i];
+            sum += m_Data[i] * m_Data[i];
         return sum;
     }
 
@@ -97,7 +97,7 @@ template <typename T, uint32_t N> class Vec
     auto operator+=(const Vec &rhs) -> Vec &
     {
         for (uint32_t i = 0; i < N; ++i)
-            m_data[i] += rhs.m_data[i];
+            m_Data[i] += rhs.m_Data[i];
         return *this;
     }
 
@@ -111,7 +111,7 @@ template <typename T, uint32_t N> class Vec
     auto operator-=(const Vec &rhs) -> Vec &
     {
         for (uint32_t i = 0; i < N; ++i)
-            m_data[i] -= rhs.m_data[i];
+            m_Data[i] -= rhs.m_Data[i];
         return *this;
     }
 
@@ -125,7 +125,7 @@ template <typename T, uint32_t N> class Vec
     auto operator*=(auto scalar) -> Vec &
     {
         for (uint32_t i = 0; i < N; ++i)
-            m_data[i] *= static_cast<T>(scalar);
+            m_Data[i] *= static_cast<T>(scalar);
         return *this;
     }
 
@@ -139,7 +139,7 @@ template <typename T, uint32_t N> class Vec
     auto operator/=(auto scalar) -> Vec &
     {
         for (uint32_t i = 0; i < N; ++i)
-            m_data[i] /= static_cast<T>(scalar);
+            m_Data[i] /= static_cast<T>(scalar);
         return *this;
     }
 
@@ -168,7 +168,7 @@ template <typename T, uint32_t N> class Vec
     {
         T sum;
         for (uint32_t i = 0; i < N; ++i)
-            sum += m_data[i] * rhs.m_data[i];
+            sum += m_Data[i] * rhs.m_Data[i];
         return sum;
     }
 
@@ -177,14 +177,14 @@ template <typename T, uint32_t N> class Vec
         requires(N == 3)
     {
         return Vec{
-            m_data[1] * rhs.m_data[2] - m_data[2] * rhs[1].m_data,
-            m_data[2] * rhs.m_data[0] - m_data[0] * rhs[2].m_data,
-            m_data[0] * rhs.m_data[1] - m_data[1] * rhs[0].m_data,
+            m_Data[1] * rhs.m_Data[2] - m_Data[2] * rhs[1].m_data,
+            m_Data[2] * rhs.m_Data[0] - m_Data[0] * rhs[2].m_data,
+            m_Data[0] * rhs.m_Data[1] - m_Data[1] * rhs[0].m_data,
         };
     }
 
   private:
-    std::array<T, N> m_data;
+    std::array<T, N> m_Data;
 };
 
 using float4 = Vec<float, 4>;

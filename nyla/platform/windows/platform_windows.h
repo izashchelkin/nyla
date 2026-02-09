@@ -25,9 +25,23 @@ class Platform::Impl
 
     auto PollEvent(PlatformEvent &outEvent) -> bool;
 
-    LRESULT MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+    auto MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) -> LRESULT;
+
+    auto GetMemPageSize() -> uint64_t;
+    auto ReserveMemPages(uint64_t size) -> char *;
+    void CommitMemPages(char *page, uint64_t size);
+    void DecommitMemPages(char *page, uint64_t size);
+
+    auto GetMonotonicTimeMillis() -> uint64_t;
+    auto GetMonotonicTimeMicros() -> uint64_t;
+    auto GetMonotonicTimeNanos() -> uint64_t;
 
   private:
+    char *m_AddressSpaceBase;
+    char *m_AddressSpaceAt;
+    uint64_t m_AddressSpaceSize;
+
+    SYSTEM_INFO m_SysInfo{};
     HINSTANCE m_HInstance{};
     HWND m_HWnd{};
     RECT m_WinRect{};

@@ -8,12 +8,11 @@ target_sources(${TARGET}
         debug_text_renderer.cc
         engine.cc
         engine0_internal.cc
-        frame_arena.cc
-        renderer2d.cc
-        staging.cc
-        staging_buffer.cc
-        tween_manager.cc
+        gpu_upload_manager.cc
         input_manager.cc
+        renderer.cc
+        staging.cc
+        tween_manager.cc
 )
 
 target_include_directories(${TARGET}
@@ -26,7 +25,8 @@ target_link_libraries(${TARGET}
         nyla::platform
         nyla::platform::dir_watch
         nyla::rhi
-        nyla::spirview
+        # nyla::spirview
+        nyla::formats::gltf::parser
         stb_image
 )
 

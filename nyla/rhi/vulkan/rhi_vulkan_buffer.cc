@@ -138,7 +138,7 @@ void Rhi::Impl::DestroyBuffer(RhiBuffer buffer)
     vkFreeMemory(m_Dev, bufferData.memory, nullptr);
 }
 
-auto Rhi::Impl::GetBufferSize(RhiBuffer buffer) -> uint32_t
+auto Rhi::Impl::GetBufferSize(RhiBuffer buffer) -> uint64_t
 {
     return m_Buffers.ResolveData(buffer).size;
 }
@@ -351,7 +351,7 @@ void Rhi::DestroyBuffer(RhiBuffer buffer)
     m_Impl->DestroyBuffer(buffer);
 }
 
-auto Rhi::GetBufferSize(RhiBuffer buffer) -> uint32_t
+auto Rhi::GetBufferSize(RhiBuffer buffer) -> uint64_t
 {
     return m_Impl->GetBufferSize(buffer);
 }

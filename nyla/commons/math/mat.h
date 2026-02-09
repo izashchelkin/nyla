@@ -24,7 +24,7 @@ template <typename T, uint32_t N> class Mat
         for (uint32_t col = 0; col < N; ++col)
         {
             for (uint32_t row = 0; row < N; ++row, ++it)
-                m_data[col][row] = *it;
+                m_Data[col][row] = *it;
         }
     }
 
@@ -36,7 +36,7 @@ template <typename T, uint32_t N> class Mat
         {
             const Vec<T, N> &v = *it;
             for (uint32_t row = 0; row < N; ++row)
-                m_data[col][row] = v[row];
+                m_Data[col][row] = v[row];
         }
     }
 
@@ -48,7 +48,7 @@ template <typename T, uint32_t N> class Mat
         for (uint32_t col = 0; col < count; ++col)
         {
             for (uint32_t row = 0; row < count; ++row)
-                m_data[col][row] = static_cast<T>(v[col][row]);
+                m_Data[col][row] = static_cast<T>(v[col][row]);
         }
     }
 
@@ -64,12 +64,12 @@ template <typename T, uint32_t N> class Mat
     [[nodiscard]] auto operator[](uint32_t col) -> std::array<T, N> &
     {
         NYLA_ASSERT(col < N);
-        return m_data[col];
+        return m_Data[col];
     }
     [[nodiscard]] auto operator[](uint32_t col) const -> const std::array<T, N> &
     {
         NYLA_ASSERT(col < N);
-        return m_data[col];
+        return m_Data[col];
     }
 
     // Column-major matrix multiply: this * rhs
@@ -82,7 +82,7 @@ template <typename T, uint32_t N> class Mat
             for (uint32_t col = 0; col < N; ++col)
             {
                 for (uint32_t k = 0; k < N; ++k)
-                    ret[col][row] += m_data[k][row] * rhs.m_data[col][k];
+                    ret[col][row] += m_Data[k][row] * rhs.m_Data[col][k];
             }
         }
         return ret;
@@ -97,7 +97,7 @@ template <typename T, uint32_t N> class Mat
         for (uint32_t row = 0; row < N; ++row)
         {
             for (uint32_t col = 0; col < N; ++col)
-                a[row][col] = m_data[col][row];
+                a[row][col] = m_Data[col][row];
 
             for (uint32_t col = 0; col < N; ++col)
                 a[row][N + col] = (row == col) ? static_cast<T>(1) : static_cast<T>(0);
@@ -148,7 +148,7 @@ template <typename T, uint32_t N> class Mat
         for (uint32_t row = 0; row < N; ++row)
         {
             for (uint32_t col = 0; col < N; ++col)
-                inv.m_data[col][row] = a[row][N + col];
+                inv.m_Data[col][row] = a[row][N + col];
         }
 
         return inv;
@@ -224,7 +224,7 @@ template <typename T, uint32_t N> class Mat
     }
 
   private:
-    std::array<std::array<T, N>, N> m_data{};
+    std::array<std::array<T, N>, N> m_Data{};
 };
 
 using float4x4 = Mat<float, 4>;

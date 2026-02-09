@@ -6,12 +6,14 @@
 #include <format>
 #include <vector>
 
+#include "nyla/commons/assert.h"
 #include "nyla/commons/color.h"
 #include "nyla/commons/math/vec.h"
-#include "nyla/commons/os/clock.h"
+#include "nyla/engine/asset_manager.h"
 #include "nyla/engine/debug_text_renderer.h"
 #include "nyla/engine/engine.h"
-#include "nyla/engine/renderer2d.h"
+#include "nyla/engine/input_manager.h"
+#include "nyla/engine/renderer.h"
 #include "nyla/engine/tween_manager.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
@@ -22,13 +24,10 @@
 namespace nyla
 {
 
-GameState *g_State;
+GameState g_State{};
 
 namespace
 {
-
-Renderer2D *renderer2d;
-DebugTextRenderer *debugTextRenderer;
 
 struct Level
 {
@@ -60,38 +59,41 @@ static Level level;
 
 void GameInit()
 {
-    g_State = new GameState{};
-    g_State->input.moveLeft = g_InputManager->NewId();
-    g_State->input.moveRight = g_InputManager->NewId();
+    auto &inputManager = g_Engine.GetInputManager();
+    auto &tweenManager = g_Engine.GetTweenManager();
 
-    renderer2d = CreateRenderer2D();
-    debugTextRenderer = CreateDebugTextRenderer();
+    g_State.input.moveLeft = inputManager.NewId();
+    inputManager.Map(g_State.input.moveLeft, 1, uint32_t(KeyPhysical::S));
 
-    //
-
-    g_InputManager->Map(g_State->input.moveLeft, 1, uint32_t(KeyPhysical::S));
-    g_InputManager->Map(g_State->input.moveRight, 1, uint32_t(KeyPhysical::F));
-
-    //
+    g_State.input.moveRight = inputManager.NewId();
+    inputManager.Map(g_State.input.moveRight, 1, uint32_t(KeyPhysical::F));
 
     {
 #if defined(__linux__) // TODO: deal with this
         std::string assetsBasePath = "assets/BBreaker";
 #else
-        std::string assetsBasePath = "D:\\nyla\\assets\\BBreaker";
+        std::string assetsBasePath = "C:\\nyla\\assets\\BBreaker";
 #endif
 
-        g_State->assets.background = g_AssetManager->DeclareTexture(assetsBasePath + "/Background1.png");
-        g_State->assets.player = g_AssetManager->DeclareTexture(assetsBasePath + "/Player.png");
-        g_State->assets.playerFlash = g_AssetManager->DeclareTexture(assetsBasePath + "/Player_flash.png");
-        g_State->assets.ball = g_AssetManager->DeclareTexture(assetsBasePath + "/Ball_small-blue.png");
-        g_State->assets.brickUnbreackable = g_AssetManager->DeclareTexture(assetsBasePath + "/Brick_unbreakable2.png");
+        auto &assetManager = g_Engine.GetAssetManager();
 
-        for (uint32_t i = 0; i < g_State->assets.bricks.size(); ++i)
+        g_State.assets.background = assetManager.DeclareTexture(assetsBasePath + "/Background1.png");
+        g_State.assets.player = assetManager.DeclareTexture(assetsBasePath + "/Player.png");
+        g_State.assets.playerFlash = assetManager.DeclareTexture(assetsBasePath + "/Player_flash.png");
+        g_State.assets.ball = assetManager.DeclareTexture(assetsBasePath + "/Ball_small-blue.png");
+        g_State.assets.brickUnbreackable = assetManager.DeclareTexture(assetsBasePath + "/Brick_unbreakable2.png");
+
+        for (uint32_t i = 0; i < g_State.assets.bricks.size(); ++i)
         {
             std::string path = std::format("{}/Brick{}_4.png", assetsBasePath, i + 1);
-            g_State->assets.bricks[i] = g_AssetManager->DeclareTexture(path);
+            g_State.assets.bricks[i] = assetManager.DeclareTexture(path);
         }
+
+#ifndef WIN32
+        g_State.assets.cube = g_Engine.GetAssetManager().DeclareMesh("/home/izashchelkin/Documents/test.glb");
+#else
+        g_State.assets.cube = assetManager.DeclareMesh("C:\\Users\\ihorz\\Desktop\\test.glb");
+#endif
     }
 
     //
@@ -114,8 +116,8 @@ void GameInit()
                 .size = {40.f / 15.f, 1.f},
             });
 
-            g_TweenManager->Lerp(brick.pos[0], x, g_TweenManager->Now(), g_TweenManager->Now() + 1);
-            g_TweenManager->Lerp(brick.pos[1], y, g_TweenManager->Now(), g_TweenManager->Now() + 1);
+            tweenManager.Lerp(brick.pos[0], x, tweenManager.Now(), tweenManager.Now() + 1);
+            tweenManager.Lerp(brick.pos[1], y, tweenManager.Now(), tweenManager.Now() + 1);
         }
     }
 }
@@ -131,10 +133,9 @@ static auto IsInside(float pos, float size, float2 boundary) -> bool
 
 void GameProcess(RhiCmdList cmd, float dt)
 {
-    Renderer2DFrameBegin(cmd, renderer2d, g_StagingBuffer);
+    auto &inputManager = g_Engine.GetInputManager();
 
-    const int dx =
-        g_InputManager->IsPressed(g_State->input.moveRight) - g_InputManager->IsPressed(g_State->input.moveLeft);
+    const int dx = inputManager.IsPressed(g_State.input.moveRight) - inputManager.IsPressed(g_State.input.moveLeft);
 
     static float dtAccumulator = 0.f;
     dtAccumulator += dt;
@@ -203,47 +204,47 @@ void GameProcess(RhiCmdList cmd, float dt)
 
 void GameRender(RhiCmdList cmd, RhiRenderTargetView rtv)
 {
-    RhiTextureInfo colorTargetInfo = g_Rhi->GetTextureInfo(g_Rhi->GetTexture(rtv));
+    auto &renderer2d = g_Engine.GetRenderer2D();
+    auto &assets = g_State.assets;
 
-    g_Rhi->PassBegin({
+    RhiTextureInfo colorTargetInfo = g_Rhi.GetTextureInfo(g_Rhi.GetTexture(rtv));
+
+    g_Rhi.PassBegin({
         .renderTarget = rtv,
         .state = RhiTextureState::ColorTarget,
     });
 
-    const auto &assets = g_State->assets;
-
-    Renderer2DRect(cmd, renderer2d, 0, 0, 100, 70, float4{}, assets.background.index);
-
-    uint32_t i = 0;
-    for (Brick &brick : level.bricks)
     {
-        i++;
-        if (brick.flags & Brick::kFlagDead)
-            continue;
+        renderer2d.Rect({0, 0}, {100, 70}, assets.background);
 
-        Renderer2DRect(cmd, renderer2d, brick.pos[0], brick.pos[1], brick.size[0], brick.size[1], float4{},
-                       assets.bricks[i % assets.bricks.size()].index);
+        uint32_t i = 0;
+        for (Brick &brick : level.bricks)
+        {
+            i++;
+            if (brick.flags & Brick::kFlagDead)
+                continue;
+
+            renderer2d.Rect(brick.pos, brick.size, assets.bricks[i % assets.bricks.size()]);
+        }
+
+        uint64_t second = g_Platform.GetMonotonicTimeMillis() / 1000;
+        if (second % 2)
+        {
+            renderer2d.Rect({playerPosX, kPlayerPosY}, {playerWidth, kPlayerHeight}, assets.playerFlash);
+        }
+        else
+        {
+            renderer2d.Rect({playerPosX, kPlayerPosY}, {playerWidth, kPlayerHeight}, assets.player);
+        }
+
+        renderer2d.Rect(ballPos, {kBallRadius * 2, kBallRadius * 2}, assets.ball);
     }
 
-    uint64_t second = GetMonotonicTimeMillis() / 1000;
-    if (second % 2)
-    {
-        Renderer2DRect(cmd, renderer2d, playerPosX, kPlayerPosY, playerWidth, kPlayerHeight, float4{1.f, 1.f, 1.f, 1},
-                       assets.playerFlash.index);
-    }
-    else
-    {
-        Renderer2DRect(cmd, renderer2d, playerPosX, kPlayerPosY, playerWidth, kPlayerHeight, float4{1.f, 1.f, 1.f, 1},
-                       assets.player.index);
-    }
+    renderer2d.CmdFlush(cmd, colorTargetInfo.width, colorTargetInfo.height, 64);
 
-    Renderer2DRect(cmd, renderer2d, ballPos[0], ballPos[1], kBallRadius * 2, kBallRadius * 2, float4{1.f, 1.f, 1.f, 1},
-                   assets.ball.index);
+    g_Engine.GetDebugTextRenderer().CmdFlush(cmd);
 
-    Renderer2DDraw(cmd, renderer2d, colorTargetInfo.width, colorTargetInfo.height, 64);
-    DebugTextRendererDraw(cmd, debugTextRenderer);
-
-    g_Rhi->PassEnd({
+    g_Rhi.PassEnd({
         .renderTarget = rtv,
         .state = RhiTextureState::Present,
     });

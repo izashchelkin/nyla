@@ -1,11 +1,13 @@
 #include "nyla/platform/windows/platform_windows.h"
 
+#include "nyla/commons/align.h"
 #include "nyla/commons/assert.h"
+#include "nyla/commons/byteliterals.h"
 #include "nyla/commons/containers/inline_ring.h"
 #include "nyla/platform/platform.h"
 #include <cstdint>
 
-LRESULT CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+auto CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) -> LRESULT;
 
 namespace nyla
 {
@@ -14,6 +16,15 @@ constexpr auto ScanCodeToKeyPhysical(uint8_t scanCode, bool extended) -> KeyPhys
 
 void Platform::Impl::Init(const PlatformInitDesc &desc)
 {
+    GetSystemInfo(&m_SysInfo);
+
+    m_AddressSpaceSize = AlignedUp<uint64_t>(256_GiB, m_SysInfo.dwAllocationGranularity);
+
+    m_AddressSpaceBase = (char *)VirtualAlloc(nullptr, m_AddressSpaceSize, MEM_RESERVE, PAGE_NOACCESS);
+    m_AddressSpaceAt = m_AddressSpaceBase;
+
+    if (desc.open)
+        WinOpen();
 }
 
 auto Platform::Impl::PollEvent(PlatformEvent &outEvent) -> bool
@@ -379,22 +390,37 @@ constexpr auto ScanCodeToKeyPhysical(uint8_t scanCode, bool extended) -> KeyPhys
     }
 }
 
-Platform *g_Platform = new Platform();
+Platform g_Platform{};
 
 } // namespace nyla
 
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, int nCmdShow)
+auto WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, int nCmdShow) -> int
 {
     using namespace nyla;
 
+#ifndef NDEBUG
+    NYLA_ASSERT(AllocConsole());
+
+    FILE *f;
+    freopen_s(&f, "CONOUT$", "w", stdout);
+    freopen_s(&f, "CONOUT$", "w", stderr);
+    freopen_s(&f, "CONIN$", "r", stdin);
+#endif
+
     auto *impl = new Platform::Impl{};
     impl->SetHInstance(hInstance);
-    g_Platform->SetImpl(impl);
+    g_Platform.SetImpl(impl);
 
-    return PlatformMain();
+    const int retCode = PlatformMain();
+
+#ifndef NDEBUG
+    getc(stdin);
+#endif
+
+    return retCode;
 }
 
-LRESULT CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+auto CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) -> LRESULT
 {
-    return nyla::g_Platform->GetImpl()->MainWndProc(hwnd, uMsg, wParam, lParam);
+    return nyla::g_Platform.GetImpl()->MainWndProc(hwnd, uMsg, wParam, lParam);
 }

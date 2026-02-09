@@ -81,7 +81,7 @@ class WindowManager
     void Activate(WindowStack &stack, xcb_window_t clientWindow, xcb_timestamp_t time);
     void ApplyBorder(xcb_connection_t *conn, xcb_window_t window, Color color);
     void CheckFocusTheft();
-    void MaybeActivateUnderPointer(WindowStack &stack, xcb_timestamp_t ts);
+    void MaybeActivateLastEntered(WindowStack &stack, xcb_timestamp_t ts);
     void ClearZoom(WindowStack &stack);
     void ConfigureClientIfNeeded(xcb_connection_t *conn, xcb_window_t clientWindow, Client &client, const Rect &newRect,
                                  uint32_t newBorderWidth);
@@ -100,7 +100,6 @@ class WindowManager
     std::vector<WindowStack> m_Stacks;
     uint64_t m_ActiveStackIdx;
 
-    xcb_timestamp_t m_LastRawmotionTs = 0;
     xcb_window_t m_LastEnteredWindow = 0;
 
     Platform::Impl *m_X11;

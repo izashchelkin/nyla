@@ -1,7 +1,13 @@
 #pragma once
 
+#include "nyla/commons/assert.h"
 #include "nyla/commons/bitenum.h"
+#include "nyla/commons/byteliterals.h"
 #include <cstdint>
+#include <fstream>
+#include <span>
+#include <string>
+#include <vector>
 
 namespace nyla
 {
@@ -57,15 +63,29 @@ struct PlatformEvent
 struct PlatformInitDesc
 {
     PlatformFeature enabledFeatures;
+    bool open;
 };
 
 class Platform
 {
   public:
+    static constexpr inline uint64_t kPageAllocMinSize = 64_KiB;
+
     void Init(const PlatformInitDesc &desc);
     void WinOpen();
     auto WinGetSize() -> PlatformWindowSize;
     auto PollEvent(PlatformEvent &outEvent) -> bool;
+
+    auto GetMemPageSize() -> uint64_t;
+    auto ReserveMemPages(uint64_t size) -> char *;
+    void CommitMemPages(char *page, uint64_t size);
+    void DecommitMemPages(char *page, uint64_t size);
+
+    auto GetMonotonicTimeMillis() -> uint64_t;
+    auto GetMonotonicTimeMicros() -> uint64_t;
+    auto GetMonotonicTimeNanos() -> uint64_t;
+
+    auto Spawn(std::span<const char *const> cmd) -> bool;
 
     class Impl;
 
@@ -79,12 +99,35 @@ class Platform
         return m_Impl;
     }
 
+    // TODO: move this
+
+    static auto ReadFileInternal(std::ifstream &file) -> std::vector<std::byte>
+    {
+        NYLA_ASSERT(file.is_open());
+
+        std::vector<std::byte> buffer(file.tellg());
+
+        file.seekg(0);
+        file.read(reinterpret_cast<char *>(buffer.data()), static_cast<long>(buffer.size()));
+
+        file.close();
+        return buffer;
+    }
+
+    auto ReadFile(const std::string &filename) -> std::vector<std::byte>
+    {
+        std::ifstream file(filename, std::ios::ate | std::ios::binary);
+        return ReadFileInternal(file);
+    }
+
+    //
+
   private:
     Impl *m_Impl;
 };
-extern Platform *g_Platform;
+extern Platform g_Platform;
 
-int PlatformMain();
+auto PlatformMain() -> int;
 
 enum class KeyPhysical
 {

@@ -44,6 +44,19 @@ class Platform::Impl
     auto WinGetSize() -> PlatformWindowSize;
     auto PollEvent(PlatformEvent &outEvent) -> bool;
 
+    auto Spawn(std::span<const char *const> cmd) -> bool;
+
+    auto PageAlloc(uint32_t &inOutSize, void *&outBase) -> bool;
+
+    auto GetMonotonicTimeMillis() -> uint64_t;
+    auto GetMonotonicTimeMicros() -> uint64_t;
+    auto GetMonotonicTimeNanos() -> uint64_t;
+
+    auto GetMemPageSize() -> uint64_t;
+    auto ReserveMemPages(uint64_t size) -> char *;
+    void CommitMemPages(char *page, uint64_t size);
+    void DecommitMemPages(char *page, uint64_t size);
+
     auto WinGetHandle() -> xcb_window_t
     {
         return m_Win;
@@ -129,6 +142,11 @@ class Platform::Impl
                              uint16_t height, uint16_t borderWidth);
 
   private:
+    uint64_t m_PageSize;
+    char *m_AddressSpaceBase;
+    char *m_AddressSpaceAt;
+    uint64_t m_AddressSpaceSize;
+
     int m_ScreenIndex{};
     xcb_connection_t *m_Conn{};
     xcb_screen_t *m_Screen{};

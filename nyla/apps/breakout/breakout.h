@@ -27,6 +27,8 @@ struct GameState
         AssetManager::Texture ball;
         AssetManager::Texture brickUnbreackable;
         std::array<AssetManager::Texture, 9> bricks;
+
+        AssetManager::Mesh cube;
     };
     Assets assets;
 
@@ -37,7 +39,7 @@ struct GameState
         AssetManager::Texture texture;
     };
 };
-extern GameState *g_State;
+extern GameState g_State;
 
 struct Brick
 {

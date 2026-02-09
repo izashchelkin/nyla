@@ -38,6 +38,8 @@ auto Rhi::Impl::ConvertVertexFormatIntoVkFormat(RhiVertexFormat format) -> VkFor
         break;
     case RhiVertexFormat::R32G32B32A32Float:
         return VK_FORMAT_R32G32B32A32_SFLOAT;
+    case RhiVertexFormat::R32G32B32Float:
+        return VK_FORMAT_R32G32B32_SFLOAT;
     case RhiVertexFormat::R32G32Float:
         return VK_FORMAT_R32G32_SFLOAT;
     }
@@ -481,14 +483,14 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
     const VkXcbSurfaceCreateInfoKHR surfaceCreateInfo{
         .sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR,
         .connection = xcb_connect(nullptr, nullptr),
-        .window = g_Platform->GetImpl()->WinGetHandle(),
+        .window = g_Platform.GetImpl()->WinGetHandle(),
     };
     VK_CHECK(vkCreateXcbSurfaceKHR(m_Instance, &surfaceCreateInfo, m_Alloc, &m_Surface));
 #else
     const VkWin32SurfaceCreateInfoKHR surfaceCreateInfo{
         .sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
-        .hinstance = g_Platform->GetImpl()->GetHInstance(),
-        .hwnd = g_Platform->GetImpl()->WinGetHandle(),
+        .hinstance = g_Platform.GetImpl()->GetHInstance(),
+        .hwnd = g_Platform.GetImpl()->WinGetHandle(),
     };
     vkCreateWin32SurfaceKHR(m_Instance, &surfaceCreateInfo, m_Alloc, &m_Surface);
 #endif
@@ -705,7 +707,7 @@ auto Rhi::GetOptimalBufferCopyOffsetAlignment() -> uint32_t
     return m_Impl->GetOptimalBufferCopyOffsetAlignment();
 }
 
-Rhi *g_Rhi = new Rhi{};
+Rhi g_Rhi{};
 
 } // namespace nyla
 

@@ -1,4 +1,6 @@
 #include "nyla/platform/linux/platform_linux.h"
+#include "nyla/commons/align.h"
+#include "nyla/commons/byteliterals.h"
 #include "nyla/platform/platform.h"
 
 #include "nyla/commons/assert.h"
@@ -12,6 +14,8 @@
 #include "xcb/xproto.h"
 #include <array>
 #include <cstdint>
+#include <sys/mman.h>
+#include <unistd.h>
 #include <xkbcommon/xkbcommon-x11.h>
 #include <xkbcommon/xkbcommon.h>
 
@@ -91,7 +95,7 @@ void Platform::Impl::Init(const PlatformInitDesc &desc)
             xkb_context *ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
             NYLA_ASSERT(ctx);
 
-            xcb_connection_t *conn = g_Platform->GetImpl()->GetConn();
+            xcb_connection_t *conn = g_Platform.GetImpl()->GetConn();
 
             const int32_t deviceId = xkb_x11_get_core_keyboard_device_id(conn);
             NYLA_ASSERT(deviceId != -1);
@@ -126,14 +130,29 @@ void Platform::Impl::Init(const PlatformInitDesc &desc)
         } mask;
 
         mask.eventMask.deviceid = XCB_INPUT_DEVICE_ALL_MASTER;
-        mask.eventMask.mask_len = 1;
-        mask.maskBits = XCB_INPUT_XI_EVENT_MASK_RAW_MOTION;
+        mask.eventMask.mask_len = 2;
+        mask.maskBits = XCB_INPUT_XI_EVENT_MASK_RAW_MOTION | XCB_INPUT_XI_EVENT_MASK_RAW_BUTTON_PRESS;
 
         if (xcb_request_check(m_Conn, xcb_input_xi_select_events_checked(m_Conn, m_Screen->root, 1, &mask.eventMask)))
             NYLA_ASSERT(false && "could not setup XI2 extension");
 
         m_ExtensionXInput2MajorOpCode = ext->major_opcode;
     }
+
+    //
+
+    m_PageSize = sysconf(_SC_PAGESIZE);
+    if (!m_PageSize)
+        m_PageSize = 4096;
+
+    m_AddressSpaceSize = AlignedUp<uint64_t>(16_GiB, m_PageSize);
+    m_AddressSpaceBase = (char *)mmap(nullptr, m_AddressSpaceSize, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    NYLA_ASSERT(m_AddressSpaceBase != MAP_FAILED);
+
+    m_AddressSpaceAt = m_AddressSpaceBase;
+
+    if (desc.open)
+        WinOpen();
 }
 
 void Platform::Impl::SendConfigureNotify(xcb_window_t window, xcb_window_t parent, int16_t x, int16_t y, uint16_t width,
@@ -525,6 +544,6 @@ auto Platform::PollEvent(PlatformEvent &outEvent) -> bool
     return m_Impl->PollEvent(outEvent);
 }
 
-Platform *g_Platform = new Platform();
+Platform g_Platform;
 
 } // namespace nyla

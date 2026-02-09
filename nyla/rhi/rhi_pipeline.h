@@ -1,6 +1,5 @@
 #pragma once
 
-#include <array>
 #include <cstdint>
 #include <string>
 
@@ -20,6 +19,7 @@ enum class RhiVertexFormat
 {
     None,
     R32G32B32A32Float,
+    R32G32B32Float,
     R32G32Float,
 };
 
@@ -65,13 +65,13 @@ struct RhiGraphicsPipelineDesc
     RhiShader ps;
 
     uint32_t vertexBindingsCount;
-    std::array<RhiVertexBindingDesc, 4> vertexBindings;
+    std::span<RhiVertexBindingDesc> vertexBindings;
 
     uint32_t vertexAttributeCount;
-    std::array<RhiVertexAttributeDesc, 16> vertexAttributes;
+    std::span<RhiVertexAttributeDesc> vertexAttributes;
 
     uint32_t colorTargetFormatsCount;
-    std::array<RhiTextureFormat, 4> colorTargetFormats;
+    std::span<RhiTextureFormat> colorTargetFormats;
 
     RhiCullMode cullMode;
     RhiFrontFace frontFace;

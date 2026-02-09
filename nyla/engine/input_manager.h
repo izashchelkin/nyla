@@ -45,6 +45,4 @@ class InputManager
     InlineVec<InputState, std::numeric_limits<uint8_t>::max() + 1> m_InputStates;
 };
 
-extern InputManager *g_InputManager;
-
 } // namespace nyla

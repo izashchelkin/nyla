@@ -1,7 +1,7 @@
 #pragma once
 
 #include <cstdio>
-#include <cstring>
+#include <cstring> // IWYU pragma: keep
 
 #if defined(_MSC_VER)
 #define NYLA_LOG_FILE() (strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 : __FILE__)

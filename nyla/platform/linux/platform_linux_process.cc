@@ -1,8 +1,5 @@
-#include "nyla/commons/os/spawn.h"
-#include "nyla/commons/assert.h"
 #include "nyla/commons/log.h"
-
-#if defined(__linux__) // TODO: move to platform
+#include "nyla/platform/linux/platform_linux.h"
 
 #include <fcntl.h>
 #include <linux/close_range.h>
@@ -15,7 +12,7 @@
 namespace nyla
 {
 
-auto Spawn(std::span<const char *const> cmd) -> bool
+auto Platform::Impl::Spawn(std::span<const char *const> cmd) -> bool
 {
     { // TODO: move this somewhere
         static bool installed = false;
@@ -30,7 +27,7 @@ auto Spawn(std::span<const char *const> cmd) -> bool
             };
             sigemptyset(&sa.sa_mask);
             sa.sa_flags = SA_RESTART;
-            if (sigaction(SIGCHLD, &sa, NULL) == -1)
+            if (sigaction(SIGCHLD, &sa, nullptr) == -1)
             {
                 NYLA_LOG("sigaction failed");
                 return false;
@@ -76,14 +73,9 @@ failure:
     _exit(127);
 }
 
-} // namespace nyla
-
-#else
-
-auto Spawn(std::span<const char *const> cmd) -> bool
+auto Platform::Spawn(std::span<const char *const> cmd) -> bool
 {
-    NYLA_ASSERT(false);
-    return false;
+    return m_Impl->Spawn(cmd);
 }
 
-#endif
+} // namespace nyla
