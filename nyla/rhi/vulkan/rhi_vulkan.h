@@ -255,8 +255,7 @@ class Rhi::Impl
     void CmdBindIndexBuffer(RhiCmdList cmd, RhiBuffer buffer, uint64_t offset);
     void CmdDraw(RhiCmdList cmd, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
                  uint32_t firstInstance);
-    void CmdDrawIndexed(RhiCmdList cmd, uint32_t indexCount, uint32_t vertexOffset, uint32_t instanceCount,
-                        uint32_t firstIndex, uint32_t firstInstance);
+    void CmdDrawIndexed(RhiCmdList cmd, uint32_t indexCount, int32_t vertexOffset, uint32_t instanceCount, uint32_t firstIndex, uint32_t firstInstance);
     auto GetVertexFormatSize(RhiVertexFormat format) -> uint32_t;
 
 #if 0

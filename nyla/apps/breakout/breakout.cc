@@ -8,6 +8,7 @@
 
 #include "nyla/commons/assert.h"
 #include "nyla/commons/color.h"
+#include "nyla/commons/handle.h"
 #include "nyla/commons/math/vec.h"
 #include "nyla/engine/asset_manager.h"
 #include "nyla/engine/debug_text_renderer.h"
@@ -89,11 +90,51 @@ void GameInit()
             g_State.assets.bricks[i] = assetManager.DeclareTexture(path);
         }
 
+        {
 #ifndef WIN32
-        g_State.assets.cube = g_Engine.GetAssetManager().DeclareMesh("/home/izashchelkin/Documents/test.glb");
+            g_State.assets.cubeMesh = g_Engine.GetAssetManager().DeclareMesh("/home/izashchelkin/Documents/test.glb");
 #else
-        g_State.assets.cube = assetManager.DeclareMesh("C:\\Users\\ihorz\\Desktop\\test.glb");
+            g_State.assets.cubeMesh = assetManager.DeclareMesh("C:\\Users\\ihorz\\Desktop\\test.glb");
 #endif
+        }
+
+        {
+            auto &alloc = g_Engine.GetPermanentAlloc();
+
+            std::span<AssetManager::MeshVSInput> vertices = alloc.PushArr<AssetManager::MeshVSInput>(4);
+
+            vertices[0] = AssetManager::MeshVSInput{
+                .pos = {-.5f, .5f, .0f},
+                .normal = {0.f, 0.f, -1.f},
+                .uv = {1.f, 0.f},
+            };
+            vertices[1] = AssetManager::MeshVSInput{
+                .pos = {.5f, -.5f, .0f},
+                .normal = {0.f, 0.f, -1.f},
+                .uv = {0.f, 1.f},
+            };
+            vertices[2] = AssetManager::MeshVSInput{
+                .pos = {.5f, .5f, .0f},
+                .normal = {0.f, 0.f, -1.f},
+                .uv = {0.f, 0.f},
+            };
+            vertices[3] = AssetManager::MeshVSInput{
+                .pos = {-.5f, -.5f, .0f},
+                .normal = {0.f, 0.f, -1.f},
+                .uv = {1.f, 1.f},
+            };
+
+            std::span<uint16_t> indices = alloc.PushArr<uint16_t>(6);
+            indices[0] = 0;
+            indices[1] = 1;
+            indices[2] = 2;
+            indices[3] = 0;
+            indices[4] = 3;
+            indices[5] = 1;
+
+            g_State.assets.rectMesh =
+                assetManager.DeclareStaticMesh({(char *)vertices.data(), vertices.size_bytes()}, indices);
+        }
     }
 
     //
@@ -204,7 +245,7 @@ void GameProcess(RhiCmdList cmd, float dt)
 
 void GameRender(RhiCmdList cmd, RhiRenderTargetView rtv)
 {
-    auto &renderer2d = g_Engine.GetRenderer2D();
+    auto &renderer = g_Engine.GetRenderer2D();
     auto &assets = g_State.assets;
 
     RhiTextureInfo colorTargetInfo = g_Rhi.GetTextureInfo(g_Rhi.GetTexture(rtv));
@@ -214,8 +255,9 @@ void GameRender(RhiCmdList cmd, RhiRenderTargetView rtv)
         .state = RhiTextureState::ColorTarget,
     });
 
+    if (HandleIsSet(assets.rectMesh))
     {
-        renderer2d.Rect({0, 0}, {100, 70}, assets.background);
+        renderer.Mesh({0, 0, 0}, {100, 70, 1}, assets.rectMesh, assets.background);
 
         uint32_t i = 0;
         for (Brick &brick : level.bricks)
@@ -224,23 +266,30 @@ void GameRender(RhiCmdList cmd, RhiRenderTargetView rtv)
             if (brick.flags & Brick::kFlagDead)
                 continue;
 
-            renderer2d.Rect(brick.pos, brick.size, assets.bricks[i % assets.bricks.size()]);
+            const float3 pos = float3{brick.pos[0], brick.pos[1], 0};
+            const float3 size = float3{brick.size[0], brick.size[1], 0};
+            renderer.Mesh(pos, size, assets.rectMesh, assets.bricks[i % assets.bricks.size()]);
         }
 
         uint64_t second = g_Platform.GetMonotonicTimeMillis() / 1000;
         if (second % 2)
         {
-            renderer2d.Rect({playerPosX, kPlayerPosY}, {playerWidth, kPlayerHeight}, assets.playerFlash);
+            renderer.Mesh({playerPosX, kPlayerPosY, 0}, {playerWidth, kPlayerHeight, 1}, assets.rectMesh,
+                          assets.playerFlash);
         }
         else
         {
-            renderer2d.Rect({playerPosX, kPlayerPosY}, {playerWidth, kPlayerHeight}, assets.player);
+            renderer.Mesh({playerPosX, kPlayerPosY, 0}, {playerWidth, kPlayerHeight, 1}, assets.rectMesh,
+                          assets.player);
         }
 
-        renderer2d.Rect(ballPos, {kBallRadius * 2, kBallRadius * 2}, assets.ball);
+        {
+            const float3 pos = float3{ballPos[0], ballPos[1], 0};
+            renderer.Mesh(pos, {kBallRadius * 2, kBallRadius * 2}, assets.rectMesh, assets.ball);
+        }
     }
 
-    renderer2d.CmdFlush(cmd, colorTargetInfo.width, colorTargetInfo.height, 64);
+    renderer.CmdFlush(cmd, colorTargetInfo.width, colorTargetInfo.height, 64);
 
     g_Engine.GetDebugTextRenderer().CmdFlush(cmd);
 

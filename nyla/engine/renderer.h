@@ -16,15 +16,12 @@ class Renderer
   public:
     void Init();
 
-    void Rect(float2 pos, float2 dimensions, float4 color);
-    void Rect(float2 pos, float2 dimensions, AssetManager::Texture texture);
+    void Mesh(float3 pos, float3 scale, AssetManager::Mesh mesh, AssetManager::Texture texture);
 
     void CmdFlush(RhiCmdList cmd, uint32_t width, uint32_t height, float metersOnScreen);
 
   private:
     RhiGraphicsPipeline m_Pipeline;
-
-    AssetManager::Mesh m_RectMesh;
 
     struct Scene // Per Frame
     {
@@ -32,15 +29,20 @@ class Renderer
         float4x4 invVp;
     };
 
-    struct Entity // Per Draw
+    struct Entity
     {
         float4x4 model;
-        float4 color;
         uint32_t srvTextureIndex;
         uint32_t samplerIndex;
     };
 
-    InlineVec<Entity, 256> m_DrawQueue;
+    struct DrawCall
+    {
+        Entity entity;
+        AssetManager::Mesh mesh;
+    };
+
+    InlineVec<DrawCall, 256> m_DrawQueue;
 };
 
 } // namespace nyla

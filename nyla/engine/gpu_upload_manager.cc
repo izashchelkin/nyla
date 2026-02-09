@@ -1,6 +1,8 @@
 #include "nyla/engine/gpu_upload_manager.h"
 
 #include "nyla/commons/align.h"
+#include "nyla/commons/assert.h"
+#include "nyla/commons/log.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
@@ -19,6 +21,7 @@ void GpuUploadManager::Init()
         .bufferUsage = RhiBufferUsage::CopySrc,
         .memoryUsage = RhiMemoryUsage::CpuToGpu,
     });
+    g_Rhi.NameBuffer(m_StagingBuffer, "StagingBuffer");
 
     m_StaticVertexBufferSize = 1_GiB;
     m_StaticVertexBufferAt = 0;
@@ -27,6 +30,7 @@ void GpuUploadManager::Init()
         .bufferUsage = RhiBufferUsage::Vertex | RhiBufferUsage::CopyDst,
         .memoryUsage = RhiMemoryUsage::GpuOnly,
     });
+    g_Rhi.NameBuffer(m_StaticVertexBuffer, "StaticVertexBuffer");
 
     m_StaticIndexBufferSize = 256_MiB;
     m_StaticIndexBufferAt = 0;
@@ -35,6 +39,7 @@ void GpuUploadManager::Init()
         .bufferUsage = RhiBufferUsage::Index | RhiBufferUsage::CopyDst,
         .memoryUsage = RhiMemoryUsage::GpuOnly,
     });
+    g_Rhi.NameBuffer(m_StaticIndexBuffer, "StaticIndexBuffer");
 }
 
 void GpuUploadManager::FrameBegin()
@@ -88,7 +93,7 @@ auto GpuUploadManager::CmdCopyStaticIndices(RhiCmdList cmd, uint32_t copySize, u
 {
     outBufferOffset = m_StaticIndexBufferAt;
 
-    char *ret = CmdCopyBuffer(cmd, m_StaticIndexBuffer, m_StaticVertexBufferAt, copySize);
+    char *ret = CmdCopyBuffer(cmd, m_StaticIndexBuffer, m_StaticIndexBufferAt, copySize);
     m_StaticIndexBufferAt += copySize;
     return ret;
 }

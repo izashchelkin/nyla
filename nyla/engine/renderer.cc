@@ -1,4 +1,5 @@
 #include "nyla/engine/renderer.h"
+#include "nyla/apps/breakout/breakout.h"
 #include "nyla/commons/byteview.h"
 #include "nyla/commons/containers/inline_vec.h"
 #include "nyla/commons/math/mat.h"
@@ -7,7 +8,6 @@
 #include "nyla/engine/engine.h"
 #include "nyla/engine/engine0_internal.h"
 #include "nyla/rhi/rhi.h"
-#include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_pipeline.h"
 #include "nyla/rhi/rhi_shader.h"
@@ -41,95 +41,9 @@ void Renderer::Init()
     };
 
     m_Pipeline = g_Rhi.CreateGraphicsPipeline(pipelineDesc);
-
-    auto &assetManager = g_Engine.GetAssetManager();
-
-    { // RECT MESH
-        auto &alloc = g_Engine.GetPermanentAlloc();
-
-        std::span<AssetManager::MeshVSInput> vertices = alloc.PushArr<AssetManager::MeshVSInput>(4);
-
-        vertices[0] = AssetManager::MeshVSInput{
-            .pos = {-.5f, .5f, .0f},
-            .normal = {0.f, 0.f, -1.f},
-            .uv = {1.f, 0.f},
-        };
-        vertices[1] = AssetManager::MeshVSInput{
-            .pos = {.5f, -.5f, .0f},
-            .normal = {0.f, 0.f, -1.f},
-            .uv = {0.f, 1.f},
-        };
-        vertices[2] = AssetManager::MeshVSInput{
-            .pos = {.5f, .5f, .0f},
-            .normal = {0.f, 0.f, -1.f},
-            .uv = {0.f, 0.f},
-        };
-        vertices[3] = AssetManager::MeshVSInput{
-            .pos = {-.5f, -.5f, .0f},
-            .normal = {0.f, 0.f, -1.f},
-            .uv = {1.f, 1.f},
-        };
-
-        std::span<uint16_t> indices = alloc.PushArr<uint16_t>(6);
-
-        indices[0] = 0;
-        indices[1] = 1;
-        indices[2] = 2;
-        indices[3] = 0;
-        indices[4] = 3;
-        indices[5] = 1;
-
-#if 0
-        VSInput{
-            .pos = {-.5f, .5f, .0f, 1.f},
-            .color = {},
-            .uv = {1.f, 0.f},
-        },
-        VSInput{
-            .pos = {.5f, -.5f, .0f, 1.f},
-            .color = {},
-            .uv = {0.f, 1.f},
-        },
-        VSInput{
-            .pos = {.5f, .5f, .0f, 1.f},
-            .uv = {0.f, 0.f},
-        },
-
-        VSInput{
-            .pos = {-.5f, .5f, .0f, 1.f},
-            .color = {},
-            .uv = {1.f, 0.f},
-        },
-        VSInput{
-            .pos = {-.5f, -.5f, .0f, 1.f},
-            .color = {},
-            .uv = {1.f, 1.f},
-        },
-        VSInput{
-            .pos = {.5f, -.5f, .0f, 1.f},
-            .color = {},
-            .uv = {0.f, 1.f},
-        },
-#endif
-
-        m_RectMesh = assetManager.DeclareStaticMesh({(char *)vertices.data(), vertices.size_bytes()}, indices);
-    }
 }
 
-namespace
-{
-
-auto GetRectTransform(float2 pos, float2 size)
-{
-    auto model = float4x4::Identity();
-    model = model.Mult(float4x4::Translate(float4{pos[0], pos[1], 0, 1}));
-    model = model.Mult(float4x4::Scale(float4{size[0], size[1], 1, 1}));
-    return model;
-}
-
-} // namespace
-
-void Renderer::Rect(float2 pos, float2 dimensions, AssetManager::Texture texture)
+void Renderer::Mesh(float3 pos, float3 scale, AssetManager::Mesh mesh, AssetManager::Texture texture)
 {
     auto &assetManager = g_Engine.GetAssetManager();
 
@@ -137,19 +51,17 @@ void Renderer::Rect(float2 pos, float2 dimensions, AssetManager::Texture texture
     if (!assetManager.GetRhiSampledTextureView(texture, srv))
         return;
 
-    auto &entity = m_DrawQueue.emplace_back(Entity{});
-    entity.model = GetRectTransform(pos, dimensions);
+    DrawCall &drawCall = m_DrawQueue.emplace_back(DrawCall{});
+    drawCall.mesh = mesh;
+
+    Entity &entity = drawCall.entity;
+
+    entity.model = float4x4::Identity();
+    entity.model = entity.model.Mult(float4x4::Translate(float4{pos[0], pos[1], pos[2], 1}));
+    entity.model = entity.model.Mult(float4x4::Scale(float4{scale[0], scale[1], scale[2], 1}));
 
     entity.srvTextureIndex = srv.index;
     entity.samplerIndex = uint32_t(AssetManager::SamplerType::NearestClamp);
-}
-
-void Renderer::Rect(float2 pos, float2 dimensions, float4 color)
-{
-    auto &entity = m_DrawQueue.emplace_back(Entity{});
-    entity.model = GetRectTransform(pos, dimensions);
-
-    entity.color = color;
 }
 
 void Renderer::CmdFlush(RhiCmdList cmd, uint32_t width, uint32_t height, float metersOnScreen)
@@ -177,15 +89,16 @@ void Renderer::CmdFlush(RhiCmdList cmd, uint32_t width, uint32_t height, float m
 
     g_Rhi.SetPassConstant(cmd, ByteViewPtr(&scene));
 
-    auto &assetManager = g_Engine.GetAssetManager();
-    assetManager.CmdBindMesh(cmd, m_RectMesh);
-
     const uint32_t frameIndex = g_Rhi.GetFrameIndex();
 
-    for (const Entity &entityUbo : m_DrawQueue)
+    auto &assetManager = g_Engine.GetAssetManager();
+    for (const auto &drawCall : m_DrawQueue)
     {
-        g_Rhi.SetDrawConstant(cmd, ByteViewPtr(&entityUbo));
-        g_Rhi.CmdDrawIndexed(cmd, 6, 0, 1, 0, 0);
+        const auto &entity = drawCall.entity;
+        g_Rhi.SetDrawConstant(cmd, ByteViewPtr(&entity));
+
+        assetManager.CmdBindMesh(cmd, drawCall.mesh);
+        assetManager.CmdDrawMesh(cmd, drawCall.mesh);
     }
     m_DrawQueue.clear();
 }

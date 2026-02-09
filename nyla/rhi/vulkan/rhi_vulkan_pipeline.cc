@@ -428,7 +428,7 @@ void Rhi::Impl::CmdDraw(RhiCmdList cmd, uint32_t vertexCount, uint32_t instanceC
     vkCmdDraw(cmdData.cmdbuf, vertexCount, instanceCount, firstVertex, firstInstance);
 }
 
-void Rhi::Impl::CmdDrawIndexed(RhiCmdList cmd, uint32_t indexCount, uint32_t vertexOffset, uint32_t instanceCount,
+void Rhi::Impl::CmdDrawIndexed(RhiCmdList cmd, uint32_t indexCount, int32_t vertexOffset, uint32_t instanceCount,
                                uint32_t firstIndex, uint32_t firstInstance)
 {
     VulkanCmdListData &cmdData = m_CmdLists.ResolveData(cmd);
@@ -442,7 +442,10 @@ auto Rhi::Impl::GetVertexFormatSize(RhiVertexFormat format) -> uint32_t
     {
     case nyla::RhiVertexFormat::None:
         break;
-
+    case RhiVertexFormat::R32G32Float:
+        return 8;
+    case RhiVertexFormat::R32G32B32Float:
+        return 12;
     case RhiVertexFormat::R32G32B32A32Float:
         return 16;
     }
@@ -517,7 +520,7 @@ void Rhi::CmdDraw(RhiCmdList cmd, uint32_t vertexCount, uint32_t instanceCount, 
     m_Impl->CmdDraw(cmd, vertexCount, instanceCount, firstVertex, firstInstance);
 }
 
-void Rhi::CmdDrawIndexed(RhiCmdList cmd, uint32_t indexCount, uint32_t vertexOffset, uint32_t instanceCount,
+void Rhi::CmdDrawIndexed(RhiCmdList cmd, uint32_t indexCount, int32_t vertexOffset, uint32_t instanceCount,
                          uint32_t firstIndex, uint32_t firstInstance)
 {
     m_Impl->CmdDrawIndexed(cmd, indexCount, vertexOffset, instanceCount, firstIndex, firstInstance);

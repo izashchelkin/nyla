@@ -58,20 +58,16 @@ void AssetManager::Upload(RhiCmdList cmd)
 
         if (meshData.isStatic)
         {
-            meshData.vertexCount = meshData.indices.size();
-            NYLA_ASSERT(meshData.vertexCount % 3 == 0);
+            meshData.indexCount = meshData.indices.size();
+            NYLA_ASSERT(meshData.indexCount % 3 == 0);
 
-            {
-                char *const uploadMemory =
-                    uploadManager.CmdCopyStaticIndices(cmd, meshData.indices.size_bytes(), meshData.indexBufferOffset);
-                memcpy(uploadMemory, meshData.indices.data(), meshData.indices.size_bytes());
-            }
+            char *uploadMemory =
+                uploadManager.CmdCopyStaticIndices(cmd, meshData.indices.size_bytes(), meshData.indexBufferOffset);
+            memcpy(uploadMemory, meshData.indices.data(), meshData.indices.size_bytes());
 
-            {
-                char *const uploadMemory = uploadManager.CmdCopyStaticVertices(cmd, meshData.vertexData.size_bytes(),
-                                                                               meshData.vertexBufferOffset);
-                memcpy(uploadMemory, meshData.vertexData.data(), meshData.vertexData.size_bytes());
-            }
+            uploadMemory =
+                uploadManager.CmdCopyStaticVertices(cmd, meshData.vertexData.size_bytes(), meshData.vertexBufferOffset);
+            memcpy(uploadMemory, meshData.vertexData.data(), meshData.vertexData.size_bytes());
         }
         else
         {
@@ -103,8 +99,8 @@ void AssetManager::Upload(RhiCmdList cmd)
                             memcpy(uploadMemory, indicesData.data(), indicesData.size_bytes());
 
                             NYLA_ASSERT((indicesData.size_bytes() % sizeof(uint16_t)) == 0);
-                            meshData.vertexCount = indicesData.size_bytes() / sizeof(uint16_t);
-                            NYLA_ASSERT(meshData.vertexCount % 3 == 0);
+                            meshData.indexCount = indicesData.size_bytes() / sizeof(uint16_t);
+                            NYLA_ASSERT(meshData.indexCount % 3 == 0);
                         }
 
                         {
@@ -270,8 +266,18 @@ void AssetManager::CmdBindMesh(RhiCmdList cmd, Mesh mesh)
     auto &uploadManager = g_Engine.GetUploadManager();
 
     const auto &meshData = m_Meshes.ResolveData(mesh);
+    NYLA_ASSERT(!meshData.needsUpload);
+
     uploadManager.CmdBindStaticMeshVertexBuffer(cmd, meshData.vertexBufferOffset);
     uploadManager.CmdBindStaticMeshIndexBuffer(cmd, meshData.indexBufferOffset);
+}
+
+void AssetManager::CmdDrawMesh(RhiCmdList cmd, AssetManager::Mesh mesh)
+{
+    const auto &meshData = m_Meshes.ResolveData(mesh);
+    NYLA_ASSERT(!meshData.needsUpload);
+
+    g_Rhi.CmdDrawIndexed(cmd, meshData.indexCount, 0, 1, 0, 0);
 }
 
 } // namespace nyla

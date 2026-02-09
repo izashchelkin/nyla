@@ -128,7 +128,7 @@ class Rhi
     void CmdPushGraphicsConstants(RhiCmdList cmd, uint32_t offset, RhiShaderStage stage, ByteView data);
     void CmdDraw(RhiCmdList cmd, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
                  uint32_t firstInstance);
-    void CmdDrawIndexed(RhiCmdList cmd, uint32_t indexCount, uint32_t vertexOffset, uint32_t instanceCount,
+    void CmdDrawIndexed(RhiCmdList cmd, uint32_t indexCount, int32_t vertexOffset, uint32_t instanceCount,
                         uint32_t firstIndex, uint32_t firstInstance);
 
     auto CreateSampler(const RhiSamplerDesc &) -> RhiSampler;

@@ -98,6 +98,7 @@ class AssetManager
     auto DeclareStaticMesh(std::span<const char> vertexData, std::span<const uint16_t> indices) -> Mesh;
 
     void CmdBindMesh(RhiCmdList cmd, Mesh mesh);
+    void CmdDrawMesh(RhiCmdList cmd, AssetManager::Mesh mesh);
 
   private:
     struct TextureData
@@ -122,7 +123,7 @@ class AssetManager
 
         uint64_t vertexBufferOffset;
         uint64_t indexBufferOffset;
-        uint32_t vertexCount;
+        uint32_t indexCount;
 
         bool needsUpload;
     };
