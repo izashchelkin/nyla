@@ -94,7 +94,7 @@ void GameInit()
 #ifndef WIN32
             g_State.assets.cubeMesh = g_Engine.GetAssetManager().DeclareMesh("/home/izashchelkin/Documents/test.glb");
 #else
-            g_State.assets.cubeMesh = assetManager.DeclareMesh("C:\\Users\\ihorz\\Desktop\\test.glb");
+            g_State.assets.cubeMesh = assetManager.DeclareMesh("C:\\blender\\export\\cube.gltf");
 #endif
         }
 

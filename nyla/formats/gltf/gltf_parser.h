@@ -117,10 +117,40 @@ struct GltfMesh
     std::span<GltfMeshPrimitive> primitives;
 };
 
+class GlbChunkParser
+{
+  public:
+    void Init(void *data, uint32_t byteLength)
+    {
+        m_Base = (uint32_t *)data;
+        m_At = m_Base;
+        m_BytesLeft = byteLength;
+    }
+
+    auto PopDWord() -> uint32_t
+    {
+        const uint32_t ret = *(uint32_t *)m_At;
+        m_At = (uint32_t *)m_At + 1;
+        return ret;
+    }
+
+    auto Parse(std::span<char> &jsonChunk, std::span<char> &binChunk) -> bool;
+
+  private:
+    void *m_Base;
+    void *m_At;
+    uint64_t m_BytesLeft;
+};
+
 class GltfParser
 {
   public:
-    void Init(RegionAlloc *alloc, void *data, uint32_t byteLength);
+    void Init(RegionAlloc *alloc, std::span<char> jsonChunk, std::span<char> binChunk)
+    {
+        m_Alloc = alloc;
+        m_JsonChunk = jsonChunk;
+        m_BinChunk = binChunk;
+    }
 
     auto Parse() -> bool;
     auto PopDWord() -> uint32_t;
@@ -170,10 +200,8 @@ class GltfParser
 
   private:
     RegionAlloc *m_Alloc;
-    void *m_Base;
-    void *m_At;
-    uint32_t m_BytesLeft;
 
+    std::span<char> m_JsonChunk;
     std::span<char> m_BinChunk;
 
     InlineVec<GltfBuffer, 1> m_Buffers;

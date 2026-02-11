@@ -260,7 +260,7 @@ void JsonParser::SkipWhitespace()
     for (;;)
     {
         const char ch = Peek();
-        if (ch == ' ' || ch == '\n')
+        if (ch == ' ' || ch == '\n' || ch == '\t')
             Advance();
         else
             break;

@@ -9,19 +9,33 @@
 namespace nyla
 {
 
-auto GltfParser::PopDWord() -> uint32_t
+auto GlbChunkParser::Parse(std::span<char> &jsonChunk, std::span<char> &binChunk) -> bool
 {
-    const uint32_t ret = *(uint32_t *)m_At;
-    m_At = (uint32_t *)m_At + 1;
-    return ret;
-}
+    if (PopDWord() != DWord("glTF"))
+        return false;
 
-void GltfParser::Init(RegionAlloc *alloc, void *data, uint32_t byteLength)
-{
-    m_Alloc = alloc;
-    m_Base = data;
-    m_At = data;
-    m_BytesLeft = byteLength;
+    const uint32_t version = PopDWord();
+    const uint32_t length = PopDWord();
+
+    //
+
+    const uint32_t jsonChunkLength = PopDWord();
+
+    if (PopDWord() != DWord("JSON"))
+        return false;
+
+    jsonChunk = {(char *)m_At, jsonChunkLength};
+
+    m_At = (char *)m_At + jsonChunkLength;
+    m_At = (char *)m_Base + AlignedUp<uint32_t>((char *)m_At - (char *)m_Base, 4);
+
+    const uint32_t binChunkLength = PopDWord();
+    if (PopDWord() != DWord("BIN\0"))
+        return false;
+
+    binChunk = {(char *)m_At, binChunkLength};
+
+    return true;
 }
 
 auto GltfParser::FindAttributeAccessor(std::span<GltfMeshPrimitiveAttribute> attributes, std::string_view attributeName,
@@ -40,21 +54,8 @@ auto GltfParser::FindAttributeAccessor(std::span<GltfMeshPrimitiveAttribute> att
 
 auto GltfParser::Parse() -> bool
 {
-    if (PopDWord() != DWord("glTF"))
-        return false;
-
-    const uint32_t version = PopDWord();
-    const uint32_t length = PopDWord();
-
-    //
-
-    const uint32_t jsonChunkLength = PopDWord();
-
-    if (PopDWord() != DWord("JSON"))
-        return false;
-
     JsonParser jsonParser;
-    jsonParser.Init(m_Alloc, (const char *)m_At, jsonChunkLength);
+    jsonParser.Init(m_Alloc, m_JsonChunk.data(), m_JsonChunk.size_bytes());
     JsonValue *jsonChunk = jsonParser.ParseNext();
 
     {
@@ -167,17 +168,6 @@ auto GltfParser::Parse() -> bool
             }
         }
     }
-
-    //
-
-    m_At = (char *)m_At + jsonChunkLength;
-    m_At = (char *)m_Base + AlignedUp<uint32_t>((char *)m_At - (char *)m_Base, 4);
-
-    const uint32_t binChunkLength = PopDWord();
-    if (PopDWord() != DWord("BIN\0"))
-        return false;
-
-    m_BinChunk = {(char *)m_At, binChunkLength};
 
     return true;
 }

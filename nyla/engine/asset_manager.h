@@ -117,7 +117,7 @@ class AssetManager
     struct MeshData
     {
         bool isStatic;
-        std::string path;
+        std::string gltfPath;
         std::span<const char> vertexData;
         std::span<const uint16_t> indices;
 
