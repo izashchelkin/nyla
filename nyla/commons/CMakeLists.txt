@@ -17,6 +17,7 @@ target_sources(${TARGET}
         handle.h
         handle_pool.h
         log.h
+        path.h
         string.h
 )
 

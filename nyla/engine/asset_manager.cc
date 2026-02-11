@@ -5,6 +5,7 @@
 #include "nyla/commons/handle_pool.h"
 #include "nyla/commons/log.h"
 #include "nyla/commons/memory/region_alloc.h"
+#include "nyla/commons/path.h"
 #include "nyla/engine/engine.h"
 #include "nyla/formats/gltf/gltf_parser.h"
 #include "nyla/platform/platform.h"
@@ -71,16 +72,14 @@ void AssetManager::Upload(RhiCmdList cmd)
         }
         else
         {
-            NYLA_ASSERT(meshData.gltfPath.ends_with(".gltf"));
-            std::string binPath = meshData.gltfPath;
-            binPath = binPath.substr(0, binPath.length() - 5);
-            binPath = binPath.append(".bin");
-
-            std::vector<std::byte> gltfData = g_Platform.ReadFile(meshData.gltfPath);
-            std::vector<std::byte> binData = g_Platform.ReadFile(binPath);
-
             RegionAlloc &transientAlloc = g_Engine.GetPerFrameAlloc();
             RegionAlloc scratchAlloc = transientAlloc.PushSubAlloc(16_KiB);
+
+            NYLA_ASSERT(meshData.gltfPath.EndsWith(".gltf"));
+            std::vector<std::byte> gltfData = g_Platform.ReadFile(meshData.gltfPath.StrView());
+            std::vector<std::byte> binData =
+                g_Platform.ReadFile(meshData.gltfPath.Clone(scratchAlloc).SetExtension(".bin").StrView());
+
             {
                 GltfParser parser;
                 parser.Init(&scratchAlloc, std::span{(char *)gltfData.data(), gltfData.size()},

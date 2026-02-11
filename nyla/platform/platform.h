@@ -7,6 +7,7 @@
 #include <fstream>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace nyla
@@ -112,6 +113,12 @@ class Platform
 
         file.close();
         return buffer;
+    }
+
+    auto ReadFile(std::string_view filename) -> std::vector<std::byte>
+    {
+        std::ifstream file(std::string{filename}, std::ios::ate | std::ios::binary);
+        return ReadFileInternal(file);
     }
 
     auto ReadFile(const std::string &filename) -> std::vector<std::byte>

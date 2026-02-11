@@ -42,6 +42,8 @@ class RegionAllocCommitPageGrowth : public RegionAllocGrowthHandler
     auto TryGrow(RegionAlloc &alloc, uint64_t neededSize) -> bool final;
 };
 
+class Path;
+
 class RegionAlloc
 {
     friend class RegionAllocCommitPageGrowth;
@@ -89,9 +91,26 @@ class RegionAlloc
         return m_Base;
     }
 
-    auto GetBytesUsed() -> uint32_t
+    [[nodiscard]]
+    auto GetBase() const -> const char *
+    {
+        return m_Base;
+    }
+
+    [[nodiscard]]
+    auto GetBytesUsed() const -> uint32_t
     {
         return m_Used;
+    }
+
+    auto GetAt() -> char *
+    {
+        return m_Base + m_Used;
+    }
+
+    auto GetMaxSize() -> uint32_t
+    {
+        return m_MaxSize;
     }
 
     template <typename T> auto Push() -> T *
@@ -106,6 +125,20 @@ class RegionAlloc
     {
         T *const p = Push<T>();
         *p = initializer;
+        return p;
+    }
+
+    template <typename T> auto PushCopySpan(std::span<const T> data) -> std::span<T>
+    {
+        std::span<T> p = PushArr<T>(data.size());
+        memcpy(p, data.data(), data.size_bytes());
+        return p;
+    }
+
+    auto PushCopyStrView(std::string_view data) -> std::span<char>
+    {
+        std::span<char> p = PushArr<char>(data.size());
+        memcpy(p.data(), data.data(), data.size());
         return p;
     }
 
@@ -127,6 +160,8 @@ class RegionAlloc
         subAlloc.Init(p, size, RegionAllocCommitPageGrowth::GetInstance());
         return subAlloc;
     }
+
+    auto PushPath() -> Path;
 
   private:
     char *m_Base;
