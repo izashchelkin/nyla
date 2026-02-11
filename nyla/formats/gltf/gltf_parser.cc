@@ -59,6 +59,17 @@ auto GltfParser::Parse() -> bool
     JsonValue *jsonChunk = jsonParser.ParseNext();
 
     {
+        JsonValue *images = jsonChunk->Array("images");
+        for (auto it = images->begin(), end = images->end(); it != end; ++it)
+        {
+            auto &image = m_Images.emplace_back(GltfImage{});
+            image.uri = it->String("uri");
+            image.mimeType = it->String("mimeType");
+            image.name = it->String("name");
+        }
+    }
+
+    {
         JsonValue *buffers = jsonChunk->Array("buffers");
         for (auto it = buffers->begin(), end = buffers->end(); it != end; ++it)
         {

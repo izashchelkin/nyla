@@ -12,6 +12,13 @@ struct GltfBuffer
     uint32_t byteLength;
 };
 
+struct GltfImage
+{
+    std::string_view uri;
+    std::string_view mimeType;
+    std::string_view name;
+};
+
 struct GltfBufferView
 {
     uint32_t buffer;
@@ -188,6 +195,11 @@ class GltfParser
         return m_Accessors[i];
     }
 
+    auto GetImages() -> std::span<GltfImage>
+    {
+        return m_Images;
+    }
+
     auto GetMeshes() -> std::span<GltfMesh>
     {
         return m_Meshes;
@@ -205,6 +217,7 @@ class GltfParser
     std::span<char> m_BinChunk;
 
     InlineVec<GltfBuffer, 1> m_Buffers;
+    InlineVec<GltfImage, 12> m_Images;
     InlineVec<GltfBufferView, 6> m_BufferViews;
     InlineVec<GltfAccessor, 6> m_Accessors;
     InlineVec<GltfMesh, 1> m_Meshes;

@@ -85,12 +85,15 @@ void AssetManager::Upload(RhiCmdList cmd)
                 GltfParser parser;
                 parser.Init(&scratchAlloc, std::span{(char *)gltfData.data(), gltfData.size()},
                             std::span{(char *)binData.data(), binData.size()});
-
                 NYLA_ASSERT(parser.Parse());
 
-                for (auto mesh : parser.GetMeshes())
+                for (const GltfImage &image : parser.GetImages())
+                {
+                }
 
-                    for (auto primitive : mesh.primitives)
+                for (const GltfMesh &mesh : parser.GetMeshes())
+
+                    for (const GltfMeshPrimitive &primitive : mesh.primitives)
                     {
                         {
                             GltfAccessor indices = parser.GetAccessor(primitive.indices);
