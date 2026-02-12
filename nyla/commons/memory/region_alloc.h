@@ -4,6 +4,7 @@
 #include "nyla/commons/assert.h"
 #include "nyla/platform/platform.h"
 #include <cstdint>
+#include <cstring>
 #include <span>
 
 namespace nyla
