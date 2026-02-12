@@ -88,6 +88,9 @@ void AssetManager::Upload(RhiCmdList cmd)
 
                 for (const GltfImage &image : parser.GetImages())
                 {
+                    Path path = meshData.gltfPath.Clone(scratchAlloc).PopBack().Append(image.uri);
+
+                    // TODO:
                 }
 
                 for (const GltfMesh &mesh : parser.GetMeshes())
@@ -256,7 +259,7 @@ auto AssetManager::DeclareMesh(std::string_view path) -> Mesh
 {
     return m_Meshes.Acquire(MeshData{
         .isStatic = false,
-        .gltfPath = std::string{path},
+        .gltfPath = g_Engine.GetPermanentAlloc().PushPath(path),
         .needsUpload = true,
     });
 }

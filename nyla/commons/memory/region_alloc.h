@@ -162,6 +162,7 @@ class RegionAlloc
     }
 
     auto PushPath() -> Path;
+    auto PushPath(std::string_view) -> Path;
 
   private:
     char *m_Base;

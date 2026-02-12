@@ -1,3 +1,5 @@
+#pragma once
+
 #include "nyla/commons/assert.h"
 #include "nyla/commons/memory/region_alloc.h"
 #include <cstring>
@@ -144,6 +146,11 @@ inline auto RegionAlloc::PushPath() -> Path
     Path path;
     path.Init(PushSubAlloc(260));
     return path;
+}
+
+inline auto RegionAlloc::PushPath(std::string_view path) -> Path
+{
+    return PushPath().Append(path);
 }
 
 } // namespace nyla
