@@ -89,8 +89,7 @@ void AssetManager::Upload(RhiCmdList cmd)
                 for (const GltfImage &image : parser.GetImages())
                 {
                     Path path = meshData.gltfPath.Clone(scratchAlloc).PopBack().Append(image.uri);
-
-                    // TODO:
+                    DeclareTexture(path.StrView());
                 }
 
                 for (const GltfMesh &mesh : parser.GetMeshes())
