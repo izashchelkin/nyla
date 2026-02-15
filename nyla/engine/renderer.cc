@@ -1,7 +1,9 @@
 #include "nyla/engine/renderer.h"
 #include "nyla/apps/breakout/breakout.h"
+#include "nyla/commons/assert.h"
 #include "nyla/commons/byteview.h"
 #include "nyla/commons/containers/inline_vec.h"
+#include "nyla/commons/handle.h"
 #include "nyla/commons/math/mat.h"
 #include "nyla/commons/math/vec.h"
 #include "nyla/engine/asset_manager.h"
@@ -48,8 +50,16 @@ void Renderer::Mesh(float3 pos, float3 scale, AssetManager::Mesh mesh, AssetMana
     auto &assetManager = g_Engine.GetAssetManager();
 
     RhiSampledTextureView srv;
-    if (!assetManager.GetRhiSampledTextureView(texture, srv))
-        return;
+    if (HandleIsSet(texture))
+    {
+        if (!assetManager.GetRhiSampledTextureView(texture, srv))
+            return;
+    }
+    else
+    {
+        if (!assetManager.GetRhiSampledTextureView(mesh, srv))
+            return;
+    }
 
     DrawCall &drawCall = m_DrawQueue.emplace_back(DrawCall{});
     drawCall.mesh = mesh;
@@ -61,6 +71,7 @@ void Renderer::Mesh(float3 pos, float3 scale, AssetManager::Mesh mesh, AssetMana
     entity.model = entity.model.Mult(float4x4::Scale(float4{scale[0], scale[1], scale[2], 1}));
 
     entity.srvTextureIndex = srv.index;
+
     entity.samplerIndex = uint32_t(AssetManager::SamplerType::NearestClamp);
 }
 

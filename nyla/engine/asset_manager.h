@@ -92,8 +92,8 @@ class AssetManager
     void Upload(RhiCmdList cmd);
 
     auto DeclareTexture(std::string_view path) -> Texture;
-    ;
     auto GetRhiSampledTextureView(Texture, RhiSampledTextureView &) -> bool;
+    auto GetRhiSampledTextureView(Mesh, RhiSampledTextureView &) -> bool;
 
     auto DeclareMesh(std::string_view path) -> Mesh;
     auto DeclareStaticMesh(std::span<const char> vertexData, std::span<const uint16_t> indices) -> Mesh;
@@ -125,6 +125,8 @@ class AssetManager
         uint64_t vertexBufferOffset;
         uint64_t indexBufferOffset;
         uint32_t indexCount;
+
+        AssetManager::Texture texture;
 
         bool needsUpload;
     };

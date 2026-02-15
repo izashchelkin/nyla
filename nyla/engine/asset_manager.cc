@@ -86,10 +86,12 @@ void AssetManager::Upload(RhiCmdList cmd)
                             std::span{(char *)binData.data(), binData.size()});
                 NYLA_ASSERT(parser.Parse());
 
-                for (const GltfImage &image : parser.GetImages())
+                NYLA_ASSERT(parser.GetImages().size() == 1);
+
                 {
+                    GltfImage image = parser.GetImages().front();
                     Path path = meshData.gltfPath.Clone(scratchAlloc).PopBack().Append(image.uri);
-                    DeclareTexture(path.StrView());
+                    meshData.texture = DeclareTexture(path.StrView());
                 }
 
                 for (const GltfMesh &mesh : parser.GetMeshes())
@@ -252,6 +254,15 @@ auto AssetManager::GetRhiSampledTextureView(Texture texture, RhiSampledTextureVi
     }
 
     return false;
+}
+
+auto AssetManager::GetRhiSampledTextureView(Mesh mesh, RhiSampledTextureView &out) -> bool
+{
+    const auto &data = m_Meshes.ResolveData(mesh);
+    if (HandleIsSet(data.texture))
+        return GetRhiSampledTextureView(data.texture, out);
+    else
+        return false;
 }
 
 auto AssetManager::DeclareMesh(std::string_view path) -> Mesh
