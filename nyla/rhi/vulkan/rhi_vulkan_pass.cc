@@ -16,7 +16,6 @@ void Rhi::Impl::PassBegin(RhiPassDesc desc)
 
     const VulkanTextureViewData &rtvData = m_RenderTargetViews.ResolveData(desc.rtv);
     const VulkanTextureData &renderTargetData = m_Textures.ResolveData(rtvData.texture);
-    CmdTransitionTexture(cmd, rtvData.texture, desc.rtState);
 
     const VkRenderingAttachmentInfo colorAttachmentInfo{
         .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
@@ -41,7 +40,6 @@ void Rhi::Impl::PassBegin(RhiPassDesc desc)
     {
         const VulkanTextureViewData &dsvData = m_DepthStencilViews.ResolveData(desc.dsv);
         const VulkanTextureData &depthStencilData = m_Textures.ResolveData(dsvData.texture);
-        CmdTransitionTexture(cmd, dsvData.texture, desc.dsState);
 
         depthAttachmentInfo = {
             .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
@@ -73,18 +71,12 @@ void Rhi::Impl::PassBegin(RhiPassDesc desc)
     vkCmdSetScissor(cmdbuf, 0, 1, &scissor);
 }
 
-void Rhi::Impl::PassEnd(RhiPassDesc desc)
+void Rhi::Impl::PassEnd()
 {
     RhiCmdList cmd = m_GraphicsQueueCmd[m_FrameIndex];
     VulkanCmdListData &cmdData = m_CmdLists.ResolveData(cmd);
     VkCommandBuffer cmdbuf = cmdData.cmdbuf;
     vkCmdEndRendering(cmdbuf);
-
-    const VulkanTextureViewData &rtvData = m_RenderTargetViews.ResolveData(desc.rtv);
-    CmdTransitionTexture(cmd, rtvData.texture, desc.rtState);
-
-    const VulkanTextureViewData &dsvData = m_DepthStencilViews.ResolveData(desc.dsv);
-    CmdTransitionTexture(cmd, dsvData.texture, desc.dsState);
 
     cmdData.passConstantHead += CbvOffset(m_Limits.passConstantSize);
 }
@@ -96,9 +88,9 @@ void Rhi::PassBegin(RhiPassDesc desc)
     m_Impl->PassBegin(desc);
 }
 
-void Rhi::PassEnd(RhiPassDesc desc)
+void Rhi::PassEnd()
 {
-    m_Impl->PassEnd(desc);
+    m_Impl->PassEnd();
 }
 
 } // namespace nyla

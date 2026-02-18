@@ -109,7 +109,7 @@ class Rhi
 #endif
 
     void PassBegin(RhiPassDesc);
-    void PassEnd(RhiPassDesc);
+    void PassEnd();
 
     auto GetVertexFormatSize(RhiVertexFormat) -> uint32_t;
 
@@ -142,6 +142,7 @@ class Rhi
     auto GetTextureInfo(RhiTexture) -> RhiTextureInfo;
     void CmdTransitionTexture(RhiCmdList, RhiTexture, RhiTextureState);
     void CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, uint32_t srcOffset, uint32_t size);
+    void CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiTexture src);
 
     auto CreateSampledTextureView(const RhiTextureViewDesc &) -> RhiSampledTextureView;
     void DestroySampledTextureView(RhiSampledTextureView);

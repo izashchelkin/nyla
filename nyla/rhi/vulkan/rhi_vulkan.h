@@ -221,6 +221,7 @@ class Rhi::Impl
     void DestroyTexture(RhiTexture texture);
     void CmdTransitionTexture(RhiCmdList cmd, RhiTexture texture, RhiTextureState newState);
     void CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, uint32_t srcOffset, uint32_t size);
+    void CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiTexture src);
 
     auto CreateSampledTextureView(const RhiTextureViewDesc &desc) -> RhiSampledTextureView;
     void DestroySampledTextureView(RhiSampledTextureView textureView);
@@ -245,7 +246,7 @@ class Rhi::Impl
     auto GetDeviceQueue(RhiQueueType queueType) -> DeviceQueue &;
 
     void PassBegin(RhiPassDesc desc);
-    void PassEnd(RhiPassDesc desc);
+    void PassEnd();
 
     auto CreateShader(const RhiShaderDesc &desc) -> RhiShader;
     void DestroyShader(RhiShader shader);

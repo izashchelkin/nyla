@@ -30,34 +30,40 @@ void Game::Process(RhiCmdList cmd, float dt)
 
 void Game::Render(RhiCmdList cmd)
 {
-    RhiTextureInfo backbufferInfo = g_Rhi.GetTextureInfo(g_Rhi.GetTexture(g_Rhi.GetBackbufferView()));
+    auto &renderer = g_Engine.GetRenderer();
+    auto &debugTextRenderer = g_Engine.GetDebugTextRenderer();
+
+    RhiTexture backbuffer = g_Rhi.GetTexture(g_Rhi.GetBackbufferView());
+    RhiTextureInfo backbufferInfo = g_Rhi.GetTextureInfo(backbuffer);
 
     RhiRenderTargetView rtv;
     RhiDepthStencilView dsv;
     m_RenderTargets.GetTargets(backbufferInfo.width, backbufferInfo.height, rtv, dsv);
 
+    RhiTexture renderTarget = g_Rhi.GetTexture(rtv);
+    RhiTextureInfo rtInfo = g_Rhi.GetTextureInfo(renderTarget);
+    g_Rhi.CmdTransitionTexture(cmd, renderTarget, RhiTextureState::ColorTarget);
+
+    g_Rhi.CmdTransitionTexture(cmd, g_Rhi.GetTexture(dsv), RhiTextureState::DepthTarget);
+
     g_Rhi.PassBegin({
         .rtv = rtv,
-        .rtState = RhiTextureState::ColorTarget,
         .dsv = dsv,
-        .dsState = RhiTextureState::DepthTarget,
     });
+    {
+        renderer.Mesh({0, 0, 0}, {10, 10, 10}, m_Assets.ball, {});
 
-    RhiTextureInfo rtvInfo = g_Rhi.GetTextureInfo(g_Rhi.GetTexture(rtv));
+        renderer.CmdFlush(cmd, rtInfo.width, rtInfo.height, 64);
+        debugTextRenderer.CmdFlush(cmd);
+    }
+    g_Rhi.PassEnd();
 
-    auto &renderer = g_Engine.GetRenderer();
+    g_Rhi.CmdTransitionTexture(cmd, renderTarget, RhiTextureState::TransferSrc);
+    g_Rhi.CmdTransitionTexture(cmd, backbuffer, RhiTextureState::TransferDst);
 
-    renderer.Mesh({0, 0, 0}, {10, 10, 10}, m_Assets.ball, {});
+    g_Rhi.CmdCopyTexture(cmd, backbuffer, renderTarget);
 
-    renderer.CmdFlush(cmd, rtvInfo.width, rtvInfo.height, 64);
-    g_Engine.GetDebugTextRenderer().CmdFlush(cmd);
-
-    g_Rhi.PassEnd({
-        .rtv = rtv,
-        .rtState = RhiTextureState::TransferSrc,
-        .dsv = dsv,
-        .dsState = RhiTextureState::DepthTarget,
-    });
+    g_Rhi.CmdTransitionTexture(cmd, backbuffer, RhiTextureState::Present);
 }
 
 //

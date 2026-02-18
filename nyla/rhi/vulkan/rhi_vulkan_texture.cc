@@ -1,3 +1,5 @@
+#include "nyla/commons/assert.h"
+#include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_texture.h"
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
 #include <vulkan/vulkan_core.h>
@@ -432,7 +434,7 @@ void Rhi::Impl::CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, ui
         .bufferImageHeight = 0,
         .imageSubresource =
             {
-                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .aspectMask = dstTextureData.aspectMask,
                 .layerCount = 1,
             },
         .imageOffset = {0, 0, 0},
@@ -440,6 +442,31 @@ void Rhi::Impl::CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, ui
     };
 
     vkCmdCopyBufferToImage(cmdbuf, srcBufferData.buffer, dstTextureData.image, dstTextureData.layout, 1, &region);
+}
+
+void Rhi::Impl::CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiTexture src)
+{
+    const VkCommandBuffer &cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
+
+    VulkanTextureData &dstTextureData = m_Textures.ResolveData(dst);
+    VulkanTextureData &srcTextureData = m_Textures.ResolveData(src);
+
+    const VkImageCopy region{
+        .srcSubresource =
+            {
+                .aspectMask = srcTextureData.aspectMask,
+                .layerCount = 1,
+            },
+        .dstSubresource =
+            {
+                .aspectMask = dstTextureData.aspectMask,
+                .layerCount = 1,
+            },
+        .extent = srcTextureData.extent,
+    };
+
+    vkCmdCopyImage(cmdbuf, srcTextureData.image, srcTextureData.layout, dstTextureData.image, dstTextureData.layout, 1,
+                   &region);
 }
 
 //
@@ -512,6 +539,11 @@ void Rhi::CmdTransitionTexture(RhiCmdList cmd, RhiTexture texture, RhiTextureSta
 void Rhi::CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, uint32_t srcOffset, uint32_t size)
 {
     m_Impl->CmdCopyTexture(cmd, dst, src, srcOffset, size);
+}
+
+void Rhi::CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiTexture src)
+{
+    m_Impl->CmdCopyTexture(cmd, dst, src);
 }
 
 } // namespace nyla

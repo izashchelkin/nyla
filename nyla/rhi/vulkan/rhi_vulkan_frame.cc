@@ -62,7 +62,7 @@ auto Rhi::Impl::FrameBegin() -> RhiCmdList
 void Rhi::Impl::FrameEnd()
 {
     RhiCmdList cmd = m_GraphicsQueueCmd[m_FrameIndex];
-    CmdTransitionTexture(cmd, GetTexture(GetBackbufferView()), RhiTextureState::Present);
+    // CmdTransitionTexture(cmd, GetTexture(GetBackbufferView()), RhiTextureState::Present);
 
     const VkCommandBuffer &cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
 
