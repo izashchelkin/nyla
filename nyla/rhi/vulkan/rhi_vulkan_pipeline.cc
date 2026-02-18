@@ -1,3 +1,4 @@
+#include "nyla/commons/bitenum.h"
 #include "nyla/commons/containers/inline_vec.h"
 #include "nyla/commons/log.h"
 #include "nyla/rhi/rhi_cmdlist.h"
@@ -298,8 +299,8 @@ auto Rhi::Impl::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> R
 
     const VkPipelineDepthStencilStateCreateInfo depthStencilState{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-        .depthTestEnable = true,
-        .depthWriteEnable = true,
+        .depthTestEnable = desc.depthTestEnabled,
+        .depthWriteEnable = desc.depthWriteEnabled,
         .depthCompareOp = VK_COMPARE_OP_LESS,
         .depthBoundsTestEnable = false,
         .stencilTestEnable = false,

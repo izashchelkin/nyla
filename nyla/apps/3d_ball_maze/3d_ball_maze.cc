@@ -54,7 +54,7 @@ void Game::Render(RhiCmdList cmd)
 
     g_Rhi.PassEnd({
         .rtv = rtv,
-        .rtState = RhiTextureState::Present,
+        .rtState = RhiTextureState::TransferSrc,
         .dsv = dsv,
         .dsState = RhiTextureState::DepthTarget,
     });

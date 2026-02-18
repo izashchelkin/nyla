@@ -68,6 +68,8 @@ struct RhiGraphicsPipelineDesc
     std::span<RhiVertexAttributeDesc> vertexAttributes;
     std::span<RhiTextureFormat> colorTargetFormats;
     RhiTextureFormat depthFormat;
+    bool depthWriteEnabled;
+    bool depthTestEnabled;
 
     RhiCullMode cullMode;
     RhiFrontFace frontFace;

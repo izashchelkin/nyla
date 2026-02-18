@@ -1,4 +1,5 @@
 #include "nyla/engine/render_targets.h"
+#include "nyla/rhi/rhi_texture.h"
 
 namespace nyla
 {
@@ -8,21 +9,16 @@ void RenderTargets::GetTargets(uint32_t width, uint32_t height, RhiRenderTargetV
 {
     uint32_t frameIndex = g_Rhi.GetFrameIndex();
 
-    if (frameIndex <= m_Rtvs.size())
+    if (frameIndex >= m_Rtvs.size())
     {
         RhiTexture texture = g_Rhi.CreateTexture(RhiTextureDesc{
             .width = width,
             .height = height,
             .memoryUsage = RhiMemoryUsage::GpuOnly,
-            .usage = RhiTextureUsage::ColorTarget,
+            .usage = RhiTextureUsage::ColorTarget | /* RhiTextureUsage::ShaderSampled | */ RhiTextureUsage::TransferSrc,
             .format = m_ColorFormat,
         });
         m_ColorTextures.emplace_back(texture);
-
-        m_ColorSrvs.emplace_back(g_Rhi.CreateSampledTextureView(RhiTextureViewDesc{
-            .texture = texture,
-            .format = m_ColorFormat,
-        }));
 
         m_Rtvs.emplace_back(g_Rhi.CreateRenderTargetView(RhiRenderTargetViewDesc{
             .texture = texture,
@@ -30,7 +26,7 @@ void RenderTargets::GetTargets(uint32_t width, uint32_t height, RhiRenderTargetV
         }));
     }
 
-    if (frameIndex <= m_Dsvs.size())
+    if (frameIndex >= m_Dsvs.size())
     {
         RhiTexture texture = g_Rhi.CreateTexture(RhiTextureDesc{
             .width = width,

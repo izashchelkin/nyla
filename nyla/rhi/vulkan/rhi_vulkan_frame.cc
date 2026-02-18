@@ -1,4 +1,5 @@
 #include "nyla/rhi/rhi.h"
+#include "nyla/rhi/rhi_texture.h"
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
 #include <limits>
 
@@ -61,6 +62,8 @@ auto Rhi::Impl::FrameBegin() -> RhiCmdList
 void Rhi::Impl::FrameEnd()
 {
     RhiCmdList cmd = m_GraphicsQueueCmd[m_FrameIndex];
+    CmdTransitionTexture(cmd, GetTexture(GetBackbufferView()), RhiTextureState::Present);
+
     const VkCommandBuffer &cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
 
     VK_CHECK(vkEndCommandBuffer(cmdbuf));

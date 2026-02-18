@@ -29,6 +29,7 @@ void DebugTextRenderer::Init()
         .vs = vs,
         .ps = ps,
         .colorTargetFormats = AssetManager::GetMeshPipelineColorTargetFormats(),
+        .depthFormat = RhiTextureFormat::D32_Float_S8_UINT,
     };
     m_Pipeline = g_Rhi.CreateGraphicsPipeline(pipelineDesc);
 }

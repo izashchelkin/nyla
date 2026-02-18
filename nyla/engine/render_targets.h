@@ -20,7 +20,6 @@ class RenderTargets
   private:
     RhiTextureFormat m_ColorFormat;
     InlineVec<RhiTexture, kRhiMaxNumFramesInFlight> m_ColorTextures;
-    InlineVec<RhiSampledTextureView, kRhiMaxNumFramesInFlight> m_ColorSrvs;
     InlineVec<RhiRenderTargetView, kRhiMaxNumFramesInFlight> m_Rtvs;
 
     RhiTextureFormat m_DepthStencilFormat;

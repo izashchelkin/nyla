@@ -1,3 +1,4 @@
+#include "nyla/commons/handle.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_pass.h"
 #include "nyla/rhi/rhi_texture.h"
@@ -17,31 +18,41 @@ void Rhi::Impl::PassBegin(RhiPassDesc desc)
     const VulkanTextureData &renderTargetData = m_Textures.ResolveData(rtvData.texture);
     CmdTransitionTexture(cmd, rtvData.texture, desc.rtState);
 
-    const VulkanTextureViewData &dsvData = m_DepthStencilViews.ResolveData(desc.dsv);
-    const VulkanTextureData &depthStencil = m_Textures.ResolveData(dsvData.texture);
-    CmdTransitionTexture(cmd, dsvData.texture, desc.dsState);
-
     const VkRenderingAttachmentInfo colorAttachmentInfo{
         .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
         .imageView = rtvData.imageView,
-        .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        .imageLayout = renderTargetData.layout,
         .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
         .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
         .clearValue = {{{0.0f, 0.0f, 0.0f, 1.0f}}},
     };
 
-    const VkRenderingAttachmentInfo depthAttachmentInfo{
-        .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-    };
-
-    const VkRenderingInfo renderingInfo{
+    VkRenderingInfo renderingInfo{
         .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
         .renderArea = {{0, 0}, {renderTargetData.extent.width, renderTargetData.extent.height}},
         .layerCount = 1,
         .colorAttachmentCount = 1,
         .pColorAttachments = &colorAttachmentInfo,
-        .pDepthAttachment = &depthAttachmentInfo,
     };
+
+    VkRenderingAttachmentInfo depthAttachmentInfo{};
+
+    if (HandleIsSet(desc.dsv))
+    {
+        const VulkanTextureViewData &dsvData = m_DepthStencilViews.ResolveData(desc.dsv);
+        const VulkanTextureData &depthStencilData = m_Textures.ResolveData(dsvData.texture);
+        CmdTransitionTexture(cmd, dsvData.texture, desc.dsState);
+
+        depthAttachmentInfo = {
+            .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+            .imageView = dsvData.imageView,
+            .imageLayout = depthStencilData.layout,
+            .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+            .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+            .clearValue = {{{0.0f, 0.0f, 0.0f, 1.0f}}},
+        };
+        renderingInfo.pDepthAttachment = &depthAttachmentInfo;
+    }
 
     vkCmdBeginRendering(cmdbuf, &renderingInfo);
 

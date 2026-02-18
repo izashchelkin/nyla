@@ -80,8 +80,11 @@ auto Rhi::Impl::ConvertTextureFormatIntoVkFormat(RhiTextureFormat format, VkImag
 {
     switch (format)
     {
-    case RhiTextureFormat::None:
+    case RhiTextureFormat::None: {
+        if (outAspectMask)
+            *outAspectMask = 0;
         return VK_FORMAT_UNDEFINED;
+    }
     case RhiTextureFormat::R8G8B8A8_sRGB: {
         if (outAspectMask)
             *outAspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
