@@ -113,6 +113,7 @@ struct VulkanTextureData
     RhiTextureState state;
     VkImageLayout layout;
     VkFormat format;
+    VkImageAspectFlags aspectMask;
     VkExtent3D extent;
 };
 
@@ -171,7 +172,7 @@ class Rhi::Impl
 
     auto ConvertVertexFormatIntoVkFormat(RhiVertexFormat format) -> VkFormat;
 
-    auto ConvertTextureFormatIntoVkFormat(RhiTextureFormat format) -> VkFormat;
+    auto ConvertTextureFormatIntoVkFormat(RhiTextureFormat format, VkImageAspectFlags *outAspectMask) -> VkFormat;
     auto ConvertVkFormatIntoTextureFormat(VkFormat format) -> RhiTextureFormat;
 
     auto ConvertTextureUsageToVkImageUsageFlags(RhiTextureUsage usage) -> VkImageUsageFlags;

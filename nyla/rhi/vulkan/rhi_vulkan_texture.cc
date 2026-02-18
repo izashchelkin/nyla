@@ -76,20 +76,32 @@ auto VulkanTextureStateGetSyncInfo(RhiTextureState state) -> VulkanTextureStateS
 
 } // namespace
 
-auto Rhi::Impl::ConvertTextureFormatIntoVkFormat(RhiTextureFormat format) -> VkFormat
+auto Rhi::Impl::ConvertTextureFormatIntoVkFormat(RhiTextureFormat format, VkImageAspectFlags *outAspectMask) -> VkFormat
 {
     switch (format)
     {
     case RhiTextureFormat::None:
         return VK_FORMAT_UNDEFINED;
-    case RhiTextureFormat::R8G8B8A8_sRGB:
+    case RhiTextureFormat::R8G8B8A8_sRGB: {
+        if (outAspectMask)
+            *outAspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         return VK_FORMAT_R8G8B8A8_SRGB;
-    case RhiTextureFormat::B8G8R8A8_sRGB:
+    }
+    case RhiTextureFormat::B8G8R8A8_sRGB: {
+        if (outAspectMask)
+            *outAspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         return VK_FORMAT_B8G8R8A8_SRGB;
-    case RhiTextureFormat::D32_Float:
+    }
+    case RhiTextureFormat::D32_Float: {
+        if (outAspectMask)
+            *outAspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
         return VK_FORMAT_D32_SFLOAT;
-    case RhiTextureFormat::D32_Float_S8_UINT:
+    }
+    case RhiTextureFormat::D32_Float_S8_UINT: {
+        if (outAspectMask)
+            *outAspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
         return VK_FORMAT_D32_SFLOAT_S8_UINT;
+    }
     }
     NYLA_ASSERT(false);
     return static_cast<VkFormat>(0);
@@ -152,9 +164,10 @@ auto Rhi::Impl::ConvertTextureUsageToVkImageUsageFlags(RhiTextureUsage usage) ->
 auto Rhi::Impl::CreateTexture(RhiTextureDesc desc) -> RhiTexture
 {
     VulkanTextureData textureData{
-        .format = ConvertTextureFormatIntoVkFormat(desc.format),
         .extent = {desc.width, desc.height, 1},
     };
+
+    textureData.format = ConvertTextureFormatIntoVkFormat(desc.format, &textureData.aspectMask);
 
     VkMemoryPropertyFlags memoryPropertyFlags = ConvertMemoryUsageIntoVkMemoryPropertyFlags(desc.memoryUsage);
 
@@ -209,7 +222,7 @@ auto Rhi::Impl::CreateSampledTextureView(const RhiTextureViewDesc &desc) -> RhiS
     if (desc.format == RhiTextureFormat::None)
         textureViewData.format = textureData.format;
     else
-        textureViewData.format = ConvertTextureFormatIntoVkFormat(desc.format);
+        textureViewData.format = ConvertTextureFormatIntoVkFormat(desc.format, nullptr);
 
     const VkImageViewCreateInfo imageViewCreateInfo{
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -247,7 +260,7 @@ auto Rhi::Impl::CreateRenderTargetView(const RhiRenderTargetViewDesc &desc) -> R
     if (desc.format == RhiTextureFormat::None)
         renderTargetViewData.format = textureData.format;
     else
-        renderTargetViewData.format = ConvertTextureFormatIntoVkFormat(desc.format);
+        renderTargetViewData.format = ConvertTextureFormatIntoVkFormat(desc.format, nullptr);
 
     const VkImageViewCreateInfo imageViewCreateInfo{
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -284,7 +297,7 @@ auto Rhi::Impl::CreateDepthStencilView(const RhiDepthStencilViewDesc &desc) -> R
     if (desc.format == RhiTextureFormat::None)
         dsvData.format = textureData.format;
     else
-        dsvData.format = ConvertTextureFormatIntoVkFormat(desc.format);
+        dsvData.format = ConvertTextureFormatIntoVkFormat(desc.format, nullptr);
 
     const VkImageViewCreateInfo imageViewCreateInfo{
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -347,7 +360,7 @@ void Rhi::Impl::CmdTransitionTexture(RhiCmdList cmd, RhiTexture texture, RhiText
         .image = textureData.image,
         .subresourceRange =
             {
-                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, // TODO: wtf here
+                .aspectMask = textureData.aspectMask,
                 .baseMipLevel = 0,
                 .levelCount = 1,
                 .baseArrayLayer = 0,

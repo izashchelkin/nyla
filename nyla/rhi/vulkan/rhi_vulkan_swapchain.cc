@@ -149,6 +149,7 @@ void Rhi::Impl::CreateSwapchain()
             textureData.layout = VK_IMAGE_LAYOUT_UNDEFINED;
             textureData.format = surfaceFormat.format;
             textureData.extent = VkExtent3D{surfaceExtent.width, surfaceExtent.height, 1};
+            textureData.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 
             vkDestroyImageView(m_Dev, rtvData.imageView, m_Alloc);
 
@@ -175,6 +176,7 @@ void Rhi::Impl::CreateSwapchain()
                 .memory = nullptr,
                 .state = RhiTextureState::Present,
                 .format = surfaceFormat.format,
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
                 .extent = VkExtent3D{surfaceExtent.width, surfaceExtent.height, 1},
             };
 

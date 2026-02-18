@@ -253,14 +253,14 @@ auto Rhi::Impl::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> R
     InlineVec<VkFormat, 16> colorTargetFormats;
     for (RhiTextureFormat colorTargetFormat : desc.colorTargetFormats)
     {
-        colorTargetFormats.emplace_back(ConvertTextureFormatIntoVkFormat(colorTargetFormat));
+        colorTargetFormats.emplace_back(ConvertTextureFormatIntoVkFormat(colorTargetFormat, nullptr));
     }
 
     const VkPipelineRenderingCreateInfo pipelineRenderingCreateInfo{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
         .colorAttachmentCount = colorTargetFormats.size(),
         .pColorAttachmentFormats = colorTargetFormats.data(),
-        .depthAttachmentFormat = ConvertTextureFormatIntoVkFormat(desc.depthFormat),
+        .depthAttachmentFormat = ConvertTextureFormatIntoVkFormat(desc.depthFormat, nullptr),
     };
 
 #if 0
