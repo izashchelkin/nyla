@@ -1,6 +1,6 @@
 #include "nyla/engine/asset_manager.h"
+#include "nyla/engine/render_targets.h"
 #include "nyla/rhi/rhi_cmdlist.h"
-#include "nyla/rhi/rhi_texture.h"
 
 namespace nyla
 {
@@ -10,7 +10,7 @@ class Game
   public:
     void Init();
     void Process(RhiCmdList cmd, float dt);
-    void Render(RhiCmdList cmd, RhiRenderTargetView rtv);
+    void Render(RhiCmdList cmd);
 
   private:
     struct Assets
@@ -18,6 +18,8 @@ class Game
         AssetManager::Mesh ball;
     };
     Assets m_Assets;
+
+    RenderTargets m_RenderTargets;
 };
 
 } // namespace nyla

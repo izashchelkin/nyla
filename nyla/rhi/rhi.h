@@ -151,6 +151,10 @@ class Rhi
     void DestroyRenderTargetView(RhiRenderTargetView);
     auto GetTexture(RhiRenderTargetView srv) -> RhiTexture;
 
+    auto CreateDepthStencilView(const RhiDepthStencilViewDesc &desc) -> RhiDepthStencilView;
+    void DestroyDepthStencilView(RhiDepthStencilView textureView);
+    auto GetTexture(RhiDepthStencilView dsv) -> RhiTexture;
+
     auto GetBackbufferView() -> RhiRenderTargetView;
     void TriggerSwapchainRecreate();
 

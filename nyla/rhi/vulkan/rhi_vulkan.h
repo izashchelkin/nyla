@@ -229,6 +229,10 @@ class Rhi::Impl
     void DestroyRenderTargetView(RhiRenderTargetView textureView);
     auto GetTexture(RhiRenderTargetView rtv) -> RhiTexture;
 
+    auto CreateDepthStencilView(const RhiDepthStencilViewDesc &desc) -> RhiDepthStencilView;
+    void DestroyDepthStencilView(RhiDepthStencilView textureView);
+    auto GetTexture(RhiDepthStencilView dsv) -> RhiTexture;
+
     void EnsureHostWritesVisible(VkCommandBuffer cmdbuf, VulkanBufferData &bufferData);
 
     auto CreateCmdList(RhiQueueType queueType) -> RhiCmdList;
@@ -302,6 +306,7 @@ class Rhi::Impl
 
     HandlePool<RhiTexture, VulkanTextureData, 128> m_Textures;
     HandlePool<RhiRenderTargetView, VulkanTextureViewData, 8> m_RenderTargetViews;
+    HandlePool<RhiDepthStencilView, VulkanTextureViewData, 8> m_DepthStencilViews;
     HandlePool<RhiSampledTextureView, VulkanTextureViewData, 128> m_SampledTextureViews;
 
     HandlePool<RhiSampler, VulkanSamplerData, 16> m_Samplers;

@@ -262,6 +262,43 @@ auto Rhi::Impl::CreateRenderTargetView(const RhiRenderTargetViewDesc &desc) -> R
     return rtv;
 }
 
+auto Rhi::Impl::CreateDepthStencilView(const RhiDepthStencilViewDesc &desc) -> RhiDepthStencilView
+{
+    VulkanTextureData &textureData = m_Textures.ResolveData(desc.texture);
+
+    VulkanTextureViewData dsvData{
+        .texture = desc.texture,
+
+        // TODO: expose these as well!
+        .imageViewType = VK_IMAGE_VIEW_TYPE_2D,
+        .subresourceRange =
+            {
+                .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
+                .baseMipLevel = 0,
+                .levelCount = 1,
+                .baseArrayLayer = 0,
+                .layerCount = 1,
+            },
+    };
+
+    if (desc.format == RhiTextureFormat::None)
+        dsvData.format = textureData.format;
+    else
+        dsvData.format = ConvertTextureFormatIntoVkFormat(desc.format);
+
+    const VkImageViewCreateInfo imageViewCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+        .image = textureData.image,
+        .viewType = dsvData.imageViewType,
+        .format = dsvData.format,
+        .subresourceRange = dsvData.subresourceRange,
+    };
+
+    VK_CHECK(vkCreateImageView(m_Dev, &imageViewCreateInfo, m_Alloc, &dsvData.imageView));
+    const RhiDepthStencilView dsv = m_DepthStencilViews.Acquire(dsvData);
+    return dsv;
+}
+
 auto Rhi::Impl::GetTexture(RhiSampledTextureView srv) -> RhiTexture
 {
     return m_SampledTextureViews.ResolveData(srv).texture;
@@ -270,6 +307,11 @@ auto Rhi::Impl::GetTexture(RhiSampledTextureView srv) -> RhiTexture
 auto Rhi::Impl::GetTexture(RhiRenderTargetView rtv) -> RhiTexture
 {
     return m_RenderTargetViews.ResolveData(rtv).texture;
+}
+
+auto Rhi::Impl::GetTexture(RhiDepthStencilView dsv) -> RhiTexture
+{
+    return m_DepthStencilViews.ResolveData(dsv).texture;
 }
 
 auto Rhi::Impl::GetTextureInfo(RhiTexture texture) -> RhiTextureInfo
@@ -351,6 +393,14 @@ void Rhi::Impl::DestroyRenderTargetView(RhiRenderTargetView textureView)
     vkDestroyImageView(m_Dev, textureViewData.imageView, m_Alloc);
 }
 
+void Rhi::Impl::DestroyDepthStencilView(RhiDepthStencilView textureView)
+{
+    const VulkanTextureViewData &textureViewData = m_DepthStencilViews.ReleaseData(textureView);
+    NYLA_ASSERT(textureViewData.imageView);
+
+    vkDestroyImageView(m_Dev, textureViewData.imageView, m_Alloc);
+}
+
 void Rhi::Impl::CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, uint32_t srcOffset, uint32_t size)
 {
     const VkCommandBuffer &cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
@@ -375,59 +425,6 @@ void Rhi::Impl::CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, ui
 
     vkCmdCopyBufferToImage(cmdbuf, srcBufferData.buffer, dstTextureData.image, dstTextureData.layout, 1, &region);
 }
-
-#if 0
-        const VkImageCreateInfo depthImageCreateInfo{
-            .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-
-            .imageType = VK_IMAGE_TYPE_2D,
-            .format = VK_FORMAT_D32_SFLOAT,
-            .extent = VkExtent3D{m_SurfaceExtent.width, m_SurfaceExtent.height, 1},
-            .mipLevels = 1,
-            .arrayLayers = 1,
-            .samples = VK_SAMPLE_COUNT_1_BIT,
-            .tiling = VK_IMAGE_TILING_OPTIMAL,
-            .usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-            .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-
-            // const void*              pNext;
-            // VkImageCreateFlags       flags;
-            // VkImageType              imageType;
-            // VkFormat                 format;
-            // VkExtent3D               extent;
-            // uint32_t                 mipLevels;
-            // uint32_t                 arrayLayers;
-            // VkSampleCountFlagBits    samples;
-            // VkImageTiling            tiling;
-            // VkImageUsageFlags        usage;
-            // VkSharingMode            sharingMode;
-            // uint32_t                 queueFamilyIndexCount;
-            // const uint32_t*          pQueueFamilyIndices;
-            // VkImageLayout            initialLayout;
-
-        };
-
-        VkImage depthImage;
-        VK_CHECK(vkCreateImage(m_Dev, &depthImageCreateInfo, m_Alloc, &depthImage));
-
-        const VkImageViewCreateInfo depthImageImageViewCreateInfo{
-            .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-            .image = depthImage,
-            .viewType = VK_IMAGE_VIEW_TYPE_2D,
-            .format = VK_FORMAT_D32_SFLOAT_S8_UINT,
-            .subresourceRange =
-                {
-                    .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
-                    .baseMipLevel = 0,
-                    .levelCount = 1,
-                    .baseArrayLayer = 0,
-                    .layerCount = 1,
-                },
-        };
-
-        VkImageView depthImageView;
-        // VK_CHECK(vkCreateImageView(m_Dev, &depthImageImageViewCreateInfo, m_Alloc, &depthImageView));
-#endif
 
 //
 
@@ -456,6 +453,16 @@ void Rhi::DestroyRenderTargetView(RhiRenderTargetView rtv)
     m_Impl->DestroyRenderTargetView(rtv);
 }
 
+auto Rhi::CreateDepthStencilView(const RhiDepthStencilViewDesc &desc) -> RhiDepthStencilView
+{
+    return m_Impl->CreateDepthStencilView(desc);
+}
+
+void Rhi::DestroyDepthStencilView(RhiDepthStencilView dsv)
+{
+    m_Impl->DestroyDepthStencilView(dsv);
+}
+
 void Rhi::DestroyTexture(RhiTexture texture)
 {
     return m_Impl->DestroyTexture(texture);
@@ -469,6 +476,11 @@ auto Rhi::GetTexture(RhiSampledTextureView srv) -> RhiTexture
 auto Rhi::GetTexture(RhiRenderTargetView rtv) -> RhiTexture
 {
     return m_Impl->GetTexture(rtv);
+}
+
+auto Rhi::GetTexture(RhiDepthStencilView dsv) -> RhiTexture
+{
+    return m_Impl->GetTexture(dsv);
 }
 
 auto Rhi::GetTextureInfo(RhiTexture texture) -> RhiTextureInfo

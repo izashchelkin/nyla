@@ -17,7 +17,7 @@ void Rhi::Impl::PassBegin(RhiPassDesc desc)
     const VulkanTextureData &renderTargetData = m_Textures.ResolveData(rtvData.texture);
     CmdTransitionTexture(cmd, rtvData.texture, desc.rtState);
 
-    const VulkanTextureViewData &dsvData = m_RenderTargetViews.ResolveData(desc.dsv);
+    const VulkanTextureViewData &dsvData = m_DepthStencilViews.ResolveData(desc.dsv);
     const VulkanTextureData &depthStencil = m_Textures.ResolveData(dsvData.texture);
     CmdTransitionTexture(cmd, dsvData.texture, desc.dsState);
 
@@ -72,7 +72,7 @@ void Rhi::Impl::PassEnd(RhiPassDesc desc)
     const VulkanTextureViewData &rtvData = m_RenderTargetViews.ResolveData(desc.rtv);
     CmdTransitionTexture(cmd, rtvData.texture, desc.rtState);
 
-    const VulkanTextureViewData &dsvData = m_RenderTargetViews.ResolveData(desc.dsv);
+    const VulkanTextureViewData &dsvData = m_DepthStencilViews.ResolveData(desc.dsv);
     CmdTransitionTexture(cmd, dsvData.texture, desc.dsState);
 
     cmdData.passConstantHead += CbvOffset(m_Limits.passConstantSize);

@@ -10,7 +10,7 @@ struct RhiPassDesc
     RhiRenderTargetView rtv;
     RhiTextureState rtState;
 
-    RhiRenderTargetView dsv;
+    RhiDepthStencilView dsv;
     RhiTextureState dsState;
 };
 

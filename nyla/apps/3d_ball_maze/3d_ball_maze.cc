@@ -2,6 +2,7 @@
 #include "nyla/commons/memory/region_alloc.h"
 #include "nyla/engine/debug_text_renderer.h"
 #include "nyla/engine/engine.h"
+#include "nyla/engine/render_targets.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_buffer.h"
@@ -17,17 +18,28 @@ void Game::Init()
     auto &assetManager = g_Engine.GetAssetManager();
 
     m_Assets.ball = assetManager.DeclareMesh("c:/blender/export/sphere.gltf");
+
+    //
+
+    m_RenderTargets.Init(RhiTextureFormat::B8G8R8A8_sRGB, RhiTextureFormat::D32_Float_S8_UINT);
 }
 
 void Game::Process(RhiCmdList cmd, float dt)
 {
 }
 
-void Game::Render(RhiCmdList cmd, RhiRenderTargetView rtv)
+void Game::Render(RhiCmdList cmd)
 {
+    RhiTextureInfo backbufferInfo = g_Rhi.GetTextureInfo(g_Rhi.GetTexture(g_Rhi.GetBackbufferView()));
+
+    RhiRenderTargetView rtv;
+    RhiDepthStencilView dsv;
+    m_RenderTargets.GetTargets(backbufferInfo.width, backbufferInfo.height, rtv, dsv);
+
     g_Rhi.PassBegin({
         .rtv = rtv,
         .rtState = RhiTextureState::ColorTarget,
+        .dsv = dsv,
         .dsState = RhiTextureState::DepthTarget,
     });
 
@@ -43,6 +55,7 @@ void Game::Render(RhiCmdList cmd, RhiRenderTargetView rtv)
     g_Rhi.PassEnd({
         .rtv = rtv,
         .rtState = RhiTextureState::Present,
+        .dsv = dsv,
         .dsState = RhiTextureState::DepthTarget,
     });
 }
@@ -66,27 +79,15 @@ auto PlatformMain() -> int
     Game game{};
     game.Init();
 
-    g_Rhi.GetBackbufferView();
-
     while (!g_Engine.ShouldExit())
     {
         const auto [cmd, dt, fps] = g_Engine.FrameBegin();
         g_Engine.GetDebugTextRenderer().Text(500, 10, std::format("fps={}", fps));
 
+        RhiTextureInfo backbufferInfo = g_Rhi.GetTextureInfo(g_Rhi.GetTexture(g_Rhi.GetBackbufferView()));
+
         game.Process(cmd, dt);
-
-        RhiRenderTargetView rtv = g_Rhi.GetBackbufferView();
-        RhiTextureInfo rtInfo = g_Rhi.GetTextureInfo(g_Rhi.GetTexture(rtv));
-
-        g_Rhi.CreateTexture(RhiTextureDesc{
-            .width = rtInfo.width,
-            .height = rtInfo.height,
-            .memoryUsage = RhiMemoryUsage::GpuOnly,
-            .usage = RhiTextureUsage::DepthStencil,
-            .format = RhiTextureFormat::D32_Float_S8_UINT,
-        });
-
-        game.Render(cmd, rtv);
+        game.Render(cmd);
 
         g_Engine.FrameEnd();
     }
