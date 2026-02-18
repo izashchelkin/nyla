@@ -58,6 +58,10 @@ struct RhiRenderTargetView : Handle
 {
 };
 
+struct RhiDepthStencilView : Handle
+{
+};
+
 struct RhiTextureDesc
 {
     uint32_t width;

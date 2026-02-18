@@ -28,7 +28,6 @@ void DebugTextRenderer::Init()
         .debugName = "DebugTextRender",
         .vs = vs,
         .ps = ps,
-        .colorTargetFormatsCount = 1,
         .colorTargetFormats = AssetManager::GetMeshPipelineColorTargetFormats(),
     };
     m_Pipeline = g_Rhi.CreateGraphicsPipeline(pipelineDesc);

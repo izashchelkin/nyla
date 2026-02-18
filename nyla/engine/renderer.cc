@@ -32,13 +32,11 @@ void Renderer::Init()
         .debugName = "Renderer",
         .vs = vs,
         .ps = ps,
-        .vertexBindingsCount = 1,
         .vertexBindings = AssetManager::GetMeshVertexBindings(),
-        .vertexAttributeCount = 3,
         .vertexAttributes = AssetManager::GetMeshVertexAttributes(),
-        .colorTargetFormatsCount = 1,
         .colorTargetFormats = AssetManager::GetMeshPipelineColorTargetFormats(),
-        .cullMode = RhiCullMode::None,
+        .depthFormat = RhiTextureFormat::D32_Float_S8_UINT,
+        .cullMode = RhiCullMode::Back,
         .frontFace = RhiFrontFace::CCW,
     };
 

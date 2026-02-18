@@ -81,7 +81,7 @@ auto Rhi::Impl::ConvertTextureFormatIntoVkFormat(RhiTextureFormat format) -> VkF
     switch (format)
     {
     case RhiTextureFormat::None:
-        break;
+        return VK_FORMAT_UNDEFINED;
     case RhiTextureFormat::R8G8B8A8_sRGB:
         return VK_FORMAT_R8G8B8A8_SRGB;
     case RhiTextureFormat::B8G8R8A8_sRGB:
