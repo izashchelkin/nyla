@@ -35,8 +35,8 @@ void Renderer::Init()
         .colorTargetFormats = AssetManager::GetMeshPipelineColorTargetFormats(),
         .depthFormat = RhiTextureFormat::D32_Float_S8_UINT,
         .depthWriteEnabled = true,
-        .depthTestEnabled = false,
-        .cullMode = RhiCullMode::Back,
+        .depthTestEnabled = true,
+        .cullMode = RhiCullMode::Front,
         .frontFace = RhiFrontFace::CCW,
     };
 

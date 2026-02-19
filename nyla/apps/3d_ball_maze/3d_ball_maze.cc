@@ -54,17 +54,15 @@ void Game::Render(RhiCmdList cmd)
     {
         renderer.Mesh({0, 0, 0}, {1, 1, 1}, m_Assets.ball, {});
 
-        float3 cameraPos = {5.0f, 0.0f, 5.0f};
+        float3 cameraPos = {3.0f, 1.0f, 3.0f};
         float3 targetPos = {0.0f, 0.0f, 0.0f};
         float3 worldUp = {0.0f, 1.0f, 0.0f};
         renderer.SetLookAtView(cameraPos, targetPos, worldUp);
 
-        renderer.SetView(float4x4::Identity());
-
         renderer.SetPerspectiveProjection(rtInfo.width, rtInfo.height, 90.f, .1f, 1000.f);
 
         renderer.CmdFlush(cmd);
-        debugTextRenderer.CmdFlush(cmd);
+        // debugTextRenderer.CmdFlush(cmd);
     }
     g_Rhi.PassEnd();
 
@@ -98,7 +96,7 @@ auto PlatformMain() -> int
     while (!g_Engine.ShouldExit())
     {
         const auto [cmd, dt, fps] = g_Engine.FrameBegin();
-        g_Engine.GetDebugTextRenderer().Text(500, 10, std::format("fps={}", fps));
+        // g_Engine.GetDebugTextRenderer().Text(500, 10, std::format("fps={}", fps));
 
         RhiTextureInfo backbufferInfo = g_Rhi.GetTextureInfo(g_Rhi.GetTexture(g_Rhi.GetBackbufferView()));
 

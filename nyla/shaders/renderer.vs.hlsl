@@ -33,7 +33,9 @@ VSOutput main(VSInput input)
     VSOutput o;
 
     float4 worldPos = mul(entity.model, float4(input.position, 1));
+
     o.position = mul(scene.vp, worldPos);
+
     o.normal = input.normal;
     o.uv = input.uv;
 

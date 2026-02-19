@@ -261,23 +261,25 @@ template <typename T, uint32_t N> class Mat
     [[nodiscard]]
     static auto LookAt(const Vec<K, 3> &eye, const Vec<K, 3> &center, const Vec<K, 3> &up) -> Mat
     {
-        // 1. Calculate the forward direction the camera is looking
+        // 1. Forward is unchanged
         const Vec<T, 3> f = (center - eye).Normalized();
 
-        // 2. Calculate the "right" direction using the cross product
-        const Vec<T, 3> s = f.Cross(up).Normalized();
+        // 2. LHS Right Vector: Swap the cross product order to 'up x f'
+        const Vec<T, 3> s = up.Cross(f).Normalized();
 
-        // 3. Re-calculate the exact "up" direction to guarantee the axes are exactly 90 degrees apart
-        const Vec<T, 3> u = s.Cross(f);
+        // 3. LHS Up Vector: 'f x s'
+        const Vec<T, 3> u = f.Cross(s);
 
-        // Column-major layout (Standard Right-Handed View Matrix)
-        return {s[0],          u[0],          -f[0],        static_cast<T>(0),
+        // Column-major layout (Standard Left-Handed View Matrix)
+        return {
+            s[0],          u[0],          f[0],          static_cast<T>(0),
 
-                s[1],          u[1],          -f[1],        static_cast<T>(0),
+            s[1],          u[1],          f[1],          static_cast<T>(0),
 
-                s[2],          u[2],          -f[2],        static_cast<T>(0),
+            s[2],          u[2],          f[2],          static_cast<T>(0),
 
-                -(s.Dot(eye)), -(u.Dot(eye)), (f.Dot(eye)), static_cast<T>(1)};
+            -(s.Dot(eye)), -(u.Dot(eye)), -(f.Dot(eye)), static_cast<T>(1),
+        };
     }
 
   private:

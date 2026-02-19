@@ -47,7 +47,7 @@ void Rhi::Impl::PassBegin(RhiPassDesc desc)
             .imageLayout = depthStencilData.layout,
             .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
             .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-            .clearValue = {{{0.0f, 0.0f, 0.0f, 1.0f}}},
+            .clearValue = {{{1.0f, 1.0f, 1.0f, 1.0f}}},
         };
         renderingInfo.pDepthAttachment = &depthAttachmentInfo;
     }

@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <complex>
 #include <cstddef>
 #include <cstdint>
@@ -84,12 +85,18 @@ template <typename T, uint32_t N> class Vec
     }
 
     [[nodiscard]]
-    auto Len() const -> T
+    auto LenSqr() const -> T
     {
         T sum{};
         for (uint32_t i = 0; i < N; ++i)
             sum += m_Data[i] * m_Data[i];
         return sum;
+    }
+
+    [[nodiscard]]
+    auto Len() const -> T
+    {
+        return std::sqrt(LenSqr());
     }
 
     //
