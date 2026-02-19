@@ -154,7 +154,7 @@ template <typename T, uint32_t N> class Vec
 
     auto Normalize()
     {
-        this /= Len();
+        *this /= Len();
     }
 
     [[nodiscard]]
@@ -166,7 +166,7 @@ template <typename T, uint32_t N> class Vec
     [[nodiscard]]
     auto Dot(const Vec &rhs) const -> T
     {
-        T sum;
+        T sum{};
         for (uint32_t i = 0; i < N; ++i)
             sum += m_Data[i] * rhs.m_Data[i];
         return sum;
@@ -177,9 +177,9 @@ template <typename T, uint32_t N> class Vec
         requires(N == 3)
     {
         return Vec{
-            m_Data[1] * rhs.m_Data[2] - m_Data[2] * rhs[1].m_data,
-            m_Data[2] * rhs.m_Data[0] - m_Data[0] * rhs[2].m_data,
-            m_Data[0] * rhs.m_Data[1] - m_Data[1] * rhs[0].m_data,
+            m_Data[1] * rhs.m_Data[2] - m_Data[2] * rhs[1],
+            m_Data[2] * rhs.m_Data[0] - m_Data[0] * rhs[2],
+            m_Data[0] * rhs.m_Data[1] - m_Data[1] * rhs[0],
         };
     }
 

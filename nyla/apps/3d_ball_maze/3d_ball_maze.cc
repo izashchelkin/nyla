@@ -1,4 +1,5 @@
 #include "nyla/apps/3d_ball_maze/3d_ball_maze.h"
+#include "nyla/commons/math/mat.h"
 #include "nyla/commons/memory/region_alloc.h"
 #include "nyla/engine/debug_text_renderer.h"
 #include "nyla/engine/engine.h"
@@ -51,9 +52,18 @@ void Game::Render(RhiCmdList cmd)
         .dsv = dsv,
     });
     {
-        renderer.Mesh({0, 0, 0}, {10, 10, 10}, m_Assets.ball, {});
+        renderer.Mesh({0, 0, 0}, {1, 1, 1}, m_Assets.ball, {});
 
-        renderer.CmdFlush(cmd, rtInfo.width, rtInfo.height, 64);
+        float3 cameraPos = {5.0f, 0.0f, 5.0f};
+        float3 targetPos = {0.0f, 0.0f, 0.0f};
+        float3 worldUp = {0.0f, 1.0f, 0.0f};
+        renderer.SetLookAtView(cameraPos, targetPos, worldUp);
+
+        renderer.SetView(float4x4::Identity());
+
+        renderer.SetPerspectiveProjection(rtInfo.width, rtInfo.height, 90.f, .1f, 1000.f);
+
+        renderer.CmdFlush(cmd);
         debugTextRenderer.CmdFlush(cmd);
     }
     g_Rhi.PassEnd();

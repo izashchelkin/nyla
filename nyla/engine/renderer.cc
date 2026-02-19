@@ -1,6 +1,4 @@
 #include "nyla/engine/renderer.h"
-#include "nyla/apps/breakout/breakout.h"
-#include "nyla/commons/assert.h"
 #include "nyla/commons/byteview.h"
 #include "nyla/commons/containers/inline_vec.h"
 #include "nyla/commons/handle.h"
@@ -36,6 +34,8 @@ void Renderer::Init()
         .vertexAttributes = AssetManager::GetMeshVertexAttributes(),
         .colorTargetFormats = AssetManager::GetMeshPipelineColorTargetFormats(),
         .depthFormat = RhiTextureFormat::D32_Float_S8_UINT,
+        .depthWriteEnabled = true,
+        .depthTestEnabled = false,
         .cullMode = RhiCullMode::Back,
         .frontFace = RhiFrontFace::CCW,
     };
@@ -73,23 +73,11 @@ void Renderer::Mesh(float3 pos, float3 scale, AssetManager::Mesh mesh, AssetMana
     entity.samplerIndex = uint32_t(AssetManager::SamplerType::NearestClamp);
 }
 
-void Renderer::CmdFlush(RhiCmdList cmd, uint32_t width, uint32_t height, float metersOnScreen)
+void Renderer::CmdFlush(RhiCmdList cmd)
 {
     g_Rhi.CmdBindGraphicsPipeline(cmd, m_Pipeline);
 
-    float worldW;
-    float worldH;
-
-    const float base = metersOnScreen;
-    const float aspect = ((float)width) / ((float)height);
-
-    worldH = base;
-    worldW = base * aspect;
-
-    float4x4 view = float4x4::Identity();
-    float4x4 proj = float4x4::Ortho(-worldW * .5f, worldW * .5f, worldH * .5f, -worldH * .5f, 0.f, 1.f);
-
-    float4x4 vp = proj.Mult(view);
+    float4x4 vp = m_Proj.Mult(m_View);
     float4x4 invVp = vp.Inversed();
     Scene scene = {
         .vp = vp,
