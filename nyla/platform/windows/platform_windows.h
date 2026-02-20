@@ -44,6 +44,8 @@ class Platform::Impl
     auto UpdateGamepad(uint32_t index) -> bool;
     auto GetGamepadLeftStick(uint32_t index) -> float2;
     auto GetGamepadRightStick(uint32_t index) -> float2;
+    auto GetGamepadLeftTrigger(uint32_t index) -> float;
+    auto GetGamepadRightTrigger(uint32_t index) -> float;
 
   private:
     char *m_AddressSpaceBase;

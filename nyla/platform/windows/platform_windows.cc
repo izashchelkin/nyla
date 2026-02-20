@@ -6,6 +6,7 @@
 #include "nyla/commons/containers/inline_ring.h"
 #include "nyla/platform/platform.h"
 #include <cstdint>
+#include <limits>
 
 auto CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) -> LRESULT;
 
@@ -139,13 +140,13 @@ auto Platform::Impl::UpdateGamepad(uint32_t index) -> bool
 namespace
 {
 
-auto GetGamepadStickInternal(auto rawx, auto rawy, auto rawdeadzone) -> float2
+auto GetGamepadStick(auto rawX, auto rawY, auto rawDeadzone) -> float2
 {
-    const float x = (float)rawx / (float)std::numeric_limits<uint16_t>::max();
-    const float y = (float)rawy / (float)std::numeric_limits<uint16_t>::max();
+    const float x = (float)rawX / (float)std::numeric_limits<int16_t>::max();
+    const float y = (float)rawY / (float)std::numeric_limits<int16_t>::max();
 
     const float magnitude = std::sqrt(x * x + y * y);
-    const float deadzone = (float)rawdeadzone / (float)std::numeric_limits<uint16_t>::max();
+    const float deadzone = (float)rawDeadzone / (float)std::numeric_limits<int16_t>::max();
 
     if (magnitude < deadzone)
     {
@@ -158,18 +159,44 @@ auto GetGamepadStickInternal(auto rawx, auto rawy, auto rawdeadzone) -> float2
     return {(x / magnitude) * scale, (y / magnitude) * scale};
 }
 
+auto GetGamepadTrigger(uint8_t rawValue, uint8_t rawDeadzone) -> float
+{
+    const float val = (float)rawValue / (float)std::numeric_limits<uint8_t>::max();
+    const float deadzone = (float)rawDeadzone / (float)std::numeric_limits<uint8_t>::max();
+
+    if (val < deadzone)
+    {
+        return 0.0f;
+    }
+
+    // Renormalize so movement starts smoothly from the edge of the deadzone
+    return (val - deadzone) / (1.0f - deadzone);
+}
+
 } // namespace
 
 auto Platform::Impl::GetGamepadLeftStick(uint32_t index) -> float2
 {
     auto &gamepad = m_Gamepads[index].Gamepad;
-    return GetGamepadStickInternal(gamepad.sThumbLX, gamepad.sThumbLY, XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE);
+    return GetGamepadStick(gamepad.sThumbLX, gamepad.sThumbLY, XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE);
 }
 
 auto Platform::Impl::GetGamepadRightStick(uint32_t index) -> float2
 {
     auto &gamepad = m_Gamepads[index].Gamepad;
-    return GetGamepadStickInternal(gamepad.sThumbRX, gamepad.sThumbRY, XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE);
+    return GetGamepadStick(gamepad.sThumbRX, gamepad.sThumbRY, XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE);
+}
+
+auto Platform::Impl::GetGamepadLeftTrigger(uint32_t index) -> float
+{
+    auto &gamepad = m_Gamepads[index].Gamepad;
+    return GetGamepadTrigger(gamepad.bLeftTrigger, XINPUT_GAMEPAD_TRIGGER_THRESHOLD);
+}
+
+auto Platform::Impl::GetGamepadRightTrigger(uint32_t index) -> float
+{
+    auto &gamepad = m_Gamepads[index].Gamepad;
+    return GetGamepadTrigger(gamepad.bRightTrigger, XINPUT_GAMEPAD_TRIGGER_THRESHOLD);
 }
 
 auto Platform::UpdateGamepad(uint32_t index) -> bool
@@ -185,6 +212,16 @@ auto Platform::GetGamepadLeftStick(uint32_t index) -> float2
 auto Platform::GetGamepadRightStick(uint32_t index) -> float2
 {
     return m_Impl->GetGamepadRightStick(index);
+}
+
+auto Platform::GetGamepadLeftTrigger(uint32_t index) -> float
+{
+    return m_Impl->GetGamepadLeftTrigger(index);
+}
+
+auto Platform::GetGamepadRightTrigger(uint32_t index) -> float
+{
+    return m_Impl->GetGamepadRightTrigger(index);
 }
 
 //

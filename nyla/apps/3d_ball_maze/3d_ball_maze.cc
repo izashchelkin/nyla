@@ -1,5 +1,6 @@
 #include "nyla/apps/3d_ball_maze/3d_ball_maze.h"
 #include "nyla/commons/assert.h"
+#include "nyla/commons/log.h"
 #include "nyla/commons/math/mat.h"
 #include "nyla/commons/memory/region_alloc.h"
 #include "nyla/engine/debug_text_renderer.h"
@@ -11,9 +12,12 @@
 #include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_texture.h"
+#include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <format>
 #include <numbers>
+#include <utility>
 
 namespace nyla
 {
@@ -69,21 +73,24 @@ void Game::Process(RhiCmdList cmd, float dt)
     int dx = inputManager.IsPressed(moveRight) - inputManager.IsPressed(moveLeft);
     int dy = inputManager.IsPressed(moveForward) - inputManager.IsPressed(moveBackward);
 #endif
-    float dx = 0;
-    float dy = 0;
+    float2 movement{};
 
-    float yaw = 0;
-    float pitch = 0;
+    static float yaw = 0;
+    static float pitch = 0;
+
+    float verticalInput = 0;
 
     if (g_Platform.UpdateGamepad(0))
     {
-        const float2 movement = g_Platform.GetGamepadLeftStick(0);
-        dx = movement[0];
-        dy = movement[1];
+        movement = g_Platform.GetGamepadLeftStick(0);
 
         const float2 rotation = g_Platform.GetGamepadRightStick(0);
-        yaw += rotation[0];
-        pitch += rotation[1];
+        yaw += rotation[0] * 0.1f;
+        pitch -= rotation[1] * 0.1f;
+
+        pitch = std::clamp(pitch, -1.55f, 1.55f);
+
+        verticalInput = g_Platform.GetGamepadLeftTrigger(0) - g_Platform.GetGamepadRightTrigger(0);
     }
 
     g_Platform.GetGamepadLeftStick(0);
@@ -108,13 +115,25 @@ void Game::Process(RhiCmdList cmd, float dt)
     {
         renderer.Mesh({0, 0, 0}, {1, 1, 1}, m_Assets.ball, {});
 
-        static float3 cameraPos = {0.f, 0.f, 5.f};
-        cameraPos[0] -= dx * dt * 10.f;
-        cameraPos[2] -= dy * dt * 10.f;
+        const float3 forward{
+            cos(pitch) * sin(yaw),
+            sin(pitch),
+            cos(pitch) * cos(yaw),
+        };
 
-        static float3 targetPos = {0.f, 0.f, 0.f};
+        static float3 cameraPos{0.f, 0.f, 5.f};
 
-        float3 worldUp = {0.0f, 1.0f, 0.0f};
+        const float3 worldUp = {0.0f, 1.0f, 0.0f};
+        const float3 right = worldUp.Cross(forward).Normalized();
+        const float3 up = forward.Cross(right);
+        const float moveSpeed = 10.0f * dt;
+
+        cameraPos += forward * movement[1] * moveSpeed;
+        cameraPos += right * movement[0] * moveSpeed;
+        cameraPos += up * verticalInput * moveSpeed;
+
+        const float3 targetPos = cameraPos + forward;
+
         renderer.SetLookAtView(cameraPos, targetPos, worldUp);
 
         renderer.SetPerspectiveProjection(rtInfo.width, rtInfo.height, 90.f, .01f, 1000.f);
