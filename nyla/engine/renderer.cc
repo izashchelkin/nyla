@@ -36,7 +36,7 @@ void Renderer::Init()
         .depthFormat = RhiTextureFormat::D32_Float_S8_UINT,
         .depthWriteEnabled = true,
         .depthTestEnabled = true,
-        .cullMode = RhiCullMode::Front,
+        .cullMode = RhiCullMode::Back,
         .frontFace = RhiFrontFace::CCW,
     };
 

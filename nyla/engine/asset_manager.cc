@@ -110,6 +110,18 @@ void AssetManager::Upload(RhiCmdList cmd)
                                 uploadManager.CmdCopyStaticIndices(cmd, bufferSize, meshData.indexBufferOffset);
 
                             std::span<char> indicesData = parser.GetAccessorData(indices);
+
+#if 0
+                            { // conversion
+                                std::span<uint16_t> indices{(uint16_t *)indicesData.data(),
+                                                            indicesData.size_bytes() / sizeof(uint16_t)};
+                                for (uint32_t i = 0; i < indices.size(); i += 3)
+                                {
+                                    std::swap(indices[i + 1], indices[i + 2]);
+                                }
+                            }
+#endif
+
                             memcpy(uploadMemory, indicesData.data(), indicesData.size_bytes());
 
                             NYLA_ASSERT((indicesData.size_bytes() % sizeof(uint16_t)) == 0);
@@ -165,6 +177,19 @@ void AssetManager::Upload(RhiCmdList cmd)
 
                             for (uint32_t i = 0; i < pos.count; ++i)
                             {
+
+#if 0
+                                { // conversion
+                                    auto *thisPos =
+                                        (float3 *)(posBufferView.data() + size_t(GetGltfAccessorSize(pos) * i));
+                                    (*thisPos)[2] = -(*thisPos)[2];
+
+                                    auto *thisNormal =
+                                        (float3 *)(normBufferView.data() + size_t(GetGltfAccessorSize(norm) * i));
+                                    (*thisNormal)[2] = -(*thisNormal)[2];
+                                }
+#endif
+
                                 auto copyAttribute = [uploadMemory, i, stride](GltfAccessor accessor, uint32_t offset,
                                                                                char *byteBufferViewData) -> void {
                                     void *const dst = uploadMemory + static_cast<uint64_t>(i * stride + offset);
@@ -196,8 +221,13 @@ void AssetManager::Upload(RhiCmdList cmd)
         if (!textureAssetData.needsUpload)
             continue;
 
+        // stbi_set_flip_vertically_on_load(true);
         void *data = stbi_load(textureAssetData.path.c_str(), (int *)&textureAssetData.width,
                                (int *)&textureAssetData.height, (int *)&textureAssetData.channels, STBI_rgb_alpha);
+
+        if (textureAssetData.channels != 4) // alpha missing?
+            textureAssetData.channels = 4;
+
         if (!data)
         {
             NYLA_LOG("stbi_load failed for '%s': %s", textureAssetData.path.data(), stbi_failure_reason());

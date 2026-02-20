@@ -36,6 +36,8 @@ VSOutput main(VSInput input)
 
     o.position = mul(scene.vp, worldPos);
 
+    // o.position.y = -o.position.y;
+
     o.normal = input.normal;
     o.uv = input.uv;
 

@@ -267,8 +267,8 @@ template <typename T, uint32_t N> class Mat
         // 2. LHS Right Vector: Swap the cross product order to 'up x f'
         const Vec<T, 3> s = up.Cross(f).Normalized();
 
-        // 3. LHS Up Vector: 'f x s'
-        const Vec<T, 3> u = f.Cross(s);
+        // 3. LHS Up Vector: 's x f'
+        const Vec<T, 3> u = s.Cross(f);
 
         // Column-major layout (Standard Left-Handed View Matrix)
         return {

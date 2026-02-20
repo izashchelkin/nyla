@@ -10,7 +10,6 @@ class Game
   public:
     void Init();
     void Process(RhiCmdList cmd, float dt);
-    void Render(RhiCmdList cmd);
 
   private:
     struct Assets

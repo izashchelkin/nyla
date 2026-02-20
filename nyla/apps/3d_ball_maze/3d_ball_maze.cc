@@ -1,14 +1,17 @@
 #include "nyla/apps/3d_ball_maze/3d_ball_maze.h"
+#include "nyla/commons/assert.h"
 #include "nyla/commons/math/mat.h"
 #include "nyla/commons/memory/region_alloc.h"
 #include "nyla/engine/debug_text_renderer.h"
 #include "nyla/engine/engine.h"
+#include "nyla/engine/input_manager.h"
 #include "nyla/engine/render_targets.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_texture.h"
+#include <cstdint>
 #include <format>
 
 namespace nyla
@@ -27,12 +30,42 @@ void Game::Init()
 
 void Game::Process(RhiCmdList cmd, float dt)
 {
-}
-
-void Game::Render(RhiCmdList cmd)
-{
     auto &renderer = g_Engine.GetRenderer();
+    auto &inputManager = g_Engine.GetInputManager();
     auto &debugTextRenderer = g_Engine.GetDebugTextRenderer();
+
+    static const auto moveLeft = [&] -> InputId {
+        const InputId ret = inputManager.NewId();
+        inputManager.Map(ret, 1, uint32_t(KeyPhysical::S));
+        return ret;
+    }();
+
+    static const auto moveRight = [&] -> InputId {
+        const InputId ret = inputManager.NewId();
+        inputManager.Map(ret, 1, uint32_t(KeyPhysical::F));
+        return ret;
+    }();
+
+    static const auto moveForward = [&] -> InputId {
+        const InputId ret = inputManager.NewId();
+        inputManager.Map(ret, 1, uint32_t(KeyPhysical::E));
+        return ret;
+    }();
+
+    static const auto moveBackward = [&] -> InputId {
+        const InputId ret = inputManager.NewId();
+        inputManager.Map(ret, 1, uint32_t(KeyPhysical::D));
+        return ret;
+    }();
+
+    static const auto resetLookat = [&] -> InputId {
+        const InputId ret = inputManager.NewId();
+        inputManager.Map(ret, 1, uint32_t(KeyPhysical::Space));
+        return ret;
+    }();
+
+    int dx = inputManager.IsPressed(moveRight) - inputManager.IsPressed(moveLeft);
+    int dy = inputManager.IsPressed(moveForward) - inputManager.IsPressed(moveBackward);
 
     RhiTexture backbuffer = g_Rhi.GetTexture(g_Rhi.GetBackbufferView());
     RhiTextureInfo backbufferInfo = g_Rhi.GetTextureInfo(backbuffer);
@@ -54,12 +87,30 @@ void Game::Render(RhiCmdList cmd)
     {
         renderer.Mesh({0, 0, 0}, {1, 1, 1}, m_Assets.ball, {});
 
-        float3 cameraPos = {3.0f, 1.0f, 3.0f};
-        float3 targetPos = {0.0f, 0.0f, 0.0f};
+        static float3 cameraPos = {0.f, 0.f, 5.f};
+        static float3 targetPos = {0.f, 0.f, 0.f};
+
+        if (dx)
+        {
+            cameraPos[0] -= (float)dx * dt * 10.f;
+            targetPos[0] -= (float)dx * dt * 10.f;
+        }
+
+        if (dy)
+        {
+            cameraPos[2] -= (float)dy * dt * 10.f;
+            targetPos[2] -= (float)dy * dt * 10.f;
+        }
+
+        if (inputManager.IsPressed(resetLookat))
+        {
+            targetPos = {0, 0, 0};
+        }
+
         float3 worldUp = {0.0f, 1.0f, 0.0f};
         renderer.SetLookAtView(cameraPos, targetPos, worldUp);
 
-        renderer.SetPerspectiveProjection(rtInfo.width, rtInfo.height, 90.f, .1f, 1000.f);
+        renderer.SetPerspectiveProjection(rtInfo.width, rtInfo.height, 90.f, .01f, 1000.f);
 
         renderer.CmdFlush(cmd);
         // debugTextRenderer.CmdFlush(cmd);
@@ -101,7 +152,6 @@ auto PlatformMain() -> int
         RhiTextureInfo backbufferInfo = g_Rhi.GetTextureInfo(g_Rhi.GetTexture(g_Rhi.GetBackbufferView()));
 
         game.Process(cmd, dt);
-        game.Render(cmd);
 
         g_Engine.FrameEnd();
     }
