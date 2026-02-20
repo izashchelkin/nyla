@@ -12,6 +12,13 @@ auto InputManager::NewId() -> InputId
     return {.index = static_cast<uint8_t>(m_InputStates.size() - 1)};
 }
 
+auto InputManager::NewIdMapped(uint32_t type, uint32_t code) -> InputId
+{
+    auto ret = NewId();
+    Map(ret, type, code);
+    return ret;
+}
+
 void InputManager::Map(InputId input, uint32_t type, uint32_t code)
 {
     m_InputStates[input.index].mappedTo = {

@@ -7,8 +7,8 @@ namespace nyla
 
 struct RhiPassDesc
 {
-    RhiRenderTargetView renderTarget;
-    RhiTextureState state;
+    RhiRenderTargetView rtv;
+    RhiDepthStencilView dsv;
 };
 
 } // namespace nyla

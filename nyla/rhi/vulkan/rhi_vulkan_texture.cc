@@ -1,3 +1,5 @@
+#include "nyla/commons/assert.h"
+#include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_texture.h"
 #include "nyla/rhi/vulkan/rhi_vulkan.h"
 #include <vulkan/vulkan_core.h>
@@ -76,20 +78,35 @@ auto VulkanTextureStateGetSyncInfo(RhiTextureState state) -> VulkanTextureStateS
 
 } // namespace
 
-auto Rhi::Impl::ConvertTextureFormatIntoVkFormat(RhiTextureFormat format) -> VkFormat
+auto Rhi::Impl::ConvertTextureFormatIntoVkFormat(RhiTextureFormat format, VkImageAspectFlags *outAspectMask) -> VkFormat
 {
     switch (format)
     {
-    case RhiTextureFormat::None:
-        break;
-    case RhiTextureFormat::R8G8B8A8_sRGB:
+    case RhiTextureFormat::None: {
+        if (outAspectMask)
+            *outAspectMask = 0;
+        return VK_FORMAT_UNDEFINED;
+    }
+    case RhiTextureFormat::R8G8B8A8_sRGB: {
+        if (outAspectMask)
+            *outAspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         return VK_FORMAT_R8G8B8A8_SRGB;
-    case RhiTextureFormat::B8G8R8A8_sRGB:
+    }
+    case RhiTextureFormat::B8G8R8A8_sRGB: {
+        if (outAspectMask)
+            *outAspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         return VK_FORMAT_B8G8R8A8_SRGB;
-    case RhiTextureFormat::D32_Float:
+    }
+    case RhiTextureFormat::D32_Float: {
+        if (outAspectMask)
+            *outAspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
         return VK_FORMAT_D32_SFLOAT;
-    case RhiTextureFormat::D32_Float_S8_UINT:
+    }
+    case RhiTextureFormat::D32_Float_S8_UINT: {
+        if (outAspectMask)
+            *outAspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
         return VK_FORMAT_D32_SFLOAT_S8_UINT;
+    }
     }
     NYLA_ASSERT(false);
     return static_cast<VkFormat>(0);
@@ -152,9 +169,10 @@ auto Rhi::Impl::ConvertTextureUsageToVkImageUsageFlags(RhiTextureUsage usage) ->
 auto Rhi::Impl::CreateTexture(RhiTextureDesc desc) -> RhiTexture
 {
     VulkanTextureData textureData{
-        .format = ConvertTextureFormatIntoVkFormat(desc.format),
         .extent = {desc.width, desc.height, 1},
     };
+
+    textureData.format = ConvertTextureFormatIntoVkFormat(desc.format, &textureData.aspectMask);
 
     VkMemoryPropertyFlags memoryPropertyFlags = ConvertMemoryUsageIntoVkMemoryPropertyFlags(desc.memoryUsage);
 
@@ -209,7 +227,7 @@ auto Rhi::Impl::CreateSampledTextureView(const RhiTextureViewDesc &desc) -> RhiS
     if (desc.format == RhiTextureFormat::None)
         textureViewData.format = textureData.format;
     else
-        textureViewData.format = ConvertTextureFormatIntoVkFormat(desc.format);
+        textureViewData.format = ConvertTextureFormatIntoVkFormat(desc.format, nullptr);
 
     const VkImageViewCreateInfo imageViewCreateInfo{
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -247,7 +265,7 @@ auto Rhi::Impl::CreateRenderTargetView(const RhiRenderTargetViewDesc &desc) -> R
     if (desc.format == RhiTextureFormat::None)
         renderTargetViewData.format = textureData.format;
     else
-        renderTargetViewData.format = ConvertTextureFormatIntoVkFormat(desc.format);
+        renderTargetViewData.format = ConvertTextureFormatIntoVkFormat(desc.format, nullptr);
 
     const VkImageViewCreateInfo imageViewCreateInfo{
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -262,6 +280,43 @@ auto Rhi::Impl::CreateRenderTargetView(const RhiRenderTargetViewDesc &desc) -> R
     return rtv;
 }
 
+auto Rhi::Impl::CreateDepthStencilView(const RhiDepthStencilViewDesc &desc) -> RhiDepthStencilView
+{
+    VulkanTextureData &textureData = m_Textures.ResolveData(desc.texture);
+
+    VulkanTextureViewData dsvData{
+        .texture = desc.texture,
+
+        // TODO: expose these as well!
+        .imageViewType = VK_IMAGE_VIEW_TYPE_2D,
+        .subresourceRange =
+            {
+                .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
+                .baseMipLevel = 0,
+                .levelCount = 1,
+                .baseArrayLayer = 0,
+                .layerCount = 1,
+            },
+    };
+
+    if (desc.format == RhiTextureFormat::None)
+        dsvData.format = textureData.format;
+    else
+        dsvData.format = ConvertTextureFormatIntoVkFormat(desc.format, nullptr);
+
+    const VkImageViewCreateInfo imageViewCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+        .image = textureData.image,
+        .viewType = dsvData.imageViewType,
+        .format = dsvData.format,
+        .subresourceRange = dsvData.subresourceRange,
+    };
+
+    VK_CHECK(vkCreateImageView(m_Dev, &imageViewCreateInfo, m_Alloc, &dsvData.imageView));
+    const RhiDepthStencilView dsv = m_DepthStencilViews.Acquire(dsvData);
+    return dsv;
+}
+
 auto Rhi::Impl::GetTexture(RhiSampledTextureView srv) -> RhiTexture
 {
     return m_SampledTextureViews.ResolveData(srv).texture;
@@ -270,6 +325,11 @@ auto Rhi::Impl::GetTexture(RhiSampledTextureView srv) -> RhiTexture
 auto Rhi::Impl::GetTexture(RhiRenderTargetView rtv) -> RhiTexture
 {
     return m_RenderTargetViews.ResolveData(rtv).texture;
+}
+
+auto Rhi::Impl::GetTexture(RhiDepthStencilView dsv) -> RhiTexture
+{
+    return m_DepthStencilViews.ResolveData(dsv).texture;
 }
 
 auto Rhi::Impl::GetTextureInfo(RhiTexture texture) -> RhiTextureInfo
@@ -305,7 +365,7 @@ void Rhi::Impl::CmdTransitionTexture(RhiCmdList cmd, RhiTexture texture, RhiText
         .image = textureData.image,
         .subresourceRange =
             {
-                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, // TODO: wtf here
+                .aspectMask = textureData.aspectMask,
                 .baseMipLevel = 0,
                 .levelCount = 1,
                 .baseArrayLayer = 0,
@@ -351,6 +411,14 @@ void Rhi::Impl::DestroyRenderTargetView(RhiRenderTargetView textureView)
     vkDestroyImageView(m_Dev, textureViewData.imageView, m_Alloc);
 }
 
+void Rhi::Impl::DestroyDepthStencilView(RhiDepthStencilView textureView)
+{
+    const VulkanTextureViewData &textureViewData = m_DepthStencilViews.ReleaseData(textureView);
+    NYLA_ASSERT(textureViewData.imageView);
+
+    vkDestroyImageView(m_Dev, textureViewData.imageView, m_Alloc);
+}
+
 void Rhi::Impl::CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, uint32_t srcOffset, uint32_t size)
 {
     const VkCommandBuffer &cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
@@ -366,7 +434,7 @@ void Rhi::Impl::CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, ui
         .bufferImageHeight = 0,
         .imageSubresource =
             {
-                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .aspectMask = dstTextureData.aspectMask,
                 .layerCount = 1,
             },
         .imageOffset = {0, 0, 0},
@@ -376,58 +444,30 @@ void Rhi::Impl::CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, ui
     vkCmdCopyBufferToImage(cmdbuf, srcBufferData.buffer, dstTextureData.image, dstTextureData.layout, 1, &region);
 }
 
-#if 0
-        const VkImageCreateInfo depthImageCreateInfo{
-            .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+void Rhi::Impl::CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiTexture src)
+{
+    const VkCommandBuffer &cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
 
-            .imageType = VK_IMAGE_TYPE_2D,
-            .format = VK_FORMAT_D32_SFLOAT,
-            .extent = VkExtent3D{m_SurfaceExtent.width, m_SurfaceExtent.height, 1},
-            .mipLevels = 1,
-            .arrayLayers = 1,
-            .samples = VK_SAMPLE_COUNT_1_BIT,
-            .tiling = VK_IMAGE_TILING_OPTIMAL,
-            .usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-            .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+    VulkanTextureData &dstTextureData = m_Textures.ResolveData(dst);
+    VulkanTextureData &srcTextureData = m_Textures.ResolveData(src);
 
-            // const void*              pNext;
-            // VkImageCreateFlags       flags;
-            // VkImageType              imageType;
-            // VkFormat                 format;
-            // VkExtent3D               extent;
-            // uint32_t                 mipLevels;
-            // uint32_t                 arrayLayers;
-            // VkSampleCountFlagBits    samples;
-            // VkImageTiling            tiling;
-            // VkImageUsageFlags        usage;
-            // VkSharingMode            sharingMode;
-            // uint32_t                 queueFamilyIndexCount;
-            // const uint32_t*          pQueueFamilyIndices;
-            // VkImageLayout            initialLayout;
+    const VkImageCopy region{
+        .srcSubresource =
+            {
+                .aspectMask = srcTextureData.aspectMask,
+                .layerCount = 1,
+            },
+        .dstSubresource =
+            {
+                .aspectMask = dstTextureData.aspectMask,
+                .layerCount = 1,
+            },
+        .extent = srcTextureData.extent,
+    };
 
-        };
-
-        VkImage depthImage;
-        VK_CHECK(vkCreateImage(m_Dev, &depthImageCreateInfo, m_Alloc, &depthImage));
-
-        const VkImageViewCreateInfo depthImageImageViewCreateInfo{
-            .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-            .image = depthImage,
-            .viewType = VK_IMAGE_VIEW_TYPE_2D,
-            .format = VK_FORMAT_D32_SFLOAT_S8_UINT,
-            .subresourceRange =
-                {
-                    .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
-                    .baseMipLevel = 0,
-                    .levelCount = 1,
-                    .baseArrayLayer = 0,
-                    .layerCount = 1,
-                },
-        };
-
-        VkImageView depthImageView;
-        // VK_CHECK(vkCreateImageView(m_Dev, &depthImageImageViewCreateInfo, m_Alloc, &depthImageView));
-#endif
+    vkCmdCopyImage(cmdbuf, srcTextureData.image, srcTextureData.layout, dstTextureData.image, dstTextureData.layout, 1,
+                   &region);
+}
 
 //
 
@@ -456,6 +496,16 @@ void Rhi::DestroyRenderTargetView(RhiRenderTargetView rtv)
     m_Impl->DestroyRenderTargetView(rtv);
 }
 
+auto Rhi::CreateDepthStencilView(const RhiDepthStencilViewDesc &desc) -> RhiDepthStencilView
+{
+    return m_Impl->CreateDepthStencilView(desc);
+}
+
+void Rhi::DestroyDepthStencilView(RhiDepthStencilView dsv)
+{
+    m_Impl->DestroyDepthStencilView(dsv);
+}
+
 void Rhi::DestroyTexture(RhiTexture texture)
 {
     return m_Impl->DestroyTexture(texture);
@@ -471,6 +521,11 @@ auto Rhi::GetTexture(RhiRenderTargetView rtv) -> RhiTexture
     return m_Impl->GetTexture(rtv);
 }
 
+auto Rhi::GetTexture(RhiDepthStencilView dsv) -> RhiTexture
+{
+    return m_Impl->GetTexture(dsv);
+}
+
 auto Rhi::GetTextureInfo(RhiTexture texture) -> RhiTextureInfo
 {
     return m_Impl->GetTextureInfo(texture);
@@ -484,6 +539,11 @@ void Rhi::CmdTransitionTexture(RhiCmdList cmd, RhiTexture texture, RhiTextureSta
 void Rhi::CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, uint32_t srcOffset, uint32_t size)
 {
     m_Impl->CmdCopyTexture(cmd, dst, src, srcOffset, size);
+}
+
+void Rhi::CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiTexture src)
+{
+    m_Impl->CmdCopyTexture(cmd, dst, src);
 }
 
 } // namespace nyla

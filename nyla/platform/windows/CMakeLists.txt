@@ -17,4 +17,5 @@ target_include_directories(${TARGET_PLATFORM}
 target_link_libraries(${TARGET_PLATFORM}
     PUBLIC
         nyla::commons
+        XInput
 )

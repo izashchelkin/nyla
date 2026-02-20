@@ -64,14 +64,12 @@ struct RhiGraphicsPipelineDesc
     RhiShader vs;
     RhiShader ps;
 
-    uint32_t vertexBindingsCount;
     std::span<RhiVertexBindingDesc> vertexBindings;
-
-    uint32_t vertexAttributeCount;
     std::span<RhiVertexAttributeDesc> vertexAttributes;
-
-    uint32_t colorTargetFormatsCount;
     std::span<RhiTextureFormat> colorTargetFormats;
+    RhiTextureFormat depthFormat;
+    bool depthWriteEnabled;
+    bool depthTestEnabled;
 
     RhiCullMode cullMode;
     RhiFrontFace frontFace;

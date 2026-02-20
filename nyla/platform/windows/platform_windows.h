@@ -1,5 +1,6 @@
 #pragma once
 
+#include "nyla/commons/math/vec.h"
 #include "nyla/platform/platform.h"
 
 #include "nyla/commons/containers/inline_ring.h"
@@ -9,8 +10,12 @@
 #define NOMINMAX
 #include <windows.h>
 
+#include <Xinput.h>
+
 namespace nyla
 {
+
+class XInputGamePad;
 
 class Platform::Impl
 {
@@ -36,6 +41,12 @@ class Platform::Impl
     auto GetMonotonicTimeMicros() -> uint64_t;
     auto GetMonotonicTimeNanos() -> uint64_t;
 
+    auto UpdateGamepad(uint32_t index) -> bool;
+    auto GetGamepadLeftStick(uint32_t index) -> float2;
+    auto GetGamepadRightStick(uint32_t index) -> float2;
+    auto GetGamepadLeftTrigger(uint32_t index) -> float;
+    auto GetGamepadRightTrigger(uint32_t index) -> float;
+
   private:
     char *m_AddressSpaceBase;
     char *m_AddressSpaceAt;
@@ -45,6 +56,8 @@ class Platform::Impl
     HINSTANCE m_HInstance{};
     HWND m_HWnd{};
     RECT m_WinRect{};
+
+    std::array<XINPUT_STATE, 1> m_Gamepads{};
 
     static inline constexpr uint32_t kFlagQuit = 1 << 0;
     static inline constexpr uint32_t kFlagWinResize = 1 << 1;
