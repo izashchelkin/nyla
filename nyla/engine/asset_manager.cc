@@ -43,6 +43,28 @@ void AssetManager::Init()
     addSampler(SamplerType::NearestRepeat, RhiFilter::Nearest, RhiSamplerAddressMode::Repeat);
 }
 
+void AssetManager::Flush()
+{
+    for (auto &slot : m_Textures)
+    {
+        if (slot.used)
+        {
+            slot.data.needsUpload = true;
+
+            g_Rhi.DestroySampledTextureView(slot.data.textureView);
+            g_Rhi.DestroyTexture(slot.data.texture);
+        }
+    }
+
+    for (auto &slot : m_Meshes)
+    {
+        if (slot.used)
+        {
+            slot.data.needsUpload = true;
+        }
+    }
+}
+
 void AssetManager::Upload(RhiCmdList cmd)
 {
     auto &uploadManager = g_Engine.GetUploadManager();

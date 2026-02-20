@@ -37,38 +37,21 @@ void Game::Process(RhiCmdList cmd, float dt)
 {
     auto &renderer = g_Engine.GetRenderer();
     auto &inputManager = g_Engine.GetInputManager();
+    auto &assetManager = g_Engine.GetAssetManager();
     auto &debugTextRenderer = g_Engine.GetDebugTextRenderer();
 
+    static const auto reloadAssets = inputManager.NewIdMapped(1, uint32_t(KeyPhysical::F5));
+    if (inputManager.IsPressed(reloadAssets))
+    {
+        assetManager.Flush();
+        assetManager.Upload(cmd);
+    }
+
 #if 0
-    static const auto moveLeft = [&] -> InputId {
-        const InputId ret = inputManager.NewId();
-        inputManager.Map(ret, 1, uint32_t(KeyPhysical::S));
-        return ret;
-    }();
-
-    static const auto moveRight = [&] -> InputId {
-        const InputId ret = inputManager.NewId();
-        inputManager.Map(ret, 1, uint32_t(KeyPhysical::F));
-        return ret;
-    }();
-
-    static const auto moveForward = [&] -> InputId {
-        const InputId ret = inputManager.NewId();
-        inputManager.Map(ret, 1, uint32_t(KeyPhysical::E));
-        return ret;
-    }();
-
-    static const auto moveBackward = [&] -> InputId {
-        const InputId ret = inputManager.NewId();
-        inputManager.Map(ret, 1, uint32_t(KeyPhysical::D));
-        return ret;
-    }();
-
-    static const auto resetLookat = [&] -> InputId {
-        const InputId ret = inputManager.NewId();
-        inputManager.Map(ret, 1, uint32_t(KeyPhysical::Space));
-        return ret;
-    }();
+    static const auto moveLeft = inputManager.NewIdMapped(1, uint32_t(KeyPhysical::S));
+    static const auto moveRight = inputManager.NewIdMapped(1, uint32_t(KeyPhysical::F));
+    static const auto moveForward = inputManager.NewIdMapped(1, uint32_t(KeyPhysical::E));
+    static const auto moveBackward = inputManager.NewIdMapped(1, uint32_t(KeyPhysical::D));
 
     int dx = inputManager.IsPressed(moveRight) - inputManager.IsPressed(moveLeft);
     int dy = inputManager.IsPressed(moveForward) - inputManager.IsPressed(moveBackward);
@@ -89,6 +72,11 @@ void Game::Process(RhiCmdList cmd, float dt)
         pitch -= rotation[1] * 0.1f;
 
         pitch = std::clamp(pitch, -1.55f, 1.55f);
+
+        if (yaw > 2 * std::numbers::pi_v<float>)
+            yaw -= 2 * std::numbers::pi_v<float>;
+        if (yaw < -2 * std::numbers::pi_v<float>)
+            yaw += 2 * std::numbers::pi_v<float>;
 
         verticalInput = g_Platform.GetGamepadLeftTrigger(0) - g_Platform.GetGamepadRightTrigger(0);
     }
@@ -130,7 +118,7 @@ void Game::Process(RhiCmdList cmd, float dt)
 
         cameraPos += forward * movement[1] * moveSpeed;
         cameraPos += right * movement[0] * moveSpeed;
-        cameraPos += up * verticalInput * moveSpeed;
+        cameraPos += worldUp * verticalInput * moveSpeed;
 
         const float3 targetPos = cameraPos + forward;
 
@@ -139,7 +127,7 @@ void Game::Process(RhiCmdList cmd, float dt)
         renderer.SetPerspectiveProjection(rtInfo.width, rtInfo.height, 90.f, .01f, 1000.f);
 
         renderer.CmdFlush(cmd);
-        // debugTextRenderer.CmdFlush(cmd);
+        debugTextRenderer.CmdFlush(cmd);
     }
     g_Rhi.PassEnd();
 
@@ -173,7 +161,7 @@ auto PlatformMain() -> int
     while (!g_Engine.ShouldExit())
     {
         const auto [cmd, dt, fps] = g_Engine.FrameBegin();
-        // g_Engine.GetDebugTextRenderer().Text(500, 10, std::format("fps={}", fps));
+        g_Engine.GetDebugTextRenderer().Text(500, 10, std::format("fps={}", fps));
 
         RhiTextureInfo backbufferInfo = g_Rhi.GetTextureInfo(g_Rhi.GetTexture(g_Rhi.GetBackbufferView()));
 

@@ -22,6 +22,7 @@ class InputManager
 {
   public:
     auto NewId() -> InputId;
+    auto NewIdMapped(uint32_t type, uint32_t code) -> InputId;
     void Map(InputId input, uint32_t type, uint32_t code);
     void HandlePressed(uint32_t type, uint32_t code, uint64_t time);
     void HandleReleased(uint32_t type, uint32_t code, uint64_t time);
