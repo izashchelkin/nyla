@@ -13,6 +13,7 @@
 #include "nyla/rhi/rhi_texture.h"
 #include <cstdint>
 #include <format>
+#include <numbers>
 
 namespace nyla
 {
@@ -34,6 +35,7 @@ void Game::Process(RhiCmdList cmd, float dt)
     auto &inputManager = g_Engine.GetInputManager();
     auto &debugTextRenderer = g_Engine.GetDebugTextRenderer();
 
+#if 0
     static const auto moveLeft = [&] -> InputId {
         const InputId ret = inputManager.NewId();
         inputManager.Map(ret, 1, uint32_t(KeyPhysical::S));
@@ -66,6 +68,25 @@ void Game::Process(RhiCmdList cmd, float dt)
 
     int dx = inputManager.IsPressed(moveRight) - inputManager.IsPressed(moveLeft);
     int dy = inputManager.IsPressed(moveForward) - inputManager.IsPressed(moveBackward);
+#endif
+    float dx = 0;
+    float dy = 0;
+
+    float yaw = 0;
+    float pitch = 0;
+
+    if (g_Platform.UpdateGamepad(0))
+    {
+        const float2 movement = g_Platform.GetGamepadLeftStick(0);
+        dx = movement[0];
+        dy = movement[1];
+
+        const float2 rotation = g_Platform.GetGamepadRightStick(0);
+        yaw += rotation[0];
+        pitch += rotation[1];
+    }
+
+    g_Platform.GetGamepadLeftStick(0);
 
     RhiTexture backbuffer = g_Rhi.GetTexture(g_Rhi.GetBackbufferView());
     RhiTextureInfo backbufferInfo = g_Rhi.GetTextureInfo(backbuffer);
@@ -88,24 +109,10 @@ void Game::Process(RhiCmdList cmd, float dt)
         renderer.Mesh({0, 0, 0}, {1, 1, 1}, m_Assets.ball, {});
 
         static float3 cameraPos = {0.f, 0.f, 5.f};
+        cameraPos[0] -= dx * dt * 10.f;
+        cameraPos[2] -= dy * dt * 10.f;
+
         static float3 targetPos = {0.f, 0.f, 0.f};
-
-        if (dx)
-        {
-            cameraPos[0] -= (float)dx * dt * 10.f;
-            targetPos[0] -= (float)dx * dt * 10.f;
-        }
-
-        if (dy)
-        {
-            cameraPos[2] -= (float)dy * dt * 10.f;
-            targetPos[2] -= (float)dy * dt * 10.f;
-        }
-
-        if (inputManager.IsPressed(resetLookat))
-        {
-            targetPos = {0, 0, 0};
-        }
 
         float3 worldUp = {0.0f, 1.0f, 0.0f};
         renderer.SetLookAtView(cameraPos, targetPos, worldUp);

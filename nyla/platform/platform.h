@@ -3,7 +3,7 @@
 #include "nyla/commons/assert.h"
 #include "nyla/commons/bitenum.h"
 #include "nyla/commons/byteliterals.h"
-#include "nyla/platform/platform_gamepad.h"
+#include "nyla/commons/math/vec.h"
 #include <cstdint>
 #include <fstream>
 #include <span>
@@ -89,7 +89,9 @@ class Platform
 
     auto Spawn(std::span<const char *const> cmd) -> bool;
 
-    auto GetGamePad() -> GamePad *;
+    auto UpdateGamepad(uint32_t index) -> bool;
+    auto GetGamepadLeftStick(uint32_t index) -> float2;
+    auto GetGamepadRightStick(uint32_t index) -> float2;
 
     class Impl;
 

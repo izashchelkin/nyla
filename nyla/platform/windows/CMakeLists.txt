@@ -7,7 +7,6 @@ target_sources(${TARGET_PLATFORM}
         platform_windows.cc
         platform_windows_clock.cc
         platform_windows_page_alloc.cc
-        platform_windows_gamepad.cc
 )
 
 target_include_directories(${TARGET_PLATFORM}
@@ -18,4 +17,5 @@ target_include_directories(${TARGET_PLATFORM}
 target_link_libraries(${TARGET_PLATFORM}
     PUBLIC
         nyla::commons
+        XInput
 )

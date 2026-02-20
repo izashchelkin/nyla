@@ -5,8 +5,6 @@
 #include "nyla/commons/byteliterals.h"
 #include "nyla/commons/containers/inline_ring.h"
 #include "nyla/platform/platform.h"
-#include "nyla/platform/platform_gamepad.h"
-#include "nyla/platform/windows/platform_windows_gamepad.h"
 #include <cstdint>
 
 auto CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) -> LRESULT;
@@ -127,14 +125,66 @@ void Platform::Impl::SetHInstance(HINSTANCE hInstance)
     m_HInstance = hInstance;
 }
 
-auto Platform::Impl::GetGamePad() -> XInputGamePad *
+//
+
+auto Platform::Impl::UpdateGamepad(uint32_t index) -> bool
 {
-    static XInputGamePad ret = [] {
-        XInputGamePad gamepad;
-        gamepad.SetGamePad();
-        return gamepad;
-    }();
-    return &ret;
+    auto &state = m_Gamepads[index];
+    ZeroMemory(&state.Gamepad, sizeof(state.Gamepad));
+
+    const DWORD dwResult = XInputGetState(0, &state);
+    return (dwResult == ERROR_SUCCESS);
+}
+
+namespace
+{
+
+auto GetGamepadStickInternal(auto rawx, auto rawy, auto rawdeadzone) -> float2
+{
+    const float x = (float)rawx / (float)std::numeric_limits<uint16_t>::max();
+    const float y = (float)rawy / (float)std::numeric_limits<uint16_t>::max();
+
+    const float magnitude = std::sqrt(x * x + y * y);
+    const float deadzone = (float)rawdeadzone / (float)std::numeric_limits<uint16_t>::max();
+
+    if (magnitude < deadzone)
+    {
+        return {0.0f, 0.0f};
+    }
+
+    // Renormalize so movement starts smoothly from the edge of the deadzone
+    const float scale = (magnitude - deadzone) / (1.0f - deadzone);
+
+    return {(x / magnitude) * scale, (y / magnitude) * scale};
+}
+
+} // namespace
+
+auto Platform::Impl::GetGamepadLeftStick(uint32_t index) -> float2
+{
+    auto &gamepad = m_Gamepads[index].Gamepad;
+    return GetGamepadStickInternal(gamepad.sThumbLX, gamepad.sThumbLY, XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE);
+}
+
+auto Platform::Impl::GetGamepadRightStick(uint32_t index) -> float2
+{
+    auto &gamepad = m_Gamepads[index].Gamepad;
+    return GetGamepadStickInternal(gamepad.sThumbRX, gamepad.sThumbRY, XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE);
+}
+
+auto Platform::UpdateGamepad(uint32_t index) -> bool
+{
+    return m_Impl->UpdateGamepad(index);
+}
+
+auto Platform::GetGamepadLeftStick(uint32_t index) -> float2
+{
+    return m_Impl->GetGamepadLeftStick(index);
+}
+
+auto Platform::GetGamepadRightStick(uint32_t index) -> float2
+{
+    return m_Impl->GetGamepadRightStick(index);
 }
 
 //
@@ -158,11 +208,6 @@ auto Platform::WinGetSize() -> PlatformWindowSize
 auto Platform::PollEvent(PlatformEvent &outEvent) -> bool
 {
     return m_Impl->PollEvent(outEvent);
-}
-
-auto Platform::GetGamePad() -> GamePad *
-{
-    return m_Impl->GetGamePad();
 }
 
 LRESULT CALLBACK Platform::Impl::MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
