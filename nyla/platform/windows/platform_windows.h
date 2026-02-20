@@ -9,8 +9,12 @@
 #define NOMINMAX
 #include <windows.h>
 
+#include <Xinput.h>
+
 namespace nyla
 {
+
+class XInputGamePad;
 
 class Platform::Impl
 {
@@ -35,6 +39,8 @@ class Platform::Impl
     auto GetMonotonicTimeMillis() -> uint64_t;
     auto GetMonotonicTimeMicros() -> uint64_t;
     auto GetMonotonicTimeNanos() -> uint64_t;
+
+    auto GetGamePad() -> XInputGamePad *;
 
   private:
     char *m_AddressSpaceBase;

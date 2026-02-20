@@ -5,6 +5,8 @@
 #include "nyla/commons/byteliterals.h"
 #include "nyla/commons/containers/inline_ring.h"
 #include "nyla/platform/platform.h"
+#include "nyla/platform/platform_gamepad.h"
+#include "nyla/platform/windows/platform_windows_gamepad.h"
 #include <cstdint>
 
 auto CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) -> LRESULT;
@@ -125,6 +127,16 @@ void Platform::Impl::SetHInstance(HINSTANCE hInstance)
     m_HInstance = hInstance;
 }
 
+auto Platform::Impl::GetGamePad() -> XInputGamePad *
+{
+    static XInputGamePad ret = [] {
+        XInputGamePad gamepad;
+        gamepad.SetGamePad();
+        return gamepad;
+    }();
+    return &ret;
+}
+
 //
 
 void Platform::Init(const PlatformInitDesc &desc)
@@ -146,6 +158,11 @@ auto Platform::WinGetSize() -> PlatformWindowSize
 auto Platform::PollEvent(PlatformEvent &outEvent) -> bool
 {
     return m_Impl->PollEvent(outEvent);
+}
+
+auto Platform::GetGamePad() -> GamePad *
+{
+    return m_Impl->GetGamePad();
 }
 
 LRESULT CALLBACK Platform::Impl::MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
