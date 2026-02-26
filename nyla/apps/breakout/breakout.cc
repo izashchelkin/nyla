@@ -245,14 +245,14 @@ void GameProcess(RhiCmdList cmd, float dt)
 
 void GameRender(RhiCmdList cmd, RhiRenderTargetView rtv)
 {
-    auto &renderer = g_Engine.GetRenderer2D();
+    auto &renderer = g_Engine.GetRenderer();
     auto &assets = g_State.assets;
 
     RhiTextureInfo colorTargetInfo = g_Rhi.GetTextureInfo(g_Rhi.GetTexture(rtv));
 
     g_Rhi.PassBegin({
-        .renderTarget = rtv,
-        .state = RhiTextureState::ColorTarget,
+        .rtv = rtv,
+        .rtState = RhiTextureState::ColorTarget,
     });
 
     if (HandleIsSet(assets.rectMesh))
@@ -294,8 +294,8 @@ void GameRender(RhiCmdList cmd, RhiRenderTargetView rtv)
     g_Engine.GetDebugTextRenderer().CmdFlush(cmd);
 
     g_Rhi.PassEnd({
-        .renderTarget = rtv,
-        .state = RhiTextureState::Present,
+        .rtv = rtv,
+        .rtState = RhiTextureState::Present,
     });
 }
 

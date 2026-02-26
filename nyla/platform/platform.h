@@ -3,6 +3,7 @@
 #include "nyla/commons/assert.h"
 #include "nyla/commons/bitenum.h"
 #include "nyla/commons/byteliterals.h"
+#include "nyla/commons/math/vec.h"
 #include <cstdint>
 #include <fstream>
 #include <span>
@@ -87,6 +88,12 @@ class Platform
     auto GetMonotonicTimeNanos() -> uint64_t;
 
     auto Spawn(std::span<const char *const> cmd) -> bool;
+
+    auto UpdateGamepad(uint32_t index) -> bool;
+    auto GetGamepadLeftStick(uint32_t index) -> float2;
+    auto GetGamepadRightStick(uint32_t index) -> float2;
+    auto GetGamepadLeftTrigger(uint32_t index) -> float;
+    auto GetGamepadRightTrigger(uint32_t index) -> float;
 
     class Impl;
 

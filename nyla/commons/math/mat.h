@@ -92,7 +92,7 @@ template <typename T, uint32_t N> class Mat
     auto Inversed() const -> Mat
         requires std::floating_point<T>
     {
-        std::array<std::array<T, 2 * N>, N> a{};
+        std::array<std::array<T, 2ULL * N>, N> a{};
 
         for (uint32_t row = 0; row < N; ++row)
         {
@@ -220,6 +220,65 @@ template <typename T, uint32_t N> class Mat
             -(top + bottom) / tb,
             -near / fn,
             static_cast<T>(1),
+        };
+    }
+
+    [[nodiscard]]
+    static auto Perspective(T fovRadians, T aspect, T nearPlane, T farPlane) -> Mat
+        requires(N == 4 && std::floating_point<T>)
+    {
+        NYLA_ASSERT(aspect != static_cast<T>(0));
+        NYLA_ASSERT(farPlane != nearPlane);
+
+        const T halfFov = fovRadians * static_cast<T>(0.5);
+        const T f = static_cast<T>(1) / std::tan(halfFov);
+        const T fn = farPlane - nearPlane;
+
+        // Column-major layout
+        return {f / aspect,
+                static_cast<T>(0),
+                static_cast<T>(0),
+                static_cast<T>(0),
+
+                static_cast<T>(0),
+                f,
+                static_cast<T>(0),
+                static_cast<T>(0),
+
+                static_cast<T>(0),
+                static_cast<T>(0),
+                farPlane / fn,
+                static_cast<T>(1), // This '1' copies the Z value into the W component
+
+                static_cast<T>(0),
+                static_cast<T>(0),
+                -(farPlane * nearPlane) / fn,
+                static_cast<T>(0)};
+    }
+
+    template <typename K>
+        requires(N == 4 && std::convertible_to<K, T>)
+    [[nodiscard]]
+    static auto LookAt(const Vec<K, 3> &eye, const Vec<K, 3> &center, const Vec<K, 3> &up) -> Mat
+    {
+        // 1. Forward is unchanged
+        const Vec<T, 3> f = (center - eye).Normalized();
+
+        // 2. LHS Right Vector: Swap the cross product order to 'up x f'
+        const Vec<T, 3> s = up.Cross(f).Normalized();
+
+        // 3. LHS Up Vector: 's x f'
+        const Vec<T, 3> u = s.Cross(f);
+
+        // Column-major layout (Standard Left-Handed View Matrix)
+        return {
+            s[0],          u[0],          f[0],          static_cast<T>(0),
+
+            s[1],          u[1],          f[1],          static_cast<T>(0),
+
+            s[2],          u[2],          f[2],          static_cast<T>(0),
+
+            -(s.Dot(eye)), -(u.Dot(eye)), -(f.Dot(eye)), static_cast<T>(1),
         };
     }
 

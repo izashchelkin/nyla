@@ -113,6 +113,7 @@ struct VulkanTextureData
     RhiTextureState state;
     VkImageLayout layout;
     VkFormat format;
+    VkImageAspectFlags aspectMask;
     VkExtent3D extent;
 };
 
@@ -171,7 +172,7 @@ class Rhi::Impl
 
     auto ConvertVertexFormatIntoVkFormat(RhiVertexFormat format) -> VkFormat;
 
-    auto ConvertTextureFormatIntoVkFormat(RhiTextureFormat format) -> VkFormat;
+    auto ConvertTextureFormatIntoVkFormat(RhiTextureFormat format, VkImageAspectFlags *outAspectMask) -> VkFormat;
     auto ConvertVkFormatIntoTextureFormat(VkFormat format) -> RhiTextureFormat;
 
     auto ConvertTextureUsageToVkImageUsageFlags(RhiTextureUsage usage) -> VkImageUsageFlags;
@@ -220,6 +221,7 @@ class Rhi::Impl
     void DestroyTexture(RhiTexture texture);
     void CmdTransitionTexture(RhiCmdList cmd, RhiTexture texture, RhiTextureState newState);
     void CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, uint32_t srcOffset, uint32_t size);
+    void CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiTexture src);
 
     auto CreateSampledTextureView(const RhiTextureViewDesc &desc) -> RhiSampledTextureView;
     void DestroySampledTextureView(RhiSampledTextureView textureView);
@@ -228,6 +230,10 @@ class Rhi::Impl
     auto CreateRenderTargetView(const RhiRenderTargetViewDesc &desc) -> RhiRenderTargetView;
     void DestroyRenderTargetView(RhiRenderTargetView textureView);
     auto GetTexture(RhiRenderTargetView rtv) -> RhiTexture;
+
+    auto CreateDepthStencilView(const RhiDepthStencilViewDesc &desc) -> RhiDepthStencilView;
+    void DestroyDepthStencilView(RhiDepthStencilView textureView);
+    auto GetTexture(RhiDepthStencilView dsv) -> RhiTexture;
 
     void EnsureHostWritesVisible(VkCommandBuffer cmdbuf, VulkanBufferData &bufferData);
 
@@ -240,7 +246,7 @@ class Rhi::Impl
     auto GetDeviceQueue(RhiQueueType queueType) -> DeviceQueue &;
 
     void PassBegin(RhiPassDesc desc);
-    void PassEnd(RhiPassDesc desc);
+    void PassEnd();
 
     auto CreateShader(const RhiShaderDesc &desc) -> RhiShader;
     void DestroyShader(RhiShader shader);
@@ -302,6 +308,7 @@ class Rhi::Impl
 
     HandlePool<RhiTexture, VulkanTextureData, 128> m_Textures;
     HandlePool<RhiRenderTargetView, VulkanTextureViewData, 8> m_RenderTargetViews;
+    HandlePool<RhiDepthStencilView, VulkanTextureViewData, 8> m_DepthStencilViews;
     HandlePool<RhiSampledTextureView, VulkanTextureViewData, 128> m_SampledTextureViews;
 
     HandlePool<RhiSampler, VulkanSamplerData, 16> m_Samplers;

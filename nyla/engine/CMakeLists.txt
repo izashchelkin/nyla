@@ -5,6 +5,7 @@ add_library(nyla::engine ALIAS ${TARGET})
 target_sources(${TARGET}
     PRIVATE
         asset_manager.cc
+        render_targets.cc
         debug_text_renderer.cc
         engine.cc
         engine0_internal.cc

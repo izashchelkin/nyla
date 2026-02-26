@@ -41,7 +41,7 @@ void Engine::Init(const EngineInitDesc &desc)
     m_GpuUploadManager.Init();
     m_AssetManager.Init();
 
-    m_Renderer2d.Init();
+    m_Renderer.Init();
     m_DebugTextRenderer.Init();
 }
 

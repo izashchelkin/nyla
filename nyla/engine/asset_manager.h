@@ -91,6 +91,8 @@ class AssetManager
     void Init();
     void Upload(RhiCmdList cmd);
 
+    void Flush();
+
     auto DeclareTexture(std::string_view path) -> Texture;
     auto GetRhiSampledTextureView(Texture, RhiSampledTextureView &) -> bool;
     auto GetRhiSampledTextureView(Mesh, RhiSampledTextureView &) -> bool;

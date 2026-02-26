@@ -61,9 +61,9 @@ class Engine
         return m_PerFrameAlloc;
     }
 
-    auto GetRenderer2D() -> Renderer &
+    auto GetRenderer() -> Renderer &
     {
-        return m_Renderer2d;
+        return m_Renderer;
     }
 
     auto GetDebugTextRenderer() -> DebugTextRenderer &
@@ -91,7 +91,7 @@ class Engine
     TweenManager m_TweenManager;
     InputManager m_InputManager;
 
-    Renderer m_Renderer2d;
+    Renderer m_Renderer;
     DebugTextRenderer m_DebugTextRenderer;
 
     uint64_t m_TargetFrameDurationUs;

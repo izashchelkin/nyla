@@ -1,6 +1,8 @@
+#include "nyla/commons/bitenum.h"
 #include "nyla/commons/containers/inline_vec.h"
 #include "nyla/commons/log.h"
 #include "nyla/rhi/rhi_cmdlist.h"
+#include "nyla/rhi/rhi_texture.h"
 #include "nyla/rhi/vulkan/rhi_vulkan_spirv_shader_manager.h"
 #include <array>
 #include <cstdint>
@@ -95,35 +97,29 @@ void Rhi::Impl::DestroyShader(RhiShader shader)
 
 auto Rhi::Impl::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGraphicsPipeline
 {
+    auto &vertexShaderData = m_Shaders.ResolveData(desc.vs);
+    SpirvShaderManager vsMan(vertexShaderData.spv->GetSpan(), RhiShaderStage::Vertex);
+
+    auto &pixelShaderData = m_Shaders.ResolveData(desc.ps);
+    SpirvShaderManager psMan(pixelShaderData.spv->GetSpan(), RhiShaderStage::Pixel);
+
     VulkanPipelineData pipelineData = {
         .bindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
     };
 
-    std::array<VkVertexInputBindingDescription, 16> vertexBindings;
-    NYLA_ASSERT(desc.vertexBindingsCount <= std::size(desc.vertexBindings));
-    for (uint32_t i = 0; i < desc.vertexBindingsCount; ++i)
+    InlineVec<VkVertexInputBindingDescription, 16> vertexBindings;
+    for (auto &binding : desc.vertexBindings)
     {
-        const auto &binding = desc.vertexBindings[i];
-        vertexBindings[i] = VkVertexInputBindingDescription{
+        vertexBindings.emplace_back(VkVertexInputBindingDescription{
             .binding = binding.binding,
             .stride = binding.stride,
             .inputRate = ConvertVulkanInputRate(binding.inputRate),
-        };
+        });
     }
 
-    VulkanShaderData &vertexShaderData = m_Shaders.ResolveData(desc.vs);
-    VulkanShaderData &pixelShaderData = m_Shaders.ResolveData(desc.ps);
-
     InlineVec<VkVertexInputAttributeDescription, 16> vertexAttributes;
-    NYLA_ASSERT(desc.vertexAttributeCount <= std::size(desc.vertexAttributes));
-
-    SpirvShaderManager vsMan(vertexShaderData.spv->GetSpan(), RhiShaderStage::Vertex);
-    SpirvShaderManager psMan(pixelShaderData.spv->GetSpan(), RhiShaderStage::Pixel);
-
-    for (uint32_t i = 0; i < desc.vertexAttributeCount; ++i)
+    for (auto &attribute : desc.vertexAttributes)
     {
-        const auto &attribute = desc.vertexAttributes[i];
-
         uint32_t location;
         if (!vsMan.FindLocationBySemantic(attribute.semantic.StringView(), SpirvShaderManager::StorageClass::Input,
                                           &location))
@@ -187,9 +183,9 @@ auto Rhi::Impl::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> R
 
     const VkPipelineVertexInputStateCreateInfo vertexInputStateCreateInfo{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-        .vertexBindingDescriptionCount = desc.vertexBindingsCount,
+        .vertexBindingDescriptionCount = vertexBindings.size(),
         .pVertexBindingDescriptions = vertexBindings.data(),
-        .vertexAttributeDescriptionCount = desc.vertexAttributeCount,
+        .vertexAttributeDescriptionCount = vertexAttributes.size(),
         .pVertexAttributeDescriptions = vertexAttributes.data(),
     };
 
@@ -255,18 +251,17 @@ auto Rhi::Impl::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> R
         .pDynamicStates = dynamicStates.data(),
     };
 
-    std::array<VkFormat, 16> colorTargetFormats;
-
-    NYLA_ASSERT(desc.colorTargetFormatsCount <= std::size(desc.colorTargetFormats));
-    for (uint32_t i = 0; i < desc.colorTargetFormatsCount; ++i)
+    InlineVec<VkFormat, 16> colorTargetFormats;
+    for (RhiTextureFormat colorTargetFormat : desc.colorTargetFormats)
     {
-        colorTargetFormats[i] = ConvertTextureFormatIntoVkFormat(desc.colorTargetFormats[i]);
+        colorTargetFormats.emplace_back(ConvertTextureFormatIntoVkFormat(colorTargetFormat, nullptr));
     }
 
     const VkPipelineRenderingCreateInfo pipelineRenderingCreateInfo{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-        .colorAttachmentCount = desc.colorTargetFormatsCount,
+        .colorAttachmentCount = colorTargetFormats.size(),
         .pColorAttachmentFormats = colorTargetFormats.data(),
+        .depthAttachmentFormat = ConvertTextureFormatIntoVkFormat(desc.depthFormat, nullptr),
     };
 
 #if 0
@@ -302,6 +297,19 @@ auto Rhi::Impl::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> R
 
     vkCreatePipelineLayout(m_Dev, &pipelineLayoutCreateInfo, nullptr, &pipelineData.layout);
 
+    const VkPipelineDepthStencilStateCreateInfo depthStencilState{
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+        .depthTestEnable = desc.depthTestEnabled,
+        .depthWriteEnable = desc.depthWriteEnabled,
+        .depthCompareOp = VK_COMPARE_OP_LESS,
+        .depthBoundsTestEnable = false,
+        .stencilTestEnable = false,
+        .front = {},
+        .back = {},
+        .minDepthBounds = 0.0f,
+        .maxDepthBounds = 1.0f,
+    };
+
     const VkGraphicsPipelineCreateInfo pipelineCreateInfo{
         .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
         .pNext = &pipelineRenderingCreateInfo,
@@ -312,7 +320,7 @@ auto Rhi::Impl::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> R
         .pViewportState = &viewportStateCreateInfo,
         .pRasterizationState = &rasterizerCreateInfo,
         .pMultisampleState = &multisamplingCreateInfo,
-        .pDepthStencilState = nullptr,
+        .pDepthStencilState = &depthStencilState,
         .pColorBlendState = &colorBlendingCreateInfo,
         .pDynamicState = &dynamicStateCreateInfo,
         .layout = pipelineData.layout,
