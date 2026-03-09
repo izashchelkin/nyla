@@ -1,4 +1,4 @@
-set -e
+set -xe
 
 export LC_ALL=C
 export PREFIX=/usr
@@ -14,4 +14,4 @@ export DESTDIR=/tmp/recipe_staging
 rm -rf $DESTDIR
 mkdir -p $DESTDIR
 
-bash $1 
+bash recipes/$1

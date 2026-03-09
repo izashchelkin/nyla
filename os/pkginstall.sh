@@ -1,6 +1,13 @@
-set -e
+set -xe
 
 export MANIFEST=$NYLAROOT/pkg/manifests/$1
+
+
+if [ -f "$MANIFEST" ]; then
+    echo Already installed!
+    exit 1
+fi
+
 echo > $MANIFEST
 
 (cd /tmp/recipe_staging && find . -type f | sed 's|^\./||' | sort) > $MANIFEST
