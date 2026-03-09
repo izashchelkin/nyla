@@ -1,0 +1,7 @@
+cd $NYLAROOT/build/sources/expat*
+make distclean || echo already clean
+./configure              \
+	--prefix=/usr    \
+	--disable-static
+make
+make DESTDIR=$DESTDIR install

@@ -1,0 +1,9 @@
+cd $NYLAROOT/build/sources/libpsl*
+
+rm -rf build
+mkdir build
+cd build
+
+meson setup --prefix=/usr --buildtype=release
+ninja
+ninja install

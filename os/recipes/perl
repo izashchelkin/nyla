@@ -1,0 +1,18 @@
+cd $NYLAROOT/build/sources/perl*
+make clean
+make distclean
+make realclean
+
+sh Configure -des \
+             -Dprefix=/usr \
+             -Dvendorprefix=/usr \
+             -Duseshrplib \
+             -Duseshrp \
+	     -Dcat1dir=none \
+	     -Dcat3dir=none \
+             -Doptimize="-O2" \
+             -Dldflags="-Wl,-rpath,/usr/lib"
+make
+make DESTDIR=$DESTDIR install
+
+find $DESTDIR/usr/lib -name Config.pm -exec sed -i "s|/nyla/build/perl-.*|/usr/lib/perl5|g" {} +

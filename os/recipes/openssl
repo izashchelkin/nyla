@@ -1,0 +1,5 @@
+cd $NYLAROOT/build/sources/openssl*
+make distclean || echo already clean
+./Configure --prefix=/usr --openssldir=/etc/ssl shared zlib-dynamic
+make
+make DESTDIR=$DESTDIR install_sw

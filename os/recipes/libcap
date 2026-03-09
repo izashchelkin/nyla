@@ -1,0 +1,4 @@
+cd $NYLAROOT/build/sources/libcap*
+make distclean || echo already clean
+make
+make install prefix=/usr lib=lib DESTDIR=$DESTDIR
