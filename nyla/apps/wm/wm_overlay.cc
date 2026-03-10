@@ -38,7 +38,6 @@ auto PlatformMain() -> int
     x11->SetWindow(window);
 
     g_Rhi.Init(RhiInitDesc{
-        .window = {window},
         .flags = RhiFlags::VSync,
         .limits =
             {
@@ -118,17 +117,20 @@ auto PlatformMain() -> int
 
         debugTextRenderer.Text(1, 1, barText);
 
+        RhiTexture backbuffer = g_Rhi.GetTexture(g_Rhi.GetBackbufferView());
+
+        g_Rhi.CmdTransitionTexture(cmd, backbuffer, RhiTextureState::ColorTarget);
+
         g_Rhi.PassBegin({
-            .renderTarget = g_Rhi.GetBackbufferView(),
-            .state = RhiTextureState::ColorTarget,
+            .rtv = g_Rhi.GetBackbufferView(),
+            .dsv = {},
         });
 
         debugTextRenderer.CmdFlush(cmd);
 
-        g_Rhi.PassEnd({
-            .renderTarget = g_Rhi.GetBackbufferView(),
-            .state = RhiTextureState::Present,
-        });
+        g_Rhi.PassEnd();
+
+        g_Rhi.CmdTransitionTexture(cmd, backbuffer, RhiTextureState::Present);
 
         g_Rhi.FrameEnd();
     }

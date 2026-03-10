@@ -248,11 +248,14 @@ void GameRender(RhiCmdList cmd, RhiRenderTargetView rtv)
     auto &renderer = g_Engine.GetRenderer();
     auto &assets = g_State.assets;
 
-    RhiTextureInfo colorTargetInfo = g_Rhi.GetTextureInfo(g_Rhi.GetTexture(rtv));
+    RhiTexture renderTarget = g_Rhi.GetTexture(rtv);
+    RhiTextureInfo colorTargetInfo = g_Rhi.GetTextureInfo(renderTarget);
+
+    g_Rhi.CmdTransitionTexture(cmd, renderTarget, RhiTextureState::ColorTarget);
 
     g_Rhi.PassBegin({
         .rtv = rtv,
-        .rtState = RhiTextureState::ColorTarget,
+        .dsv = {},
     });
 
     if (HandleIsSet(assets.rectMesh))
@@ -289,14 +292,14 @@ void GameRender(RhiCmdList cmd, RhiRenderTargetView rtv)
         }
     }
 
-    renderer.CmdFlush(cmd, colorTargetInfo.width, colorTargetInfo.height, 64);
+    renderer.SetOrthoProjection(colorTargetInfo.width, colorTargetInfo.height, 64);
+    renderer.CmdFlush(cmd);
 
     g_Engine.GetDebugTextRenderer().CmdFlush(cmd);
 
-    g_Rhi.PassEnd({
-        .rtv = rtv,
-        .rtState = RhiTextureState::Present,
-    });
+    g_Rhi.CmdTransitionTexture(cmd, renderTarget, RhiTextureState::Present);
+
+    g_Rhi.PassEnd();
 }
 
 } // namespace nyla
