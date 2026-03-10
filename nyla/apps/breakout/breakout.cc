@@ -91,14 +91,6 @@ void GameInit()
         }
 
         {
-#ifndef WIN32
-            g_State.assets.cubeMesh = g_Engine.GetAssetManager().DeclareMesh("/home/izashchelkin/Documents/test.glb");
-#else
-            g_State.assets.cubeMesh = assetManager.DeclareMesh("C:\\blender\\export\\cube.gltf");
-#endif
-        }
-
-        {
             auto &alloc = g_Engine.GetPermanentAlloc();
 
             std::span<AssetManager::MeshVSInput> vertices = alloc.PushArr<AssetManager::MeshVSInput>(4);

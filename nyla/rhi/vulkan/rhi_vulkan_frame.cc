@@ -17,35 +17,46 @@ auto Rhi::Impl::FrameBegin() -> RhiCmdList
         m_SwapchainUsable = true;
         m_RecreateSwapchain = false;
     }
+    else
+    {
+        WaitTimeline(m_GraphicsQueue.timeline, m_GraphicsQueueCmdDone[m_FrameIndex]);
+    }
 
     if (m_SwapchainUsable)
-        WaitTimeline(m_GraphicsQueue.timeline, m_GraphicsQueueCmdDone[m_FrameIndex]);
-    else
-        vkDeviceWaitIdle(m_Dev);
-
-    VkResult acquireResult =
-        vkAcquireNextImageKHR(m_Dev, m_Swapchain, std::numeric_limits<uint64_t>::max(),
-                              m_SwapchainAcquireSemaphores[m_FrameIndex], VK_NULL_HANDLE, &m_SwapchainTextureIndex);
-    switch (acquireResult)
     {
-    case VK_ERROR_OUT_OF_DATE_KHR: {
-        m_SwapchainUsable = false;
-        break;
+        const VkResult acquireResult =
+            vkAcquireNextImageKHR(m_Dev, m_Swapchain, std::numeric_limits<uint64_t>::max(),
+                                  m_SwapchainAcquireSemaphores[m_FrameIndex], VK_NULL_HANDLE, &m_SwapchainTextureIndex);
+
+        switch (acquireResult)
+        {
+        case VK_ERROR_OUT_OF_DATE_KHR: {
+            m_SwapchainUsable = false;
+            m_RecreateSwapchain = true;
+            break;
+        }
+
+        case VK_SUBOPTIMAL_KHR: {
+            m_SwapchainUsable = true;
+            m_RecreateSwapchain = true;
+            break;
+        }
+
+        default: {
+            VK_CHECK(acquireResult);
+            m_RecreateSwapchain = false;
+            m_SwapchainUsable = true;
+            break;
+        }
+        }
     }
 
-    case VK_SUBOPTIMAL_KHR: {
-        m_SwapchainUsable = true;
-        break;
+    if (!m_SwapchainUsable)
+    {
+        vkDeviceWaitIdle(m_Dev);
     }
 
-    default: {
-        m_SwapchainUsable = true;
-        VK_CHECK(acquireResult);
-        break;
-    }
-    }
-
-    RhiCmdList cmd = m_GraphicsQueueCmd[m_FrameIndex];
+    const RhiCmdList cmd = m_GraphicsQueueCmd[m_FrameIndex];
     ResetCmdList(cmd);
 
     const VulkanCmdListData &cmdData = m_CmdLists.ResolveData(cmd);
@@ -62,7 +73,6 @@ auto Rhi::Impl::FrameBegin() -> RhiCmdList
 void Rhi::Impl::FrameEnd()
 {
     RhiCmdList cmd = m_GraphicsQueueCmd[m_FrameIndex];
-    // CmdTransitionTexture(cmd, GetTexture(GetBackbufferView()), RhiTextureState::Present);
 
     const VkCommandBuffer &cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
 
