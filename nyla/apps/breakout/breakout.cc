@@ -297,9 +297,9 @@ void GameRender(RhiCmdList cmd, RhiRenderTargetView rtv)
 
     g_Engine.GetDebugTextRenderer().CmdFlush(cmd);
 
-    g_Rhi.CmdTransitionTexture(cmd, renderTarget, RhiTextureState::Present);
-
     g_Rhi.PassEnd();
+
+    g_Rhi.CmdTransitionTexture(cmd, renderTarget, RhiTextureState::Present);
 }
 
 } // namespace nyla
