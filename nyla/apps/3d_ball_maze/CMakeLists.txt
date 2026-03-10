@@ -8,6 +8,8 @@ endif()
 
 target_sources(${TARGET} PRIVATE 
     3d_ball_maze.cc
+    game_scene.cc
+    level_editor_scene.cc
 )
 
 target_include_directories(${TARGET} PRIVATE ${PROJECT_SOURCE_DIR})

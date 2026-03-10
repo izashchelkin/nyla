@@ -1,4 +1,5 @@
 #include "nyla/apps/3d_ball_maze/3d_ball_maze.h"
+#include "nyla/apps/3d_ball_maze/scene.h"
 #include "nyla/commons/assert.h"
 #include "nyla/commons/log.h"
 #include "nyla/commons/math/mat.h"
@@ -43,6 +44,9 @@ void Game::Process(RhiCmdList cmd, float dt)
     RhiDepthStencilView dsv;
     m_RenderTargets.GetTargets(backbufferInfo.width, backbufferInfo.height, rtv, dsv);
 
+    GameScene scene;
+    scene.Process(*this, cmd, dt, rtv, dsv);
+
     RhiTexture renderTarget = g_Rhi.GetTexture(rtv);
 
     g_Rhi.CmdTransitionTexture(cmd, renderTarget, RhiTextureState::TransferSrc);
@@ -75,7 +79,10 @@ auto PlatformMain() -> int
     while (!g_Engine.ShouldExit())
     {
         const auto [cmd, dt, fps] = g_Engine.FrameBegin();
-        g_Engine.GetDebugTextRenderer().Text(500, 10, std::format("fps={}", fps));
+        if (false)
+        {
+            g_Engine.GetDebugTextRenderer().Text(500, 10, std::format("fps={}", fps));
+        }
 
         RhiTextureInfo backbufferInfo = g_Rhi.GetTextureInfo(g_Rhi.GetTexture(g_Rhi.GetBackbufferView()));
 
