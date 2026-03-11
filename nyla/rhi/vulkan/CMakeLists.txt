@@ -1,9 +1,12 @@
-set(TARGET nyla_rhi_vulkan)
-add_library(${TARGET})
-add_library(nyla::rhi::vulkan ALIAS ${TARGET})
+find_package(Vulkan)
 
-target_sources(${TARGET}
-    PRIVATE
+if (Vulkan_FOUND)
+    set(TARGET nyla_rhi_vulkan)
+    add_library(${TARGET})
+    add_library(nyla::rhi::vulkan ALIAS ${TARGET})
+
+    target_sources(${TARGET}
+        PRIVATE
         rhi_vulkan.cc
         rhi_vulkan_buffer.cc
         rhi_vulkan_command_list.cc
@@ -15,17 +18,16 @@ target_sources(${TARGET}
         rhi_vulkan_swapchain.cc
         rhi_vulkan_sync.cc
         rhi_vulkan_texture.cc
-)
+    )
 
-target_include_directories(${TARGET}
-    PUBLIC
+    target_include_directories(${TARGET}
+        PUBLIC
         ${PROJECT_SOURCE_DIR}
-)
+    )
 
-find_package(Vulkan REQUIRED)
-
-target_link_libraries(${TARGET}
-    PUBLIC
+    target_link_libraries(${TARGET}
+        PUBLIC
         nyla::commons
         Vulkan::Vulkan        
-)
+    )
+endif()

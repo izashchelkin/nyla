@@ -15,13 +15,9 @@ target_include_directories(${TARGET_PLATFORM}
         ${VULKAN_INCLUDE_DIRS}
 )
 
-find_package(Vulkan REQUIRED) # TODO: make this a separate target?
-
 target_link_libraries(${TARGET_PLATFORM}
     PUBLIC
         nyla::commons
-
-        Vulkan::Vulkan
 
         xcb
         xcb-util
@@ -55,7 +51,7 @@ target_link_libraries(${TARGET_PLATFORM_DIR_WATCH}
 #
 
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(ALSA REQUIRED IMPORTED_TARGET alsa)
+pkg_check_modules(ALSA IMPORTED_TARGET alsa)
 
 set(target_audio nyla_platform_linux_audio)
 add_library(${target_audio})

@@ -1,20 +1,26 @@
-set(TARGET terminal)
+set(HAS_RHI TARGET nyla::rhi)
 
-if (WIN32)
-    add_executable(${TARGET} WIN32)
-else()
-    add_executable(${TARGET})
-endif()
+if (${HAS_RHI})
 
-target_sources(${TARGET} PRIVATE 
-    terminal.cc
-    bdf_parser.cc
-)
+    set(TARGET terminal)
 
-target_include_directories(${TARGET} PRIVATE ${PROJECT_SOURCE_DIR})
+    if (WIN32)
+        add_executable(${TARGET} WIN32)
+    else()
+        add_executable(${TARGET})
+    endif()
 
-target_link_libraries(${TARGET}
-    PRIVATE
+    target_sources(${TARGET} PRIVATE 
+        terminal.cc
+        bdf_parser.cc
+    )
+
+    target_include_directories(${TARGET} PRIVATE ${PROJECT_SOURCE_DIR})
+
+    target_link_libraries(${TARGET}
+        PRIVATE
         nyla::platform
         nyla::rhi
-)
+    )
+
+endif()
