@@ -1,9 +1,11 @@
+#include "nyla/platform/platform.h"
 
-namespace nyla {
+namespace nyla
+{
 
-auto Main() -> int
+auto PlatformMain() -> int
 {
     return 0;
 }
 
-}
+} // namespace nyla
