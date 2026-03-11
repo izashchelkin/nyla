@@ -1,5 +1,4 @@
 set (HAS_RHI TARGET nyla::rhi)
-
 if (${HAS_RHI})
 
     set(TARGET nyla_engine)

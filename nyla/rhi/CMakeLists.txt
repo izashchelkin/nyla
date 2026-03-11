@@ -7,6 +7,9 @@ add_subdirectory(vulkan)
 set(HAS_VULKAN TARGET nyla::rhi::vulkan)
 set(HAS_D3D12 TARGET nyla::rhi::d3d12)
 
+message(${HAS_VULKAN})
+message(${HAS_D3D12})
+
 if(${HAS_VULKAN} OR ${HAS_D3D12})
 
     set(TARGET nyla_rhi)
