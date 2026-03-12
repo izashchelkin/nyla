@@ -110,13 +110,13 @@ class Platform
         return buffer;
     }
 
-    auto ReadFile(std::string_view filename) -> std::vector<std::byte>
+    static auto ReadFile(std::string_view filename) -> std::vector<std::byte>
     {
         std::ifstream file(std::string{filename}, std::ios::ate | std::ios::binary);
         return ReadFileInternal(file);
     }
 
-    auto ReadFile(const std::string &filename) -> std::vector<std::byte>
+    static auto ReadFile(const std::string &filename) -> std::vector<std::byte>
     {
         std::ifstream file(filename, std::ios::ate | std::ios::binary);
         return ReadFileInternal(file);

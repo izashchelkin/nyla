@@ -98,9 +98,9 @@ void AssetManager::Upload(RhiCmdList cmd)
             RegionAlloc scratchAlloc = transientAlloc.PushSubAlloc(16_KiB);
 
             NYLA_ASSERT(meshData.gltfPath.EndsWith(".gltf"));
-            std::vector<std::byte> gltfData = g_Platform.ReadFile(meshData.gltfPath.StrView());
+            std::vector<std::byte> gltfData = Platform::ReadFile(meshData.gltfPath.StrView());
             std::vector<std::byte> binData =
-                g_Platform.ReadFile(meshData.gltfPath.Clone(scratchAlloc).SetExtension(".bin").StrView());
+                Platform::ReadFile(meshData.gltfPath.Clone(scratchAlloc).SetExtension(".bin").StrView());
 
             {
                 GltfParser parser;

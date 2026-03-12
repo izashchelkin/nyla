@@ -61,7 +61,7 @@ void Game::Process(RhiCmdList cmd, float dt)
 
 auto PlatformMain() -> int
 {
-    g_Platform.Init({
+    Platform::InitGraphical({
         .enabledFeatures = PlatformFeature::KeyboardInput,
         .open = true,
     });

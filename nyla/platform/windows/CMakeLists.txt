@@ -5,8 +5,6 @@ add_library(nyla::platform::windows ALIAS ${TARGET_PLATFORM})
 target_sources(${TARGET_PLATFORM}
     PRIVATE
         platform_windows.cc
-        platform_windows_clock.cc
-        platform_windows_page_alloc.cc
 )
 
 target_include_directories(${TARGET_PLATFORM}

@@ -1,10 +1,13 @@
 #include "nyla/platform/windows/platform_windows.h"
 
+#include <immintrin.h>
+
 #include "nyla/commons/align.h"
 #include "nyla/commons/assert.h"
 #include "nyla/commons/byteliterals.h"
 #include "nyla/commons/containers/inline_ring.h"
 #include "nyla/platform/platform.h"
+#include "platform_windows.h"
 #include <cstdint>
 #include <limits>
 
@@ -13,24 +16,117 @@ auto CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) ->
 namespace nyla
 {
 
-constexpr auto ScanCodeToKeyPhysical(uint8_t scanCode, bool extended) -> KeyPhysical;
-
-void Platform::Impl::InitGraphical(const PlatformInitDesc &desc)
+namespace
 {
-    GetSystemInfo(&m_SysInfo);
 
-    m_AddressSpaceSize = AlignedUp<uint64_t>(256_GiB, m_SysInfo.dwAllocationGranularity);
+char *g_AddressSpaceBase;
+char *g_AddressSpaceAt;
+uint64_t g_AddressSpaceSize;
 
-    m_AddressSpaceBase = (char *)VirtualAlloc(nullptr, m_AddressSpaceSize, MEM_RESERVE, PAGE_NOACCESS);
-    m_AddressSpaceAt = m_AddressSpaceBase;
+SYSTEM_INFO g_SysInfo{};
+HINSTANCE g_HInstance{};
+HWND g_HWnd{};
+RECT g_WinRect{};
+
+std::array<XINPUT_STATE, 1> g_Gamepads{};
+
+static inline constexpr uint32_t kFlagQuit = 1 << 0;
+static inline constexpr uint32_t kFlagWinResize = 1 << 1;
+static inline constexpr uint32_t kFlagRepaint = 1 << 2;
+uint32_t g_Flags{};
+
+InlineRing<PlatformEvent, 32> g_EventsRing{};
+
+} // namespace
+
+namespace
+{
+
+auto GetPerformanceFreq() -> uint64_t
+{
+    static const auto freq = [] -> uint64_t {
+        LARGE_INTEGER freq;
+        QueryPerformanceFrequency(&freq);
+        return static_cast<uint64_t>(freq.QuadPart);
+    }();
+    return freq;
+}
+
+auto GetPerformanceTicks() -> uint64_t
+{
+    LARGE_INTEGER counter;
+    QueryPerformanceCounter(&counter);
+    return static_cast<uint64_t>(counter.QuadPart);
+}
+
+auto TicksTo(uint64_t ticks, uint64_t scale) -> uint64_t
+{
+    unsigned __int64 hi = 0;
+    unsigned __int64 lo = _umul128(ticks, scale, &hi);
+
+    unsigned __int64 rem = 0;
+    unsigned __int64 q = _udiv128(hi, lo, GetPerformanceFreq(), &rem);
+    return static_cast<uint64_t>(q);
+}
+
+} // namespace
+
+auto Platform::GetMonotonicTimeMillis() -> uint64_t
+{
+    return TicksTo(GetPerformanceTicks(), 1'000ULL);
+}
+
+auto Platform::GetMonotonicTimeMicros() -> uint64_t
+{
+    return TicksTo(GetPerformanceTicks(), 1'000'000ULL);
+}
+
+auto Platform::GetMemPageSize() -> uint64_t
+{
+    return g_SysInfo.dwPageSize;
+}
+
+auto Platform::ReserveMemPages(uint64_t size) -> char *
+{
+    char *ret = g_AddressSpaceAt;
+    g_AddressSpaceAt += AlignedUp<uint64_t>(size, g_SysInfo.dwPageSize);
+    return ret;
+}
+
+void Platform::CommitMemPages(char *page, uint64_t size)
+{
+    NYLA_ASSERT(((page - g_AddressSpaceBase) % g_SysInfo.dwPageSize) == 0);
+
+    AlignUp<uint64_t>(size, g_SysInfo.dwPageSize);
+
+    VirtualAlloc(page, size, MEM_COMMIT, PAGE_READWRITE);
+}
+
+void Platform::DecommitMemPages(char *page, uint64_t size)
+{
+    NYLA_ASSERT(((page - g_AddressSpaceBase) % g_SysInfo.dwPageSize) == 0);
+
+    AlignUp<uint64_t>(size, g_SysInfo.dwPageSize);
+
+    VirtualAlloc(page, size, MEM_DECOMMIT, PAGE_NOACCESS);
+}
+
+void Platform::InitGraphical(const PlatformInitDesc &desc)
+{
+    GetSystemInfo(&g_SysInfo);
+
+    g_AddressSpaceSize = AlignedUp<uint64_t>(256_GiB, g_SysInfo.dwAllocationGranularity);
+
+    g_AddressSpaceBase = (char *)VirtualAlloc(nullptr, g_AddressSpaceSize, MEM_RESERVE, PAGE_NOACCESS);
+    g_AddressSpaceAt = g_AddressSpaceBase;
 
     if (desc.open)
         WinOpen();
 }
 
-auto Platform::Impl::PollEvent(PlatformEvent &outEvent) -> bool
+auto Platform::WinPollEvent(PlatformEvent &outEvent) -> bool
 {
-    while (m_EventsRing.empty() && !(m_Flags & (kFlagRepaint | kFlagRepaint | kFlagQuit)))
+    while (g_EventsRing.empty() && !(g_Flags & (kFlagRepaint | kFlagRepaint | kFlagQuit)))
     {
         MSG msg{};
         if (!PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
@@ -38,7 +134,7 @@ auto Platform::Impl::PollEvent(PlatformEvent &outEvent) -> bool
 
         if (msg.message == WM_QUIT)
         {
-            m_Flags |= kFlagQuit;
+            g_Flags |= kFlagQuit;
             break;
         }
 
@@ -46,91 +142,91 @@ auto Platform::Impl::PollEvent(PlatformEvent &outEvent) -> bool
         DispatchMessage(&msg);
     }
 
-    if (m_Flags & kFlagQuit)
+    if (g_Flags & kFlagQuit)
     {
         outEvent = PlatformEvent{.type = PlatformEventType::Quit};
         return true;
     }
 
-    if (m_Flags & kFlagWinResize)
+    if (g_Flags & kFlagWinResize)
     {
         outEvent = PlatformEvent{.type = PlatformEventType::WinResize};
-        m_Flags &= ~kFlagWinResize;
+        g_Flags &= ~kFlagWinResize;
         return true;
     }
 
-    if (m_Flags & kFlagRepaint)
+    if (g_Flags & kFlagRepaint)
     {
         PAINTSTRUCT ps{};
-        BeginPaint(m_HWnd, &ps);
-        EndPaint(m_HWnd, &ps);
+        BeginPaint(g_HWnd, &ps);
+        EndPaint(g_HWnd, &ps);
 
         outEvent = PlatformEvent{.type = PlatformEventType::Repaint};
-        m_Flags &= ~kFlagRepaint;
+        g_Flags &= ~kFlagRepaint;
         return true;
     }
 
-    if (!m_EventsRing.empty())
+    if (!g_EventsRing.empty())
     {
-        outEvent = m_EventsRing.pop_front();
+        outEvent = g_EventsRing.pop_front();
         return true;
     }
 
     return false;
 }
 
-auto Platform::Impl::WinGetHandle() -> HWND
+auto WindowsPlatform::WinGetHandle() -> HWND
 {
-    NYLA_ASSERT(m_HWnd);
-    return m_HWnd;
+    NYLA_ASSERT(g_HWnd);
+    return g_HWnd;
 }
 
-void Platform::Impl::WinOpen()
+void Platform::WinOpen()
 {
-    if (!m_HWnd)
+    if (!g_HWnd)
     {
         constexpr wchar_t kName[] = L"nyla";
 
         WNDCLASSW windowClass = {
-            .lpfnWndProc = ::MainWndProc,
-            .hInstance = m_HInstance,
+            .lpfnWndProc = WindowsPlatform::MainWndProc,
+            .hInstance = g_HInstance,
             .lpszClassName = kName,
         };
         RegisterClassW(&windowClass);
 
-        m_HWnd = CreateWindowExW(0, kName, kName, WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
-                                 CW_USEDEFAULT, nullptr, nullptr, m_HInstance, nullptr);
+        g_HWnd = CreateWindowExW(0, kName, kName, WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
+                                 CW_USEDEFAULT, nullptr, nullptr, g_HInstance, nullptr);
     }
 
-    ShowWindow(m_HWnd, SW_SHOW);
-    UpdateWindow(m_HWnd);
+    ShowWindow(g_HWnd, SW_SHOW);
+    UpdateWindow(g_HWnd);
 
-    GetWindowRect(m_HWnd, &m_WinRect);
+    GetWindowRect(g_HWnd, &g_WinRect);
 }
 
-auto Platform::Impl::WinGetSize() -> PlatformWindowSize
+auto Platform::WinGetSize() -> PlatformWindowSize
 {
     return {
-        .width = static_cast<uint32_t>(m_WinRect.right - m_WinRect.left),
-        .height = static_cast<uint32_t>(m_WinRect.bottom - m_WinRect.top),
+        .width = static_cast<uint32_t>(g_WinRect.right - g_WinRect.left),
+        .height = static_cast<uint32_t>(g_WinRect.bottom - g_WinRect.top),
     };
 }
 
-auto Platform::Impl::GetHInstance() -> HINSTANCE
+auto WindowsPlatform::GetHInstance() -> HINSTANCE
 {
-    return m_HInstance;
+    return g_HInstance;
 }
 
-void Platform::Impl::SetHInstance(HINSTANCE hInstance)
+void WindowsPlatform::SetHInstance(HINSTANCE hInstance)
 {
-    m_HInstance = hInstance;
+    g_HInstance = hInstance;
 }
 
 //
 
-auto Platform::Impl::UpdateGamepad(uint32_t index) -> bool
+auto Platform::UpdateGamepad(uint32_t index) -> bool
 {
-    auto &state = m_Gamepads[index];
+    auto &state = g_Gamepads[index];
     ZeroMemory(&state.Gamepad, sizeof(state.Gamepad));
 
     const DWORD dwResult = XInputGetState(0, &state);
@@ -175,84 +271,36 @@ auto GetGamepadTrigger(uint8_t rawValue, uint8_t rawDeadzone) -> float
 
 } // namespace
 
-auto Platform::Impl::GetGamepadLeftStick(uint32_t index) -> float2
-{
-    auto &gamepad = m_Gamepads[index].Gamepad;
-    return GetGamepadStick(gamepad.sThumbLX, gamepad.sThumbLY, XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE);
-}
-
-auto Platform::Impl::GetGamepadRightStick(uint32_t index) -> float2
-{
-    auto &gamepad = m_Gamepads[index].Gamepad;
-    return GetGamepadStick(gamepad.sThumbRX, gamepad.sThumbRY, XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE);
-}
-
-auto Platform::Impl::GetGamepadLeftTrigger(uint32_t index) -> float
-{
-    auto &gamepad = m_Gamepads[index].Gamepad;
-    return GetGamepadTrigger(gamepad.bLeftTrigger, XINPUT_GAMEPAD_TRIGGER_THRESHOLD);
-}
-
-auto Platform::Impl::GetGamepadRightTrigger(uint32_t index) -> float
-{
-    auto &gamepad = m_Gamepads[index].Gamepad;
-    return GetGamepadTrigger(gamepad.bRightTrigger, XINPUT_GAMEPAD_TRIGGER_THRESHOLD);
-}
-
-auto Platform::UpdateGamepad(uint32_t index) -> bool
-{
-    return m_Impl->UpdateGamepad(index);
-}
-
 auto Platform::GetGamepadLeftStick(uint32_t index) -> float2
 {
-    return m_Impl->GetGamepadLeftStick(index);
+    auto &gamepad = g_Gamepads[index].Gamepad;
+    return GetGamepadStick(gamepad.sThumbLX, gamepad.sThumbLY, XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE);
 }
 
 auto Platform::GetGamepadRightStick(uint32_t index) -> float2
 {
-    return m_Impl->GetGamepadRightStick(index);
+    auto &gamepad = g_Gamepads[index].Gamepad;
+    return GetGamepadStick(gamepad.sThumbRX, gamepad.sThumbRY, XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE);
 }
 
 auto Platform::GetGamepadLeftTrigger(uint32_t index) -> float
 {
-    return m_Impl->GetGamepadLeftTrigger(index);
+    auto &gamepad = g_Gamepads[index].Gamepad;
+    return GetGamepadTrigger(gamepad.bLeftTrigger, XINPUT_GAMEPAD_TRIGGER_THRESHOLD);
 }
 
 auto Platform::GetGamepadRightTrigger(uint32_t index) -> float
 {
-    return m_Impl->GetGamepadRightTrigger(index);
+    auto &gamepad = g_Gamepads[index].Gamepad;
+    return GetGamepadTrigger(gamepad.bRightTrigger, XINPUT_GAMEPAD_TRIGGER_THRESHOLD);
 }
 
-//
-
-void Platform::InitGraphical(const PlatformInitDesc &desc)
-{
-    NYLA_ASSERT(m_Impl);
-    m_Impl->InitGraphical(desc);
-}
-
-void Platform::WinOpen()
-{
-    m_Impl->WinOpen();
-}
-
-auto Platform::WinGetSize() -> PlatformWindowSize
-{
-    return m_Impl->WinGetSize();
-}
-
-auto Platform::WinPollEvent(PlatformEvent &outEvent) -> bool
-{
-    return m_Impl->PollEvent(outEvent);
-}
-
-LRESULT CALLBACK Platform::Impl::MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+auto CALLBACK WindowsPlatform::MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) -> LRESULT
 {
     switch (uMsg)
     {
     case WM_PAINT: {
-        m_Flags |= kFlagRepaint;
+        g_Flags |= kFlagRepaint;
         return 0;
     }
 
@@ -262,7 +310,7 @@ LRESULT CALLBACK Platform::Impl::MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam
     }
 
     case WM_DESTROY: {
-        m_Flags |= kFlagQuit;
+        g_Flags |= kFlagQuit;
         PostQuitMessage(0);
         return 0;
     }
@@ -271,9 +319,9 @@ LRESULT CALLBACK Platform::Impl::MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam
         if (wParam == SIZE_MINIMIZED)
             return 0;
 
-        m_Flags |= kFlagWinResize;
+        g_Flags |= kFlagWinResize;
         RECT newRect{};
-        GetWindowRect(m_HWnd, &newRect);
+        GetWindowRect(g_HWnd, &newRect);
 
         return 0;
     }
@@ -286,8 +334,8 @@ LRESULT CALLBACK Platform::Impl::MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam
 
         if (!wasDown)
         {
-            KeyPhysical key = ScanCodeToKeyPhysical(scanCode, extended);
-            m_EventsRing.emplace_back(PlatformEvent{
+            KeyPhysical key = WindowsPlatform::ScanCodeToKeyPhysical(scanCode, extended);
+            g_EventsRing.emplace_back(PlatformEvent{
                 .type = PlatformEventType::KeyDown,
                 .key = key,
             });
@@ -300,8 +348,8 @@ LRESULT CALLBACK Platform::Impl::MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam
         UINT scanCode = (UINT)((lParam >> 16) & 0xFF);
         bool extended = ((lParam >> 24) & 0x01) != 0;
 
-        KeyPhysical key = ScanCodeToKeyPhysical(scanCode, extended);
-        m_EventsRing.emplace_back(PlatformEvent{
+        KeyPhysical key = WindowsPlatform::ScanCodeToKeyPhysical(scanCode, extended);
+        g_EventsRing.emplace_back(PlatformEvent{
             .type = PlatformEventType::KeyUp,
             .key = key,
         });
@@ -314,7 +362,7 @@ LRESULT CALLBACK Platform::Impl::MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam
     return 0;
 }
 
-constexpr auto ScanCodeToKeyPhysical(uint8_t scanCode, bool extended) -> KeyPhysical
+auto WindowsPlatform::ScanCodeToKeyPhysical(uint8_t scanCode, bool extended) -> KeyPhysical
 {
     // Extended (E0) keys first where collisions exist.
     if (extended)
@@ -489,8 +537,6 @@ constexpr auto ScanCodeToKeyPhysical(uint8_t scanCode, bool extended) -> KeyPhys
     }
 }
 
-Platform g_Platform{};
-
 } // namespace nyla
 
 auto WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, int nCmdShow) -> int
@@ -506,10 +552,6 @@ auto WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine
     freopen_s(&f, "CONIN$", "r", stdin);
 #endif
 
-    auto *impl = new Platform::Impl{};
-    impl->SetHInstance(hInstance);
-    g_Platform.SetImpl(impl);
-
     const int retCode = PlatformMain();
 
 #ifndef NDEBUG
@@ -517,9 +559,4 @@ auto WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine
 #endif
 
     return retCode;
-}
-
-auto CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) -> LRESULT
-{
-    return nyla::g_Platform.GetImpl()->MainWndProc(hwnd, uMsg, wParam, lParam);
 }

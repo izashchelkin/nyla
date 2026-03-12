@@ -60,7 +60,7 @@ class RegionAlloc
         m_Base = (char *)base;
 
         if (!m_Base)
-            m_Base = g_Platform.ReserveMemPages(maxSize);
+            m_Base = Platform::ReserveMemPages(maxSize);
     }
 
     auto PushBytes(uint64_t size, uint32_t align) -> char *
@@ -154,9 +154,9 @@ class RegionAlloc
 
     auto PushSubAlloc(uint64_t size) -> RegionAlloc
     {
-        AlignUp(size, g_Platform.GetMemPageSize());
+        AlignUp(size, Platform::GetMemPageSize());
 
-        void *const p = PushBytes(size, g_Platform.GetMemPageSize());
+        void *const p = PushBytes(size, Platform::GetMemPageSize());
         RegionAlloc subAlloc{};
         subAlloc.Init(p, size, RegionAllocCommitPageGrowth::GetInstance());
         return subAlloc;
@@ -182,11 +182,11 @@ inline auto RegionAllocBumpOnlyGrowth::TryGrow(RegionAlloc &alloc, uint64_t need
 
 inline auto RegionAllocCommitPageGrowth::TryGrow(RegionAlloc &alloc, uint64_t neededSize) -> bool
 {
-    AlignUp(neededSize, g_Platform.GetMemPageSize());
+    AlignUp(neededSize, Platform::GetMemPageSize());
     NYLA_ASSERT(neededSize <= alloc.m_MaxSize);
 
     char *const p = alloc.m_Base + alloc.m_Size;
-    g_Platform.CommitMemPages(p, neededSize - alloc.m_Size);
+    Platform::CommitMemPages(p, neededSize - alloc.m_Size);
 
     alloc.m_Size = neededSize;
     return true;

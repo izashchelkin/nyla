@@ -35,11 +35,11 @@ void GameScene::Process(Game &game, RhiCmdList cmd, float dt, RhiRenderTargetVie
 
     float verticalInput = 0;
 
-    if (g_Platform.UpdateGamepad(0))
+    if (Platform::UpdateGamepad(0))
     {
-        movement = g_Platform.GetGamepadLeftStick(0);
+        movement = Platform::GetGamepadLeftStick(0);
 
-        const float2 rotation = g_Platform.GetGamepadRightStick(0);
+        const float2 rotation = Platform::GetGamepadRightStick(0);
         yaw += rotation[0] * 0.1f;
         pitch -= rotation[1] * 0.1f;
 
@@ -50,7 +50,7 @@ void GameScene::Process(Game &game, RhiCmdList cmd, float dt, RhiRenderTargetVie
         if (yaw < -2 * std::numbers::pi_v<float>)
             yaw += 2 * std::numbers::pi_v<float>;
 
-        verticalInput = g_Platform.GetGamepadLeftTrigger(0) - g_Platform.GetGamepadRightTrigger(0);
+        verticalInput = Platform::GetGamepadLeftTrigger(0) - Platform::GetGamepadRightTrigger(0);
     }
 
     RhiTexture renderTarget = g_Rhi.GetTexture(rtv);

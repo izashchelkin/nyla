@@ -18,7 +18,7 @@ namespace nyla
 
 void Engine::Init(const EngineInitDesc &desc)
 {
-    m_LastFrameStart = g_Platform.GetMonotonicTimeMicros();
+    m_LastFrameStart = Platform::GetMonotonicTimeMicros();
 
     m_RootAlloc = &desc.rootAlloc;
     m_PermanentAlloc = m_RootAlloc->PushSubAlloc(16_MiB);
@@ -54,7 +54,7 @@ auto Engine::FrameBegin() -> EngineFrameBeginResult
 {
     RhiCmdList cmd = g_Rhi.FrameBegin();
 
-    const uint64_t frameStart = g_Platform.GetMonotonicTimeMicros();
+    const uint64_t frameStart = Platform::GetMonotonicTimeMicros();
 
     const uint64_t dtUs = frameStart - m_LastFrameStart;
     m_DtUsAccum += dtUs;
@@ -76,7 +76,7 @@ auto Engine::FrameBegin() -> EngineFrameBeginResult
     for (;;)
     {
         PlatformEvent event{};
-        if (!g_Platform.PollEvent(event))
+        if (!Platform::WinPollEvent(event))
             break;
 
         switch (event.type)
@@ -131,7 +131,7 @@ auto Engine::FrameEnd() -> void
 {
     g_Rhi.FrameEnd();
 
-    uint64_t frameEnd = g_Platform.GetMonotonicTimeMicros();
+    uint64_t frameEnd = Platform::GetMonotonicTimeMicros();
     uint64_t frameDurationUs = frameEnd - m_LastFrameStart;
 
     if (m_TargetFrameDurationUs > frameDurationUs)

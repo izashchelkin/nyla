@@ -73,7 +73,7 @@ void GameInit()
 #if defined(__linux__) // TODO: deal with this
         std::string assetsBasePath = "assets/BBreaker";
 #else
-        std::string assetsBasePath = "C:\\nyla\\assets\\BBreaker";
+        std::string assetsBasePath = "D:\\nyla\\assets\\BBreaker";
 #endif
 
         auto &assetManager = g_Engine.GetAssetManager();
@@ -266,7 +266,7 @@ void GameRender(RhiCmdList cmd, RhiRenderTargetView rtv)
             renderer.Mesh(pos, size, assets.rectMesh, assets.bricks[i % assets.bricks.size()]);
         }
 
-        uint64_t second = g_Platform.GetMonotonicTimeMillis() / 1000;
+        uint64_t second = Platform::GetMonotonicTimeMillis() / 1000;
         if (second % 2)
         {
             renderer.Mesh({playerPosX, kPlayerPosY, 0}, {playerWidth, kPlayerHeight, 1}, assets.rectMesh,
