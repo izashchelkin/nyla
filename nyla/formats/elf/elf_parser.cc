@@ -4,9 +4,9 @@
 namespace nyla
 {
 
-auto PlatformMain() -> int
+class ElfParser
 {
-    return 0;
-}
+  public:
+};
 
 } // namespace nyla

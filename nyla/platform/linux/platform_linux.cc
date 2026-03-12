@@ -34,9 +34,9 @@
 
 #undef explicit
 
-auto main(int argc, char *argv[]) -> int
+auto main(int argc, const char *argv[]) -> int
 {
-    nyla::PlatformMain();
+    nyla::PlatformMain(std::span<const char *>{argv, uint64_t(argc)});
     return 0;
 }
 

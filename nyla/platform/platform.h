@@ -123,7 +123,7 @@ class Platform
     }
 };
 
-auto PlatformMain() -> int;
+auto PlatformMain(std::span<const char *> argv) -> int;
 
 enum class KeyPhysical
 {
