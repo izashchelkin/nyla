@@ -8,7 +8,7 @@
 #include "nyla/commons/align.h"
 #include "nyla/commons/assert.h"
 #include "nyla/commons/byteliterals.h"
-#include "nyla/commons/containers/inline_ring.h"
+#include "nyla/commons/inline_ring.h"
 #include "nyla/platform/platform.h"
 #include "platform_windows.h"
 

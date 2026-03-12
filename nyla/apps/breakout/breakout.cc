@@ -272,7 +272,7 @@ void GameRender(RhiCmdList cmd, RhiRenderTargetView rtv)
 
         {
             const float3 pos = float3{ballPos[0], ballPos[1], 0};
-            Renderer::Mesh(pos, {kBallRadius * 2, kBallRadius * 2}, assets.rectMesh, assets.ball);
+            Renderer::Mesh(pos, {kBallRadius * 2, kBallRadius * 2, 0}, assets.rectMesh, assets.ball);
         }
     }
 

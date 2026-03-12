@@ -6,9 +6,11 @@
 #include <array>
 #include <cmath>
 #include <complex>
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <initializer_list>
+#include <ranges>
 
 namespace nyla
 {
@@ -18,54 +20,72 @@ template <typename T, uint32_t N> class Vec
   public:
     constexpr Vec() = default;
 
-    constexpr Vec(std::initializer_list<T> elems)
-    {
-        NYLA_ASSERT(elems.size() <= N);
-        std::ranges::copy(elems.begin(), elems.end(), m_Data.begin());
-    }
-
     template <typename K, uint32_t M>
         requires std::convertible_to<K, T>
-    explicit Vec(const Vec<K, M> &v)
+    constexpr explicit Vec(const Vec<K, M> &v)
     {
         auto count = std::min<uint32_t>(N, M);
         for (uint32_t i = 0; i < count; ++i)
             m_Data[i] = static_cast<T>(v[i]);
     }
 
-    explicit Vec(std::complex<T> c)
+    constexpr explicit Vec(T x)
+        requires(N == 1)
+        : m_Data{x}
+    {
+    }
+
+    constexpr Vec(T x, T y)
+        requires(N == 2)
+        : m_Data{x, y}
+    {
+    }
+
+    constexpr Vec(std::complex<T> c)
         requires(N == 2)
         : m_Data{c.imag(), c.real()}
     {
     }
 
-    explicit operator std::complex<T>() const
+    constexpr Vec(T x, T y, T z)
+        requires(N == 3)
+        : m_Data{x, y, z}
+    {
+    }
+
+    constexpr Vec(T x, T y, T z, T w)
+        requires(N == 4)
+        : m_Data{x, y, z, w}
+    {
+    }
+
+    constexpr explicit operator std::complex<T>() const
         requires(N == 2)
     {
         return std::complex{m_Data[1], m_Data[0]};
     }
 
-    [[nodiscard]] auto data() const -> const T *
+    [[nodiscard]] constexpr auto data() const -> const T *
     {
         return m_Data.data();
     }
 
     [[nodiscard]]
-    auto operator[](size_t i) const -> const T &
+    constexpr auto operator[](size_t i) const -> const T &
     {
         NYLA_ASSERT(i < N);
         return m_Data[i];
     }
 
     [[nodiscard]]
-    auto operator[](size_t i) -> T &
+    constexpr auto operator[](size_t i) -> T &
     {
         NYLA_ASSERT(i < N);
         return m_Data[i];
     }
 
     [[nodiscard]]
-    auto operator-() const -> Vec
+    constexpr auto operator-() const -> Vec
     {
         Vec ret;
         for (uint32_t i = 0; i < N; ++i)
@@ -74,7 +94,7 @@ template <typename T, uint32_t N> class Vec
     }
 
     [[nodiscard]]
-    auto operator==(const Vec &rhs) const -> bool
+    constexpr auto operator==(const Vec &rhs) const -> bool
     {
         for (uint32_t i = 0; i < N; ++i)
         {
@@ -85,7 +105,7 @@ template <typename T, uint32_t N> class Vec
     }
 
     [[nodiscard]]
-    auto LenSqr() const -> T
+    constexpr auto LenSqr() const -> T
     {
         T sum{};
         for (uint32_t i = 0; i < N; ++i)
@@ -94,14 +114,14 @@ template <typename T, uint32_t N> class Vec
     }
 
     [[nodiscard]]
-    auto Len() const -> T
+    constexpr auto Len() const -> T
     {
         return std::sqrt(LenSqr());
     }
 
     //
 
-    auto operator+=(const Vec &rhs) -> Vec &
+    constexpr auto operator+=(const Vec &rhs) -> Vec &
     {
         for (uint32_t i = 0; i < N; ++i)
             m_Data[i] += rhs.m_Data[i];
@@ -109,13 +129,12 @@ template <typename T, uint32_t N> class Vec
     }
 
     [[nodiscard]]
-    auto operator+(const Vec &rhs) const -> Vec
+    constexpr auto operator+(const Vec &rhs) const -> Vec
     {
         Vec lhs = *this;
         return (lhs += rhs);
     }
-
-    auto operator-=(const Vec &rhs) -> Vec &
+    constexpr auto operator-=(const Vec &rhs) -> Vec &
     {
         for (uint32_t i = 0; i < N; ++i)
             m_Data[i] -= rhs.m_Data[i];
@@ -123,13 +142,13 @@ template <typename T, uint32_t N> class Vec
     }
 
     [[nodiscard]]
-    auto operator-(const Vec &rhs) const -> Vec
+    constexpr auto operator-(const Vec &rhs) const -> Vec
     {
         Vec lhs = *this;
         return (lhs -= rhs);
     }
 
-    auto operator*=(auto scalar) -> Vec &
+    constexpr auto operator*=(auto scalar) -> Vec &
     {
         for (uint32_t i = 0; i < N; ++i)
             m_Data[i] *= static_cast<T>(scalar);
@@ -137,13 +156,13 @@ template <typename T, uint32_t N> class Vec
     }
 
     [[nodiscard]]
-    auto operator*(auto scalar) const -> Vec
+    constexpr auto operator*(auto scalar) const -> Vec
     {
         Vec lhs = *this;
         return (lhs *= scalar);
     }
 
-    auto operator/=(auto scalar) -> Vec &
+    constexpr auto operator/=(auto scalar) -> Vec &
     {
         for (uint32_t i = 0; i < N; ++i)
             m_Data[i] /= static_cast<T>(scalar);
@@ -151,7 +170,7 @@ template <typename T, uint32_t N> class Vec
     }
 
     [[nodiscard]]
-    auto operator/(auto scalar) const -> Vec
+    constexpr auto operator/(auto scalar) const -> Vec
     {
         Vec lhs = *this;
         return (lhs /= scalar);
@@ -159,19 +178,19 @@ template <typename T, uint32_t N> class Vec
 
     //
 
-    auto Normalize()
+    constexpr auto Normalize()
     {
         *this /= Len();
     }
 
     [[nodiscard]]
-    auto Normalized() const -> Vec
+    constexpr auto Normalized() const -> Vec
     {
         return (*this / Len());
     }
 
     [[nodiscard]]
-    auto Dot(const Vec &rhs) const -> T
+    constexpr auto Dot(const Vec &rhs) const -> T
     {
         T sum{};
         for (uint32_t i = 0; i < N; ++i)
@@ -180,7 +199,7 @@ template <typename T, uint32_t N> class Vec
     }
 
     [[nodiscard]]
-    auto Cross(const Vec &rhs) const -> Vec
+    constexpr auto Cross(const Vec &rhs) const -> Vec
         requires(N == 3)
     {
         return Vec{

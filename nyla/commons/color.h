@@ -5,7 +5,7 @@
 namespace nyla
 {
 
-constexpr auto ConvertHsvToRgb(float3 hsv) -> float3
+auto ConvertHsvToRgb(float3 hsv) -> float3
 {
     const float h = hsv[0];
     const float s = hsv[1];

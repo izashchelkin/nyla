@@ -42,6 +42,7 @@ target_include_directories(${TARGET_PLATFORM_DIR_WATCH}
 
 #
 
+find_package(PkgConfig REQUIRED)
 pkg_check_modules(ALSA IMPORTED_TARGET alsa)
 
 set(target_audio nyla_platform_linux_audio)
