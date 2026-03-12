@@ -97,6 +97,19 @@ class Platform
 
     // TODO: move this
 
+    static auto ReadFile(std::string_view filename) -> std::vector<std::byte>
+    {
+        std::ifstream file(std::string{filename}, std::ios::ate | std::ios::binary);
+        return ReadFileInternal(file);
+    }
+
+    static auto ReadFile(const std::string &filename) -> std::vector<std::byte>
+    {
+        std::ifstream file(filename, std::ios::ate | std::ios::binary);
+        return ReadFileInternal(file);
+    }
+
+  private:
     static auto ReadFileInternal(std::ifstream &file) -> std::vector<std::byte>
     {
         NYLA_ASSERT(file.is_open());
@@ -108,18 +121,6 @@ class Platform
 
         file.close();
         return buffer;
-    }
-
-    static auto ReadFile(std::string_view filename) -> std::vector<std::byte>
-    {
-        std::ifstream file(std::string{filename}, std::ios::ate | std::ios::binary);
-        return ReadFileInternal(file);
-    }
-
-    static auto ReadFile(const std::string &filename) -> std::vector<std::byte>
-    {
-        std::ifstream file(filename, std::ios::ate | std::ios::binary);
-        return ReadFileInternal(file);
     }
 };
 

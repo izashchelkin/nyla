@@ -10,53 +10,19 @@
 namespace nyla
 {
 
-class RegionAlloc;
-
-class RegionAllocGrowthHandler
-{
-  public:
-    [[nodiscard]]
-    virtual auto TryGrow(RegionAlloc &alloc, uint64_t neededSize) -> bool = 0;
-};
-
-class RegionAllocBumpOnlyGrowth : public RegionAllocGrowthHandler
-{
-  public:
-    static auto GetInstance() -> RegionAllocGrowthHandler &
-    {
-        static RegionAllocBumpOnlyGrowth handler{};
-        return handler;
-    }
-
-    auto TryGrow(RegionAlloc &alloc, uint64_t neededSize) -> bool final;
-};
-
-class RegionAllocCommitPageGrowth : public RegionAllocGrowthHandler
-{
-  public:
-    static auto GetInstance() -> RegionAllocGrowthHandler &
-    {
-        static RegionAllocCommitPageGrowth handler{};
-        return handler;
-    }
-
-    auto TryGrow(RegionAlloc &alloc, uint64_t neededSize) -> bool final;
-};
-
 class Path;
 
 class RegionAlloc
 {
-    friend class RegionAllocCommitPageGrowth;
-    friend class RegionAllocBumpOnlyGrowth;
-
   public:
-    void Init(void *base, uint64_t maxSize, RegionAllocGrowthHandler &growthHandler)
+    void Init(void *base, uint64_t maxSize, bool ownsPages)
     {
+        NYLA_ASSERT(ownsPages || m_Base);
+
+        m_OwnsPages = ownsPages;
         m_Used = 0;
         m_Size = 0;
         m_MaxSize = maxSize;
-        m_GrowthHandler = &growthHandler;
         m_Base = (char *)base;
 
         if (!m_Base)
@@ -70,7 +36,18 @@ class RegionAlloc
         m_Used += size;
 
         if (m_Used > m_Size)
-            NYLA_ASSERT(m_GrowthHandler->TryGrow(*this, m_Used));
+        {
+            if (m_OwnsPages)
+            {
+                AlignUp(m_Used, Platform::GetMemPageSize());
+                NYLA_ASSERT(m_Used <= m_MaxSize);
+
+                char *const p = m_Base + m_Size;
+                Platform::CommitMemPages(p, m_Used - m_Size);
+            }
+
+            m_Size = m_Used;
+        }
 
         NYLA_ASSERT(m_Size <= m_MaxSize);
         return ret;
@@ -158,7 +135,7 @@ class RegionAlloc
 
         void *const p = PushBytes(size, Platform::GetMemPageSize());
         RegionAlloc subAlloc{};
-        subAlloc.Init(p, size, RegionAllocCommitPageGrowth::GetInstance());
+        subAlloc.Init(p, size, false);
         return subAlloc;
     }
 
@@ -166,30 +143,11 @@ class RegionAlloc
     auto PushPath(std::string_view) -> Path;
 
   private:
+    bool m_OwnsPages;
     char *m_Base;
-    RegionAllocGrowthHandler *m_GrowthHandler;
     uint64_t m_Size;
     uint64_t m_MaxSize;
     uint64_t m_Used;
 };
-
-inline auto RegionAllocBumpOnlyGrowth::TryGrow(RegionAlloc &alloc, uint64_t neededSize) -> bool
-{
-    alloc.m_Size = neededSize;
-
-    return true;
-}
-
-inline auto RegionAllocCommitPageGrowth::TryGrow(RegionAlloc &alloc, uint64_t neededSize) -> bool
-{
-    AlignUp(neededSize, Platform::GetMemPageSize());
-    NYLA_ASSERT(neededSize <= alloc.m_MaxSize);
-
-    char *const p = alloc.m_Base + alloc.m_Size;
-    Platform::CommitMemPages(p, neededSize - alloc.m_Size);
-
-    alloc.m_Size = neededSize;
-    return true;
-}
 
 } // namespace nyla

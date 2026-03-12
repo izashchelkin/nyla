@@ -57,7 +57,7 @@ auto PlatformMain(std::span<const char *> argv) -> int
     });
 
     RegionAlloc rootAlloc;
-    rootAlloc.Init(nullptr, 64_GiB, RegionAllocCommitPageGrowth::GetInstance());
+    rootAlloc.Init(nullptr, 64_GiB, true);
 
     Engine::Init({
         .rootAlloc = rootAlloc,

@@ -1,12 +1,13 @@
 #pragma once
 
+#include "nyla/alloc/region_alloc.h"
 #include "nyla/commons/byteparser.h"
 #include <cstdint>
 
 namespace nyla
 {
 
-struct ElfHeader
+struct Elf64Header
 {
     uint8_t ident[16];
     uint16_t type;
@@ -23,11 +24,50 @@ struct ElfHeader
     uint16_t sectionHeaderEntryCount;
     uint16_t sectionHeaderStringTableIndex;
 };
-static_assert(sizeof(ElfHeader) == 64);
+static_assert(sizeof(Elf64Header) == 64);
+
+struct Elf64ProgramHeader
+{
+    uint32_t type;
+    uint32_t flags;
+    uint64_t offset;
+    uint64_t virtualAddress;
+    uint64_t physicalAddress;
+    uint64_t fileSize;
+    uint64_t memorySize;
+    uint64_t align;
+};
+static_assert(sizeof(Elf64ProgramHeader) == 56);
+
+struct Elf64SectionHeader
+{
+    uint32_t name;
+    uint32_t type;
+    uint64_t flags;
+    uint64_t addr;
+    uint64_t offset;
+    uint64_t size;
+    uint32_t link;
+    uint32_t info;
+    uint64_t align;
+    uint64_t entrySizae;
+};
+static_assert(sizeof(Elf64SectionHeader) == 64);
 
 class ElfParser : public ByteParser
 {
   public:
+    void Init(RegionAlloc *alloc, const char *base, uint32_t size)
+    {
+        m_Alloc = alloc;
+        m_At = base;
+        m_Left = size;
+    }
+
+    void Parse();
+
+  private:
+    RegionAlloc *m_Alloc;
 };
 
 } // namespace nyla

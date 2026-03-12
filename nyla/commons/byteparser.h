@@ -25,6 +25,13 @@ class ByteParser
         return ret;
     }
 
+    template <typename T> constexpr auto Pop() -> T
+    {
+        const T ret = *reinterpret_cast<const T *>(m_At);
+        m_At += sizeof(ret);
+        return ret;
+    }
+
     constexpr auto PopDWord() -> uint32_t
     {
         const auto ret = *(uint32_t *)m_At;
