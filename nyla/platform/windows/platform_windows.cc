@@ -1,6 +1,9 @@
 #include "nyla/platform/windows/platform_windows.h"
 
+#include <cstdint>
 #include <immintrin.h>
+#include <limits>
+#include <span>
 
 #include "nyla/commons/align.h"
 #include "nyla/commons/assert.h"
@@ -8,8 +11,6 @@
 #include "nyla/commons/containers/inline_ring.h"
 #include "nyla/platform/platform.h"
 #include "platform_windows.h"
-#include <cstdint>
-#include <limits>
 
 auto CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) -> LRESULT;
 
@@ -552,7 +553,7 @@ auto WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine
     freopen_s(&f, "CONIN$", "r", stdin);
 #endif
 
-    const int retCode = PlatformMain();
+    const int retCode = PlatformMain(std::span<const char *>{(const char **)__argv, (uint32_t)__argc});
 
 #ifndef NDEBUG
     getc(stdin);
