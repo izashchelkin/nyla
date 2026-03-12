@@ -1,22 +1,20 @@
 #include "nyla/apps/3d_ball_maze/3d_ball_maze.h"
 #include "nyla/apps/3d_ball_maze/scene.h"
-#include "nyla/engine/engine.h"
+#include "nyla/engine/asset_manager.h"
+#include "nyla/engine/debug_text_renderer.h"
+#include "nyla/engine/input_manager.h"
+#include "nyla/engine/renderer.h"
 
 namespace nyla
 {
 
 void GameScene::Process(Game &game, RhiCmdList cmd, float dt, RhiRenderTargetView rtv, RhiDepthStencilView dsv)
 {
-    auto &renderer = g_Engine.GetRenderer();
-    auto &inputManager = g_Engine.GetInputManager();
-    auto &assetManager = g_Engine.GetAssetManager();
-    auto &debugTextRenderer = g_Engine.GetDebugTextRenderer();
-
-    static const auto reloadAssets = inputManager.NewIdMapped(1, uint32_t(KeyPhysical::F5));
-    if (inputManager.IsPressed(reloadAssets))
+    static const auto reloadAssets = InputManager::NewIdMapped(1, uint32_t(KeyPhysical::F5));
+    if (InputManager::IsPressed(reloadAssets))
     {
-        assetManager.Flush();
-        assetManager.Upload(cmd);
+        AssetManager::Flush();
+        AssetManager::Upload(cmd);
     }
 
 #if 0
@@ -64,8 +62,8 @@ void GameScene::Process(Game &game, RhiCmdList cmd, float dt, RhiRenderTargetVie
         .dsv = dsv,
     });
     {
-        renderer.Mesh({0, 0, 0}, {1, 1, 1}, game.GetAssets().ball, {});
-        renderer.Mesh({0, 0, 0}, {1, 1, 1}, game.GetAssets().cube, {});
+        Renderer::Mesh({0, 0, 0}, {1, 1, 1}, game.GetAssets().ball, {});
+        Renderer::Mesh({0, 0, 0}, {1, 1, 1}, game.GetAssets().cube, {});
 
         const float3 forward{
             std::cos(pitch) * std::sin(yaw),
@@ -86,12 +84,12 @@ void GameScene::Process(Game &game, RhiCmdList cmd, float dt, RhiRenderTargetVie
 
         const float3 targetPos = cameraPos + forward;
 
-        renderer.SetLookAtView(cameraPos, targetPos, worldUp);
+        Renderer::SetLookAtView(cameraPos, targetPos, worldUp);
 
-        renderer.SetPerspectiveProjection(rtInfo.width, rtInfo.height, 90.f, .01f, 1000.f);
+        Renderer::SetPerspectiveProjection(rtInfo.width, rtInfo.height, 90.f, .01f, 1000.f);
 
-        renderer.CmdFlush(cmd);
-        debugTextRenderer.CmdFlush(cmd);
+        Renderer::CmdFlush(cmd);
+        DebugTextRenderer::CmdFlush(cmd);
     }
     g_Rhi.PassEnd();
 }

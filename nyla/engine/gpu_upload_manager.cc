@@ -11,7 +11,34 @@
 namespace nyla
 {
 
+namespace
+{
+
 constexpr uint64_t kPerFrameUploadMaxSize = 16_MiB;
+
+RhiBuffer m_StagingBuffer;
+uint64_t m_StagingBufferAt;
+
+uint64_t m_StaticVertexBufferSize;
+uint64_t m_StaticVertexBufferAt;
+RhiBuffer m_StaticVertexBuffer;
+
+uint64_t m_StaticIndexBufferSize;
+uint64_t m_StaticIndexBufferAt;
+RhiBuffer m_StaticIndexBuffer;
+
+auto PrepareCopySrc(uint64_t copySize) -> uint64_t
+{
+    AlignUp<uint64_t>(m_StagingBufferAt, g_Rhi.GetOptimalBufferCopyOffsetAlignment());
+    NYLA_ASSERT(m_StagingBufferAt + copySize <= kPerFrameUploadMaxSize);
+
+    g_Rhi.BufferMarkWritten(m_StagingBuffer, m_StagingBufferAt, copySize);
+
+    const uint64_t ret = kPerFrameUploadMaxSize * g_Rhi.GetFrameIndex() + m_StagingBufferAt;
+    return ret;
+}
+
+} // namespace
 
 void GpuUploadManager::Init()
 {
@@ -45,17 +72,6 @@ void GpuUploadManager::Init()
 void GpuUploadManager::FrameBegin()
 {
     m_StagingBufferAt = 0;
-}
-
-auto GpuUploadManager::PrepareCopySrc(uint64_t copySize) -> uint64_t
-{
-    AlignUp<uint64_t>(m_StagingBufferAt, g_Rhi.GetOptimalBufferCopyOffsetAlignment());
-    NYLA_ASSERT(m_StagingBufferAt + copySize <= kPerFrameUploadMaxSize);
-
-    g_Rhi.BufferMarkWritten(m_StagingBuffer, m_StagingBufferAt, copySize);
-
-    const uint64_t ret = kPerFrameUploadMaxSize * g_Rhi.GetFrameIndex() + m_StagingBufferAt;
-    return ret;
 }
 
 auto GpuUploadManager::CmdCopyBuffer(RhiCmdList cmd, RhiBuffer dst, uint64_t dstOffset, uint64_t copySize) -> char *

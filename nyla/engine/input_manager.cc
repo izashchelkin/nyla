@@ -1,10 +1,30 @@
 #include "nyla/engine/input_manager.h"
 #include "nyla/commons/inline_vec.h"
+#include <limits>
 
 #include <cstdint>
 
 namespace nyla
 {
+
+namespace
+{
+
+struct InputState
+{
+    uint64_t pressedAt;
+    bool released;
+
+    struct Physical
+    {
+        uint32_t type;
+        uint32_t code;
+    };
+    Physical mappedTo;
+};
+InlineVec<InputState, std::numeric_limits<uint8_t>::max() + 1> m_InputStates;
+
+} // namespace
 
 auto InputManager::NewId() -> InputId
 {

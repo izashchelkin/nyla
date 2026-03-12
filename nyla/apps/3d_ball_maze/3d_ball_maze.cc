@@ -1,34 +1,24 @@
-#include "nyla/apps/3d_ball_maze/3d_ball_maze.h"
+#include <format>
+
 #include "nyla/alloc/region_alloc.h"
+#include "nyla/apps/3d_ball_maze/3d_ball_maze.h"
 #include "nyla/apps/3d_ball_maze/scene.h"
-#include "nyla/commons/assert.h"
-#include "nyla/commons/log.h"
-#include "nyla/commons/mat.h"
+#include "nyla/engine/asset_manager.h"
 #include "nyla/engine/debug_text_renderer.h"
 #include "nyla/engine/engine.h"
-#include "nyla/engine/input_manager.h"
 #include "nyla/engine/render_targets.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
-#include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_texture.h"
-#include <algorithm>
-#include <cmath>
-#include <cstdint>
-#include <format>
-#include <numbers>
-#include <utility>
 
 namespace nyla
 {
 
 void Game::Init()
 {
-    auto &assetManager = g_Engine.GetAssetManager();
-
-    m_Assets.ball = assetManager.DeclareMesh("c:/blender/export/sphere.gltf");
-    m_Assets.cube = assetManager.DeclareMesh("c:/blender/export/cube.gltf");
+    m_Assets.ball = AssetManager::DeclareMesh("c:/blender/export/sphere.gltf");
+    m_Assets.cube = AssetManager::DeclareMesh("c:/blender/export/cube.gltf");
 
     //
 
@@ -69,26 +59,23 @@ auto PlatformMain(std::span<const char *> argv) -> int
     RegionAlloc rootAlloc;
     rootAlloc.Init(nullptr, 64_GiB, RegionAllocCommitPageGrowth::GetInstance());
 
-    g_Engine.Init({
+    Engine::Init({
         .rootAlloc = rootAlloc,
     });
 
     Game game{};
     game.Init();
 
-    while (!g_Engine.ShouldExit())
+    while (!Engine::ShouldExit())
     {
-        const auto [cmd, dt, fps] = g_Engine.FrameBegin();
-        if (false)
-        {
-            g_Engine.GetDebugTextRenderer().Text(500, 10, std::format("fps={}", fps));
-        }
+        const auto [cmd, dt, fps] = Engine::FrameBegin();
+        DebugTextRenderer::Fmt(500, 10, "fps=%d", fps);
 
         RhiTextureInfo backbufferInfo = g_Rhi.GetTextureInfo(g_Rhi.GetTexture(g_Rhi.GetBackbufferView()));
 
         game.Process(cmd, dt);
 
-        g_Engine.FrameEnd();
+        Engine::FrameEnd();
     }
 
     return 0;

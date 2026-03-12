@@ -21,23 +21,23 @@ auto PlatformMain(std::span<const char *> argv) -> int
     RegionAlloc rootAlloc;
     rootAlloc.Init(nullptr, 64_GiB, RegionAllocCommitPageGrowth::GetInstance());
 
-    g_Engine.Init({
+    Engine::Init({
         .rootAlloc = rootAlloc,
     });
 
     GameInit();
 
-    while (!g_Engine.ShouldExit())
+    while (!Engine::ShouldExit())
     {
-        const auto [cmd, dt, fps] = g_Engine.FrameBegin();
-        g_Engine.GetDebugTextRenderer().Text(500, 10, std::format("fps={}", fps));
+        const auto [cmd, dt, fps] = Engine::FrameBegin();
+        DebugTextRenderer::Fmt(500, 10, "fps=%d", fps);
 
         GameProcess(cmd, dt);
 
         RhiRenderTargetView rtv = g_Rhi.GetBackbufferView();
         GameRender(cmd, rtv);
 
-        g_Engine.FrameEnd();
+        Engine::FrameEnd();
     }
 
     return 0;

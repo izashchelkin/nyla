@@ -1,20 +1,61 @@
-#include "nyla/engine/engine.h"
+#include <chrono>
+#include <cmath>
+#include <concepts>
+#include <cstdint>
+#include <thread>
+
+#include "nyla/alloc/region_alloc.h"
 #include "nyla/commons/bitenum.h"
 #include "nyla/engine/asset_manager.h"
+#include "nyla/engine/debug_text_renderer.h"
+#include "nyla/engine/engine.h"
+#include "nyla/engine/gpu_upload_manager.h"
 #include "nyla/engine/input_manager.h"
+#include "nyla/engine/renderer.h"
 #include "nyla/engine/staging_buffer.h"
 #include "nyla/engine/tween_manager.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_buffer.h"
 #include "nyla/rhi/rhi_cmdlist.h"
-#include <chrono>
-#include <cmath>
-#include <cstdint>
-#include <thread>
 
 namespace nyla
 {
+
+namespace
+{
+
+RegionAlloc *m_RootAlloc;
+RegionAlloc m_PermanentAlloc;
+RegionAlloc m_PerFrameAlloc;
+
+GpuUploadManager m_GpuUploadManager;
+AssetManager m_AssetManager;
+TweenManager m_TweenManager;
+InputManager m_InputManager;
+
+Renderer m_Renderer;
+DebugTextRenderer m_DebugTextRenderer;
+
+uint64_t m_TargetFrameDurationUs;
+
+uint64_t m_LastFrameStart;
+uint32_t m_DtUsAccum;
+uint32_t m_FramesCounted;
+uint32_t m_Fps;
+bool m_ShouldExit;
+
+} // namespace
+
+auto Engine::GetPermanentAlloc() -> RegionAlloc &
+{
+    return m_PermanentAlloc;
+}
+
+auto Engine::GetPerFrameAlloc() -> RegionAlloc &
+{
+    return m_PerFrameAlloc;
+}
 
 void Engine::Init(const EngineInitDesc &desc)
 {

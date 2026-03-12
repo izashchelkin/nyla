@@ -1,5 +1,6 @@
 #pragma once
 
+#include "nyla/commons/inline_vec.h"
 #include "nyla/commons/vec.h"
 #include "nyla/engine/asset_manager.h"
 #include "nyla/engine/input_manager.h"
