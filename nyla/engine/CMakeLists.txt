@@ -29,7 +29,6 @@ if (${HAS_RHI})
         nyla::platform
         nyla::platform::dir_watch
         nyla::rhi
-        # nyla::spirview
         nyla::formats::gltf::parser
         stb_image
     )
@@ -47,11 +46,6 @@ if (${HAS_RHI})
     target_include_directories(${TARGET_DEBUG_TEXT_RENDERER}
         PUBLIC
         ${PROJECT_SOURCE_DIR}
-    )
-
-    target_link_libraries(${TARGET_DEBUG_TEXT_RENDERER}
-        PUBLIC
-        nyla::spirview
     )
 
 endif()

@@ -15,6 +15,5 @@ target_include_directories(nyla_debugfs
 
 target_link_libraries(nyla_debugfs
     PUBLIC
-        nyla::commons
         ${FUSE_LIBRARIES}
 )

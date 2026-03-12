@@ -27,7 +27,6 @@ if (Vulkan_FOUND)
 
     target_link_libraries(${TARGET}
         PUBLIC
-        nyla::commons
         Vulkan::Vulkan        
     )
 endif()

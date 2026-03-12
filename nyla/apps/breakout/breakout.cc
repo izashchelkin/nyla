@@ -9,7 +9,7 @@
 #include "nyla/commons/assert.h"
 #include "nyla/commons/color.h"
 #include "nyla/commons/handle.h"
-#include "nyla/commons/math/vec.h"
+#include "nyla/commons/vec.h"
 #include "nyla/engine/asset_manager.h"
 #include "nyla/engine/debug_text_renderer.h"
 #include "nyla/engine/engine.h"

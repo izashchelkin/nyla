@@ -6,6 +6,8 @@ if(MSVC)
  add_compile_options( /MP )
 endif()
 
+find_package(PkgConfig REQUIRED)
+
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)

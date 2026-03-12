@@ -13,7 +13,7 @@
 namespace nyla
 {
 
-auto PlatformMain() -> int
+auto PlatformMain(std::span<const char *> argv) -> int
 {
     struct sigaction sa;
     sa.sa_handler = [](int signum) -> void { std::abort(); };

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "nyla/commons/assert.h"
-#include "nyla/commons/math/vec.h"
+#include "nyla/commons/vec.h"
 
 #include <algorithm>
 #include <array>

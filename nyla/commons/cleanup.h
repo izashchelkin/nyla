@@ -14,10 +14,10 @@ template <class F> class Cleanup
     }
 
     Cleanup(Cleanup &&) noexcept(std::is_nothrow_move_constructible_v<F>) = default;
-    Cleanup &operator=(Cleanup &&) = delete;
+    auto operator=(Cleanup &&) -> Cleanup & = delete;
 
     Cleanup(const Cleanup &) = delete;
-    Cleanup &operator=(const Cleanup &) = delete;
+    auto operator=(const Cleanup &) -> Cleanup & = delete;
 
     ~Cleanup() noexcept
     {

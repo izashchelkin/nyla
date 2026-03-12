@@ -1,5 +1,5 @@
 #include "nyla/engine/input_manager.h"
-#include "nyla/commons/containers/inline_vec.h"
+#include "nyla/commons/inline_vec.h"
 
 #include <cstdint>
 

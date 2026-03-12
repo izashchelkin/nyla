@@ -1,5 +1,6 @@
 #pragma once
 
+#include "nyla/commons/byteparser.h"
 #include <cstdint>
 
 namespace nyla
@@ -23,5 +24,10 @@ struct ElfHeader
     uint16_t sectionHeaderStringTableIndex;
 };
 static_assert(sizeof(ElfHeader) == 64);
+
+class ElfParser : public ByteParser
+{
+  public:
+};
 
 } // namespace nyla

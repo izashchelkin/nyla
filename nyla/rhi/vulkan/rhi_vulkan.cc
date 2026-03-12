@@ -7,7 +7,7 @@
 
 #include "nyla/commons/assert.h"
 #include "nyla/commons/bitenum.h"
-#include "nyla/commons/containers/inline_vec.h"
+#include "nyla/commons/inline_vec.h"
 #include "nyla/commons/log.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"

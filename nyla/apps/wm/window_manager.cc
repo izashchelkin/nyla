@@ -14,7 +14,7 @@
 #include "nyla/apps/wm/layout.h"
 #include "nyla/commons/assert.h"
 #include "nyla/commons/cleanup.h"
-#include "nyla/commons/containers/inline_vec.h"
+#include "nyla/commons/inline_vec.h"
 #include "nyla/commons/log.h"
 #include "nyla/platform/linux/platform_linux.h"
 #include "nyla/platform/linux/x11_wm_hints.h"
@@ -81,9 +81,10 @@ void WindowManager::Init()
             mod |= XCB_MOD_MASK_SHIFT;
 
         uint32_t keycode = LinuxX11Platform::KeyPhysicalToKeyCode(key);
-        const xcb_generic_error_t *error = xcb_request_check(
-            LinuxX11Platform::GetConn(), xcb_grab_key_checked(LinuxX11Platform::GetConn(), 1, LinuxX11Platform::GetRoot(), mod,
-                                                              keycode, XCB_GRAB_MODE_ASYNC, XCB_GRAB_MODE_ASYNC));
+        const xcb_generic_error_t *error =
+            xcb_request_check(LinuxX11Platform::GetConn(),
+                              xcb_grab_key_checked(LinuxX11Platform::GetConn(), 1, LinuxX11Platform::GetRoot(), mod,
+                                                   keycode, XCB_GRAB_MODE_ASYNC, XCB_GRAB_MODE_ASYNC));
         NYLA_ASSERT(!error);
     };
 

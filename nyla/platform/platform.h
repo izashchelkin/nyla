@@ -3,7 +3,7 @@
 #include "nyla/commons/assert.h"
 #include "nyla/commons/bitenum.h"
 #include "nyla/commons/byteliterals.h"
-#include "nyla/commons/math/vec.h"
+#include "nyla/commons/vec.h"
 #include <cstdint>
 #include <fstream>
 #include <span>

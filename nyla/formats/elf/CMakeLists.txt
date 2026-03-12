@@ -13,8 +13,3 @@ target_include_directories(${TARGET_PARSER}
     PUBLIC
         ${PROJECT_SOURCE_DIR}
 )
-
-# target_link_libraries(${TARGET_PARSER}
-#     PUBLIC
-#         nyla::commons::memory
-# )

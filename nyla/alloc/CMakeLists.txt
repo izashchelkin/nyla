@@ -1,6 +1,6 @@
-set(TARGET nyla_commons_memory)
+set(TARGET nyla_alloc)
 add_library(${TARGET})
-add_library(nyla::commons::memory ALIAS ${TARGET})
+add_library(nyla::alloc LIAS ${TARGET})
 
 target_sources(${TARGET}
     INTERFACE
@@ -14,7 +14,6 @@ target_include_directories(${TARGET}
 
 target_link_libraries(${TARGET}
     PUBLIC
-        nyla::commons
         nyla::platform
 )
 
@@ -38,8 +37,7 @@ target_include_directories(${REGION_ALLOC_TEST}
 
 target_link_libraries(${REGION_ALLOC_TEST}
     PUBLIC
-        nyla::commons
-        # nyla::commons::memory
+        nyla::alloc
         nyla::platform
 )
 

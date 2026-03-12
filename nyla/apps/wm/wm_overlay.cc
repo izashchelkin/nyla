@@ -25,7 +25,7 @@
 namespace nyla
 {
 
-auto PlatformMain() -> int
+auto PlatformMain(std::span<const char *> argv) -> int
 {
     Platform::InitGraphical({});
 

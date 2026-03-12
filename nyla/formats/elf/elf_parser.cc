@@ -4,9 +4,4 @@
 namespace nyla
 {
 
-class ElfParser
-{
-  public:
-};
-
 } // namespace nyla

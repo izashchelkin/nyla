@@ -1,12 +1,20 @@
-#include "nyla/commons/math/lerp.h"
+#pragma once
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <numbers>
-#include <span>
+
+#include "nyla/commons/vec.h"
 
 namespace nyla
 {
+
+template <typename T, uint32_t N> void Lerp(Vec<T, N> &a, const Vec<T, N> &b, float p)
+{
+    for (uint32_t i = 0; i < N; ++i)
+        a[i] = Lerp(a[i], b[i], p);
+}
 
 auto Lerp(float a, float b, float p) -> float
 {

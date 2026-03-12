@@ -1,7 +1,7 @@
 #pragma once
 
+#include "nyla/alloc/region_alloc.h"
 #include "nyla/commons/byteparser.h"
-#include "nyla/commons/memory/region_alloc.h"
 #include <cstdint>
 
 namespace nyla

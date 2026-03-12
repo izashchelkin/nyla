@@ -10,5 +10,4 @@ target_include_directories(${TARGET} PRIVATE ${PROJECT_SOURCE_DIR})
 
 target_link_libraries(${TARGET} PRIVATE
     nyla::platform
-    nyla::commons
 )

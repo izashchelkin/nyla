@@ -10,12 +10,11 @@ target_sources(${TARGET_PLATFORM}
 target_include_directories(${TARGET_PLATFORM}
     PUBLIC
         ${VULKAN_INCLUDE_DIRS}
+        ${PROJECT_SOURCE_DIR}
 )
 
 target_link_libraries(${TARGET_PLATFORM}
     PUBLIC
-        nyla::commons
-
         xcb
         xcb-util
         xcb-xkb
@@ -40,14 +39,9 @@ target_include_directories(${TARGET_PLATFORM_DIR_WATCH}
         ${PROJECT_SOURCE_DIR}
 )
 
-target_link_libraries(${TARGET_PLATFORM_DIR_WATCH}
-    PUBLIC
-        nyla::commons
-)
 
 #
 
-find_package(PkgConfig REQUIRED)
 pkg_check_modules(ALSA IMPORTED_TARGET alsa)
 
 set(target_audio nyla_platform_linux_audio)
@@ -67,6 +61,5 @@ target_include_directories(${target_audio}
 
 target_link_libraries(${target_audio}
     PUBLIC
-        nyla::commons
         ${ALSA_LIBRARIES}
 )

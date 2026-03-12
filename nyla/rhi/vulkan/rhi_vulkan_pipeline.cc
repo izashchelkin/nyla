@@ -1,5 +1,5 @@
 #include "nyla/commons/bitenum.h"
-#include "nyla/commons/containers/inline_vec.h"
+#include "nyla/commons/inline_vec.h"
 #include "nyla/commons/log.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_texture.h"
@@ -10,8 +10,8 @@
 #include <vulkan/vulkan_core.h>
 
 #include "nyla/commons/assert.h"
-#include "nyla/commons/containers/inline_string.h"
-#include "nyla/commons/containers/inline_vec.h"
+#include "nyla/commons/inline_string.h"
+#include "nyla/commons/inline_vec.h"
 #include "nyla/rhi/rhi_pipeline.h"
 #include "nyla/rhi/rhi_shader.h"
 #include "nyla/rhi/vulkan/rhi_vulkan.h"

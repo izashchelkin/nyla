@@ -1,7 +1,7 @@
 #pragma once
 
-#include "nyla/commons/containers/inline_vec.h"
-#include "nyla/commons/math/vec.h"
+#include "nyla/commons/inline_vec.h"
+#include "nyla/commons/vec.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_pipeline.h"
 #include <array>

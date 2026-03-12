@@ -1,6 +1,6 @@
 #pragma once
 
-#include "nyla/commons/containers/inline_vec.h"
+#include "nyla/commons/inline_vec.h"
 
 #include <cstdint>
 #include <limits>

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "nyla/commons/memory/region_alloc.h"
+#include "nyla/alloc/region_alloc.h"
 #include "nyla/engine/asset_manager.h"
 #include "nyla/engine/debug_text_renderer.h"
 #include "nyla/engine/gpu_upload_manager.h"

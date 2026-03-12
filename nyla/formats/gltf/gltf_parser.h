@@ -1,7 +1,7 @@
 #pragma once
 
-#include "nyla/commons/containers/inline_vec.h"
-#include "nyla/commons/memory/region_alloc.h"
+#include "nyla/alloc/region_alloc.h"
+#include "nyla/commons/inline_vec.h"
 #include "nyla/formats/json/json_parser.h"
 #include <cstdint>
 
