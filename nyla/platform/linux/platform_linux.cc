@@ -1,11 +1,3 @@
-#include "nyla/platform/linux/platform_linux.h"
-#include "nyla/commons/align.h"
-#include "nyla/commons/assert.h"
-#include "nyla/commons/byteliterals.h"
-#include "nyla/commons/cleanup.h"
-#include "nyla/commons/log.h"
-#include "nyla/commons/string.h"
-#include "nyla/platform/platform.h"
 #include <array>
 #include <cstdint>
 #include <fcntl.h>
@@ -21,6 +13,15 @@
 #include <xkbcommon/xkbcommon-x11.h>
 #include <xkbcommon/xkbcommon.h>
 
+#include "nyla/commons/align.h"
+#include "nyla/commons/assert.h"
+#include "nyla/commons/byteliterals.h"
+#include "nyla/commons/cleanup.h"
+#include "nyla/commons/log.h"
+#include "nyla/commons/string.h"
+#include "nyla/platform/linux/platform_linux.h"
+#include "nyla/platform/platform.h"
+
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wkeyword-macro"
@@ -33,12 +34,6 @@
 #include <xcb/xkb.h>
 
 #undef explicit
-
-auto main(int argc, const char *argv[]) -> int
-{
-    nyla::PlatformMain(std::span<const char *>{argv, uint64_t(argc)});
-    return 0;
-}
 
 namespace nyla
 {
@@ -64,6 +59,31 @@ LinuxX11Platform::Atoms m_Atoms;
 std::array<xcb_keycode_t, static_cast<uint32_t>(KeyPhysical::Count)> g_KeyPhysicalCodes;
 
 } // namespace
+
+auto Platform::UpdateGamepad(uint32_t index) -> bool
+{
+    return false;
+}
+
+auto Platform::GetGamepadLeftStick(uint32_t index) -> float2
+{
+    return {};
+}
+
+auto Platform::GetGamepadRightStick(uint32_t index) -> float2
+{
+    return {};
+}
+
+auto Platform::GetGamepadLeftTrigger(uint32_t index) -> float
+{
+    return {};
+}
+
+auto Platform::GetGamepadRightTrigger(uint32_t index) -> float
+{
+    return {};
+}
 
 auto Platform::GetMonotonicTimeMillis() -> uint64_t
 {
@@ -727,3 +747,9 @@ failure:
 }
 
 } // namespace nyla
+
+auto main(int argc, const char *argv[]) -> int
+{
+    nyla::PlatformMain(std::span<const char *>{argv, uint64_t(argc)});
+    return 0;
+}

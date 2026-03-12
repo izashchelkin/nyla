@@ -68,9 +68,9 @@ void GameScene::Process(Game &game, RhiCmdList cmd, float dt, RhiRenderTargetVie
         renderer.Mesh({0, 0, 0}, {1, 1, 1}, game.GetAssets().cube, {});
 
         const float3 forward{
-            cos(pitch) * sin(yaw),
-            sin(pitch),
-            cos(pitch) * cos(yaw),
+            std::cos(pitch) * std::sin(yaw),
+            std::sin(pitch),
+            std::cos(pitch) * std::cos(yaw),
         };
 
         static float3 cameraPos{0.f, 0.f, 5.f};
