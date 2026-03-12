@@ -1,22 +1,23 @@
 #include "nyla/platform/linux/platform_linux.h"
 #include "nyla/commons/align.h"
-#include "nyla/commons/byteliterals.h"
-#include "nyla/platform/platform.h"
-
 #include "nyla/commons/assert.h"
+#include "nyla/commons/byteliterals.h"
 #include "nyla/commons/cleanup.h"
 #include "nyla/commons/log.h"
 #include "nyla/commons/string.h"
 #include "nyla/platform/platform.h"
-#include "xcb/xcb.h"
-#include "xcb/xcb_aux.h"
-#include "xcb/xinput.h"
-#include "xcb/xproto.h"
 #include <array>
 #include <cstdint>
+#include <fcntl.h>
+#include <linux/close_range.h>
 #include <sys/mman.h>
-#include <type_traits>
+#include <sys/signal.h>
+#include <sys/wait.h>
 #include <unistd.h>
+#include <xcb/xcb.h>
+#include <xcb/xcb_aux.h>
+#include <xcb/xinput.h>
+#include <xcb/xproto.h>
 #include <xkbcommon/xkbcommon-x11.h>
 #include <xkbcommon/xkbcommon.h>
 
@@ -63,6 +64,58 @@ LinuxX11Platform::Atoms m_Atoms;
 std::array<xcb_keycode_t, static_cast<uint32_t>(KeyPhysical::Count)> g_KeyPhysicalCodes;
 
 } // namespace
+
+auto Platform::GetMonotonicTimeMillis() -> uint64_t
+{
+    timespec ts{};
+    NYLA_ASSERT(clock_gettime(CLOCK_MONOTONIC_RAW, &ts) == 0);
+    return ts.tv_sec * 1'000 + ts.tv_nsec / 1'000'000;
+}
+
+auto Platform::GetMonotonicTimeMicros() -> uint64_t
+{
+    timespec ts{};
+    NYLA_ASSERT(clock_gettime(CLOCK_MONOTONIC_RAW, &ts) == 0);
+    return ts.tv_sec * 1'000'000 + ts.tv_nsec / 1'000;
+}
+
+auto Platform::GetMonotonicTimeNanos() -> uint64_t
+{
+    timespec ts{};
+    NYLA_ASSERT(clock_gettime(CLOCK_MONOTONIC_RAW, &ts) == 0);
+    return ts.tv_sec * 1'000'000'000 + ts.tv_nsec;
+}
+
+auto Platform::GetMemPageSize() -> uint64_t
+{
+    return g_PageSize;
+}
+
+auto Platform::ReserveMemPages(uint64_t size) -> char *
+{
+    char *ret = g_AddressSpaceAt;
+    g_AddressSpaceAt += AlignedUp<uint64_t>(size, g_PageSize);
+    return ret;
+}
+
+void Platform::CommitMemPages(char *page, uint64_t size)
+{
+    NYLA_ASSERT(((page - g_AddressSpaceBase) % g_PageSize) == 0);
+
+    AlignUp(size, GetMemPageSize());
+
+    mprotect(page, size, PROT_READ | PROT_WRITE);
+}
+
+void Platform::DecommitMemPages(char *page, uint64_t size)
+{
+    NYLA_ASSERT(((page - g_AddressSpaceBase) % g_PageSize) == 0);
+
+    AlignUp(size, GetMemPageSize());
+
+    mprotect(page, size, PROT_NONE);
+    madvise(page, size, MADV_DONTNEED);
+}
 
 auto LinuxX11Platform::WinGetHandle() -> xcb_window_t
 {
@@ -305,8 +358,8 @@ void Platform::WinOpen()
     free(windowGeometry);
 }
 
-auto LinuxX11Platform::CreateWin(uint32_t widPlatformth, uint32_t height, bool overrideRedirect,
-                                 xcb_event_mask_t eventMask) -> xcb_window_t
+auto LinuxX11Platform::CreateWin(uint32_t width, uint32_t height, bool overrideRedirect, xcb_event_mask_t eventMask)
+    -> xcb_window_t
 {
     const xcb_window_t window = xcb_generate_id(g_Conn);
 
@@ -610,6 +663,67 @@ auto LinuxX11Platform::ConvertKeyPhysicalIntoXkbName(KeyPhysical key) -> const c
     default:
         return nullptr;
     }
+}
+
+auto Platform::Spawn(std::span<const char *const> cmd) -> bool
+{
+    { // TODO: move this somewhere
+        static bool installed = false;
+        if (!installed)
+        {
+            struct sigaction sa;
+            sa.sa_handler = [](int signum) -> void {
+                pid_t pid;
+                int status;
+                while ((pid = waitpid(-1, &status, WNOHANG)) > 0)
+                    ;
+            };
+            sigemptyset(&sa.sa_mask);
+            sa.sa_flags = SA_RESTART;
+            if (sigaction(SIGCHLD, &sa, nullptr) == -1)
+            {
+                NYLA_LOG("sigaction failed");
+                return false;
+            }
+            else
+            {
+                installed = true;
+            }
+        }
+    }
+
+    if (cmd.size() <= 1)
+        return false;
+    if (cmd.back() != nullptr)
+        return false;
+
+    switch (fork())
+    {
+    case -1:
+        return false;
+    case 0:
+        break;
+    default:
+        return true;
+    }
+
+    int devNullFd = open("/dev/null", O_RDWR);
+    if (devNullFd != -1)
+    {
+        dup2(devNullFd, STDIN_FILENO);
+        dup2(devNullFd, STDOUT_FILENO);
+        dup2(devNullFd, STDERR_FILENO);
+    }
+
+    if (close_range(3, ~0U, CLOSE_RANGE_UNSHARE) != 0)
+    {
+        goto failure;
+    }
+
+    execvp(cmd[0], const_cast<char *const *>(cmd.data()));
+
+failure:
+    _exit(127);
 }
 
 } // namespace nyla

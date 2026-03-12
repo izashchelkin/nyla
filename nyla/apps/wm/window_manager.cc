@@ -28,13 +28,11 @@ namespace nyla
 
 void WindowManager::Init()
 {
-    m_X11 = g_Platform.GetImpl();
-
     m_Stacks.resize(9);
 
-    if (xcb_request_check(m_X11->GetConn(),
+    if (xcb_request_check(LinuxX11Platform::GetConn(),
                           xcb_change_window_attributes_checked(
-                              m_X11->GetConn(), m_X11->GetRoot(), XCB_CW_EVENT_MASK,
+                              LinuxX11Platform::GetConn(), LinuxX11Platform::GetRoot(), XCB_CW_EVENT_MASK,
                               (uint32_t[]){XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT | XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY |
                                            XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_KEY_RELEASE |
                                            XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE |
@@ -43,10 +41,10 @@ void WindowManager::Init()
         NYLA_ASSERT(false && "another wm is already running");
     }
 
-    m_X11->Grab();
+    LinuxX11Platform::Grab();
 
-    xcb_query_tree_reply_t *treeReply =
-        xcb_query_tree_reply(m_X11->GetConn(), xcb_query_tree(m_X11->GetConn(), m_X11->GetRoot()), nullptr);
+    xcb_query_tree_reply_t *treeReply = xcb_query_tree_reply(
+        LinuxX11Platform::GetConn(), xcb_query_tree(LinuxX11Platform::GetConn(), LinuxX11Platform::GetRoot()), nullptr);
     if (!treeReply)
         return;
 
@@ -56,7 +54,7 @@ void WindowManager::Init()
     for (xcb_window_t clientWindow : children)
     {
         xcb_get_window_attributes_reply_t *attrReply = xcb_get_window_attributes_reply(
-            m_X11->GetConn(), xcb_get_window_attributes(m_X11->GetConn(), clientWindow), nullptr);
+            LinuxX11Platform::GetConn(), xcb_get_window_attributes(LinuxX11Platform::GetConn(), clientWindow), nullptr);
         if (!attrReply)
             continue;
         Cleanup attrReplyFreer([=] -> void { free(attrReply); });
@@ -82,10 +80,10 @@ void WindowManager::Init()
         if (shift)
             mod |= XCB_MOD_MASK_SHIFT;
 
-        uint32_t keycode = m_X11->KeyPhysicalToKeyCode(key);
+        uint32_t keycode = LinuxX11Platform::KeyPhysicalToKeyCode(key);
         const xcb_generic_error_t *error = xcb_request_check(
-            m_X11->GetConn(), xcb_grab_key_checked(m_X11->GetConn(), 1, m_X11->GetRoot(), mod, keycode,
-                                                   XCB_GRAB_MODE_ASYNC, XCB_GRAB_MODE_ASYNC));
+            LinuxX11Platform::GetConn(), xcb_grab_key_checked(LinuxX11Platform::GetConn(), 1, LinuxX11Platform::GetRoot(), mod,
+                                                              keycode, XCB_GRAB_MODE_ASYNC, XCB_GRAB_MODE_ASYNC));
         NYLA_ASSERT(!error);
     };
 
@@ -104,8 +102,8 @@ void WindowManager::Init()
     grabKey(1, 0, 1, 0, KeyPhysical::ArrowLeft);
     grabKey(1, 0, 1, 0, KeyPhysical::ArrowRight);
 
-    m_X11->Flush();
-    m_X11->Ungrab();
+    LinuxX11Platform::Flush();
+    LinuxX11Platform::Ungrab();
 }
 
 auto WindowManager::GetActiveStack() -> WindowStack &
@@ -125,15 +123,15 @@ void WindowManager::FetchClientProperty(xcb_window_t clientWindow, Client &clien
         break;
 
     default: {
-        if (property == m_X11->GetAtoms().wm_protocols)
+        if (property == LinuxX11Platform::GetAtoms().wm_protocols)
             break;
 
         return;
     }
     }
 
-    auto cookie = xcb_get_property_unchecked(m_X11->GetConn(), false, clientWindow, property, XCB_ATOM_ANY, 0,
-                                             std::numeric_limits<uint32_t>::max());
+    auto cookie = xcb_get_property_unchecked(LinuxX11Platform::GetConn(), false, clientWindow, property, XCB_ATOM_ANY,
+                                             0, std::numeric_limits<uint32_t>::max());
     client.propertyCookies.try_emplace(property, cookie);
 }
 
@@ -145,7 +143,7 @@ void WindowManager::ManageClient(xcb_window_t clientWindow)
 
     const uint32_t eventMask =
         XCB_EVENT_MASK_PROPERTY_CHANGE | XCB_EVENT_MASK_FOCUS_CHANGE | XCB_EVENT_MASK_ENTER_WINDOW;
-    xcb_change_window_attributes(m_X11->GetConn(), clientWindow, XCB_CW_EVENT_MASK, &eventMask);
+    xcb_change_window_attributes(LinuxX11Platform::GetConn(), clientWindow, XCB_CW_EVENT_MASK, &eventMask);
 
     Client &client = it->second;
 
@@ -153,7 +151,7 @@ void WindowManager::ManageClient(xcb_window_t clientWindow)
     FetchClientProperty(clientWindow, client, XCB_ATOM_WM_NORMAL_HINTS);
     FetchClientProperty(clientWindow, client, XCB_ATOM_WM_NAME);
     FetchClientProperty(clientWindow, client, XCB_ATOM_WM_TRANSIENT_FOR);
-    FetchClientProperty(clientWindow, client, m_X11->GetAtoms().wm_protocols);
+    FetchClientProperty(clientWindow, client, LinuxX11Platform::GetAtoms().wm_protocols);
 
     m_PendingClients.emplace_back(clientWindow);
 }
@@ -168,7 +166,7 @@ void WindowManager::UnmanageClient(xcb_window_t clientWindow)
 
     for (auto &[_, cookie] : client.propertyCookies)
     {
-        xcb_discard_reply(m_X11->GetConn(), cookie.sequence);
+        xcb_discard_reply(LinuxX11Platform::GetConn(), cookie.sequence);
     }
 
     if (client.transientFor)
@@ -230,7 +228,7 @@ void WindowManager::UnmanageClient(xcb_window_t clientWindow)
 void WindowManager::Activate(const WindowStack &stack, xcb_timestamp_t time)
 {
     auto revertToRoot = [&] {
-        xcb_set_input_focus(m_X11->GetConn(), XCB_INPUT_FOCUS_NONE, m_X11->GetRoot(), time);
+        xcb_set_input_focus(LinuxX11Platform::GetConn(), XCB_INPUT_FOCUS_NONE, LinuxX11Platform::GetRoot(), time);
         m_LastEnteredWindow = 0;
     };
 
@@ -254,19 +252,19 @@ void WindowManager::Activate(const WindowStack &stack, xcb_timestamp_t time)
     if (client.wmHintsInput)
         immediateFocus = stack.activeWindow;
     else
-        immediateFocus = m_X11->GetRoot();
+        immediateFocus = LinuxX11Platform::GetRoot();
 
-    xcb_set_input_focus(m_X11->GetConn(), XCB_INPUT_FOCUS_NONE, immediateFocus, time);
+    xcb_set_input_focus(LinuxX11Platform::GetConn(), XCB_INPUT_FOCUS_NONE, immediateFocus, time);
 
     if (client.wmTakeFocus)
-        m_X11->SendWmTakeFocus(stack.activeWindow, time);
+        LinuxX11Platform::SendWmTakeFocus(stack.activeWindow, time);
 }
 
 void WindowManager::Activate(WindowStack &stack, xcb_window_t clientWindow, xcb_timestamp_t time)
 {
     if (stack.activeWindow != clientWindow)
     {
-        ApplyBorder(m_X11->GetConn(), stack.activeWindow, Color::KNone);
+        ApplyBorder(LinuxX11Platform::GetConn(), stack.activeWindow, Color::KNone);
         stack.activeWindow = clientWindow;
         // wmBackgroundDirty = true;
     }
@@ -283,7 +281,8 @@ void WindowManager::ApplyBorder(xcb_connection_t *conn, xcb_window_t window, Col
 
 void WindowManager::CheckFocusTheft()
 {
-    auto reply = xcb_get_input_focus_reply(m_X11->GetConn(), xcb_get_input_focus(m_X11->GetConn()), nullptr);
+    auto reply = xcb_get_input_focus_reply(LinuxX11Platform::GetConn(),
+                                           xcb_get_input_focus(LinuxX11Platform::GetConn()), nullptr);
     xcb_window_t focusedWindow = reply->focus;
     free(reply);
 
@@ -291,7 +290,7 @@ void WindowManager::CheckFocusTheft()
     if (stack.activeWindow == focusedWindow)
         return;
 
-    if (focusedWindow == m_X11->GetRoot())
+    if (focusedWindow == LinuxX11Platform::GetRoot())
         return;
     if (!focusedWindow)
         return;
@@ -300,8 +299,8 @@ void WindowManager::CheckFocusTheft()
     {
         for (;;)
         {
-            xcb_query_tree_reply_t *reply =
-                xcb_query_tree_reply(m_X11->GetConn(), xcb_query_tree(m_X11->GetConn(), focusedWindow), nullptr);
+            xcb_query_tree_reply_t *reply = xcb_query_tree_reply(
+                LinuxX11Platform::GetConn(), xcb_query_tree(LinuxX11Platform::GetConn(), focusedWindow), nullptr);
 
             if (!reply)
             {
@@ -312,7 +311,7 @@ void WindowManager::CheckFocusTheft()
             xcb_window_t parent = reply->parent;
             free(reply);
 
-            if (!parent || parent == m_X11->GetRoot())
+            if (!parent || parent == LinuxX11Platform::GetRoot())
                 break;
             focusedWindow = parent;
         }
@@ -355,7 +354,7 @@ void WindowManager::MaybeActivateLastEntered(WindowStack &stack, xcb_timestamp_t
 
     if (!m_LastEnteredWindow)
         return;
-    if (m_LastEnteredWindow == m_X11->GetRoot())
+    if (m_LastEnteredWindow == LinuxX11Platform::GetRoot())
         return;
     if (m_LastEnteredWindow == stack.activeWindow)
         return;
@@ -377,7 +376,7 @@ void WindowManager::Process(bool &isRunning)
 {
     while (isRunning)
     {
-        xcb_generic_event_t *event = xcb_poll_for_event(m_X11->GetConn());
+        xcb_generic_event_t *event = xcb_poll_for_event(LinuxX11Platform::GetConn());
         if (!event)
             break;
         Cleanup eventFreer([event] -> void { free(event); });
@@ -404,7 +403,7 @@ void WindowManager::Process(bool &isRunning)
             const bool shift = keypress->state & XCB_MOD_MASK_SHIFT;
 
             KeyPhysical key;
-            if (!m_X11->KeyCodeToKeyPhysical(keypress->detail, &key))
+            if (!LinuxX11Platform::KeyCodeToKeyPhysical(keypress->detail, &key))
                 break;
 
             if (meta && control && (key == KeyPhysical::ArrowLeft))
@@ -469,13 +468,13 @@ void WindowManager::Process(bool &isRunning)
 
             if (meta && (key == KeyPhysical::T))
             {
-                g_Platform.Spawn({{"ghostty", nullptr}});
+                Platform::Spawn({{"ghostty", nullptr}});
                 break;
             }
 
             if (meta && (key == KeyPhysical::S))
             {
-                g_Platform.Spawn({{"dmenu_run", nullptr}});
+                Platform::Spawn({{"dmenu_run", nullptr}});
                 break;
             }
 
@@ -517,7 +516,7 @@ void WindowManager::Process(bool &isRunning)
         }
 
         case XCB_MAP_REQUEST: {
-            xcb_map_window(m_X11->GetConn(), reinterpret_cast<xcb_map_request_event_t *>(event)->window);
+            xcb_map_window(LinuxX11Platform::GetConn(), reinterpret_cast<xcb_map_request_event_t *>(event)->window);
             break;
         }
 
@@ -558,7 +557,7 @@ void WindowManager::Process(bool &isRunning)
         case XCB_GE_GENERIC: {
             auto ge = reinterpret_cast<xcb_ge_generic_event_t *>(event);
 
-            if (ge->extension == m_X11->GetXInputExtensionMajorOpCode())
+            if (ge->extension == LinuxX11Platform::GetXInputExtensionMajorOpCode())
             {
                 switch (ge->event_type)
                 {
@@ -600,7 +599,7 @@ void WindowManager::Process(bool &isRunning)
     {
         for (auto &[property, cookie] : client.propertyCookies)
         {
-            xcb_get_property_reply_t *reply = xcb_get_property_reply(m_X11->GetConn(), cookie, nullptr);
+            xcb_get_property_reply_t *reply = xcb_get_property_reply(LinuxX11Platform::GetConn(), cookie, nullptr);
             if (!reply)
                 continue;
 
@@ -669,7 +668,7 @@ void WindowManager::Process(bool &isRunning)
             }
 
             default: {
-                if (property == m_X11->GetAtoms().wm_protocols)
+                if (property == LinuxX11Platform::GetAtoms().wm_protocols)
                 {
                     if (!reply)
                         break;
@@ -686,12 +685,12 @@ void WindowManager::Process(bool &isRunning)
 
                     for (xcb_atom_t atom : wmProtocols)
                     {
-                        if (atom == m_X11->GetAtoms().wm_delete_window)
+                        if (atom == LinuxX11Platform::GetAtoms().wm_delete_window)
                         {
                             client.wmDeleteWindow = true;
                             continue;
                         }
-                        if (atom == m_X11->GetAtoms().wm_take_focus)
+                        if (atom == LinuxX11Platform::GetAtoms().wm_take_focus)
                         {
                             client.wmTakeFocus = true;
                             continue;
@@ -779,21 +778,23 @@ void WindowManager::Process(bool &isRunning)
                 return Color::KNone;
             return Color::KActive;
         }();
-        ApplyBorder(m_X11->GetConn(), stack.activeWindow, color);
+        ApplyBorder(LinuxX11Platform::GetConn(), stack.activeWindow, color);
 
         m_BorderDirty = false;
     }
 
     if (m_LayoutDirty)
     {
-        Rect screenRect = Rect(m_X11->GetScreen()->width_in_pixels, m_X11->GetScreen()->height_in_pixels);
+        Rect screenRect =
+            Rect(LinuxX11Platform::GetScreen()->width_in_pixels, LinuxX11Platform::GetScreen()->height_in_pixels);
         if (!stack.zoom)
             screenRect = TryApplyMarginTop(screenRect, m_BarHeight);
 
         auto hide = [this](xcb_window_t clientWindow, Client &client) -> void {
-            ConfigureClientIfNeeded(m_X11->GetConn(), clientWindow, client,
-                                    Rect{m_X11->GetScreen()->width_in_pixels, m_X11->GetScreen()->height_in_pixels,
-                                         client.rect.Width(), client.rect.Height()},
+            ConfigureClientIfNeeded(LinuxX11Platform::GetConn(), clientWindow, client,
+                                    Rect{LinuxX11Platform::GetScreen()->width_in_pixels,
+                                         LinuxX11Platform::GetScreen()->height_in_pixels, client.rect.Width(),
+                                         client.rect.Height()},
                                     client.borderWidth);
         };
 
@@ -823,7 +824,7 @@ void WindowManager::Process(bool &isRunning)
                 center(client.maxWidth, rect.Width(), rect.X());
                 center(client.maxHeight, rect.Height(), rect.Y());
 
-                ConfigureClientIfNeeded(m_X11->GetConn(), client_window, client, rect, 2);
+                ConfigureClientIfNeeded(LinuxX11Platform::GetConn(), client_window, client, rect, 2);
 
                 visitor(client);
             }
@@ -846,7 +847,8 @@ void WindowManager::Process(bool &isRunning)
                 }
                 else
                 {
-                    ConfigureClientIfNeeded(m_X11->GetConn(), clientWindow, client, screenRect, m_Follow ? 2 : 0);
+                    ConfigureClientIfNeeded(LinuxX11Platform::GetConn(), clientWindow, client, screenRect,
+                                            m_Follow ? 2 : 0);
 
                     configureSubwindows(client);
                 }
@@ -873,8 +875,8 @@ void WindowManager::Process(bool &isRunning)
     {
         if (client.wantsConfigureNotify)
         {
-            m_X11->SendConfigureNotify(client_window, m_X11->GetRoot(), client.rect.X(), client.rect.Y(),
-                                       client.rect.Width(), client.rect.Height(), 2);
+            LinuxX11Platform::SendConfigureNotify(client_window, LinuxX11Platform::GetRoot(), client.rect.X(),
+                                                  client.rect.Y(), client.rect.Width(), client.rect.Height(), 2);
             client.wantsConfigureNotify = false;
         }
     }
@@ -972,7 +974,7 @@ void WindowManager::MoveStack(xcb_timestamp_t time, auto computeIdx)
     }
     else
     {
-        ApplyBorder(m_X11->GetConn(), oldstack.activeWindow, Color::KNone);
+        ApplyBorder(LinuxX11Platform::GetConn(), oldstack.activeWindow, Color::KNone);
         Activate(newstack, newstack.activeWindow, time);
     }
 
@@ -1062,10 +1064,10 @@ void WindowManager::CloseActive()
         return;
 
     static uint64_t last = 0;
-    uint64_t now = g_Platform.GetMonotonicTimeMillis();
+    uint64_t now = Platform::GetMonotonicTimeMillis();
     if (now - last >= 100)
     {
-        m_X11->SendWmDeleteWindow(stack.activeWindow);
+        LinuxX11Platform::SendWmDeleteWindow(stack.activeWindow);
     }
     last = now;
 }

@@ -21,19 +21,20 @@ auto PlatformMain() -> int
     sa.sa_flags = SA_RESTART;
     NYLA_ASSERT(sigaction(SIGINT, &sa, nullptr) != -1);
 
-    g_Platform.Init({.enabledFeatures = PlatformFeature::KeyboardInput | PlatformFeature::MouseInput});
+    Platform::InitGraphical({
+        .enabledFeatures = PlatformFeature::KeyboardInput | PlatformFeature::MouseInput,
+        .open = false,
+    });
 
     WindowManager wm{};
     wm.Init();
 
-    auto *x11 = g_Platform.GetImpl();
-
     bool isRunning = true;
-    while (isRunning && !xcb_connection_has_error(x11->GetConn()))
+    while (isRunning && !xcb_connection_has_error(LinuxX11Platform::GetConn()))
     {
         std::array<pollfd, 1> fds{
             pollfd{
-                .fd = xcb_get_file_descriptor(x11->GetConn()),
+                .fd = xcb_get_file_descriptor(LinuxX11Platform::GetConn()),
                 .events = POLLIN,
             },
         };
@@ -46,7 +47,7 @@ auto PlatformMain() -> int
         if (fds[0].revents & POLLIN)
         {
             wm.Process(isRunning);
-            x11->Flush();
+            LinuxX11Platform::Flush();
         }
     }
 

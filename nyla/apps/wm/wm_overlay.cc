@@ -27,15 +27,16 @@ namespace nyla
 
 auto PlatformMain() -> int
 {
-    g_Platform.Init({});
-    Platform::Impl *x11 = g_Platform.GetImpl();
+    Platform::InitGraphical({});
 
-    const xcb_window_t window = x11->CreateWin(x11->GetScreen()->width_in_pixels, x11->GetScreen()->height_in_pixels,
-                                               true, XCB_EVENT_MASK_EXPOSURE);
-    xcb_configure_window(x11->GetConn(), window, XCB_CONFIG_WINDOW_STACK_MODE, (uint32_t[]){XCB_STACK_MODE_BELOW});
-    x11->Flush();
+    const xcb_window_t window =
+        LinuxX11Platform::CreateWin(LinuxX11Platform::GetScreen()->width_in_pixels,
+                                    LinuxX11Platform::GetScreen()->height_in_pixels, true, XCB_EVENT_MASK_EXPOSURE);
+    xcb_configure_window(LinuxX11Platform::GetConn(), window, XCB_CONFIG_WINDOW_STACK_MODE,
+                         (uint32_t[]){XCB_STACK_MODE_BELOW});
+    LinuxX11Platform::Flush();
 
-    x11->SetWindow(window);
+    LinuxX11Platform::SetWindow(window);
 
     g_Rhi.Init(RhiInitDesc{
         .flags = RhiFlags::VSync,
@@ -70,7 +71,7 @@ auto PlatformMain() -> int
             for (;;)
             {
                 PlatformEvent event{};
-                if (!x11->PollEvent(event))
+                if (!Platform::WinPollEvent(event))
                     break;
 
                 if (event.type == PlatformEventType::Repaint)
@@ -81,12 +82,12 @@ auto PlatformMain() -> int
         };
         processEvents();
 
-        static uint64_t prevUs = g_Platform.GetMonotonicTimeMicros();
+        static uint64_t prevUs = Platform::GetMonotonicTimeMicros();
         if (!shouldRedraw)
         {
             for (;;)
             {
-                const uint64_t now = g_Platform.GetMonotonicTimeMicros();
+                const uint64_t now = Platform::GetMonotonicTimeMicros();
                 const uint64_t diff = now - prevUs;
                 if (diff >= 500'000)
                 {
@@ -95,7 +96,7 @@ auto PlatformMain() -> int
                 }
 
                 std::array<pollfd, 1> fds{pollfd{
-                    .fd = xcb_get_file_descriptor(x11->GetConn()),
+                    .fd = xcb_get_file_descriptor(LinuxX11Platform::GetConn()),
                     .events = POLLIN,
                 }};
 
