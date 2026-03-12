@@ -73,39 +73,27 @@ class Platform
   public:
     static constexpr inline uint64_t kPageAllocMinSize = 64_KiB;
 
-    void Init(const PlatformInitDesc &desc);
-    void WinOpen();
-    auto WinGetSize() -> PlatformWindowSize;
-    auto PollEvent(PlatformEvent &outEvent) -> bool;
+    static auto GetMemPageSize() -> uint64_t;
+    static auto ReserveMemPages(uint64_t size) -> char *;
+    static void CommitMemPages(char *page, uint64_t size);
+    static void DecommitMemPages(char *page, uint64_t size);
 
-    auto GetMemPageSize() -> uint64_t;
-    auto ReserveMemPages(uint64_t size) -> char *;
-    void CommitMemPages(char *page, uint64_t size);
-    void DecommitMemPages(char *page, uint64_t size);
+    static auto GetMonotonicTimeMillis() -> uint64_t;
+    static auto GetMonotonicTimeMicros() -> uint64_t;
+    static auto GetMonotonicTimeNanos() -> uint64_t;
 
-    auto GetMonotonicTimeMillis() -> uint64_t;
-    auto GetMonotonicTimeMicros() -> uint64_t;
-    auto GetMonotonicTimeNanos() -> uint64_t;
+    static auto Spawn(std::span<const char *const> cmd) -> bool;
 
-    auto Spawn(std::span<const char *const> cmd) -> bool;
+    static void InitGraphical(const PlatformInitDesc &desc);
+    static void WinOpen();
+    static auto WinGetSize() -> PlatformWindowSize;
+    static auto WinPollEvent(PlatformEvent &outEvent) -> bool;
 
-    auto UpdateGamepad(uint32_t index) -> bool;
-    auto GetGamepadLeftStick(uint32_t index) -> float2;
-    auto GetGamepadRightStick(uint32_t index) -> float2;
-    auto GetGamepadLeftTrigger(uint32_t index) -> float;
-    auto GetGamepadRightTrigger(uint32_t index) -> float;
-
-    class Impl;
-
-    void SetImpl(Impl *impl)
-    {
-        m_Impl = impl;
-    }
-
-    auto GetImpl() -> auto *
-    {
-        return m_Impl;
-    }
+    static auto UpdateGamepad(uint32_t index) -> bool;
+    static auto GetGamepadLeftStick(uint32_t index) -> float2;
+    static auto GetGamepadRightStick(uint32_t index) -> float2;
+    static auto GetGamepadLeftTrigger(uint32_t index) -> float;
+    static auto GetGamepadRightTrigger(uint32_t index) -> float;
 
     // TODO: move this
 
@@ -133,13 +121,7 @@ class Platform
         std::ifstream file(filename, std::ios::ate | std::ios::binary);
         return ReadFileInternal(file);
     }
-
-    //
-
-  private:
-    Impl *m_Impl;
 };
-extern Platform g_Platform;
 
 auto PlatformMain() -> int;
 

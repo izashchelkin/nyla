@@ -15,7 +15,7 @@ namespace nyla
 
 constexpr auto ScanCodeToKeyPhysical(uint8_t scanCode, bool extended) -> KeyPhysical;
 
-void Platform::Impl::Init(const PlatformInitDesc &desc)
+void Platform::Impl::InitGraphical(const PlatformInitDesc &desc)
 {
     GetSystemInfo(&m_SysInfo);
 
@@ -226,10 +226,10 @@ auto Platform::GetGamepadRightTrigger(uint32_t index) -> float
 
 //
 
-void Platform::Init(const PlatformInitDesc &desc)
+void Platform::InitGraphical(const PlatformInitDesc &desc)
 {
     NYLA_ASSERT(m_Impl);
-    m_Impl->Init(desc);
+    m_Impl->InitGraphical(desc);
 }
 
 void Platform::WinOpen()
@@ -242,7 +242,7 @@ auto Platform::WinGetSize() -> PlatformWindowSize
     return m_Impl->WinGetSize();
 }
 
-auto Platform::PollEvent(PlatformEvent &outEvent) -> bool
+auto Platform::WinPollEvent(PlatformEvent &outEvent) -> bool
 {
     return m_Impl->PollEvent(outEvent);
 }

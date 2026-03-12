@@ -1,3 +1,4 @@
+#include "nyla/formats/elf/elf_parser.h"
 #include "nyla/platform/platform.h"
 
 #include <elf.h>
@@ -7,9 +8,7 @@ namespace nyla
 
 auto PlatformMain() -> int
 {
-
-
-    Elf64_Ehdr header;
+    g_Platform.InitGraphical({});
 
     return 0;
 }
