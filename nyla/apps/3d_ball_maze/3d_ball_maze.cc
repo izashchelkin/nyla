@@ -51,8 +51,8 @@ void Game::Process(RhiCmdList cmd, float dt)
 
 auto PlatformMain(std::span<const char *> argv) -> int
 {
-    Platform::InitGraphical({
-        .enabledFeatures = PlatformFeature::KeyboardInput,
+    Platform::Init({
+        .enabledFeatures = PlatformFeature::Gfx | PlatformFeature::KeyboardInput,
         .open = true,
     });
 

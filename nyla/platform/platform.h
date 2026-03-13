@@ -18,8 +18,9 @@ enum class KeyPhysical;
 
 enum class PlatformFeature
 {
-    KeyboardInput = 1 << 0,
-    MouseInput = 1 << 1,
+    Gfx = 1 << 0,
+    KeyboardInput = 1 << 1,
+    MouseInput = 1 << 2,
 };
 NYLA_BITENUM(PlatformFeature);
 
@@ -84,7 +85,7 @@ class Platform
 
     static auto Spawn(std::span<const char *const> cmd) -> bool;
 
-    static void InitGraphical(const PlatformInitDesc &desc);
+    static void Init(const PlatformInitDesc &desc);
     static void WinOpen();
     static auto WinGetSize() -> PlatformWindowSize;
     static auto WinPollEvent(PlatformEvent &outEvent) -> bool;

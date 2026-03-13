@@ -12,6 +12,8 @@ void ElfParser::Parse()
 
 auto PlatformMain(std::span<const char *> argv) -> int
 {
+    Platform::Init({});
+
     std::vector<std::byte> data = Platform::ReadFile((std::string_view) R"(\\wsl.localhost\archlinux\usr\bin\pacman)");
 
     RegionAlloc rootAlloc;

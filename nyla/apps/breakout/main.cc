@@ -6,15 +6,14 @@
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_texture.h"
-#include <format>
 
 namespace nyla
 {
 
 auto PlatformMain(std::span<const char *> argv) -> int
 {
-    Platform::InitGraphical({
-        .enabledFeatures = PlatformFeature::KeyboardInput,
+    Platform::Init({
+        .enabledFeatures = PlatformFeature::Gfx | PlatformFeature::KeyboardInput,
         .open = true,
     });
 

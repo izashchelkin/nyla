@@ -17,7 +17,7 @@ class RegionAlloc
   public:
     void Init(void *base, uint64_t maxSize, bool ownsPages)
     {
-        NYLA_ASSERT(ownsPages || m_Base);
+        NYLA_ASSERT(ownsPages || base);
 
         m_OwnsPages = ownsPages;
         m_Used = 0;

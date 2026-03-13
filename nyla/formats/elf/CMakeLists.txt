@@ -1,5 +1,5 @@
 set(TARGET_PARSER nyla_formats_elf_parser)
-add_executable(${TARGET_PARSER})
+add_executable(${TARGET_PARSER} WIN32)
 add_executable(nyla::formats::elf::parser ALIAS ${TARGET_PARSER})
 
 target_sources(${TARGET_PARSER}

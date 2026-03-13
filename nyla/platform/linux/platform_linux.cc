@@ -222,90 +222,8 @@ auto LinuxX11Platform::InternAtom(std::string_view name, bool onlyIfExists) -> x
     return ret;
 }
 
-void Platform::InitGraphical(const PlatformInitDesc &desc)
+void Platform::Init(const PlatformInitDesc &desc)
 {
-    g_Conn = xcb_connect(nullptr, &g_ScreenIndex);
-    if (xcb_connection_has_error(g_Conn))
-        NYLA_ASSERT(false && "could not connect to X server");
-
-    g_Screen = xcb_aux_get_screen(g_Conn, g_ScreenIndex);
-    NYLA_ASSERT(g_Screen);
-
-#define X(name) m_Atoms.name = LinuxX11Platform::InternAtom(AsciiStrToUpper(#name), false);
-    NYLA_X11_ATOMS(X)
-#undef X
-
-    if (Any(desc.enabledFeatures & PlatformFeature::KeyboardInput))
-    {
-        uint16_t majorXkbVersionOut, minorXkbVersionOut;
-        uint8_t baseEventOut, baseErrorOut;
-
-        if (!xkb_x11_setup_xkb_extension(g_Conn, XKB_X11_MIN_MAJOR_XKB_VERSION, XKB_X11_MIN_MINOR_XKB_VERSION,
-                                         XKB_X11_SETUP_XKB_EXTENSION_NO_FLAGS, &majorXkbVersionOut, &minorXkbVersionOut,
-                                         &baseEventOut, &baseErrorOut))
-            NYLA_ASSERT(false && "could not set up xkb extension");
-
-        if (majorXkbVersionOut < XKB_X11_MIN_MAJOR_XKB_VERSION ||
-            (majorXkbVersionOut == XKB_X11_MIN_MAJOR_XKB_VERSION && minorXkbVersionOut < XKB_X11_MIN_MINOR_XKB_VERSION))
-            NYLA_ASSERT(false && "could not set up xkb extension");
-
-        xcb_generic_error_t *err = nullptr;
-        xcb_xkb_per_client_flags_reply_t *reply = xcb_xkb_per_client_flags_reply(
-            g_Conn,
-            xcb_xkb_per_client_flags(g_Conn, XCB_XKB_ID_USE_CORE_KBD, XCB_XKB_PER_CLIENT_FLAG_DETECTABLE_AUTO_REPEAT,
-                                     XCB_XKB_PER_CLIENT_FLAG_DETECTABLE_AUTO_REPEAT, 0, 0, 0),
-            &err);
-        if (!reply || err)
-            NYLA_ASSERT(false && "could not set up detectable autorepeat");
-
-        {
-            xkb_context *ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
-            NYLA_ASSERT(ctx);
-
-            const int32_t deviceId = xkb_x11_get_core_keyboard_device_id(g_Conn);
-            NYLA_ASSERT(deviceId != -1);
-
-            xkb_keymap *keymap = xkb_x11_keymap_new_from_device(ctx, g_Conn, deviceId, XKB_KEYMAP_COMPILE_NO_FLAGS);
-            NYLA_ASSERT(keymap);
-
-            for (uint32_t i = 1; i < static_cast<uint32_t>(KeyPhysical::Count); ++i)
-            {
-                const auto key = static_cast<KeyPhysical>(i);
-                const char *xkbName = LinuxX11Platform::ConvertKeyPhysicalIntoXkbName(key);
-                const xkb_keycode_t keycode = xkb_keymap_key_by_name(keymap, xkbName);
-                NYLA_ASSERT(xkb_keycode_is_legal_x11(keycode));
-                g_KeyPhysicalCodes[i] = keycode;
-            }
-
-            xkb_keymap_unref(keymap);
-            xkb_context_unref(ctx);
-        }
-    }
-
-    if (Any(desc.enabledFeatures & PlatformFeature::MouseInput))
-    {
-        const xcb_query_extension_reply_t *ext = xcb_get_extension_data(g_Conn, &xcb_input_id);
-        if (!ext || !ext->present)
-            NYLA_ASSERT(false && "could nolt set up XI2 extension");
-
-        struct
-        {
-            xcb_input_event_mask_t eventMask;
-            uint32_t maskBits;
-        } mask;
-
-        mask.eventMask.deviceid = XCB_INPUT_DEVICE_ALL_MASTER;
-        mask.eventMask.mask_len = 2;
-        mask.maskBits = XCB_INPUT_XI_EVENT_MASK_RAW_MOTION | XCB_INPUT_XI_EVENT_MASK_RAW_BUTTON_PRESS;
-
-        if (xcb_request_check(g_Conn, xcb_input_xi_select_events_checked(g_Conn, g_Screen->root, 1, &mask.eventMask)))
-            NYLA_ASSERT(false && "could not setup XI2 extension");
-
-        g_ExtensionXInput2MajorOpCode = ext->major_opcode;
-    }
-
-    //
-
     g_PageSize = sysconf(_SC_PAGESIZE);
     if (!g_PageSize)
         g_PageSize = 4096;
@@ -316,8 +234,93 @@ void Platform::InitGraphical(const PlatformInitDesc &desc)
 
     g_AddressSpaceAt = g_AddressSpaceBase;
 
-    if (desc.open)
-        WinOpen();
+    if (Any(desc.enabledFeatures & (PlatformFeature::Graphical)) {
+        g_Conn = xcb_connect(nullptr, &g_ScreenIndex);
+        if (xcb_connection_has_error(g_Conn))
+            NYLA_ASSERT(false && "could not connect to X server");
+
+        g_Screen = xcb_aux_get_screen(g_Conn, g_ScreenIndex);
+        NYLA_ASSERT(g_Screen);
+
+#define X(name) m_Atoms.name = LinuxX11Platform::InternAtom(AsciiStrToUpper(#name), false);
+        NYLA_X11_ATOMS(X)
+#undef X
+
+        if (Any(desc.enabledFeatures & PlatformFeature::KeyboardInput))
+        {
+            uint16_t majorXkbVersionOut, minorXkbVersionOut;
+            uint8_t baseEventOut, baseErrorOut;
+
+            if (!xkb_x11_setup_xkb_extension(g_Conn, XKB_X11_MIN_MAJOR_XKB_VERSION, XKB_X11_MIN_MINOR_XKB_VERSION,
+                                             XKB_X11_SETUP_XKB_EXTENSION_NO_FLAGS, &majorXkbVersionOut,
+                                             &minorXkbVersionOut, &baseEventOut, &baseErrorOut))
+                NYLA_ASSERT(false && "could not set up xkb extension");
+
+            if (majorXkbVersionOut < XKB_X11_MIN_MAJOR_XKB_VERSION ||
+                (majorXkbVersionOut == XKB_X11_MIN_MAJOR_XKB_VERSION &&
+                 minorXkbVersionOut < XKB_X11_MIN_MINOR_XKB_VERSION))
+                NYLA_ASSERT(false && "could not set up xkb extension");
+
+            xcb_generic_error_t *err = nullptr;
+            xcb_xkb_per_client_flags_reply_t *reply = xcb_xkb_per_client_flags_reply(
+                g_Conn,
+                xcb_xkb_per_client_flags(g_Conn, XCB_XKB_ID_USE_CORE_KBD,
+                                         XCB_XKB_PER_CLIENT_FLAG_DETECTABLE_AUTO_REPEAT,
+                                         XCB_XKB_PER_CLIENT_FLAG_DETECTABLE_AUTO_REPEAT, 0, 0, 0),
+                &err);
+            if (!reply || err)
+                NYLA_ASSERT(false && "could not set up detectable autorepeat");
+
+            {
+                xkb_context *ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
+                NYLA_ASSERT(ctx);
+
+                const int32_t deviceId = xkb_x11_get_core_keyboard_device_id(g_Conn);
+                NYLA_ASSERT(deviceId != -1);
+
+                xkb_keymap *keymap = xkb_x11_keymap_new_from_device(ctx, g_Conn, deviceId, XKB_KEYMAP_COMPILE_NO_FLAGS);
+                NYLA_ASSERT(keymap);
+
+                for (uint32_t i = 1; i < static_cast<uint32_t>(KeyPhysical::Count); ++i)
+                {
+                    const auto key = static_cast<KeyPhysical>(i);
+                    const char *xkbName = LinuxX11Platform::ConvertKeyPhysicalIntoXkbName(key);
+                    const xkb_keycode_t keycode = xkb_keymap_key_by_name(keymap, xkbName);
+                    NYLA_ASSERT(xkb_keycode_is_legal_x11(keycode));
+                    g_KeyPhysicalCodes[i] = keycode;
+                }
+
+                xkb_keymap_unref(keymap);
+                xkb_context_unref(ctx);
+            }
+        }
+
+        if (Any(desc.enabledFeatures & PlatformFeature::MouseInput))
+        {
+            const xcb_query_extension_reply_t *ext = xcb_get_extension_data(g_Conn, &xcb_input_id);
+            if (!ext || !ext->present)
+                NYLA_ASSERT(false && "could nolt set up XI2 extension");
+
+            struct
+            {
+                xcb_input_event_mask_t eventMask;
+                uint32_t maskBits;
+            } mask;
+
+            mask.eventMask.deviceid = XCB_INPUT_DEVICE_ALL_MASTER;
+            mask.eventMask.mask_len = 2;
+            mask.maskBits = XCB_INPUT_XI_EVENT_MASK_RAW_MOTION | XCB_INPUT_XI_EVENT_MASK_RAW_BUTTON_PRESS;
+
+            if (xcb_request_check(g_Conn,
+                                  xcb_input_xi_select_events_checked(g_Conn, g_Screen->root, 1, &mask.eventMask)))
+                NYLA_ASSERT(false && "could not setup XI2 extension");
+
+            g_ExtensionXInput2MajorOpCode = ext->major_opcode;
+        }
+
+        if (desc.open)
+            WinOpen();
+    }
 }
 
 void LinuxX11Platform::SendConfigureNotify(xcb_window_t window, xcb_window_t parent, int16_t x, int16_t y,

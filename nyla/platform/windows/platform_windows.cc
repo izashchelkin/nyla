@@ -112,9 +112,9 @@ void Platform::DecommitMemPages(char *page, uint64_t size)
     VirtualAlloc(page, size, MEM_DECOMMIT, PAGE_NOACCESS);
 }
 
-void Platform::InitGraphical(const PlatformInitDesc &desc)
+void Platform::Init(const PlatformInitDesc &desc)
 {
-    GetSystemInfo(&g_SysInfo);
+    GetNativeSystemInfo(&g_SysInfo);
 
     g_AddressSpaceSize = AlignedUp<uint64_t>(256_GiB, g_SysInfo.dwAllocationGranularity);
 
