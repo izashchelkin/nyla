@@ -35,9 +35,7 @@ if (UNIX AND NOT APPLE)
 
         target_link_libraries(wm_overlay
             PRIVATE
-            nyla::debug_text_renderer
-            nyla::rhi
-            nyla::platform::linux
+            nyla::engine
         )
 
     endif()

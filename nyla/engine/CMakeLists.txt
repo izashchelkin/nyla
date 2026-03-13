@@ -33,19 +33,4 @@ if (${HAS_RHI})
         stb_image
     )
 
-    set(TARGET_DEBUG_TEXT_RENDERER nyla_debug_text_renderer)
-    add_library(${TARGET_DEBUG_TEXT_RENDERER})
-    add_library(nyla::debug_text_renderer ALIAS ${TARGET_DEBUG_TEXT_RENDERER})
-
-    target_sources(${TARGET_DEBUG_TEXT_RENDERER}
-        PRIVATE
-        engine0_internal.cc
-        debug_text_renderer.cc
-    )
-
-    target_include_directories(${TARGET_DEBUG_TEXT_RENDERER}
-        PUBLIC
-        ${PROJECT_SOURCE_DIR}
-    )
-
 endif()

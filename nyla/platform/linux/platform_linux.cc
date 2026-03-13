@@ -234,7 +234,8 @@ void Platform::Init(const PlatformInitDesc &desc)
 
     g_AddressSpaceAt = g_AddressSpaceBase;
 
-    if (Any(desc.enabledFeatures & (PlatformFeature::Graphical)) {
+    if (Any(desc.enabledFeatures & (PlatformFeature::Gfx)))
+    {
         g_Conn = xcb_connect(nullptr, &g_ScreenIndex);
         if (xcb_connection_has_error(g_Conn))
             NYLA_ASSERT(false && "could not connect to X server");

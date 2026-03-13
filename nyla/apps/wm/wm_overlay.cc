@@ -27,7 +27,9 @@ namespace nyla
 
 auto PlatformMain(std::span<const char *> argv) -> int
 {
-    Platform::InitGraphical({});
+    Platform::Init({
+        .enabledFeatures = PlatformFeature::Gfx,
+    });
 
     const xcb_window_t window =
         LinuxX11Platform::CreateWin(LinuxX11Platform::GetScreen()->width_in_pixels,

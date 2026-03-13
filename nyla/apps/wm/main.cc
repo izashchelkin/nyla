@@ -21,8 +21,8 @@ auto PlatformMain(std::span<const char *> argv) -> int
     sa.sa_flags = SA_RESTART;
     NYLA_ASSERT(sigaction(SIGINT, &sa, nullptr) != -1);
 
-    Platform::InitGraphical({
-        .enabledFeatures = PlatformFeature::KeyboardInput | PlatformFeature::MouseInput,
+    Platform::Init({
+        .enabledFeatures = PlatformFeature::Gfx | PlatformFeature::KeyboardInput | PlatformFeature::MouseInput,
         .open = false,
     });
 

@@ -66,6 +66,7 @@ struct GltfMeshUploadQueueEntry
     char *path;
 };
 RegionAlloc m_GltfMeshUploadQueue;
+
 } // namespace
 
 auto AssetManager::GetMeshVertexAttributes() -> std::span<RhiVertexAttributeDesc>
