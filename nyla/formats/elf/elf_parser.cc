@@ -1,5 +1,6 @@
 #include "nyla/formats/elf/elf_parser.h"
 #include "nyla/alloc/region_alloc.h"
+#include "nyla/commons/assert.h"
 #include "nyla/platform/platform.h"
 
 namespace nyla
@@ -8,6 +9,8 @@ namespace nyla
 void ElfParser::Parse()
 {
     auto elfHeader = Pop<Elf64Header>();
+
+    NYLA_DEBUGBREAK();
 }
 
 auto PlatformMain(std::span<const char *> argv) -> int

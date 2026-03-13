@@ -23,9 +23,10 @@ class RegionAlloc
         m_Used = 0;
         m_Size = 0;
         m_MaxSize = maxSize;
-        m_Base = (char *)base;
 
-        if (!m_Base)
+        if (base)
+            m_Base = (char *)base;
+        else
             m_Base = Platform::ReserveMemPages(maxSize);
     }
 
