@@ -1,5 +1,6 @@
 #include "nyla/commons/assert.h"
 #include <cstdint>
+#include <string_view>
 
 namespace nyla
 {
@@ -7,6 +8,12 @@ namespace nyla
 class ByteParser
 {
   public:
+    void Init(const char *base, uint64_t size)
+    {
+        m_At = base;
+        m_Left = size;
+    }
+
     constexpr auto Peek() -> char
     {
         return *m_At;
@@ -14,8 +21,14 @@ class ByteParser
 
     constexpr void Advance()
     {
-        ++m_At;
-        --m_Left;
+        Advance(1);
+    }
+
+    constexpr void Advance(uint64_t i)
+    {
+        m_At += i;
+        m_Left -= i;
+        NYLA_ASSERT(m_Left >= 0);
     }
 
     constexpr auto Pop() -> char
@@ -39,10 +52,40 @@ class ByteParser
         return ret;
     }
 
+    constexpr void SkipUntil(char ch)
+    {
+        while (Peek() != ch)
+            Advance();
+    }
+
+    constexpr void NextLine()
+    {
+        while (Pop() != '\n')
+            ;
+    }
+
     constexpr void SkipWhitespace()
     {
         while (IsWhitespace(Peek()))
             Advance();
+    }
+
+    constexpr auto StartsWith(std::string_view str) -> bool
+    {
+        return std::string_view{m_At, m_Left}.starts_with(str);
+    }
+
+    constexpr auto StartsWithAdvance(std::string_view str) -> bool
+    {
+        if (StartsWith(str))
+        {
+            Advance(str.size());
+            return true;
+        }
+        else
+        {
+            return false;
+        }
     }
 
     constexpr static auto IsNumber(unsigned char ch) -> bool
@@ -61,6 +104,14 @@ class ByteParser
     }
 
     //
+    //
+    constexpr auto ParseLong() -> uint64_t
+    {
+        double d;
+        int64_t l;
+        NYLA_ASSERT(ParseDecimal(d, l) == ParseNumberResult::Long);
+        return l;
+    }
 
     enum ParseNumberResult
     {
@@ -190,7 +241,7 @@ class ByteParser
 
   protected:
     const char *m_At;
-    uint32_t m_Left;
+    uint64_t m_Left;
 };
 
 } // namespace nyla

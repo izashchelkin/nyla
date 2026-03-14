@@ -1,4 +1,4 @@
-#include "nyla/formats/json/json_parser.h"
+#include "nyla/formats/json/json.h"
 #include "nyla/alloc/region_alloc.h"
 #include "nyla/commons/assert.h"
 #include "nyla/formats/json/json_value.h"

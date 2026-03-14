@@ -8,7 +8,7 @@
 #include "nyla/commons/path.h"
 #include "nyla/engine/engine.h"
 #include "nyla/engine/gpu_upload_manager.h"
-#include "nyla/formats/gltf/gltf_parser.h"
+#include "nyla/formats/gltf/gltf.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_buffer.h"

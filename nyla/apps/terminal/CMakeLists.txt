@@ -12,7 +12,6 @@ if (${HAS_RHI})
 
     target_sources(${TARGET} PRIVATE 
         terminal.cc
-        bdf_parser.cc
     )
 
     target_include_directories(${TARGET} PRIVATE ${PROJECT_SOURCE_DIR})

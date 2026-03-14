@@ -29,7 +29,7 @@ if (${HAS_RHI})
         nyla::platform
         nyla::platform::dir_watch
         nyla::rhi
-        nyla::formats::gltf::parser
+        nyla::formats::gltf
         stb_image
     )
 

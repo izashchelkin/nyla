@@ -1,14 +1,15 @@
-#include "nyla/formats/gltf/gltf_parser.h"
+#include "nyla/formats/gltf/gltf.h"
 #include "nyla/commons/align.h"
 #include "nyla/commons/assert.h"
 #include "nyla/commons/word.h"
-#include "nyla/formats/json/json_parser.h"
+#include "nyla/formats/json/json.h"
 #include "nyla/formats/json/json_value.h"
 #include <cstdint>
 
 namespace nyla
 {
 
+#if 0
 auto GlbChunkParser::Parse(std::span<char> &jsonChunk, std::span<char> &binChunk) -> bool
 {
     if (PopDWord() != DWord("glTF"))
@@ -37,6 +38,7 @@ auto GlbChunkParser::Parse(std::span<char> &jsonChunk, std::span<char> &binChunk
 
     return true;
 }
+#endif
 
 auto GltfParser::FindAttributeAccessor(std::span<GltfMeshPrimitiveAttribute> attributes, std::string_view attributeName,
                                        GltfAccessor &out) -> bool

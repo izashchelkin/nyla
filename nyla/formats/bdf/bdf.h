@@ -1,5 +1,8 @@
+#include <array>
 #include <cstdint>
 #include <span>
+
+#include "nyla/commons/byteparser.h"
 
 namespace nyla
 {
@@ -12,18 +15,15 @@ struct BdfGlyph
     std::span<const char> bitmap;
 };
 
-class BdfParser
+class BdfParser : ByteParser
 {
   public:
-    void Init(std::span<const char> font)
+    void Init(const char *data, uint64_t size)
     {
-        m_Data = font;
+        ByteParser::Init(data, size);
     }
 
-    auto FindGlyph(uint16_t encoding) -> BdfGlyph;
-
-  private:
-    std::span<const char> m_Data;
+    auto NextGlyph() -> BdfGlyph;
 };
 
 } // namespace nyla

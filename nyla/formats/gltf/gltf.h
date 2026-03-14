@@ -2,7 +2,7 @@
 
 #include "nyla/alloc/region_alloc.h"
 #include "nyla/commons/inline_vec.h"
-#include "nyla/formats/json/json_parser.h"
+#include "nyla/formats/json/json.h"
 #include <cstdint>
 
 namespace nyla
@@ -125,14 +125,14 @@ struct GltfMesh
     std::span<GltfMeshPrimitive> primitives;
 };
 
+#if 0
 class GlbChunkParser : public ByteParser
 {
   public:
-    void Init(void *data, uint32_t byteLength)
+    void Init(void *data, uint64_t size)
     {
         m_Base = (uint32_t *)data;
-        m_At = m_Base;
-        m_BytesLeft = byteLength;
+        ByteParser::Init((char *)m_Base, size);
     }
 
     auto Parse(std::span<char> &jsonChunk, std::span<char> &binChunk) -> bool;
@@ -142,6 +142,7 @@ class GlbChunkParser : public ByteParser
     void *m_At;
     uint64_t m_BytesLeft;
 };
+#endif
 
 class GltfParser
 {

@@ -6,7 +6,7 @@ namespace nyla
 
 auto PlatformMain(std::span<const char *> argv) -> int
 {
-    Platform::InitGraphical(PlatformInitDesc{
+    Platform::Init(PlatformInitDesc{
         .enabledFeatures = PlatformFeature::KeyboardInput,
         .open = true,
     });

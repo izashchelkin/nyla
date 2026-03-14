@@ -12,11 +12,10 @@ class JsonValue;
 class JsonParser : public ByteParser
 {
   public:
-    void Init(RegionAlloc *alloc, const char *base, uint32_t size)
+    void Init(RegionAlloc *alloc, const char *base, uint64_t size)
     {
         m_Alloc = alloc;
-        m_At = base;
-        m_Left = size;
+        ByteParser::Init(base, size);
     }
 
     auto ParseNext() -> JsonValue *;

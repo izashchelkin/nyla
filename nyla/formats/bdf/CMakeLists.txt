@@ -1,12 +1,12 @@
-set(TARGET nyla_formats_elf)
+set(TARGET nyla_formats_bdf)
 add_library(${TARGET})
-add_library(nyla::formats::elf ALIAS ${TARGET})
+add_library(nyla::formats::bdf ALIAS ${TARGET})
 
 target_sources(${TARGET}
     PRIVATE
-        elf.cc
+        bdf.cc
     PUBLIC
-        elf.h
+        bdf.h
 )
 
 target_link_libraries(${TARGET}
