@@ -6,10 +6,8 @@
 namespace nyla
 {
 
-auto BdfParser::NextGlyph() -> BdfGlyph
+auto BdfParser::NextGlyph(BdfGlyph &out) -> bool
 {
-    BdfGlyph ret;
-
     for (;;)
     {
         if (!StartsWithAdvance("ENCODING "))

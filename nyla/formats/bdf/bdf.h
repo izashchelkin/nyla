@@ -23,7 +23,7 @@ class BdfParser : ByteParser
         ByteParser::Init(data, size);
     }
 
-    auto NextGlyph() -> BdfGlyph;
+    auto NextGlyph(BdfGlyph& out) -> bool;
 };
 
 } // namespace nyla
