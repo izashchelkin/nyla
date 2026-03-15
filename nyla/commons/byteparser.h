@@ -112,7 +112,8 @@ class ByteParser
     {
         double d;
         int64_t l;
-        NYLA_ASSERT(ParseDecimal(d, l) == ParseNumberResult::Long);
+        const ParseNumberResult res = ParseDecimal(d, l);
+        NYLA_ASSERT(res == ParseNumberResult::Long);
         return l;
     }
 
@@ -124,7 +125,7 @@ class ByteParser
 
     constexpr auto ParseDecimal(double &outDouble, int64_t &outLong) -> ParseNumberResult
     {
-        uint32_t sign = 1;
+        int32_t sign = 1;
         if (Peek() == '-')
         {
             sign = -1;

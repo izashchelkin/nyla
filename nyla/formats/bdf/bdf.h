@@ -12,6 +12,7 @@ namespace nyla
 
 struct BdfGlyph
 {
+    uint32_t encoding;
     // const char *name;
     int32_t dwidth[2];
     int32_t bbx[4];
@@ -23,6 +24,7 @@ class BdfParser : ByteParser
   public:
     void Init(RegionAlloc *alloc, const char *data, uint64_t size)
     {
+        m_Alloc = alloc;
         ByteParser::Init(data, size);
     }
 
