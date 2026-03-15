@@ -1,0 +1,7 @@
+cd $NYLAROOT/build/sources/ninja*
+
+rm -rf $DESTDIR/build $DESTDIR/ninja
+
+python3 configure.py --bootstrap
+mkdir -p $DESTDIR/usr/bin/
+install -m755 ninja $DESTDIR/usr/bin/

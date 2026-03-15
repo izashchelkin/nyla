@@ -1,26 +1,31 @@
-file(GLOB SOURCES CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/*.cc"
-)
+set (HAS_ENGINE TARGET nyla::engine)
+if (${HAS_ENGINE})
 
-file(GLOB HEADERS CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/*.h"
-)
+    file(GLOB SOURCES CONFIGURE_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/*.cc"
+    )
 
-set(TARGET guidemo)
-add_executable(${TARGET})
+    file(GLOB HEADERS CONFIGURE_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/*.h"
+    )
 
-target_sources(${TARGET}
-    PRIVATE
+    set(TARGET guidemo)
+    add_executable(${TARGET})
+
+    target_sources(${TARGET}
+        PRIVATE
         ${SOURCES}
         ${HEADERS}
-)
+    )
 
-target_include_directories(${TARGET}
-    PRIVATE
+    target_include_directories(${TARGET}
+        PRIVATE
         ${PROJECT_SOURCE_DIR}
-)
+    )
 
-target_link_libraries(${TARGET}
-    PRIVATE
+    target_link_libraries(${TARGET}
+        PRIVATE
         nyla::engine
-)
+    )
+
+endif()

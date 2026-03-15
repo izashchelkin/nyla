@@ -5,7 +5,7 @@
 #include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/vulkan_core.h>
 
-#include "nyla/commons/containers/inline_vec.h"
+#include "nyla/commons/inline_vec.h"
 #include "nyla/commons/log.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
@@ -91,7 +91,7 @@ void Rhi::Impl::CreateSwapchain()
         if (surfaceCapabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
             return surfaceCapabilities.currentExtent;
 
-        const PlatformWindowSize windowSize = g_Platform.WinGetSize();
+        const PlatformWindowSize windowSize = Platform::WinGetSize();
         return VkExtent2D{
             .width = std::clamp(windowSize.width, surfaceCapabilities.minImageExtent.width,
                                 surfaceCapabilities.maxImageExtent.width),

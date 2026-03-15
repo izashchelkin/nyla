@@ -1,7 +1,6 @@
 #pragma once
 
 #include "nyla/commons/handle.h"
-#include "nyla/commons/handle_pool.h"
 
 namespace nyla
 {
@@ -13,31 +12,16 @@ struct Tween : Handle
 class TweenManager
 {
   public:
-    auto Now() -> float
-    {
-        return m_Now;
-    }
+    static auto Now() -> float;
+    static void Update(float dt);
 
-    void Update(float dt);
+    static auto BeginOf(Tween) -> float;
+    static auto EndOf(Tween) -> float;
 
-    auto BeginOf(Tween) -> float;
-    auto EndOf(Tween) -> float;
-
-    void Cancel(Tween);
-    auto Lerp(float &value, float endValue, float begin, float end) -> Tween;
+    static void Cancel(Tween);
+    static auto Lerp(float &value, float endValue, float begin, float end) -> Tween;
 
   private:
-    struct TweenData
-    {
-        float *value;
-        float begin;
-        float end;
-        float startValue;
-        float endValue;
-    };
-    HandlePool<Tween, TweenData, 1024> m_Tweens;
-
-    float m_Now;
 };
 
 } // namespace nyla

@@ -1,7 +1,7 @@
 #pragma once
 
+#include "nyla/alloc/region_alloc.h"
 #include "nyla/commons/assert.h"
-#include "nyla/commons/memory/region_alloc.h"
 #include <cstring>
 #include <string_view>
 

@@ -1,0 +1,8 @@
+cd $NYLAROOT/build/sources/attr*
+make distclean || echo already clean
+./configure                     \
+	--prefix=/usr           \
+	--disable-static        \
+	--sysconfdir=/etc
+make
+make DESTDIR=$DESTDIR install

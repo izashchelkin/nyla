@@ -101,8 +101,6 @@ class WindowManager
     uint64_t m_ActiveStackIdx;
 
     xcb_window_t m_LastEnteredWindow = 0;
-
-    Platform::Impl *m_X11;
 };
 
 } // namespace nyla

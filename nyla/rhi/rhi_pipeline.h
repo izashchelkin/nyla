@@ -3,8 +3,8 @@
 #include <cstdint>
 #include <string>
 
-#include "nyla/commons/containers/inline_string.h"
 #include "nyla/commons/handle.h"
+#include "nyla/commons/inline_string.h"
 #include "nyla/rhi/rhi_shader.h"
 #include "nyla/rhi/rhi_texture.h"
 

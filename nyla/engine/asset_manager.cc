@@ -1,13 +1,14 @@
 #include "nyla/engine/asset_manager.h"
+#include "nyla/alloc/region_alloc.h"
 #include "nyla/commons/align.h"
 #include "nyla/commons/assert.h"
 #include "nyla/commons/handle.h"
 #include "nyla/commons/handle_pool.h"
 #include "nyla/commons/log.h"
-#include "nyla/commons/memory/region_alloc.h"
 #include "nyla/commons/path.h"
 #include "nyla/engine/engine.h"
-#include "nyla/formats/gltf/gltf_parser.h"
+#include "nyla/engine/gpu_upload_manager.h"
+#include "nyla/formats/gltf/gltf.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
 #include "nyla/rhi/rhi_buffer.h"
@@ -20,6 +21,95 @@
 namespace nyla
 {
 
+namespace
+{
+
+struct TextureData
+{
+    std::string path;
+    bool needsUpload;
+
+    RhiTexture texture;
+    RhiSampledTextureView textureView;
+    uint32_t width = 0;
+    uint32_t height = 0;
+    uint32_t channels = 0;
+};
+HandlePool<AssetManager::Texture, TextureData, 128> m_Textures;
+
+struct MeshData
+{
+    bool isStatic;
+    Path gltfPath;
+    std::span<const char> vertexData;
+    std::span<const uint16_t> indices;
+
+    uint64_t vertexBufferOffset;
+    uint64_t indexBufferOffset;
+    uint32_t indexCount;
+
+    AssetManager::Texture texture;
+
+    bool needsUpload;
+};
+HandlePool<AssetManager::Mesh, MeshData, 128> m_Meshes;
+
+struct MeshPrimitiveData
+{
+};
+HandlePool<AssetManager::Mesh, MeshData, 128> m_MeshPrimitives;
+
+//
+
+struct GltfMeshUploadQueueEntry
+{
+    char *path;
+};
+RegionAlloc m_GltfMeshUploadQueue;
+
+} // namespace
+
+auto AssetManager::GetMeshVertexAttributes() -> std::span<RhiVertexAttributeDesc>
+{
+    static std::array<RhiVertexAttributeDesc, 3> ret{
+        RhiVertexAttributeDesc{
+            .binding = 0,
+            .semantic = "POSITION0",
+            .format = RhiVertexFormat::R32G32B32Float,
+            .offset = offsetof(AssetManager::MeshVSInput, pos),
+        },
+        RhiVertexAttributeDesc{
+            .binding = 0,
+            .semantic = "NORMAL0",
+            .format = RhiVertexFormat::R32G32B32Float,
+            .offset = offsetof(AssetManager::MeshVSInput, normal),
+        },
+        RhiVertexAttributeDesc{
+            .binding = 0,
+            .semantic = "TEXCOORD0",
+            .format = RhiVertexFormat::R32G32Float,
+            .offset = offsetof(AssetManager::MeshVSInput, uv),
+        },
+    };
+    return ret;
+}
+
+auto AssetManager::GetMeshVertexBindings() -> std::span<RhiVertexBindingDesc>
+{
+    static auto ret = RhiVertexBindingDesc{
+        .binding = 0,
+        .stride = sizeof(AssetManager::MeshVSInput),
+        .inputRate = RhiInputRate::PerVertex,
+    };
+    return std::span{&ret, 1};
+}
+
+auto AssetManager::GetMeshPipelineColorTargetFormats() -> std::span<RhiTextureFormat>
+{
+    static auto ret = RhiTextureFormat::B8G8R8A8_sRGB;
+    return std::span{&ret, 1};
+}
+
 void AssetManager::Init()
 {
     static bool inited = false;
@@ -28,7 +118,7 @@ void AssetManager::Init()
 
     //
 
-    auto addSampler = [this](SamplerType samplerType, RhiFilter filter, RhiSamplerAddressMode addressMode) -> void {
+    auto addSampler = [](SamplerType samplerType, RhiFilter filter, RhiSamplerAddressMode addressMode) -> void {
         RhiSampler sampler = g_Rhi.CreateSampler({
             .minFilter = filter,
             .magFilter = filter,
@@ -67,8 +157,6 @@ void AssetManager::Flush()
 
 void AssetManager::Upload(RhiCmdList cmd)
 {
-    auto &uploadManager = g_Engine.GetUploadManager();
-
     for (uint32_t i = 0; i < m_Meshes.size(); ++i)
     {
         auto &slot = *(m_Meshes.begin() + i);
@@ -85,22 +173,22 @@ void AssetManager::Upload(RhiCmdList cmd)
             NYLA_ASSERT(meshData.indexCount % 3 == 0);
 
             char *uploadMemory =
-                uploadManager.CmdCopyStaticIndices(cmd, meshData.indices.size_bytes(), meshData.indexBufferOffset);
+                GpuUploadManager::CmdCopyStaticIndices(cmd, meshData.indices.size_bytes(), meshData.indexBufferOffset);
             memcpy(uploadMemory, meshData.indices.data(), meshData.indices.size_bytes());
 
-            uploadMemory =
-                uploadManager.CmdCopyStaticVertices(cmd, meshData.vertexData.size_bytes(), meshData.vertexBufferOffset);
+            uploadMemory = GpuUploadManager::CmdCopyStaticVertices(cmd, meshData.vertexData.size_bytes(),
+                                                                   meshData.vertexBufferOffset);
             memcpy(uploadMemory, meshData.vertexData.data(), meshData.vertexData.size_bytes());
         }
         else
         {
-            RegionAlloc &transientAlloc = g_Engine.GetPerFrameAlloc();
+            RegionAlloc &transientAlloc = Engine::GetPerFrameAlloc();
             RegionAlloc scratchAlloc = transientAlloc.PushSubAlloc(16_KiB);
 
             NYLA_ASSERT(meshData.gltfPath.EndsWith(".gltf"));
-            std::vector<std::byte> gltfData = g_Platform.ReadFile(meshData.gltfPath.StrView());
+            std::vector<std::byte> gltfData = Platform::ReadFile(meshData.gltfPath.StrView());
             std::vector<std::byte> binData =
-                g_Platform.ReadFile(meshData.gltfPath.Clone(scratchAlloc).SetExtension(".bin").StrView());
+                Platform::ReadFile(meshData.gltfPath.Clone(scratchAlloc).SetExtension(".bin").StrView());
 
             {
                 GltfParser parser;
@@ -129,7 +217,7 @@ void AssetManager::Upload(RhiCmdList cmd)
 
                             uint32_t bufferSize = indices.count * GetGltfAccessorSize(indices);
                             char *const uploadMemory =
-                                uploadManager.CmdCopyStaticIndices(cmd, bufferSize, meshData.indexBufferOffset);
+                                GpuUploadManager::CmdCopyStaticIndices(cmd, bufferSize, meshData.indexBufferOffset);
 
                             std::span<char> indicesData = parser.GetAccessorData(indices);
 
@@ -195,7 +283,7 @@ void AssetManager::Upload(RhiCmdList cmd)
                             const auto texCoordBufferView = parser.GetAccessorData(texCoord);
 
                             char *const uploadMemory =
-                                uploadManager.CmdCopyStaticVertices(cmd, bufferSize, meshData.vertexBufferOffset);
+                                GpuUploadManager::CmdCopyStaticVertices(cmd, bufferSize, meshData.vertexBufferOffset);
 
                             for (uint32_t i = 0; i < pos.count; ++i)
                             {
@@ -274,7 +362,7 @@ void AssetManager::Upload(RhiCmdList cmd)
 
         const uint32_t size = textureAssetData.width * textureAssetData.height * textureAssetData.channels;
 
-        char *uploadMemory = g_Engine.GetUploadManager().CmdCopyTexture(cmd, texture, size);
+        char *uploadMemory = GpuUploadManager::CmdCopyTexture(cmd, texture, size);
         memcpy(uploadMemory, data, size);
 
         free(data);
@@ -321,7 +409,7 @@ auto AssetManager::DeclareMesh(std::string_view path) -> Mesh
 {
     return m_Meshes.Acquire(MeshData{
         .isStatic = false,
-        .gltfPath = g_Engine.GetPermanentAlloc().PushPath(path),
+        .gltfPath = Engine::GetPermanentAlloc().PushPath(path),
         .needsUpload = true,
     });
 }
@@ -338,13 +426,11 @@ auto AssetManager::DeclareStaticMesh(std::span<const char> vertexData, std::span
 
 void AssetManager::CmdBindMesh(RhiCmdList cmd, Mesh mesh)
 {
-    auto &uploadManager = g_Engine.GetUploadManager();
-
     const auto &meshData = m_Meshes.ResolveData(mesh);
     NYLA_ASSERT(!meshData.needsUpload);
 
-    uploadManager.CmdBindStaticMeshVertexBuffer(cmd, meshData.vertexBufferOffset);
-    uploadManager.CmdBindStaticMeshIndexBuffer(cmd, meshData.indexBufferOffset);
+    GpuUploadManager::CmdBindStaticMeshVertexBuffer(cmd, meshData.vertexBufferOffset);
+    GpuUploadManager::CmdBindStaticMeshIndexBuffer(cmd, meshData.indexBufferOffset);
 }
 
 void AssetManager::CmdDrawMesh(RhiCmdList cmd, AssetManager::Mesh mesh)

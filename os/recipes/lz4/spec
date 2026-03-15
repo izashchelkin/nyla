@@ -1,0 +1,4 @@
+cd $NYLAROOT/build/sources/lz4*
+make clean || echo already clean
+make prefix=/usr
+make DESTDIR=$DESTDIR prefix=/usr install

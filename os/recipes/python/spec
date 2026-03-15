@@ -1,0 +1,9 @@
+cd $NYLAROOT/build/sources/Python*
+make distclean || echo already clean
+./configure                       \
+	--prefix=/usr             \
+        --enable-optimizations    \
+	--enable-shared           \
+	--disable-static
+make
+make DESTDIR=$DESTDIR install

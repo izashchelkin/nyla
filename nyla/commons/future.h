@@ -7,11 +7,10 @@ namespace nyla
 
 template <typename T> inline auto IsFutureReady(const std::future<T> &fut) -> bool
 {
-    if (!fut.valid())
+    if (fut.valid())
+        return fut.wait_for(0) == std::future_status::ready;
+    else
         return true;
-
-    using namespace std::chrono_literals;
-    return fut.wait_for(0ms) == std::future_status::ready;
 }
 
 } // namespace nyla

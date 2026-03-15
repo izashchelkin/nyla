@@ -2,8 +2,8 @@
 #include <cstdint>
 
 #include "nyla/commons/assert.h"
-#include "nyla/commons/containers/inline_vec.h"
 #include "nyla/commons/handle_pool.h"
+#include "nyla/commons/inline_vec.h"
 #include "nyla/commons/log.h"
 #include "nyla/rhi/rhi_cmdlist.h"
 #include "nyla/rhi/rhi_descriptor.h"

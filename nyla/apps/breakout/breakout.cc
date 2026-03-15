@@ -9,7 +9,7 @@
 #include "nyla/commons/assert.h"
 #include "nyla/commons/color.h"
 #include "nyla/commons/handle.h"
-#include "nyla/commons/math/vec.h"
+#include "nyla/commons/vec.h"
 #include "nyla/engine/asset_manager.h"
 #include "nyla/engine/debug_text_renderer.h"
 #include "nyla/engine/engine.h"
@@ -60,46 +60,33 @@ static Level level;
 
 void GameInit()
 {
-    auto &inputManager = g_Engine.GetInputManager();
-    auto &tweenManager = g_Engine.GetTweenManager();
+    g_State.input.moveLeft = InputManager::NewId();
+    InputManager::Map(g_State.input.moveLeft, 1, uint32_t(KeyPhysical::S));
 
-    g_State.input.moveLeft = inputManager.NewId();
-    inputManager.Map(g_State.input.moveLeft, 1, uint32_t(KeyPhysical::S));
-
-    g_State.input.moveRight = inputManager.NewId();
-    inputManager.Map(g_State.input.moveRight, 1, uint32_t(KeyPhysical::F));
+    g_State.input.moveRight = InputManager::NewId();
+    InputManager::Map(g_State.input.moveRight, 1, uint32_t(KeyPhysical::F));
 
     {
 #if defined(__linux__) // TODO: deal with this
         std::string assetsBasePath = "assets/BBreaker";
 #else
-        std::string assetsBasePath = "C:\\nyla\\assets\\BBreaker";
+        std::string assetsBasePath = "D:\\nyla\\assets\\BBreaker";
 #endif
 
-        auto &assetManager = g_Engine.GetAssetManager();
-
-        g_State.assets.background = assetManager.DeclareTexture(assetsBasePath + "/Background1.png");
-        g_State.assets.player = assetManager.DeclareTexture(assetsBasePath + "/Player.png");
-        g_State.assets.playerFlash = assetManager.DeclareTexture(assetsBasePath + "/Player_flash.png");
-        g_State.assets.ball = assetManager.DeclareTexture(assetsBasePath + "/Ball_small-blue.png");
-        g_State.assets.brickUnbreackable = assetManager.DeclareTexture(assetsBasePath + "/Brick_unbreakable2.png");
+        g_State.assets.background = AssetManager::DeclareTexture(assetsBasePath + "/Background1.png");
+        g_State.assets.player = AssetManager::DeclareTexture(assetsBasePath + "/Player.png");
+        g_State.assets.playerFlash = AssetManager::DeclareTexture(assetsBasePath + "/Player_flash.png");
+        g_State.assets.ball = AssetManager::DeclareTexture(assetsBasePath + "/Ball_small-blue.png");
+        g_State.assets.brickUnbreackable = AssetManager::DeclareTexture(assetsBasePath + "/Brick_unbreakable2.png");
 
         for (uint32_t i = 0; i < g_State.assets.bricks.size(); ++i)
         {
             std::string path = std::format("{}/Brick{}_4.png", assetsBasePath, i + 1);
-            g_State.assets.bricks[i] = assetManager.DeclareTexture(path);
+            g_State.assets.bricks[i] = AssetManager::DeclareTexture(path);
         }
 
         {
-#ifndef WIN32
-            g_State.assets.cubeMesh = g_Engine.GetAssetManager().DeclareMesh("/home/izashchelkin/Documents/test.glb");
-#else
-            g_State.assets.cubeMesh = assetManager.DeclareMesh("C:\\blender\\export\\cube.gltf");
-#endif
-        }
-
-        {
-            auto &alloc = g_Engine.GetPermanentAlloc();
+            auto &alloc = Engine::GetPermanentAlloc();
 
             std::span<AssetManager::MeshVSInput> vertices = alloc.PushArr<AssetManager::MeshVSInput>(4);
 
@@ -133,7 +120,7 @@ void GameInit()
             indices[5] = 1;
 
             g_State.assets.rectMesh =
-                assetManager.DeclareStaticMesh({(char *)vertices.data(), vertices.size_bytes()}, indices);
+                AssetManager::DeclareStaticMesh({(char *)vertices.data(), vertices.size_bytes()}, indices);
         }
     }
 
@@ -157,8 +144,8 @@ void GameInit()
                 .size = {40.f / 15.f, 1.f},
             });
 
-            tweenManager.Lerp(brick.pos[0], x, tweenManager.Now(), tweenManager.Now() + 1);
-            tweenManager.Lerp(brick.pos[1], y, tweenManager.Now(), tweenManager.Now() + 1);
+            TweenManager::Lerp(brick.pos[0], x, TweenManager::Now(), TweenManager::Now() + 1);
+            TweenManager::Lerp(brick.pos[1], y, TweenManager::Now(), TweenManager::Now() + 1);
         }
     }
 }
@@ -174,9 +161,7 @@ static auto IsInside(float pos, float size, float2 boundary) -> bool
 
 void GameProcess(RhiCmdList cmd, float dt)
 {
-    auto &inputManager = g_Engine.GetInputManager();
-
-    const int dx = inputManager.IsPressed(g_State.input.moveRight) - inputManager.IsPressed(g_State.input.moveLeft);
+    const int dx = InputManager::IsPressed(g_State.input.moveRight) - InputManager::IsPressed(g_State.input.moveLeft);
 
     static float dtAccumulator = 0.f;
     dtAccumulator += dt;
@@ -245,19 +230,21 @@ void GameProcess(RhiCmdList cmd, float dt)
 
 void GameRender(RhiCmdList cmd, RhiRenderTargetView rtv)
 {
-    auto &renderer = g_Engine.GetRenderer();
     auto &assets = g_State.assets;
 
-    RhiTextureInfo colorTargetInfo = g_Rhi.GetTextureInfo(g_Rhi.GetTexture(rtv));
+    RhiTexture renderTarget = g_Rhi.GetTexture(rtv);
+    RhiTextureInfo colorTargetInfo = g_Rhi.GetTextureInfo(renderTarget);
+
+    g_Rhi.CmdTransitionTexture(cmd, renderTarget, RhiTextureState::ColorTarget);
 
     g_Rhi.PassBegin({
         .rtv = rtv,
-        .rtState = RhiTextureState::ColorTarget,
+        .dsv = {},
     });
 
     if (HandleIsSet(assets.rectMesh))
     {
-        renderer.Mesh({0, 0, 0}, {100, 70, 1}, assets.rectMesh, assets.background);
+        Renderer::Mesh({0, 0, 0}, {100, 70, 1}, assets.rectMesh, assets.background);
 
         uint32_t i = 0;
         for (Brick &brick : level.bricks)
@@ -268,35 +255,35 @@ void GameRender(RhiCmdList cmd, RhiRenderTargetView rtv)
 
             const float3 pos = float3{brick.pos[0], brick.pos[1], 0};
             const float3 size = float3{brick.size[0], brick.size[1], 0};
-            renderer.Mesh(pos, size, assets.rectMesh, assets.bricks[i % assets.bricks.size()]);
+            Renderer::Mesh(pos, size, assets.rectMesh, assets.bricks[i % assets.bricks.size()]);
         }
 
-        uint64_t second = g_Platform.GetMonotonicTimeMillis() / 1000;
+        uint64_t second = Platform::GetMonotonicTimeMillis() / 1000;
         if (second % 2)
         {
-            renderer.Mesh({playerPosX, kPlayerPosY, 0}, {playerWidth, kPlayerHeight, 1}, assets.rectMesh,
-                          assets.playerFlash);
+            Renderer::Mesh({playerPosX, kPlayerPosY, 0}, {playerWidth, kPlayerHeight, 1}, assets.rectMesh,
+                           assets.playerFlash);
         }
         else
         {
-            renderer.Mesh({playerPosX, kPlayerPosY, 0}, {playerWidth, kPlayerHeight, 1}, assets.rectMesh,
-                          assets.player);
+            Renderer::Mesh({playerPosX, kPlayerPosY, 0}, {playerWidth, kPlayerHeight, 1}, assets.rectMesh,
+                           assets.player);
         }
 
         {
             const float3 pos = float3{ballPos[0], ballPos[1], 0};
-            renderer.Mesh(pos, {kBallRadius * 2, kBallRadius * 2}, assets.rectMesh, assets.ball);
+            Renderer::Mesh(pos, {kBallRadius * 2, kBallRadius * 2, 0}, assets.rectMesh, assets.ball);
         }
     }
 
-    renderer.CmdFlush(cmd, colorTargetInfo.width, colorTargetInfo.height, 64);
+    Renderer::SetOrthoProjection(colorTargetInfo.width, colorTargetInfo.height, 64);
+    Renderer::CmdFlush(cmd);
 
-    g_Engine.GetDebugTextRenderer().CmdFlush(cmd);
+    DebugTextRenderer::CmdFlush(cmd);
 
-    g_Rhi.PassEnd({
-        .rtv = rtv,
-        .rtState = RhiTextureState::Present,
-    });
+    g_Rhi.PassEnd();
+
+    g_Rhi.CmdTransitionTexture(cmd, renderTarget, RhiTextureState::Present);
 }
 
 } // namespace nyla

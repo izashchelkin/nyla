@@ -1,6 +1,7 @@
 #pragma once
 
-#include "nyla/commons/math/vec.h"
+#include "nyla/commons/inline_vec.h"
+#include "nyla/commons/vec.h"
 #include "nyla/engine/asset_manager.h"
 #include "nyla/engine/input_manager.h"
 #include "nyla/rhi/rhi_texture.h"
@@ -28,7 +29,6 @@ struct GameState
         AssetManager::Texture brickUnbreackable;
         std::array<AssetManager::Texture, 9> bricks;
 
-        AssetManager::Mesh cubeMesh;
         AssetManager::Mesh rectMesh;
     };
     Assets assets;

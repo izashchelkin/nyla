@@ -1,0 +1,8 @@
+cd $NYLAROOT/build/sources/acl*
+make distclean || echo already clean
+./configure                     \
+	--prefix=/usr           \
+	--disable-static        \
+	--libexecdir=/usr/lib
+make
+make DESTDIR=$DESTDIR install

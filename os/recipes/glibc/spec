@@ -1,0 +1,14 @@
+rm -rf /tmp/glibc-build
+mkdir -p /tmp/glibc-build
+cd /tmp/glibc-build
+
+$NYLAROOT/build/sources/glibc*/configure \
+	--prefix=/usr                    \
+	--disable-werror                 \
+	--disable-static                 \
+	--enable-kernel=6.6              \
+	--with-headers=/usr/include/
+
+make
+make DESTDIR=$DESTDIR install
+

@@ -58,7 +58,6 @@ struct RhiLimits
 
 struct RhiInitDesc
 {
-    PlatformWindow window;
     RhiFlags flags;
     RhiLimits limits;
 };

@@ -1,0 +1,3 @@
+cd $NYLAROOT/build/sources/linux*
+make mrproper
+make headers_install ARCH=x86_64 INSTALL_HDR_PATH=$DESTDIR/usr

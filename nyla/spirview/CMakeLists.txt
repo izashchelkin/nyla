@@ -1,42 +1,16 @@
-set(TARGET nyla_spirview)
-add_library(${TARGET})
-add_library(nyla::spirview ALIAS ${TARGET})
+add_executable(nyla_spirview_bin WIN32)
 
-target_sources(${TARGET}
-    PUBLIC
-        spirview.h
-)
-
-target_include_directories(${TARGET}
-    PUBLIC
-        ${PROJECT_SOURCE_DIR}  
-        $ENV{VULKAN_SDK}/Include
-)
-
-target_link_libraries(${TARGET}
-    PUBLIC
-        nyla::commons
-)
-
-
-
-
-add_executable(${TARGET}_bin WIN32)
-
-target_sources(${TARGET}_bin
+target_sources(nyla_spirview_bin
     PRIVATE
         main.cc
 )
 
-target_include_directories(${TARGET}_bin
+target_include_directories(nyla_spirview_bin
     PUBLIC
         ${PROJECT_SOURCE_DIR}  
 )
 
-target_link_libraries(${TARGET}_bin
+target_link_libraries(nyla_spirview_bin
     PUBLIC
-        nyla::spirview
-        nyla::commons
-        # nyla::commons::memory
         nyla::platform
 )

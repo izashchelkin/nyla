@@ -1,0 +1,8 @@
+cd $NYLAROOT/build/sources/bzip2*
+make clean || echo already clean
+
+make -f Makefile-libbz2_so
+make
+cp -a libbz2.so* $DESTDIR/usr/lib/
+make PREFIX=$DESTDIR/usr install
+ln -sf libbz2.so.1.0.8 $DESTDIR/usr/lib/libbz2.so
