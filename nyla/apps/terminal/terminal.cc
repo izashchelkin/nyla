@@ -51,11 +51,9 @@ auto PlatformMain(std::span<const char *> argv) -> int
         printf("\n\n");
         for (uint32_t i = 0; i < 32; ++i)
         {
-            for (uint32_t j = 0; j < 16; ++j)
+            for (uint32_t j = 0; j < 2; ++j)
             {
-                glyph.bitmap.data();
-
-                printf("%d", *(+(i * 32ULL) * j));
+                NYLA_LOG(); // needs print binary
             }
             printf("\n");
         }
