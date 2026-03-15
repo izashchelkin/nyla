@@ -20,6 +20,7 @@ if (${HAS_RHI})
         PRIVATE
         nyla::platform
         nyla::rhi
+        nyla::formats::bdf
     )
 
 endif()

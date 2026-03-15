@@ -1,8 +1,11 @@
-#include <array>
+#pragma once
+
 #include <cstdint>
 #include <span>
 
+#include "nyla/alloc/region_alloc.h"
 #include "nyla/commons/byteparser.h"
+#include "nyla/commons/vec.h"
 
 namespace nyla
 {
@@ -10,20 +13,23 @@ namespace nyla
 struct BdfGlyph
 {
     // const char *name;
-    std::array<uint8_t, 2> dwidth;
-    std::array<uint8_t, 4> bbx;
-    std::span<const char> bitmap;
+    int32_t dwidth[2];
+    int32_t bbx[4];
+    std::span<uint8_t> bitmap;
 };
 
 class BdfParser : ByteParser
 {
   public:
-    void Init(const char *data, uint64_t size)
+    void Init(RegionAlloc *alloc, const char *data, uint64_t size)
     {
         ByteParser::Init(data, size);
     }
 
-    auto NextGlyph(BdfGlyph& out) -> bool;
+    auto NextGlyph(BdfGlyph &out) -> bool;
+
+  private:
+    RegionAlloc *m_Alloc;
 };
 
 } // namespace nyla
