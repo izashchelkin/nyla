@@ -10,12 +10,17 @@
 namespace nyla
 {
 
-template <typename T, uint32_t N> void Lerp(Vec<T, N> &a, const Vec<T, N> &b, float p)
+template <typename T, uint32_t N>
+[[nodiscard]]
+auto Lerp(const Vec<T, N> &a, const Vec<T, N> &b, float p) -> Vec<T, N>
 {
+    Vec<T, N> ret;
     for (uint32_t i = 0; i < N; ++i)
-        a[i] = Lerp(a[i], b[i], p);
+        ret[i] = Lerp(a[i], b[i], p);
+    return ret;
 }
 
+[[nodiscard]]
 auto Lerp(float a, float b, float p) -> float
 {
     if (a == b)
@@ -31,6 +36,7 @@ auto Lerp(float a, float b, float p) -> float
     return ret;
 }
 
+[[nodiscard]]
 auto LerpAngle(float a, float b, float p) -> float
 {
     if (a == b)
