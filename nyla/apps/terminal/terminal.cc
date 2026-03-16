@@ -1,6 +1,5 @@
 #include "nyla/alloc/region_alloc.h"
-#include "nyla/commons/assert.h"
-#include "nyla/commons/log.h"
+#include "nyla/commons/assert.h" #include "nyla/commons/log.h"
 #include "nyla/formats/bdf/bdf.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
@@ -48,17 +47,25 @@ auto PlatformMain(std::span<const char *> argv) -> int
     BdfGlyph glyph;
     while (bdfParser.NextGlyph(glyph))
     {
-        printf("\n\n");
-        for (uint32_t i = 0; i < 32; ++i)
+        uint32_t i = 0;
+        for (auto b : glyph.bitmap)
         {
-            for (uint32_t j = 0; j < 2; ++j)
-            {
-                NYLA_LOG(); // needs print binary
-            }
-            printf("\n");
-        }
-    }
+            fprintf(stdout, "%c%c%c%c%c%c%c%c",
+                    ((b >> 7) & 1) ? 'X' : ' ', // Left-most pixel
+                    ((b >> 6) & 1) ? 'X' : ' ', ((b >> 5) & 1) ? 'X' : ' ', ((b >> 4) & 1) ? 'X' : ' ',
+                    ((b >> 3) & 1) ? 'X' : ' ', ((b >> 2) & 1) ? 'X' : ' ', ((b >> 1) & 1) ? 'X' : ' ',
+                    ((b >> 0) & 1) ? 'X' : ' ');
 
+            if ((++i) % 2 == 0)
+            {
+                fprintf(stdout, "\n");
+                fflush(stdout);
+            }
+        }
+
+        fprintf(stdout, "\n\n");
+        getc(stdin);
+    }
     return 0;
 }
 
