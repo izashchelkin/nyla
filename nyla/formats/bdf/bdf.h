@@ -5,7 +5,6 @@
 
 #include "nyla/alloc/region_alloc.h"
 #include "nyla/commons/byteparser.h"
-#include "nyla/commons/vec.h"
 
 namespace nyla
 {
@@ -22,16 +21,12 @@ struct BdfGlyph
 class BdfParser : ByteParser
 {
   public:
-    void Init(RegionAlloc *alloc, const char *data, uint64_t size)
+    void Init(const char *data, uint64_t size)
     {
-        m_Alloc = alloc;
         ByteParser::Init(data, size);
     }
 
-    auto NextGlyph(BdfGlyph &out) -> bool;
-
-  private:
-    RegionAlloc *m_Alloc;
+    auto NextGlyph(RegionAlloc *alloc, BdfGlyph &out) -> bool;
 };
 
 } // namespace nyla

@@ -12,6 +12,8 @@ if (${HAS_RHI})
 
     target_sources(${TARGET} PRIVATE 
         terminal.cc
+        font_atlas.cc
+        colortheme.cc
     )
 
     target_include_directories(${TARGET} PRIVATE ${PROJECT_SOURCE_DIR})

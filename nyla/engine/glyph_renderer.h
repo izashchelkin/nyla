@@ -12,8 +12,6 @@ class GlyphRenderer
   public:
     static void Init();
 
-    static void UploadGlyphs(std::string_view fontFile); // how do we handle this?
-
     static void CmdFlush();
 };
 

@@ -10,7 +10,7 @@
 namespace nyla
 {
 
-auto BdfParser::NextGlyph(BdfGlyph &out) -> bool
+auto BdfParser::NextGlyph(RegionAlloc *alloc, BdfGlyph &out) -> bool
 {
     for (;;)
     {
@@ -51,25 +51,26 @@ auto BdfParser::NextGlyph(BdfGlyph &out) -> bool
         NYLA_ASSERT(StartsWithAdvance("BITMAP"));
         NextLine();
 
-        const auto mark = m_Alloc->GetAt();
+        auto &data = *alloc->Push<std::array<uint8_t, 32ULL * 2ULL>>();
+        uint32_t i = 0;
 
         uint32_t count = 0;
         while (!StartsWith("ENDCHAR"))
         {
             char ch1 = Pop();
             char ch2 = Pop();
-            m_Alloc->Push(ParseHexByte(ch1, ch2));
+            data[i++] = ParseHexByte(ch1, ch2);
             ++count;
 
             ch1 = Pop();
             ch2 = Pop();
-            m_Alloc->Push(ParseHexByte(ch1, ch2));
+            data[i++] = ParseHexByte(ch1, ch2);
             ++count;
 
             NextLine();
         }
 
-        out.bitmap = std::span<uint8_t>{(uint8_t *)mark, count};
+        out.bitmap = std::span{data};
 
         return true;
     }
