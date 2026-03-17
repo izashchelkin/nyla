@@ -12,7 +12,7 @@ struct EngineInitDesc
     uint32_t maxFps;
     bool vsync;
 
-    RegionAlloc &rootAlloc;
+    RegionAlloc *rootAlloc;
 };
 
 struct EngineFrameBeginResult

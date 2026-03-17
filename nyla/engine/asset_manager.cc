@@ -182,7 +182,7 @@ void AssetManager::Upload(RhiCmdList cmd)
         }
         else
         {
-            RegionAlloc &transientAlloc = Engine::GetPerFrameAlloc();
+            auto &transientAlloc = Engine::GetPerFrameAlloc();
             RegionAlloc scratchAlloc = transientAlloc.PushSubAlloc(16_KiB);
 
             NYLA_ASSERT(meshData.gltfPath.EndsWith(".gltf"));

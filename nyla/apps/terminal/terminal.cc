@@ -162,19 +162,19 @@ auto PlatformMain(std::span<const char *> argv) -> int
 
         for (uint32_t r = 0; r < 6; ++r)
         {
-            auto c0 = Lerp(base8Lab[0], base8Lab[1], static_cast<float>(r) / 5.f);
-            auto c1 = Lerp(base8Lab[2], base8Lab[3], static_cast<float>(r) / 5.f);
-            auto c2 = Lerp(base8Lab[4], base8Lab[5], static_cast<float>(r) / 5.f);
-            auto c3 = Lerp(base8Lab[6], base8Lab[7], static_cast<float>(r) / 5.f);
+            float3 c0 = Lerp(base8Lab[0], base8Lab[1], static_cast<float>(r) / 5.f);
+            float3 c1 = Lerp(base8Lab[2], base8Lab[3], static_cast<float>(r) / 5.f);
+            float3 c2 = Lerp(base8Lab[4], base8Lab[5], static_cast<float>(r) / 5.f);
+            float3 c3 = Lerp(base8Lab[6], base8Lab[7], static_cast<float>(r) / 5.f);
 
             for (uint32_t g = 0; g < 6; ++g)
             {
-                auto c4 = Lerp(c0, c1, static_cast<float>(g) / 5.f);
-                auto c5 = Lerp(c2, c3, static_cast<float>(g) / 5.f);
+                float3 c4 = Lerp(c0, c1, static_cast<float>(g) / 5.f);
+                float3 c5 = Lerp(c2, c3, static_cast<float>(g) / 5.f);
 
                 for (uint32_t b = 0; b < 6; ++b)
                 {
-                    auto c6 = Lerp(c4, c5, static_cast<float>(b) / 5.f);
+                    float3 c6 = Lerp(c4, c5, static_cast<float>(b) / 5.f);
                     palette[i++] = PackRGB(LABToRGB(c6));
                 }
             }

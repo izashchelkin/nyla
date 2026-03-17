@@ -61,7 +61,7 @@ void Engine::Init(const EngineInitDesc &desc)
 {
     m_LastFrameStart = Platform::GetMonotonicTimeMicros();
 
-    m_RootAlloc = &desc.rootAlloc;
+    m_RootAlloc = desc.rootAlloc;
     m_PermanentAlloc = m_RootAlloc->PushSubAlloc(16_MiB);
     m_PerFrameAlloc = m_RootAlloc->PushSubAlloc(16_MiB);
 

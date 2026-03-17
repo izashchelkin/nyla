@@ -10,16 +10,6 @@
 namespace nyla
 {
 
-template <typename T, uint32_t N>
-[[nodiscard]]
-auto Lerp(const Vec<T, N> &a, const Vec<T, N> &b, float p) -> Vec<T, N>
-{
-    Vec<T, N> ret;
-    for (uint32_t i = 0; i < N; ++i)
-        ret[i] = Lerp(a[i], b[i], p);
-    return ret;
-}
-
 [[nodiscard]]
 auto Lerp(float a, float b, float p) -> float
 {
@@ -33,6 +23,16 @@ auto Lerp(float a, float b, float p) -> float
     }
 
     float ret = b * p + a * (1.f - p);
+    return ret;
+}
+
+template <typename T, uint32_t N>
+[[nodiscard]]
+auto Lerp(const Vec<T, N> &a, const Vec<T, N> &b, T t) -> Vec<T, N>
+{
+    Vec<T, N> ret;
+    for (uint32_t i = 0; i < N; ++i)
+        ret[i] = Lerp(a[i], b[i], t);
     return ret;
 }
 

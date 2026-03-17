@@ -60,7 +60,7 @@ auto PlatformMain(std::span<const char *> argv) -> int
     rootAlloc.Init(nullptr, 64_GiB, true);
 
     Engine::Init({
-        .rootAlloc = rootAlloc,
+        .rootAlloc = &rootAlloc,
     });
 
     Game game{};
