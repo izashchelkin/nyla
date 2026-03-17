@@ -10,7 +10,7 @@ namespace nyla
 class GlyphRenderer
 {
   public:
-    static void Init();
+    static void Init(uint8_t *atlas, uint32_t width, uint32_t height);
 
     static void CmdFlush();
 };
@@ -45,7 +45,7 @@ class CellBuffer
     void ResizeIfNeeded(uint32_t width, uint32_t height);
 
   private:
-    // it would nice to have here a growable subarena here!
+    // it would be nice to have here a growable subarena here!
     RegionAlloc *m_Alloc;
 
     uint32_t m_CellHeight = 32;
