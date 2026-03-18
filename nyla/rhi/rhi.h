@@ -105,6 +105,8 @@ enum class RhiTextureFormat
 {
     None,
 
+    R8_UNORM,
+
     R8G8B8A8_sRGB,
     B8G8R8A8_sRGB,
 
