@@ -10,10 +10,6 @@
 #include "nyla/engine/engine0_internal.h"
 #include "nyla/engine/renderer.h"
 #include "nyla/rhi/rhi.h"
-#include "nyla/rhi/rhi_cmdlist.h"
-#include "nyla/rhi/rhi_pipeline.h"
-#include "nyla/rhi/rhi_shader.h"
-#include "nyla/rhi/rhi_texture.h"
 
 namespace nyla
 {
@@ -110,7 +106,7 @@ void Renderer::Init()
         .frontFace = RhiFrontFace::CCW,
     };
 
-    m_Pipeline = g_Rhi.CreateGraphicsPipeline(pipelineDesc);
+    m_Pipeline = Rhi::CreateGraphicsPipeline(pipelineDesc);
 }
 
 void Renderer::Mesh(float3 pos, float3 scale, AssetManager::Mesh mesh, AssetManager::Texture texture)
@@ -143,7 +139,7 @@ void Renderer::Mesh(float3 pos, float3 scale, AssetManager::Mesh mesh, AssetMana
 
 void Renderer::CmdFlush(RhiCmdList cmd)
 {
-    g_Rhi.CmdBindGraphicsPipeline(cmd, m_Pipeline);
+    Rhi::CmdBindGraphicsPipeline(cmd, m_Pipeline);
 
     float4x4 vp = m_Proj.Mult(m_View);
     float4x4 invVp = vp.Inversed();
@@ -152,14 +148,14 @@ void Renderer::CmdFlush(RhiCmdList cmd)
         .invVp = invVp,
     };
 
-    g_Rhi.SetPassConstant(cmd, ByteViewPtr(&scene));
+    Rhi::SetPassConstant(cmd, ByteViewPtr(&scene));
 
-    const uint32_t frameIndex = g_Rhi.GetFrameIndex();
+    const uint32_t frameIndex = Rhi::GetFrameIndex();
 
     for (const auto &drawCall : m_DrawQueue)
     {
         const auto &entity = drawCall.entity;
-        g_Rhi.SetDrawConstant(cmd, ByteViewPtr(&entity));
+        Rhi::SetDrawConstant(cmd, ByteViewPtr(&entity));
 
         AssetManager::CmdBindMesh(cmd, drawCall.mesh);
         AssetManager::CmdDrawMesh(cmd, drawCall.mesh);

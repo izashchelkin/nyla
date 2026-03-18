@@ -53,13 +53,13 @@ void GameScene::Process(Game &game, RhiCmdList cmd, float dt, RhiRenderTargetVie
         verticalInput = Platform::GetGamepadLeftTrigger(0) - Platform::GetGamepadRightTrigger(0);
     }
 
-    RhiTexture renderTarget = g_Rhi.GetTexture(rtv);
-    RhiTextureInfo rtInfo = g_Rhi.GetTextureInfo(renderTarget);
-    g_Rhi.CmdTransitionTexture(cmd, renderTarget, RhiTextureState::ColorTarget);
+    RhiTexture renderTarget = Rhi::GetTexture(rtv);
+    RhiTextureInfo rtInfo = Rhi::GetTextureInfo(renderTarget);
+    Rhi::CmdTransitionTexture(cmd, renderTarget, RhiTextureState::ColorTarget);
 
-    g_Rhi.CmdTransitionTexture(cmd, g_Rhi.GetTexture(dsv), RhiTextureState::DepthTarget);
+    Rhi::CmdTransitionTexture(cmd, Rhi::GetTexture(dsv), RhiTextureState::DepthTarget);
 
-    g_Rhi.PassBegin({
+    Rhi::PassBegin({
         .rtv = rtv,
         .dsv = dsv,
     });
@@ -93,7 +93,7 @@ void GameScene::Process(Game &game, RhiCmdList cmd, float dt, RhiRenderTargetVie
         Renderer::CmdFlush(cmd);
         DebugTextRenderer::CmdFlush(cmd);
     }
-    g_Rhi.PassEnd();
+    Rhi::PassEnd();
 }
 
 } // namespace nyla

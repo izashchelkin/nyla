@@ -20,8 +20,7 @@ if (${HAS_RHI})
 
     target_link_libraries(${TARGET}
         PRIVATE
-        nyla::platform
-        nyla::rhi
+        nyla::engine
         nyla::formats::bdf
     )
 

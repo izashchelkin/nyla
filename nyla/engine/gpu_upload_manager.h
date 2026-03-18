@@ -1,8 +1,6 @@
 #pragma once
 
-#include "nyla/rhi/rhi_buffer.h"
-#include "nyla/rhi/rhi_cmdlist.h"
-#include "nyla/rhi/rhi_texture.h"
+#include "nyla/rhi/rhi.h"
 #include <cstdint>
 
 namespace nyla

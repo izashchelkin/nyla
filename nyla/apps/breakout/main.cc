@@ -4,8 +4,6 @@
 #include "nyla/engine/engine.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
-#include "nyla/rhi/rhi_cmdlist.h"
-#include "nyla/rhi/rhi_texture.h"
 
 namespace nyla
 {
@@ -33,7 +31,7 @@ auto PlatformMain(std::span<const char *> argv) -> int
 
         GameProcess(cmd, dt);
 
-        RhiRenderTargetView rtv = g_Rhi.GetBackbufferView();
+        RhiRenderTargetView rtv = Rhi::GetBackbufferView();
         GameRender(cmd, rtv);
 
         Engine::FrameEnd();

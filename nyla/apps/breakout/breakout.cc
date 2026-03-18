@@ -18,9 +18,6 @@
 #include "nyla/engine/tween_manager.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
-#include "nyla/rhi/rhi_cmdlist.h"
-#include "nyla/rhi/rhi_pass.h"
-#include "nyla/rhi/rhi_texture.h"
 
 namespace nyla
 {
@@ -232,12 +229,12 @@ void GameRender(RhiCmdList cmd, RhiRenderTargetView rtv)
 {
     auto &assets = g_State.assets;
 
-    RhiTexture renderTarget = g_Rhi.GetTexture(rtv);
-    RhiTextureInfo colorTargetInfo = g_Rhi.GetTextureInfo(renderTarget);
+    RhiTexture renderTarget = Rhi::GetTexture(rtv);
+    RhiTextureInfo colorTargetInfo = Rhi::GetTextureInfo(renderTarget);
 
-    g_Rhi.CmdTransitionTexture(cmd, renderTarget, RhiTextureState::ColorTarget);
+    Rhi::CmdTransitionTexture(cmd, renderTarget, RhiTextureState::ColorTarget);
 
-    g_Rhi.PassBegin({
+    Rhi::PassBegin({
         .rtv = rtv,
         .dsv = {},
     });
@@ -281,9 +278,9 @@ void GameRender(RhiCmdList cmd, RhiRenderTargetView rtv)
 
     DebugTextRenderer::CmdFlush(cmd);
 
-    g_Rhi.PassEnd();
+    Rhi::PassEnd();
 
-    g_Rhi.CmdTransitionTexture(cmd, renderTarget, RhiTextureState::Present);
+    Rhi::CmdTransitionTexture(cmd, renderTarget, RhiTextureState::Present);
 }
 
 } // namespace nyla

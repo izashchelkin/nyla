@@ -1,7 +1,7 @@
 #pragma once
 
 #include "nyla/alloc/region_alloc.h"
-#include "nyla/rhi/rhi_cmdlist.h"
+#include "nyla/rhi/rhi.h"
 #include <cstdint>
 
 namespace nyla

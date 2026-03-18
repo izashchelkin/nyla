@@ -1,7 +1,7 @@
 #pragma once
 
 #include "nyla/engine/engine.h"
-#include "nyla/rhi/rhi_cmdlist.h"
+#include "nyla/rhi/rhi.h"
 #include <cstdint>
 #include <cstdio>
 #include <string_view>

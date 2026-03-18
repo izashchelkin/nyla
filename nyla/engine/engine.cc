@@ -16,8 +16,6 @@
 #include "nyla/engine/tween_manager.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
-#include "nyla/rhi/rhi_buffer.h"
-#include "nyla/rhi/rhi_cmdlist.h"
 
 namespace nyla
 {
@@ -75,7 +73,7 @@ void Engine::Init(const EngineInitDesc &desc)
     if (desc.vsync)
         flags |= RhiFlags::VSync;
 
-    g_Rhi.Init(RhiInitDesc{
+    Rhi::Init(RhiInitDesc{
         .flags = flags,
     });
 
@@ -93,7 +91,7 @@ auto Engine::ShouldExit() -> bool
 
 auto Engine::FrameBegin() -> EngineFrameBeginResult
 {
-    RhiCmdList cmd = g_Rhi.FrameBegin();
+    RhiCmdList cmd = Rhi::FrameBegin();
 
     const uint64_t frameStart = Platform::GetMonotonicTimeMicros();
 
@@ -141,7 +139,7 @@ auto Engine::FrameBegin() -> EngineFrameBeginResult
         }
 
         case PlatformEventType::WinResize: {
-            g_Rhi.TriggerSwapchainRecreate();
+            Rhi::TriggerSwapchainRecreate();
             break;
         }
 
@@ -170,7 +168,7 @@ auto Engine::FrameBegin() -> EngineFrameBeginResult
 
 auto Engine::FrameEnd() -> void
 {
-    g_Rhi.FrameEnd();
+    Rhi::FrameEnd();
 
     uint64_t frameEnd = Platform::GetMonotonicTimeMicros();
     uint64_t frameDurationUs = frameEnd - m_LastFrameStart;

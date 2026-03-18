@@ -7,17 +7,7 @@ if (Vulkan_FOUND)
 
     target_sources(${TARGET}
         PRIVATE
-        rhi_vulkan.cc
-        rhi_vulkan_buffer.cc
-        rhi_vulkan_command_list.cc
-        rhi_vulkan_descriptor.cc
-        rhi_vulkan_frame.cc
-        rhi_vulkan_pass.cc
-        rhi_vulkan_pipeline.cc
-        rhi_vulkan_sampler.cc
-        rhi_vulkan_swapchain.cc
-        rhi_vulkan_sync.cc
-        rhi_vulkan_texture.cc
+            rhi_vulkan.cc
     )
 
     target_include_directories(${TARGET}
@@ -27,6 +17,6 @@ if (Vulkan_FOUND)
 
     target_link_libraries(${TARGET}
         PUBLIC
-        Vulkan::Vulkan        
+            Vulkan::Vulkan        
     )
 endif()

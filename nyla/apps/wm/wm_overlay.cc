@@ -13,14 +13,11 @@
 #include <cstdint>
 
 #include "nyla/rhi/rhi.h"
-#include "nyla/rhi/rhi_texture.h"
 #include "xcb/xcb.h"
 #include "xcb/xproto.h"
 
 #include "nyla/engine/debug_text_renderer.h"
 #include "nyla/platform/platform.h"
-#include "nyla/rhi/rhi_cmdlist.h"
-#include "nyla/rhi/rhi_texture.h"
 
 namespace nyla
 {
@@ -40,7 +37,7 @@ auto PlatformMain(std::span<const char *> argv) -> int
 
     LinuxX11Platform::SetWindow(window);
 
-    g_Rhi.Init(RhiInitDesc{
+    Rhi::Init(RhiInitDesc{
         .flags = RhiFlags::VSync,
         .limits =
             {
@@ -65,7 +62,7 @@ auto PlatformMain(std::span<const char *> argv) -> int
 
     for (;;)
     {
-        RhiCmdList cmd = g_Rhi.FrameBegin();
+        RhiCmdList cmd = Rhi::FrameBegin();
 
         bool shouldRedraw = false;
 
@@ -120,22 +117,22 @@ auto PlatformMain(std::span<const char *> argv) -> int
 
         debugTextRenderer.Text(1, 1, barText);
 
-        RhiTexture backbuffer = g_Rhi.GetTexture(g_Rhi.GetBackbufferView());
+        RhiTexture backbuffer = Rhi::GetTexture(Rhi::GetBackbufferView());
 
-        g_Rhi.CmdTransitionTexture(cmd, backbuffer, RhiTextureState::ColorTarget);
+        Rhi::CmdTransitionTexture(cmd, backbuffer, RhiTextureState::ColorTarget);
 
-        g_Rhi.PassBegin({
-            .rtv = g_Rhi.GetBackbufferView(),
+        Rhi::PassBegin({
+            .rtv = Rhi::GetBackbufferView(),
             .dsv = {},
         });
 
         debugTextRenderer.CmdFlush(cmd);
 
-        g_Rhi.PassEnd();
+        Rhi::PassEnd();
 
-        g_Rhi.CmdTransitionTexture(cmd, backbuffer, RhiTextureState::Present);
+        Rhi::CmdTransitionTexture(cmd, backbuffer, RhiTextureState::Present);
 
-        g_Rhi.FrameEnd();
+        Rhi::FrameEnd();
     }
 
     return 0;

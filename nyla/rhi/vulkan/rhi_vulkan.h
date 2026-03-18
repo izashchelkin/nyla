@@ -9,357 +9,148 @@
 #include "nyla/commons/inline_vec.h"
 #include "nyla/commons/log.h"
 #include "nyla/rhi/rhi.h"
-#include "nyla/rhi/rhi_buffer.h"
-#include "nyla/rhi/rhi_cmdlist.h"
-#include "nyla/rhi/rhi_pass.h"
-#include "nyla/rhi/rhi_pipeline.h"
-#include "nyla/rhi/rhi_sampler.h"
-#include "nyla/rhi/rhi_texture.h"
 #include "nyla/spirview/spirview.h"
 #include "vulkan/vk_enum_string_helper.h"
 #include "vulkan/vulkan_core.h"
 
-#define VK_GET_INSTANCE_PROC_ADDR(name) reinterpret_cast<PFN_##name>(vkGetInstanceProcAddr(this->m_Instance, #name))
-
 namespace nyla
 {
 
-namespace rhi_vulkan_internal
-{
-
-inline auto VkCheckImpl(VkResult res)
-{
-    switch (res)
-    {
-    case VK_SUCCESS:
-        break;
-
-    case VK_ERROR_DEVICE_LOST:
-        // TODO:
-        // NYLA_LOG("Last checkpoint: %I64d", RhiGetLastCheckpointData(RhiQueueType::Graphics));
-        // FALLTHROUGH
-
-    default: {
-        NYLA_LOG("Vulkan error: %s", string_VkResult(res));
-        NYLA_ASSERT(false);
-    }
-    }
-};
-#define VK_CHECK(res) VkCheckImpl(res)
-
-struct DeviceQueue
-{
-    VkQueue queue;
-    uint32_t queueFamilyIndex;
-    VkCommandPool cmdPool;
-
-    VkSemaphore timeline;
-    uint64_t timelineNext;
-};
-
-struct VulkanBufferData
-{
-    VkBuffer buffer;
-    uint64_t size;
-    RhiMemoryUsage memoryUsage;
-    VkDeviceMemory memory;
-    char *mapped;
-    RhiBufferState state;
-
-    uint32_t dirtyBegin;
-    uint32_t dirtyEnd;
-    bool dirty;
-};
-
-struct VulkanBufferViewData
-{
-    RhiBuffer buffer;
-    uint32_t size;
-    uint32_t offset;
-    uint32_t range;
-    bool dynamic;
-
-    bool descriptorWritten;
-};
-
-struct VulkanCmdListData
-{
-    VkCommandBuffer cmdbuf;
-    RhiQueueType queueType;
-    RhiGraphicsPipeline boundGraphicsPipeline;
-
-    uint32_t frameConstantHead;
-    uint32_t passConstantHead;
-    uint32_t drawConstantHead;
-    uint32_t largeDrawConstantHead;
-};
-
-struct VulkanPipelineData
-{
-    VkPipelineLayout layout;
-    VkPipeline pipeline;
-    VkPipelineBindPoint bindPoint;
-};
-
-struct VulkanShaderData
-{
-    InlineVec<uint32_t, 1 << 18> *spv;
-};
-
-struct VulkanTextureData
-{
-    VkImage image;
-    VkDeviceMemory memory;
-    RhiTextureState state;
-    VkImageLayout layout;
-    VkFormat format;
-    VkImageAspectFlags aspectMask;
-    VkExtent3D extent;
-};
-
-struct VulkanTextureViewData
-{
-    RhiTexture texture;
-
-    VkImageView imageView;
-    VkImageViewType imageViewType;
-    VkFormat format;
-    VkImageSubresourceRange subresourceRange;
-
-    bool descriptorWritten;
-};
-
-struct VulkanSamplerData
-{
-    VkSampler sampler;
-
-    bool descriptorWritten;
-};
-
-#if 0
-struct VulkanDescriptorSetLayoutData
-{
-    VkDescriptorSetLayout layout;
-    InlineVec<RhiDescriptorLayoutDesc, 64> descriptors;
-};
-
-struct VulkanDescriptorSetData
-{
-    VkDescriptorSet set;
-    RhiDescriptorSetLayout layout;
-};
-#endif
-
-void CreateSwapchain();
-
-} // namespace rhi_vulkan_internal
-
-using namespace rhi_vulkan_internal;
-
-class Rhi::Impl
-{
-  public:
-    auto CreateTimeline(uint64_t initialValue) -> VkSemaphore;
-    void WaitTimeline(VkSemaphore timeline, uint64_t waitValue);
-
-    auto FindMemoryTypeIndex(VkMemoryRequirements memRequirements, VkMemoryPropertyFlags properties) -> uint32_t;
-
-    void VulkanNameHandle(VkObjectType type, uint64_t handle, std::string_view name);
-
-    auto ConvertBufferUsageIntoVkBufferUsageFlags(RhiBufferUsage usage) -> VkBufferUsageFlags;
-
-    auto ConvertMemoryUsageIntoVkMemoryPropertyFlags(RhiMemoryUsage usage) -> VkMemoryPropertyFlags;
-
-    auto ConvertVertexFormatIntoVkFormat(RhiVertexFormat format) -> VkFormat;
-
-    auto ConvertTextureFormatIntoVkFormat(RhiTextureFormat format, VkImageAspectFlags *outAspectMask) -> VkFormat;
-    auto ConvertVkFormatIntoTextureFormat(VkFormat format) -> RhiTextureFormat;
-
-    auto ConvertTextureUsageToVkImageUsageFlags(RhiTextureUsage usage) -> VkImageUsageFlags;
-
-    auto ConvertShaderStageIntoVkShaderStageFlags(RhiShaderStage stageFlags) -> VkShaderStageFlags;
-
-    auto DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-                                VkDebugUtilsMessageTypeFlagsEXT messageType,
-                                const VkDebugUtilsMessengerCallbackDataEXT *callbackData) -> VkBool32;
-
-    //
-
-    void Init(const RhiInitDesc &);
-    auto GetMinUniformBufferOffsetAlignment() -> uint32_t;
-    auto GetOptimalBufferCopyOffsetAlignment() -> uint32_t;
-
-    auto FrameBegin() -> RhiCmdList;
-    void FrameEnd();
-    auto GetNumFramesInFlight() -> uint32_t
-    {
-        return m_Limits.numFramesInFlight;
-    }
-    auto GetFrameIndex() -> uint32_t
-    {
-        return m_FrameIndex;
-    }
-    auto FrameGetCmdList() -> RhiCmdList;
-
-    auto CreateSampler(const RhiSamplerDesc &desc) -> RhiSampler;
-    void DestroySampler(RhiSampler sampler);
-
-    auto CreateBuffer(const RhiBufferDesc &desc) -> RhiBuffer;
-    void NameBuffer(RhiBuffer buf, std::string_view name);
-    void DestroyBuffer(RhiBuffer buffer);
-    auto GetBufferSize(RhiBuffer buffer) -> uint64_t;
-    auto MapBuffer(RhiBuffer buffer) -> char *;
-    void UnmapBuffer(RhiBuffer buffer);
-    void CmdTransitionBuffer(RhiCmdList cmd, RhiBuffer buffer, RhiBufferState newState);
-    void CmdCopyBuffer(RhiCmdList cmd, RhiBuffer dst, uint32_t dstOffset, RhiBuffer src, uint32_t srcOffset,
-                       uint32_t size);
-    void CmdUavBarrierBuffer(RhiCmdList cmd, RhiBuffer buffer);
-    void BufferMarkWritten(RhiBuffer buffer, uint32_t offset, uint32_t size);
-
-    auto CreateTexture(RhiTextureDesc desc) -> RhiTexture;
-    auto GetTextureInfo(RhiTexture texture) -> RhiTextureInfo;
-    void DestroyTexture(RhiTexture texture);
-    void CmdTransitionTexture(RhiCmdList cmd, RhiTexture texture, RhiTextureState newState);
-    void CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, uint32_t srcOffset, uint32_t size);
-    void CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiTexture src);
-
-    auto CreateSampledTextureView(const RhiTextureViewDesc &desc) -> RhiSampledTextureView;
-    void DestroySampledTextureView(RhiSampledTextureView textureView);
-    auto GetTexture(RhiSampledTextureView srv) -> RhiTexture;
-
-    auto CreateRenderTargetView(const RhiRenderTargetViewDesc &desc) -> RhiRenderTargetView;
-    void DestroyRenderTargetView(RhiRenderTargetView textureView);
-    auto GetTexture(RhiRenderTargetView rtv) -> RhiTexture;
-
-    auto CreateDepthStencilView(const RhiDepthStencilViewDesc &desc) -> RhiDepthStencilView;
-    void DestroyDepthStencilView(RhiDepthStencilView textureView);
-    auto GetTexture(RhiDepthStencilView dsv) -> RhiTexture;
-
-    void EnsureHostWritesVisible(VkCommandBuffer cmdbuf, VulkanBufferData &bufferData);
-
-    auto CreateCmdList(RhiQueueType queueType) -> RhiCmdList;
-    void NameCmdList(RhiCmdList cmd, std::string_view name);
-    void DestroyCmdList(RhiCmdList cmd);
-    void ResetCmdList(RhiCmdList cmd);
-    auto CmdSetCheckpoint(RhiCmdList cmd, uint64_t data) -> uint64_t;
-    auto GetLastCheckpointData(RhiQueueType queueType) -> uint64_t;
-    auto GetDeviceQueue(RhiQueueType queueType) -> DeviceQueue &;
-
-    void PassBegin(RhiPassDesc desc);
-    void PassEnd();
-
-    auto CreateShader(const RhiShaderDesc &desc) -> RhiShader;
-    void DestroyShader(RhiShader shader);
-
-    auto CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGraphicsPipeline;
-    void NameGraphicsPipeline(RhiGraphicsPipeline pipeline, std::string_view name);
-    void DestroyGraphicsPipeline(RhiGraphicsPipeline pipeline);
-    void CmdBindGraphicsPipeline(RhiCmdList cmd, RhiGraphicsPipeline pipeline);
-    void CmdPushGraphicsConstants(RhiCmdList cmd, uint32_t offset, RhiShaderStage stage, ByteView data);
-    void CmdBindVertexBuffers(RhiCmdList cmd, uint32_t firstBinding, std::span<const RhiBuffer> buffers,
-                              std::span<const uint64_t> offsets);
-    void CmdBindIndexBuffer(RhiCmdList cmd, RhiBuffer buffer, uint64_t offset);
-    void CmdDraw(RhiCmdList cmd, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
-                 uint32_t firstInstance);
-    void CmdDrawIndexed(RhiCmdList cmd, uint32_t indexCount, int32_t vertexOffset, uint32_t instanceCount,
-                        uint32_t firstIndex, uint32_t firstInstance);
-    auto GetVertexFormatSize(RhiVertexFormat format) -> uint32_t;
-
-#if 0
-    auto CreateDescriptorSetLayout(const RhiDescriptorSetLayoutDesc &desc) -> RhiDescriptorSetLayout;
-    void DestroyDescriptorSetLayout(RhiDescriptorSetLayout layout);
-    auto CreateDescriptorSet(RhiDescriptorSetLayout layout) -> RhiDescriptorSet;
-    void WriteDescriptors(std::span<const RhiDescriptorWriteDesc> writes);
-    void DestroyDescriptorSet(RhiDescriptorSet bindGroup);
-    void CmdBindGraphicsBindGroup(RhiCmdList cmd, uint32_t setIndex, RhiDescriptorSet bindGroup,
-                                  std::span<const uint32_t> dynamicOffsets);
-#endif
-
-    void TriggerSwapchainRecreate()
-    {
-        m_RecreateSwapchain = true;
-    }
-    void CreateSwapchain();
-    auto GetBackbufferView() -> RhiRenderTargetView;
-
-    void WriteDescriptorTables();
-    void BindDescriptorTables(RhiCmdList cmd);
-
-    void SetFrameConstant(RhiCmdList cmd, std::span<const std::byte> data);
-    void SetPassConstant(RhiCmdList cmd, std::span<const std::byte> data);
-    void SetDrawConstant(RhiCmdList cmd, std::span<const std::byte> data);
-    void SetLargeDrawConstant(RhiCmdList cmd, std::span<const std::byte> data);
-
-  private:
-    void CmdDrawInternal(VulkanCmdListData &cmdData);
-
-#if 0
-    HandlePool<RhiDescriptorSetLayout, VulkanDescriptorSetLayoutData, 16> m_DescriptorSetLayouts;
-    HandlePool<RhiDescriptorSet, VulkanDescriptorSetData, 16> m_DescriptorSets;
-#endif
-
-    HandlePool<RhiCmdList, VulkanCmdListData, 16> m_CmdLists;
-
-    HandlePool<RhiShader, VulkanShaderData, 16> m_Shaders;
-    HandlePool<RhiGraphicsPipeline, VulkanPipelineData, 16> m_GraphicsPipelines;
-
-    HandlePool<RhiBuffer, VulkanBufferData, 16> m_Buffers;
-    HandlePool<RhiBuffer, VulkanBufferViewData, 16> m_CBVs;
-
-    HandlePool<RhiTexture, VulkanTextureData, 128> m_Textures;
-    HandlePool<RhiRenderTargetView, VulkanTextureViewData, 8> m_RenderTargetViews;
-    HandlePool<RhiDepthStencilView, VulkanTextureViewData, 8> m_DepthStencilViews;
-    HandlePool<RhiSampledTextureView, VulkanTextureViewData, 128> m_SampledTextureViews;
-
-    HandlePool<RhiSampler, VulkanSamplerData, 16> m_Samplers;
-
-    VkAllocationCallbacks *m_Alloc;
-
-    RhiFlags m_Flags;
-    RhiLimits m_Limits;
-
-    auto CbvOffset(uint32_t offset) -> uint32_t
-    {
-        return AlignedUp<uint32_t>(offset, m_PhysDevProps.limits.minUniformBufferOffsetAlignment);
-    }
-
-    VkInstance m_Instance;
-    VkDevice m_Dev;
-    VkPhysicalDevice m_PhysDev;
-    VkPhysicalDeviceProperties m_PhysDevProps;
-    VkPhysicalDeviceMemoryProperties m_PhysDevMemProps;
-    VkDescriptorPool m_DescriptorPool;
-
-    struct DescriptorTable
-    {
-        VkDescriptorSetLayout layout;
-        VkDescriptorSet set;
-    };
-
-    DescriptorTable m_ConstantsDescriptorTable;
-    RhiBuffer m_ConstantsUniformBuffer;
-    DescriptorTable m_TexturesDescriptorTable;
-    DescriptorTable m_SamplersDescriptorTable;
-
-    VkSurfaceKHR m_Surface;
-    VkSwapchainKHR m_Swapchain;
-    bool m_SwapchainUsable = true;
-    bool m_RecreateSwapchain = true;
-
-    InlineVec<RhiRenderTargetView, kRhiMaxNumSwapchainTextures> m_SwapchainRTVs;
-    uint32_t m_SwapchainTextureIndex;
-
-    std::array<VkSemaphore, kRhiMaxNumSwapchainTextures> m_RenderFinishedSemaphores;
-    std::array<VkSemaphore, kRhiMaxNumFramesInFlight> m_SwapchainAcquireSemaphores;
-
-    DeviceQueue m_GraphicsQueue;
-    uint32_t m_FrameIndex;
-    std::array<RhiCmdList, kRhiMaxNumFramesInFlight> m_GraphicsQueueCmd;
-    std::array<uint64_t, kRhiMaxNumFramesInFlight> m_GraphicsQueueCmdDone;
-
-    DeviceQueue m_TransferQueue;
-    RhiCmdList m_TransferQueueCmd;
-    uint64_t m_TransferQueueCmdDone;
-};
+// class Rhi::Impl
+// {
+//   public:
+//     auto CreateTimeline(uint64_t initialValue) -> VkSemaphore;
+//     void WaitTimeline(VkSemaphore timeline, uint64_t waitValue);
+//
+//     auto FindMemoryTypeIndex(VkMemoryRequirements memRequirements, VkMemoryPropertyFlags properties) -> uint32_t;
+//
+//     void VulkanNameHandle(VkObjectType type, uint64_t handle, std::string_view name);
+//
+//     auto ConvertBufferUsageIntoVkBufferUsageFlags(RhiBufferUsage usage) -> VkBufferUsageFlags;
+//
+//     auto ConvertMemoryUsageIntoVkMemoryPropertyFlags(RhiMemoryUsage usage) -> VkMemoryPropertyFlags;
+//
+//     auto ConvertVertexFormatIntoVkFormat(RhiVertexFormat format) -> VkFormat;
+//
+//     auto ConvertTextureFormatIntoVkFormat(RhiTextureFormat format, VkImageAspectFlags *outAspectMask) -> VkFormat;
+//     auto ConvertVkFormatIntoTextureFormat(VkFormat format) -> RhiTextureFormat;
+//
+//     auto ConvertTextureUsageToVkImageUsageFlags(RhiTextureUsage usage) -> VkImageUsageFlags;
+//
+//     auto ConvertShaderStageIntoVkShaderStageFlags(RhiShaderStage stageFlags) -> VkShaderStageFlags;
+//
+//     auto DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+//                                 VkDebugUtilsMessageTypeFlagsEXT messageType,
+//                                 const VkDebugUtilsMessengerCallbackDataEXT *callbackData) -> VkBool32;
+//
+//     //
+//
+//     void Init(const RhiInitDesc &);
+//     auto GetMinUniformBufferOffsetAlignment() -> uint32_t;
+//     auto GetOptimalBufferCopyOffsetAlignment() -> uint32_t;
+//
+//     auto FrameBegin() -> RhiCmdList;
+//     void FrameEnd();
+//     auto GetNumFramesInFlight() -> uint32_t
+//     {
+//         return m_Limits.numFramesInFlight;
+//     }
+//     auto GetFrameIndex() -> uint32_t
+//     {
+//         return m_FrameIndex;
+//     }
+//     auto FrameGetCmdList() -> RhiCmdList;
+//
+//     auto CreateSampler(const RhiSamplerDesc &desc) -> RhiSampler;
+//     void DestroySampler(RhiSampler sampler);
+//
+//     auto CreateBuffer(const RhiBufferDesc &desc) -> RhiBuffer;
+//     void NameBuffer(RhiBuffer buf, std::string_view name);
+//     void DestroyBuffer(RhiBuffer buffer);
+//     auto GetBufferSize(RhiBuffer buffer) -> uint64_t;
+//     auto MapBuffer(RhiBuffer buffer) -> char *;
+//     void UnmapBuffer(RhiBuffer buffer);
+//     void CmdTransitionBuffer(RhiCmdList cmd, RhiBuffer buffer, RhiBufferState newState);
+//     void CmdCopyBuffer(RhiCmdList cmd, RhiBuffer dst, uint32_t dstOffset, RhiBuffer src, uint32_t srcOffset,
+//                        uint32_t size);
+//     void CmdUavBarrierBuffer(RhiCmdList cmd, RhiBuffer buffer);
+//     void BufferMarkWritten(RhiBuffer buffer, uint32_t offset, uint32_t size);
+//
+//     auto CreateTexture(RhiTextureDesc desc) -> RhiTexture;
+//     auto GetTextureInfo(RhiTexture texture) -> RhiTextureInfo;
+//     void DestroyTexture(RhiTexture texture);
+//     void CmdTransitionTexture(RhiCmdList cmd, RhiTexture texture, RhiTextureState newState);
+//     void CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, uint32_t srcOffset, uint32_t size);
+//     void CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiTexture src);
+//
+//     auto CreateSampledTextureView(const RhiTextureViewDesc &desc) -> RhiSampledTextureView;
+//     void DestroySampledTextureView(RhiSampledTextureView textureView);
+//     auto GetTexture(RhiSampledTextureView srv) -> RhiTexture;
+//
+//     auto CreateRenderTargetView(const RhiRenderTargetViewDesc &desc) -> RhiRenderTargetView;
+//     void DestroyRenderTargetView(RhiRenderTargetView textureView);
+//     auto GetTexture(RhiRenderTargetView rtv) -> RhiTexture;
+//
+//     auto CreateDepthStencilView(const RhiDepthStencilViewDesc &desc) -> RhiDepthStencilView;
+//     void DestroyDepthStencilView(RhiDepthStencilView textureView);
+//     auto GetTexture(RhiDepthStencilView dsv) -> RhiTexture;
+//
+//     void EnsureHostWritesVisible(VkCommandBuffer cmdbuf, VulkanBufferData &bufferData);
+//
+//     auto CreateCmdList(RhiQueueType queueType) -> RhiCmdList;
+//     void NameCmdList(RhiCmdList cmd, std::string_view name);
+//     void DestroyCmdList(RhiCmdList cmd);
+//     void ResetCmdList(RhiCmdList cmd);
+//     auto CmdSetCheckpoint(RhiCmdList cmd, uint64_t data) -> uint64_t;
+//     auto GetLastCheckpointData(RhiQueueType queueType) -> uint64_t;
+//     auto GetDeviceQueue(RhiQueueType queueType) -> DeviceQueue &;
+//
+//     void PassBegin(RhiPassDesc desc);
+//     void PassEnd();
+//
+//     auto CreateShader(const RhiShaderDesc &desc) -> RhiShader;
+//     void DestroyShader(RhiShader shader);
+//
+//     auto CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGraphicsPipeline;
+//     void NameGraphicsPipeline(RhiGraphicsPipeline pipeline, std::string_view name);
+//     void DestroyGraphicsPipeline(RhiGraphicsPipeline pipeline);
+//     void CmdBindGraphicsPipeline(RhiCmdList cmd, RhiGraphicsPipeline pipeline);
+//     void CmdPushGraphicsConstants(RhiCmdList cmd, uint32_t offset, RhiShaderStage stage, ByteView data);
+//     void CmdBindVertexBuffers(RhiCmdList cmd, uint32_t firstBinding, std::span<const RhiBuffer> buffers,
+//                               std::span<const uint64_t> offsets);
+//     void CmdBindIndexBuffer(RhiCmdList cmd, RhiBuffer buffer, uint64_t offset);
+//     void CmdDraw(RhiCmdList cmd, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
+//                  uint32_t firstInstance);
+//     void CmdDrawIndexed(RhiCmdList cmd, uint32_t indexCount, int32_t vertexOffset, uint32_t instanceCount,
+//                         uint32_t firstIndex, uint32_t firstInstance);
+//     auto GetVertexFormatSize(RhiVertexFormat format) -> uint32_t;
+//
+// #if 0
+//     auto CreateDescriptorSetLayout(const RhiDescriptorSetLayoutDesc &desc) -> RhiDescriptorSetLayout;
+//     void DestroyDescriptorSetLayout(RhiDescriptorSetLayout layout);
+//     auto CreateDescriptorSet(RhiDescriptorSetLayout layout) -> RhiDescriptorSet;
+//     void WriteDescriptors(std::span<const RhiDescriptorWriteDesc> writes);
+//     void DestroyDescriptorSet(RhiDescriptorSet bindGroup);
+//     void CmdBindGraphicsBindGroup(RhiCmdList cmd, uint32_t setIndex, RhiDescriptorSet bindGroup,
+//                                   std::span<const uint32_t> dynamicOffsets);
+// #endif
+//
+//     void TriggerSwapchainRecreate()
+//     {
+//         m_RecreateSwapchain = true;
+//     }
+//     void CreateSwapchain();
+//     auto GetBackbufferView() -> RhiRenderTargetView;
+//
+//     void WriteDescriptorTables();
+//     void BindDescriptorTables(RhiCmdList cmd);
+//
+//     void SetFrameConstant(RhiCmdList cmd, std::span<const std::byte> data);
+//     void SetPassConstant(RhiCmdList cmd, std::span<const std::byte> data);
+//     void SetDrawConstant(RhiCmdList cmd, std::span<const std::byte> data);
+//     void SetLargeDrawConstant(RhiCmdList cmd, std::span<const std::byte> data);
+//
+//   private:
+// };
 
 } // namespace nyla

@@ -2,9 +2,6 @@
 #include "nyla/commons/align.h"
 #include "nyla/commons/assert.h"
 #include "nyla/rhi/rhi.h"
-#include "nyla/rhi/rhi_buffer.h"
-#include "nyla/rhi/rhi_cmdlist.h"
-#include "nyla/rhi/rhi_texture.h"
 #include <cstdint>
 
 namespace nyla
@@ -14,7 +11,7 @@ auto CreateStagingBuffer(uint32_t size) -> GpuStagingBuffer *
 {
     auto *stagingBuffer = new GpuStagingBuffer{};
 
-    stagingBuffer->buffer = g_Rhi->CreateBuffer(RhiBufferDesc{
+    stagingBuffer->buffer = Rhi::CreateBuffer(RhiBufferDesc{
         .size = size,
         .bufferUsage = RhiBufferUsage::CopySrc,
         .memoryUsage = RhiMemoryUsage::CpuToGpu,
@@ -28,7 +25,7 @@ auto StagingBufferCopyIntoBuffer(RhiCmdList cmd, GpuStagingBuffer *stagingBuffer
 {
     char *ret = BeforeCopy(stagingBuffer, size);
 
-    g_Rhi->CmdCopyBuffer(cmd, dst, dstOffset, stagingBuffer->buffer, stagingBuffer->written, size);
+    Rhi::CmdCopyBuffer(cmd, dst, dstOffset, stagingBuffer->buffer, stagingBuffer->written, size);
 
     stagingBuffer->written += size;
     return ret;
@@ -39,7 +36,7 @@ auto StagingBufferCopyIntoTexture(RhiCmdList cmd, GpuStagingBuffer *stagingBuffe
 {
     char *ret = BeforeCopy(stagingBuffer, size);
 
-    g_Rhi->CmdCopyTexture(cmd, dst, stagingBuffer->buffer, stagingBuffer->written, size);
+    Rhi::CmdCopyTexture(cmd, dst, stagingBuffer->buffer, stagingBuffer->written, size);
 
     stagingBuffer->written += size;
     return ret;

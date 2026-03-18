@@ -2,7 +2,6 @@
 
 #include "nyla/commons/inline_vec.h"
 #include "nyla/rhi/rhi.h"
-#include "nyla/rhi/rhi_texture.h"
 
 namespace nyla
 {

@@ -8,8 +8,7 @@
 #include "nyla/engine0/staging.h"
 #include "nyla/platform/key_physical.h"
 #include "nyla/platform/platform.h"
-#include "nyla/rhi/rhi_pass.h"
-#include "nyla/rhi/rhi_texture.h"
+#include "nyla/rhi/rhi.h"
 
 namespace nyla
 {

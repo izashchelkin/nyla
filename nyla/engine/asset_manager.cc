@@ -11,10 +11,6 @@
 #include "nyla/formats/gltf/gltf.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
-#include "nyla/rhi/rhi_buffer.h"
-#include "nyla/rhi/rhi_cmdlist.h"
-#include "nyla/rhi/rhi_sampler.h"
-#include "nyla/rhi/rhi_texture.h"
 #include "third_party/stb/stb_image.h"
 #include <cstdint>
 
@@ -119,7 +115,7 @@ void AssetManager::Init()
     //
 
     auto addSampler = [](SamplerType samplerType, RhiFilter filter, RhiSamplerAddressMode addressMode) -> void {
-        RhiSampler sampler = g_Rhi.CreateSampler({
+        RhiSampler sampler = Rhi::CreateSampler({
             .minFilter = filter,
             .magFilter = filter,
             .addressModeU = addressMode,
@@ -141,8 +137,8 @@ void AssetManager::Flush()
         {
             slot.data.needsUpload = true;
 
-            g_Rhi.DestroySampledTextureView(slot.data.textureView);
-            g_Rhi.DestroyTexture(slot.data.texture);
+            Rhi::DestroySampledTextureView(slot.data.textureView);
+            Rhi::DestroyTexture(slot.data.texture);
         }
     }
 
@@ -344,7 +340,7 @@ void AssetManager::Upload(RhiCmdList cmd)
             NYLA_ASSERT(false);
         }
 
-        const RhiTexture texture = g_Rhi.CreateTexture(RhiTextureDesc{
+        const RhiTexture texture = Rhi::CreateTexture(RhiTextureDesc{
             .width = textureAssetData.width,
             .height = textureAssetData.height,
             .memoryUsage = RhiMemoryUsage::GpuOnly,
@@ -353,12 +349,12 @@ void AssetManager::Upload(RhiCmdList cmd)
         });
         textureAssetData.texture = texture;
 
-        const RhiSampledTextureView textureView = g_Rhi.CreateSampledTextureView(RhiTextureViewDesc{
+        const RhiSampledTextureView textureView = Rhi::CreateSampledTextureView(RhiTextureViewDesc{
             .texture = texture,
         });
         textureAssetData.textureView = textureView;
 
-        g_Rhi.CmdTransitionTexture(cmd, texture, RhiTextureState::TransferDst);
+        Rhi::CmdTransitionTexture(cmd, texture, RhiTextureState::TransferDst);
 
         const uint32_t size = textureAssetData.width * textureAssetData.height * textureAssetData.channels;
 
@@ -368,7 +364,7 @@ void AssetManager::Upload(RhiCmdList cmd)
         free(data);
 
         // TODO: this barrier does not need to be here
-        g_Rhi.CmdTransitionTexture(cmd, texture, RhiTextureState::ShaderRead);
+        Rhi::CmdTransitionTexture(cmd, texture, RhiTextureState::ShaderRead);
 
         NYLA_LOG("Uploading '%s'", (const char *)textureAssetData.path.data());
 
@@ -438,7 +434,7 @@ void AssetManager::CmdDrawMesh(RhiCmdList cmd, AssetManager::Mesh mesh)
     const auto &meshData = m_Meshes.ResolveData(mesh);
     NYLA_ASSERT(!meshData.needsUpload);
 
-    g_Rhi.CmdDrawIndexed(cmd, meshData.indexCount, 0, 1, 0, 0);
+    Rhi::CmdDrawIndexed(cmd, meshData.indexCount, 0, 1, 0, 0);
 }
 
 } // namespace nyla

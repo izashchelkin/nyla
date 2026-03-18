@@ -5,9 +5,7 @@
 #include "nyla/commons/handle_pool.h"
 #include "nyla/commons/path.h"
 #include "nyla/commons/vec.h"
-#include "nyla/rhi/rhi_cmdlist.h"
-#include "nyla/rhi/rhi_pipeline.h"
-#include "nyla/rhi/rhi_texture.h"
+#include "nyla/rhi/rhi.h"
 #include <cstdint>
 #include <string>
 

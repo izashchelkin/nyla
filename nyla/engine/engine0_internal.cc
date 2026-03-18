@@ -1,10 +1,12 @@
 #include "nyla/engine/engine0_internal.h"
 
+#include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
-#include "nyla/rhi/rhi_shader.h"
+
 #include <cstdint>
 #include <format>
 #include <sys/types.h>
+#include <vector>
 
 namespace nyla::engine0_internal
 {
@@ -22,7 +24,7 @@ auto GetShader(const char *name, RhiShaderStage stage) -> RhiShader
     std::vector<std::byte> code = Platform::ReadFile(path);
     const auto spirv = std::span{reinterpret_cast<uint32_t *>(code.data()), code.size() / 4};
 
-    RhiShader shader = g_Rhi.CreateShader(RhiShaderDesc{
+    RhiShader shader = Rhi::CreateShader(RhiShaderDesc{
         .stage = stage,
         .code = spirv,
     });

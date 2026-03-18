@@ -9,8 +9,6 @@
 #include "nyla/engine/render_targets.h"
 #include "nyla/platform/platform.h"
 #include "nyla/rhi/rhi.h"
-#include "nyla/rhi/rhi_cmdlist.h"
-#include "nyla/rhi/rhi_texture.h"
 
 namespace nyla
 {
@@ -27,8 +25,8 @@ void Game::Init()
 
 void Game::Process(RhiCmdList cmd, float dt)
 {
-    RhiTexture backbuffer = g_Rhi.GetTexture(g_Rhi.GetBackbufferView());
-    RhiTextureInfo backbufferInfo = g_Rhi.GetTextureInfo(backbuffer);
+    RhiTexture backbuffer = Rhi::GetTexture(Rhi::GetBackbufferView());
+    RhiTextureInfo backbufferInfo = Rhi::GetTextureInfo(backbuffer);
 
     RhiRenderTargetView rtv;
     RhiDepthStencilView dsv;
@@ -37,14 +35,14 @@ void Game::Process(RhiCmdList cmd, float dt)
     GameScene scene;
     scene.Process(*this, cmd, dt, rtv, dsv);
 
-    RhiTexture renderTarget = g_Rhi.GetTexture(rtv);
+    RhiTexture renderTarget = Rhi::GetTexture(rtv);
 
-    g_Rhi.CmdTransitionTexture(cmd, renderTarget, RhiTextureState::TransferSrc);
-    g_Rhi.CmdTransitionTexture(cmd, backbuffer, RhiTextureState::TransferDst);
+    Rhi::CmdTransitionTexture(cmd, renderTarget, RhiTextureState::TransferSrc);
+    Rhi::CmdTransitionTexture(cmd, backbuffer, RhiTextureState::TransferDst);
 
-    g_Rhi.CmdCopyTexture(cmd, backbuffer, renderTarget);
+    Rhi::CmdCopyTexture(cmd, backbuffer, renderTarget);
 
-    g_Rhi.CmdTransitionTexture(cmd, backbuffer, RhiTextureState::Present);
+    Rhi::CmdTransitionTexture(cmd, backbuffer, RhiTextureState::Present);
 }
 
 //
@@ -71,7 +69,7 @@ auto PlatformMain(std::span<const char *> argv) -> int
         const auto [cmd, dt, fps] = Engine::FrameBegin();
         DebugTextRenderer::Fmt(500, 10, "fps=%d", fps);
 
-        RhiTextureInfo backbufferInfo = g_Rhi.GetTextureInfo(g_Rhi.GetTexture(g_Rhi.GetBackbufferView()));
+        RhiTextureInfo backbufferInfo = Rhi::GetTextureInfo(Rhi::GetTexture(Rhi::GetBackbufferView()));
 
         game.Process(cmd, dt);
 

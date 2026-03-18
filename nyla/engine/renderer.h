@@ -3,7 +3,7 @@
 #include "nyla/commons/mat.h"
 #include "nyla/commons/vec.h"
 #include "nyla/engine/asset_manager.h"
-#include "nyla/rhi/rhi_cmdlist.h"
+#include "nyla/rhi/rhi.h"
 #include <cstdint>
 
 namespace nyla

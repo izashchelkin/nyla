@@ -1,6 +1,6 @@
 #pragma once
 
-#include "nyla/rhi/rhi_shader.h"
+#include "nyla/rhi/rhi.h"
 
 namespace nyla::engine0_internal
 {
