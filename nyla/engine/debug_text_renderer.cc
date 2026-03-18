@@ -1,19 +1,34 @@
 #include "nyla/engine/debug_text_renderer.h"
 #include "nyla/commons/byteview.h"
-#include "nyla/commons/containers/inline_vec.h"
+#include "nyla/commons/inline_vec.h"
 #include "nyla/engine/asset_manager.h"
 #include "nyla/engine/engine0_internal.h"
 
 #include <cstdint>
 
 #include "nyla/rhi/rhi.h"
-#include "nyla/rhi/rhi_cmdlist.h"
-#include "nyla/rhi/rhi_pipeline.h"
-#include "nyla/rhi/rhi_shader.h"
-#include "nyla/rhi/rhi_texture.h"
 
 namespace nyla
 {
+
+namespace
+{
+
+RhiGraphicsPipeline m_Pipeline;
+
+struct DrawData
+{
+    std::array<uint4, 17> words;
+    int32_t originX;
+    int32_t originY;
+    uint32_t wordCount;
+    uint32_t pad;
+    std::array<float, 4> fg;
+    std::array<float, 4> bg;
+};
+InlineVec<DrawData, 4> m_PendingDraws;
+
+} // namespace
 
 using namespace engine0_internal;
 
@@ -31,7 +46,7 @@ void DebugTextRenderer::Init()
         .colorTargetFormats = AssetManager::GetMeshPipelineColorTargetFormats(),
         .depthFormat = RhiTextureFormat::D32_Float_S8_UINT,
     };
-    m_Pipeline = g_Rhi.CreateGraphicsPipeline(pipelineDesc);
+    m_Pipeline = Rhi::CreateGraphicsPipeline(pipelineDesc);
 }
 
 void DebugTextRenderer::Text(int32_t x, int32_t y, std::string_view text)
@@ -66,14 +81,14 @@ void DebugTextRenderer::CmdFlush(RhiCmdList cmd)
     if (m_PendingDraws.empty())
         return;
 
-    const uint32_t frameIndex = g_Rhi.GetFrameIndex();
+    const uint32_t frameIndex = Rhi::GetFrameIndex();
 
-    g_Rhi.CmdBindGraphicsPipeline(cmd, m_Pipeline);
+    Rhi::CmdBindGraphicsPipeline(cmd, m_Pipeline);
 
     for (const DrawData &drawData : m_PendingDraws)
     {
-        g_Rhi.SetLargeDrawConstant(cmd, ByteViewPtr(&drawData));
-        g_Rhi.CmdDraw(cmd, 3, 1, 0, 0);
+        Rhi::SetLargeDrawConstant(cmd, ByteViewPtr(&drawData));
+        Rhi::CmdDraw(cmd, 3, 1, 0, 0);
     }
     m_PendingDraws.clear();
 }

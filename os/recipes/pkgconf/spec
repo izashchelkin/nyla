@@ -1,0 +1,10 @@
+cd $NYLAROOT/build/sources/pkgconf*
+
+make distclean || echo already clean
+
+./autogen.sh
+./configure              \
+	--prefix=/usr    \
+	--disable-static
+make
+make DESTDIR=$DESTDIR install

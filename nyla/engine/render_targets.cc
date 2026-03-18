@@ -1,5 +1,5 @@
 #include "nyla/engine/render_targets.h"
-#include "nyla/rhi/rhi_texture.h"
+#include "nyla/rhi/rhi.h"
 
 namespace nyla
 {
@@ -7,11 +7,11 @@ namespace nyla
 void RenderTargets::GetTargets(uint32_t width, uint32_t height, RhiRenderTargetView &outRtv,
                                RhiDepthStencilView &outDsv)
 {
-    uint32_t frameIndex = g_Rhi.GetFrameIndex();
+    uint32_t frameIndex = Rhi::GetFrameIndex();
 
     if (frameIndex >= m_Rtvs.size())
     {
-        RhiTexture texture = g_Rhi.CreateTexture(RhiTextureDesc{
+        RhiTexture texture = Rhi::CreateTexture(RhiTextureDesc{
             .width = width,
             .height = height,
             .memoryUsage = RhiMemoryUsage::GpuOnly,
@@ -20,7 +20,7 @@ void RenderTargets::GetTargets(uint32_t width, uint32_t height, RhiRenderTargetV
         });
         m_ColorTextures.emplace_back(texture);
 
-        m_Rtvs.emplace_back(g_Rhi.CreateRenderTargetView(RhiRenderTargetViewDesc{
+        m_Rtvs.emplace_back(Rhi::CreateRenderTargetView(RhiRenderTargetViewDesc{
             .texture = texture,
             .format = m_ColorFormat,
         }));
@@ -28,7 +28,7 @@ void RenderTargets::GetTargets(uint32_t width, uint32_t height, RhiRenderTargetV
 
     if (frameIndex >= m_Dsvs.size())
     {
-        RhiTexture texture = g_Rhi.CreateTexture(RhiTextureDesc{
+        RhiTexture texture = Rhi::CreateTexture(RhiTextureDesc{
             .width = width,
             .height = height,
             .memoryUsage = RhiMemoryUsage::GpuOnly,
@@ -37,7 +37,7 @@ void RenderTargets::GetTargets(uint32_t width, uint32_t height, RhiRenderTargetV
         });
         m_DepthStencilTextures.emplace_back(texture);
 
-        m_Dsvs.emplace_back(g_Rhi.CreateDepthStencilView(RhiDepthStencilViewDesc{
+        m_Dsvs.emplace_back(Rhi::CreateDepthStencilView(RhiDepthStencilViewDesc{
             .texture = texture,
             .format = m_DepthStencilFormat,
         }));

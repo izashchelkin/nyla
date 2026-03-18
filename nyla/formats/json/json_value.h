@@ -64,7 +64,7 @@ class JsonValue
         m_Val = {.valBool = val};
     }
 
-    void SetValue(uint64_t val)
+    void SetValue(int64_t val)
     {
         m_Tag = JsonTag::Integer;
         m_Val = {.valInt = val};
@@ -177,7 +177,7 @@ class JsonValue
     JsonTag m_Tag;
     union {
         bool valBool;
-        uint64_t valInt;
+        int64_t valInt;
         double valDouble;
 
         struct

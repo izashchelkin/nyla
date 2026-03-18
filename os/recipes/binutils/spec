@@ -1,0 +1,22 @@
+cd $NYLAROOT/build/sources/binutils*
+
+rm -rf build
+mkdir build
+cd build
+
+../configure --prefix=/usr       \
+             --sysconfdir=/etc   \
+             --enable-ld=default \
+             --enable-plugins    \
+             --disable-werror    \
+             --enable-64-bit-bfd \
+             --enable-new-dtags  \
+             --with-system-zlib  \
+             --enable-default-hash-style=gnu \
+	     --target=x86_64-pc-linux-gnu \
+             --host=x86_64-pc-linux-gnu
+
+make
+make DESTDIR=$DESTDIR install
+
+rm $DESTDIR/usr/share/info/dir || true

@@ -2,7 +2,7 @@
 
 #include "nyla/engine/asset_manager.h"
 #include "nyla/engine/render_targets.h"
-#include "nyla/rhi/rhi_cmdlist.h"
+#include "nyla/rhi/rhi.h"
 
 namespace nyla
 {

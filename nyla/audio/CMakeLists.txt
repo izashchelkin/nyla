@@ -12,11 +12,6 @@ target_include_directories(${TARGET}
         ${PROJECT_SOURCE_DIR}
 )
 
-target_link_libraries(${TARGET}
-    PUBLIC
-        nyla::commons
-)
-
 #
 
 set(TARGET_EXEC nyla_audio_main)
@@ -36,5 +31,4 @@ target_link_libraries(${TARGET_EXEC}
     PUBLIC
         nyla::platform::audio
         nyla::audio::wave
-        nyla::commons
 )

@@ -7,7 +7,7 @@
 namespace nyla
 {
 
-inline auto AsciiChrToUpper(uint32_t ch) -> uint32_t
+constexpr inline auto AsciiChrToUpper(uint32_t ch) -> uint32_t
 {
     if (ch >= 'a' && ch <= 'z')
         return ch - ('a' - 'A');
@@ -15,13 +15,13 @@ inline auto AsciiChrToUpper(uint32_t ch) -> uint32_t
         return ch;
 }
 
-inline void AsciiStrToUpperInPlace(std::string &s)
+constexpr inline void AsciiStrToUpperInPlace(std::string &s)
 {
     for (char &c : s)
         c = static_cast<char>(AsciiChrToUpper(c));
 }
 
-inline auto AsciiStrToUpper(std::string_view sv) -> std::string
+constexpr inline auto AsciiStrToUpper(std::string_view sv) -> std::string
 {
     std::string out(sv);
     AsciiStrToUpperInPlace(out);

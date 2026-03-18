@@ -4,6 +4,28 @@
 namespace nyla
 {
 
+namespace
+{
+
+struct TweenData
+{
+    float *value;
+    float begin;
+    float end;
+    float startValue;
+    float endValue;
+};
+HandlePool<Tween, TweenData, 1024> m_Tweens;
+
+float m_Now;
+
+} // namespace
+
+auto TweenManager::Now() -> float
+{
+    return m_Now;
+}
+
 void TweenManager::Update(float dt)
 {
     m_Now += dt;

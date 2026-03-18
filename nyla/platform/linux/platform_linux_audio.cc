@@ -1,3 +1,5 @@
+#include "nyla/commons/assert.h"
+#include "nyla/commons/log.h"
 #include "nyla/platform/platform_audio.h"
 #include <alsa/asoundlib.h>
 #include <cerrno>

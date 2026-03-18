@@ -1,0 +1,9 @@
+cd $NYLAROOT/build/sources/autoconf*
+make distclean || echo already clean
+./configure              \
+	--prefix=/usr    \
+	--disable-static
+make
+make DESTDIR=$DESTDIR install
+
+rm $DESTDIR/usr/share/info/dir

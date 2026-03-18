@@ -1,0 +1,10 @@
+cd $NYLAROOT/build/sources/readline*
+make distclean || echo already clean
+
+./configure --prefix=/usr    \
+            --disable-static \
+            --with-curses    \
+	    LDFLAGS="-L/usr/lib -lncursesw"
+
+make SHLIB_LIBS="-lncursesw"
+make DESTDIR=$DESTDIR install

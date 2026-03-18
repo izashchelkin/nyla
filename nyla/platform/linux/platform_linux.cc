@@ -1,23 +1,26 @@
-#include "nyla/platform/linux/platform_linux.h"
-#include "nyla/commons/align.h"
-#include "nyla/commons/byteliterals.h"
-#include "nyla/platform/platform.h"
+#include <array>
+#include <cstdint>
+#include <fcntl.h>
+#include <linux/close_range.h>
+#include <sys/mman.h>
+#include <sys/signal.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <xcb/xcb.h>
+#include <xcb/xcb_aux.h>
+#include <xcb/xinput.h>
+#include <xcb/xproto.h>
+#include <xkbcommon/xkbcommon-x11.h>
+#include <xkbcommon/xkbcommon.h>
 
+#include "nyla/commons/align.h"
 #include "nyla/commons/assert.h"
+#include "nyla/commons/byteliterals.h"
 #include "nyla/commons/cleanup.h"
 #include "nyla/commons/log.h"
 #include "nyla/commons/string.h"
+#include "nyla/platform/linux/platform_linux.h"
 #include "nyla/platform/platform.h"
-#include "xcb/xcb.h"
-#include "xcb/xcb_aux.h"
-#include "xcb/xinput.h"
-#include "xcb/xproto.h"
-#include <array>
-#include <cstdint>
-#include <sys/mman.h>
-#include <unistd.h>
-#include <xkbcommon/xkbcommon-x11.h>
-#include <xkbcommon/xkbcommon.h>
 
 #ifdef __clang__
 #pragma clang diagnostic push
@@ -32,21 +35,185 @@
 
 #undef explicit
 
-auto main(int argc, char *argv[]) -> int
-{
-    nyla::PlatformMain();
-    return 0;
-}
-
 namespace nyla
 {
 
-auto ConvertKeyPhysicalIntoXkbName(KeyPhysical key) -> const char *;
+namespace
+{
 
-auto Platform::Impl::InternAtom(std::string_view name, bool onlyIfExists) -> xcb_atom_t
+uint64_t g_PageSize;
+char *g_AddressSpaceBase;
+char *g_AddressSpaceAt;
+uint64_t g_AddressSpaceSize;
+
+int g_ScreenIndex{};
+xcb_connection_t *g_Conn{};
+xcb_screen_t *g_Screen{};
+uint32_t g_ExtensionXInput2MajorOpCode{};
+
+xcb_window_t g_Win{};
+xcb_get_geometry_reply_t g_WinGeom{};
+
+LinuxX11Platform::Atoms m_Atoms;
+
+std::array<xcb_keycode_t, static_cast<uint32_t>(KeyPhysical::Count)> g_KeyPhysicalCodes;
+
+} // namespace
+
+auto Platform::UpdateGamepad(uint32_t index) -> bool
+{
+    return false;
+}
+
+auto Platform::GetGamepadLeftStick(uint32_t index) -> float2
+{
+    return {};
+}
+
+auto Platform::GetGamepadRightStick(uint32_t index) -> float2
+{
+    return {};
+}
+
+auto Platform::GetGamepadLeftTrigger(uint32_t index) -> float
+{
+    return {};
+}
+
+auto Platform::GetGamepadRightTrigger(uint32_t index) -> float
+{
+    return {};
+}
+
+auto Platform::GetMonotonicTimeMillis() -> uint64_t
+{
+    timespec ts{};
+    NYLA_ASSERT(clock_gettime(CLOCK_MONOTONIC_RAW, &ts) == 0);
+    return ts.tv_sec * 1'000 + ts.tv_nsec / 1'000'000;
+}
+
+auto Platform::GetMonotonicTimeMicros() -> uint64_t
+{
+    timespec ts{};
+    NYLA_ASSERT(clock_gettime(CLOCK_MONOTONIC_RAW, &ts) == 0);
+    return ts.tv_sec * 1'000'000 + ts.tv_nsec / 1'000;
+}
+
+auto Platform::GetMonotonicTimeNanos() -> uint64_t
+{
+    timespec ts{};
+    NYLA_ASSERT(clock_gettime(CLOCK_MONOTONIC_RAW, &ts) == 0);
+    return ts.tv_sec * 1'000'000'000 + ts.tv_nsec;
+}
+
+auto Platform::GetMemPageSize() -> uint64_t
+{
+    return g_PageSize;
+}
+
+auto Platform::ReserveMemPages(uint64_t size) -> char *
+{
+    char *ret = g_AddressSpaceAt;
+    g_AddressSpaceAt += AlignedUp<uint64_t>(size, g_PageSize);
+    return ret;
+}
+
+void Platform::CommitMemPages(char *page, uint64_t size)
+{
+    NYLA_ASSERT(((page - g_AddressSpaceBase) % g_PageSize) == 0);
+
+    AlignUp(size, GetMemPageSize());
+
+    mprotect(page, size, PROT_READ | PROT_WRITE);
+}
+
+void Platform::DecommitMemPages(char *page, uint64_t size)
+{
+    NYLA_ASSERT(((page - g_AddressSpaceBase) % g_PageSize) == 0);
+
+    AlignUp(size, GetMemPageSize());
+
+    mprotect(page, size, PROT_NONE);
+    madvise(page, size, MADV_DONTNEED);
+}
+
+auto LinuxX11Platform::WinGetHandle() -> xcb_window_t
+{
+    return g_Win;
+}
+
+auto LinuxX11Platform::GetScreenIndex() -> int
+{
+    return g_ScreenIndex;
+}
+
+auto LinuxX11Platform::GetScreen() -> xcb_screen_t *
+{
+    return g_Screen;
+}
+
+auto LinuxX11Platform::GetRoot() -> xcb_window_t
+{
+    return g_Screen->root;
+}
+
+auto LinuxX11Platform::GetConn() -> xcb_connection_t *
+{
+    return g_Conn;
+}
+
+auto LinuxX11Platform::GetAtoms() -> LinuxX11Platform::Atoms &
+{
+    return m_Atoms;
+}
+
+auto LinuxX11Platform::GetXInputExtensionMajorOpCode() -> uint32_t
+{
+    return g_ExtensionXInput2MajorOpCode;
+}
+
+void LinuxX11Platform::Grab()
+{
+    xcb_grab_server(g_Conn);
+}
+
+void LinuxX11Platform::Ungrab()
+{
+    xcb_ungrab_server(g_Conn);
+}
+
+void LinuxX11Platform::Flush()
+{
+    xcb_flush(g_Conn);
+}
+
+void LinuxX11Platform::SetWindow(xcb_window_t window)
+{
+    g_Win = window;
+}
+
+auto LinuxX11Platform::KeyPhysicalToKeyCode(KeyPhysical key) -> uint32_t
+{
+    return g_KeyPhysicalCodes[static_cast<uint32_t>(key)];
+}
+
+auto LinuxX11Platform::KeyCodeToKeyPhysical(uint32_t keyCode, KeyPhysical *outKeyPhysical) -> bool
+{
+    for (uint32_t i = 1; i < g_KeyPhysicalCodes.size(); ++i)
+    {
+        if (g_KeyPhysicalCodes[i] == keyCode)
+        {
+            *outKeyPhysical = static_cast<KeyPhysical>(i);
+            return true;
+        }
+    }
+    return false;
+}
+
+auto LinuxX11Platform::InternAtom(std::string_view name, bool onlyIfExists) -> xcb_atom_t
 {
     xcb_intern_atom_reply_t *reply =
-        xcb_intern_atom_reply(m_Conn, xcb_intern_atom(m_Conn, onlyIfExists, name.size(), name.data()), nullptr);
+        xcb_intern_atom_reply(g_Conn, xcb_intern_atom(g_Conn, onlyIfExists, name.size(), name.data()), nullptr);
     if (!reply || !reply->atom)
         NYLA_LOG("could not intern atom " NYLA_SV_FMT, NYLA_SV_ARG(name));
 
@@ -55,108 +222,110 @@ auto Platform::Impl::InternAtom(std::string_view name, bool onlyIfExists) -> xcb
     return ret;
 }
 
-void Platform::Impl::Init(const PlatformInitDesc &desc)
+void Platform::Init(const PlatformInitDesc &desc)
 {
-    m_Conn = xcb_connect(nullptr, &m_ScreenIndex);
-    if (xcb_connection_has_error(m_Conn))
-        NYLA_ASSERT(false && "could not connect to X server");
+    g_PageSize = sysconf(_SC_PAGESIZE);
+    if (!g_PageSize)
+        g_PageSize = 4096;
 
-    m_Screen = xcb_aux_get_screen(m_Conn, m_ScreenIndex);
-    NYLA_ASSERT(m_Screen);
+    g_AddressSpaceSize = AlignedUp<uint64_t>(16_GiB, g_PageSize);
+    g_AddressSpaceBase = (char *)mmap(nullptr, g_AddressSpaceSize, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    NYLA_ASSERT(g_AddressSpaceBase != MAP_FAILED);
 
-#define X(name) m_Atoms.name = InternAtom(AsciiStrToUpper(#name), false);
-    NYLA_X11_ATOMS(X)
+    g_AddressSpaceAt = g_AddressSpaceBase;
+
+    if (Any(desc.enabledFeatures & (PlatformFeature::Gfx)))
+    {
+        g_Conn = xcb_connect(nullptr, &g_ScreenIndex);
+        if (xcb_connection_has_error(g_Conn))
+            NYLA_ASSERT(false && "could not connect to X server");
+
+        g_Screen = xcb_aux_get_screen(g_Conn, g_ScreenIndex);
+        NYLA_ASSERT(g_Screen);
+
+#define X(name) m_Atoms.name = LinuxX11Platform::InternAtom(AsciiStrToUpper(#name), false);
+        NYLA_X11_ATOMS(X)
 #undef X
 
-    if (Any(desc.enabledFeatures & PlatformFeature::KeyboardInput))
-    {
-        uint16_t majorXkbVersionOut, minorXkbVersionOut;
-        uint8_t baseEventOut, baseErrorOut;
-
-        if (!xkb_x11_setup_xkb_extension(m_Conn, XKB_X11_MIN_MAJOR_XKB_VERSION, XKB_X11_MIN_MINOR_XKB_VERSION,
-                                         XKB_X11_SETUP_XKB_EXTENSION_NO_FLAGS, &majorXkbVersionOut, &minorXkbVersionOut,
-                                         &baseEventOut, &baseErrorOut))
-            NYLA_ASSERT(false && "could not set up xkb extension");
-
-        if (majorXkbVersionOut < XKB_X11_MIN_MAJOR_XKB_VERSION ||
-            (majorXkbVersionOut == XKB_X11_MIN_MAJOR_XKB_VERSION && minorXkbVersionOut < XKB_X11_MIN_MINOR_XKB_VERSION))
-            NYLA_ASSERT(false && "could not set up xkb extension");
-
-        xcb_generic_error_t *err = nullptr;
-        xcb_xkb_per_client_flags_reply_t *reply = xcb_xkb_per_client_flags_reply(
-            m_Conn,
-            xcb_xkb_per_client_flags(m_Conn, XCB_XKB_ID_USE_CORE_KBD, XCB_XKB_PER_CLIENT_FLAG_DETECTABLE_AUTO_REPEAT,
-                                     XCB_XKB_PER_CLIENT_FLAG_DETECTABLE_AUTO_REPEAT, 0, 0, 0),
-            &err);
-        if (!reply || err)
-            NYLA_ASSERT(false && "could not set up detectable autorepeat");
-
+        if (Any(desc.enabledFeatures & PlatformFeature::KeyboardInput))
         {
-            xkb_context *ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
-            NYLA_ASSERT(ctx);
+            uint16_t majorXkbVersionOut, minorXkbVersionOut;
+            uint8_t baseEventOut, baseErrorOut;
 
-            xcb_connection_t *conn = g_Platform.GetImpl()->GetConn();
+            if (!xkb_x11_setup_xkb_extension(g_Conn, XKB_X11_MIN_MAJOR_XKB_VERSION, XKB_X11_MIN_MINOR_XKB_VERSION,
+                                             XKB_X11_SETUP_XKB_EXTENSION_NO_FLAGS, &majorXkbVersionOut,
+                                             &minorXkbVersionOut, &baseEventOut, &baseErrorOut))
+                NYLA_ASSERT(false && "could not set up xkb extension");
 
-            const int32_t deviceId = xkb_x11_get_core_keyboard_device_id(conn);
-            NYLA_ASSERT(deviceId != -1);
+            if (majorXkbVersionOut < XKB_X11_MIN_MAJOR_XKB_VERSION ||
+                (majorXkbVersionOut == XKB_X11_MIN_MAJOR_XKB_VERSION &&
+                 minorXkbVersionOut < XKB_X11_MIN_MINOR_XKB_VERSION))
+                NYLA_ASSERT(false && "could not set up xkb extension");
 
-            xkb_keymap *keymap = xkb_x11_keymap_new_from_device(ctx, conn, deviceId, XKB_KEYMAP_COMPILE_NO_FLAGS);
-            NYLA_ASSERT(keymap);
+            xcb_generic_error_t *err = nullptr;
+            xcb_xkb_per_client_flags_reply_t *reply = xcb_xkb_per_client_flags_reply(
+                g_Conn,
+                xcb_xkb_per_client_flags(g_Conn, XCB_XKB_ID_USE_CORE_KBD,
+                                         XCB_XKB_PER_CLIENT_FLAG_DETECTABLE_AUTO_REPEAT,
+                                         XCB_XKB_PER_CLIENT_FLAG_DETECTABLE_AUTO_REPEAT, 0, 0, 0),
+                &err);
+            if (!reply || err)
+                NYLA_ASSERT(false && "could not set up detectable autorepeat");
 
-            for (uint32_t i = 1; i < static_cast<uint32_t>(KeyPhysical::Count); ++i)
             {
-                const auto key = static_cast<KeyPhysical>(i);
-                const char *xkbName = ConvertKeyPhysicalIntoXkbName(key);
-                const xkb_keycode_t keycode = xkb_keymap_key_by_name(keymap, xkbName);
-                NYLA_ASSERT(xkb_keycode_is_legal_x11(keycode));
-                m_KeyPhysicalCodes[i] = keycode;
+                xkb_context *ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
+                NYLA_ASSERT(ctx);
+
+                const int32_t deviceId = xkb_x11_get_core_keyboard_device_id(g_Conn);
+                NYLA_ASSERT(deviceId != -1);
+
+                xkb_keymap *keymap = xkb_x11_keymap_new_from_device(ctx, g_Conn, deviceId, XKB_KEYMAP_COMPILE_NO_FLAGS);
+                NYLA_ASSERT(keymap);
+
+                for (uint32_t i = 1; i < static_cast<uint32_t>(KeyPhysical::Count); ++i)
+                {
+                    const auto key = static_cast<KeyPhysical>(i);
+                    const char *xkbName = LinuxX11Platform::ConvertKeyPhysicalIntoXkbName(key);
+                    const xkb_keycode_t keycode = xkb_keymap_key_by_name(keymap, xkbName);
+                    NYLA_ASSERT(xkb_keycode_is_legal_x11(keycode));
+                    g_KeyPhysicalCodes[i] = keycode;
+                }
+
+                xkb_keymap_unref(keymap);
+                xkb_context_unref(ctx);
             }
-
-            xkb_keymap_unref(keymap);
-            xkb_context_unref(ctx);
         }
-    }
 
-    if (Any(desc.enabledFeatures & PlatformFeature::MouseInput))
-    {
-        const xcb_query_extension_reply_t *ext = xcb_get_extension_data(m_Conn, &xcb_input_id);
-        if (!ext || !ext->present)
-            NYLA_ASSERT(false && "could nolt set up XI2 extension");
-
-        struct
+        if (Any(desc.enabledFeatures & PlatformFeature::MouseInput))
         {
-            xcb_input_event_mask_t eventMask;
-            uint32_t maskBits;
-        } mask;
+            const xcb_query_extension_reply_t *ext = xcb_get_extension_data(g_Conn, &xcb_input_id);
+            if (!ext || !ext->present)
+                NYLA_ASSERT(false && "could nolt set up XI2 extension");
 
-        mask.eventMask.deviceid = XCB_INPUT_DEVICE_ALL_MASTER;
-        mask.eventMask.mask_len = 2;
-        mask.maskBits = XCB_INPUT_XI_EVENT_MASK_RAW_MOTION | XCB_INPUT_XI_EVENT_MASK_RAW_BUTTON_PRESS;
+            struct
+            {
+                xcb_input_event_mask_t eventMask;
+                uint32_t maskBits;
+            } mask;
 
-        if (xcb_request_check(m_Conn, xcb_input_xi_select_events_checked(m_Conn, m_Screen->root, 1, &mask.eventMask)))
-            NYLA_ASSERT(false && "could not setup XI2 extension");
+            mask.eventMask.deviceid = XCB_INPUT_DEVICE_ALL_MASTER;
+            mask.eventMask.mask_len = 2;
+            mask.maskBits = XCB_INPUT_XI_EVENT_MASK_RAW_MOTION | XCB_INPUT_XI_EVENT_MASK_RAW_BUTTON_PRESS;
 
-        m_ExtensionXInput2MajorOpCode = ext->major_opcode;
+            if (xcb_request_check(g_Conn,
+                                  xcb_input_xi_select_events_checked(g_Conn, g_Screen->root, 1, &mask.eventMask)))
+                NYLA_ASSERT(false && "could not setup XI2 extension");
+
+            g_ExtensionXInput2MajorOpCode = ext->major_opcode;
+        }
+
+        if (desc.open)
+            WinOpen();
     }
-
-    //
-
-    m_PageSize = sysconf(_SC_PAGESIZE);
-    if (!m_PageSize)
-        m_PageSize = 4096;
-
-    m_AddressSpaceSize = AlignedUp<uint64_t>(16_GiB, m_PageSize);
-    m_AddressSpaceBase = (char *)mmap(nullptr, m_AddressSpaceSize, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    NYLA_ASSERT(m_AddressSpaceBase != MAP_FAILED);
-
-    m_AddressSpaceAt = m_AddressSpaceBase;
-
-    if (desc.open)
-        WinOpen();
 }
 
-void Platform::Impl::SendConfigureNotify(xcb_window_t window, xcb_window_t parent, int16_t x, int16_t y, uint16_t width,
-                                         uint16_t height, uint16_t borderWidth)
+void LinuxX11Platform::SendConfigureNotify(xcb_window_t window, xcb_window_t parent, int16_t x, int16_t y,
+                                           uint16_t width, uint16_t height, uint16_t borderWidth)
 {
     const xcb_configure_notify_event_t event = {
         .response_type = XCB_CONFIGURE_NOTIFY,
@@ -168,11 +337,11 @@ void Platform::Impl::SendConfigureNotify(xcb_window_t window, xcb_window_t paren
         .border_width = borderWidth,
     };
 
-    xcb_send_event(m_Conn, false, window, XCB_EVENT_MASK_STRUCTURE_NOTIFY, reinterpret_cast<const char *>(&event));
+    xcb_send_event(g_Conn, false, window, XCB_EVENT_MASK_STRUCTURE_NOTIFY, reinterpret_cast<const char *>(&event));
 }
 
-void Platform::Impl::SendClientMessage32(xcb_window_t window, xcb_atom_t type, xcb_atom_t arg1, uint32_t arg2,
-                                         uint32_t arg3, uint32_t arg4)
+void LinuxX11Platform::SendClientMessage32(xcb_window_t window, xcb_atom_t type, xcb_atom_t arg1, uint32_t arg2,
+                                           uint32_t arg3, uint32_t arg4)
 {
     const xcb_client_message_event_t event = {
         .response_type = XCB_CLIENT_MESSAGE,
@@ -182,72 +351,72 @@ void Platform::Impl::SendClientMessage32(xcb_window_t window, xcb_atom_t type, x
         .data = {.data32 = {arg1, arg2, arg3, arg4}},
     };
 
-    xcb_send_event(m_Conn, false, window, XCB_EVENT_MASK_NO_EVENT, reinterpret_cast<const char *>(&event));
+    xcb_send_event(g_Conn, false, window, XCB_EVENT_MASK_NO_EVENT, reinterpret_cast<const char *>(&event));
 }
 
-void Platform::Impl::SendWmTakeFocus(xcb_window_t window, uint32_t time)
+void LinuxX11Platform::SendWmTakeFocus(xcb_window_t window, uint32_t time)
 {
     SendClientMessage32(window, m_Atoms.wm_protocols, m_Atoms.wm_take_focus, time, 0, 0);
 }
 
-void Platform::Impl::SendWmDeleteWindow(xcb_window_t window)
+void LinuxX11Platform::SendWmDeleteWindow(xcb_window_t window)
 {
     SendClientMessage32(window, m_Atoms.wm_protocols, m_Atoms.wm_delete_window, XCB_CURRENT_TIME, 0, 0);
 }
 
-void Platform::Impl::WinOpen()
+void Platform::WinOpen()
 {
-    if (m_Win)
+    if (g_Win)
     {
-        xcb_map_window(m_Conn, m_Win);
+        xcb_map_window(g_Conn, g_Win);
         return;
     }
 
     constexpr auto kEventMask = static_cast<xcb_event_mask_t>(
         XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_KEY_RELEASE | XCB_EVENT_MASK_BUTTON_PRESS |
         XCB_EVENT_MASK_BUTTON_RELEASE | XCB_EVENT_MASK_EXPOSURE | XCB_EVENT_MASK_STRUCTURE_NOTIFY);
-    m_Win = CreateWin(m_Screen->width_in_pixels, m_Screen->height_in_pixels, false, kEventMask);
+    g_Win = LinuxX11Platform::CreateWin(g_Screen->width_in_pixels, g_Screen->height_in_pixels, false, kEventMask);
 
-    xcb_get_geometry_reply_t *windowGeometry = xcb_get_geometry_reply(m_Conn, xcb_get_geometry(m_Conn, m_Win), nullptr);
-    m_WinGeom = *windowGeometry;
+    xcb_get_geometry_reply_t *windowGeometry = xcb_get_geometry_reply(g_Conn, xcb_get_geometry(g_Conn, g_Win), nullptr);
+    g_WinGeom = *windowGeometry;
     free(windowGeometry);
 }
 
-auto Platform::Impl::CreateWin(uint32_t width, uint32_t height, bool overrideRedirect, xcb_event_mask_t eventMask)
+auto LinuxX11Platform::CreateWin(uint32_t width, uint32_t height, bool overrideRedirect, xcb_event_mask_t eventMask)
     -> xcb_window_t
 {
-    const xcb_window_t window = xcb_generate_id(m_Conn);
+    const xcb_window_t window = xcb_generate_id(g_Conn);
 
     const std::array<uint32_t, 2> values{overrideRedirect, eventMask};
-    xcb_create_window(m_Conn, XCB_COPY_FROM_PARENT, window, m_Screen->root, 0, 0, width, height, 0,
-                      XCB_WINDOW_CLASS_INPUT_OUTPUT, m_Screen->root_visual,
+    xcb_create_window(g_Conn, XCB_COPY_FROM_PARENT, window, g_Screen->root, 0, 0, width, height, 0,
+                      XCB_WINDOW_CLASS_INPUT_OUTPUT, g_Screen->root_visual,
                       XCB_CW_OVERRIDE_REDIRECT | XCB_CW_EVENT_MASK, values.data());
 
-    xcb_map_window(m_Conn, window);
-    xcb_flush(m_Conn);
+    xcb_map_window(g_Conn, window);
+    xcb_flush(g_Conn);
 
     return window;
 }
 
-auto Platform::Impl::WinGetSize() -> PlatformWindowSize
+auto Platform::WinGetSize() -> PlatformWindowSize
 {
     return PlatformWindowSize{
-        .width = m_WinGeom.width,
-        .height = m_WinGeom.height,
+        .width = g_WinGeom.width,
+        .height = g_WinGeom.height,
     };
 }
 
-auto Platform::Impl::PollEvent(PlatformEvent &outEvent) -> bool
+auto Platform::WinPollEvent(PlatformEvent &outEvent) -> bool
 {
     for (;;)
     {
-        if (xcb_connection_has_error(m_Conn))
+        if (xcb_connection_has_error(g_Conn))
         {
             outEvent = {.type = PlatformEventType::Quit};
             return true;
         }
 
-        xcb_generic_event_t *event = xcb_poll_for_event(m_Conn);
+        xcb_generic_event_t *event = xcb_poll_for_event(g_Conn);
         if (!event)
             return false;
 
@@ -264,7 +433,7 @@ auto Platform::Impl::PollEvent(PlatformEvent &outEvent) -> bool
 
             for (uint32_t i = 1; i < static_cast<uint32_t>(KeyPhysical::Count); ++i)
             {
-                if (m_KeyPhysicalCodes[i] == keypress->detail)
+                if (g_KeyPhysicalCodes[i] == keypress->detail)
                 {
                     outEvent = PlatformEvent{
                         .type = PlatformEventType::KeyDown,
@@ -282,7 +451,7 @@ auto Platform::Impl::PollEvent(PlatformEvent &outEvent) -> bool
 
             for (uint32_t i = 1; i < static_cast<uint32_t>(KeyPhysical::Count); ++i)
             {
-                if (m_KeyPhysicalCodes[i] == keyrelease->detail)
+                if (g_KeyPhysicalCodes[i] == keyrelease->detail)
                 {
                     outEvent = PlatformEvent{
                         .type = PlatformEventType::KeyUp,
@@ -317,10 +486,10 @@ auto Platform::Impl::PollEvent(PlatformEvent &outEvent) -> bool
             auto configurenotify = reinterpret_cast<xcb_configure_notify_event_t *>(event);
 
             xcb_get_geometry_reply_t *newGeom =
-                xcb_get_geometry_reply(m_Conn, xcb_get_geometry(m_Conn, m_Win), nullptr);
+                xcb_get_geometry_reply(g_Conn, xcb_get_geometry(g_Conn, g_Win), nullptr);
 
-            const bool windowResized = newGeom->width != m_WinGeom.width || newGeom->height != m_WinGeom.height;
-            m_WinGeom = *newGeom;
+            const bool windowResized = newGeom->width != g_WinGeom.width || newGeom->height != g_WinGeom.height;
+            g_WinGeom = *newGeom;
             free(newGeom);
 
             if (windowResized)
@@ -353,7 +522,7 @@ auto Platform::Impl::PollEvent(PlatformEvent &outEvent) -> bool
     }
 }
 
-auto ConvertKeyPhysicalIntoXkbName(KeyPhysical key) -> const char *
+auto LinuxX11Platform::ConvertKeyPhysicalIntoXkbName(KeyPhysical key) -> const char *
 {
     using K = KeyPhysical;
 
@@ -520,30 +689,71 @@ auto ConvertKeyPhysicalIntoXkbName(KeyPhysical key) -> const char *
     }
 }
 
-//
-
-void Platform::Init(const PlatformInitDesc &desc)
+auto Platform::Spawn(std::span<const char *const> cmd) -> bool
 {
-    NYLA_ASSERT(!m_Impl);
-    m_Impl = new Impl();
-    m_Impl->Init(desc);
-}
+    { // TODO: move this somewhere
+        static bool installed = false;
+        if (!installed)
+        {
+            struct sigaction sa;
+            sa.sa_handler = [](int signum) -> void {
+                pid_t pid;
+                int status;
+                while ((pid = waitpid(-1, &status, WNOHANG)) > 0)
+                    ;
+            };
+            sigemptyset(&sa.sa_mask);
+            sa.sa_flags = SA_RESTART;
+            if (sigaction(SIGCHLD, &sa, nullptr) == -1)
+            {
+                NYLA_LOG("sigaction failed");
+                return false;
+            }
+            else
+            {
+                installed = true;
+            }
+        }
+    }
 
-void Platform::WinOpen()
-{
-    m_Impl->WinOpen();
-}
+    if (cmd.size() <= 1)
+        return false;
+    if (cmd.back() != nullptr)
+        return false;
 
-auto Platform::WinGetSize() -> PlatformWindowSize
-{
-    return m_Impl->WinGetSize();
-}
+    switch (fork())
+    {
+    case -1:
+        return false;
+    case 0:
+        break;
+    default:
+        return true;
+    }
 
-auto Platform::PollEvent(PlatformEvent &outEvent) -> bool
-{
-    return m_Impl->PollEvent(outEvent);
-}
+    int devNullFd = open("/dev/null", O_RDWR);
+    if (devNullFd != -1)
+    {
+        dup2(devNullFd, STDIN_FILENO);
+        dup2(devNullFd, STDOUT_FILENO);
+        dup2(devNullFd, STDERR_FILENO);
+    }
 
-Platform g_Platform;
+    if (close_range(3, ~0U, CLOSE_RANGE_UNSHARE) != 0)
+    {
+        goto failure;
+    }
+
+    execvp(cmd[0], const_cast<char *const *>(cmd.data()));
+
+failure:
+    _exit(127);
+}
 
 } // namespace nyla
+
+auto main(int argc, const char *argv[]) -> int
+{
+    nyla::PlatformMain(std::span<const char *>{argv, uint64_t(argc)});
+    return 0;
+}

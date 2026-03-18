@@ -180,7 +180,7 @@ void ShipgameFrame(float dt, uint32_t fps)
             {
                 AbstractInputRelease(kBoost);
 
-                Lerp(gameShip.velocity, float2{}, kStep * 5.f);
+                gameShip.velocity = Lerp(gameShip.velocity, float2{}, kStep * 5.f);
             }
             else if (Pressed(kBoost))
             {
@@ -199,14 +199,14 @@ void ShipgameFrame(float dt, uint32_t fps)
                     maxSpeed = 100 + (duration - 100000) / 10000.f;
                 }
 
-                Lerp(gameShip.velocity, direction * maxSpeed, kStep);
+                gameShip.velocity = Lerp(gameShip.velocity, direction * maxSpeed, kStep);
 
                 if (gameShip.velocity.Len() < 20)
                     gameShip.velocity = gameShip.velocity * (20.f / gameShip.velocity.Len());
             }
             else
             {
-                Lerp(gameShip.velocity, float2{}, kStep);
+                gameShip.velocity = Lerp(gameShip.velocity, float2{}, kStep);
             }
 
             gameShip.pos += gameShip.velocity * kStep;

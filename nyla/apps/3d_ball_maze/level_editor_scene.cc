@@ -5,12 +5,8 @@
 namespace nyla
 {
 
-class LevelEditorScene : Scene
+void LevelEditorScene::Process(Game &game, RhiCmdList cmd, float dt, RhiRenderTargetView rtv, RhiDepthStencilView dsv)
 {
-  public:
-    void Process(Game &game, RhiCmdList cmd, float dt, RhiRenderTargetView rtv, RhiDepthStencilView dsv) final
-    {
-    }
-};
+}
 
 } // namespace nyla

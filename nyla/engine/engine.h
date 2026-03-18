@@ -1,28 +1,18 @@
 #pragma once
 
-#include "nyla/commons/memory/region_alloc.h"
-#include "nyla/engine/asset_manager.h"
-#include "nyla/engine/debug_text_renderer.h"
-#include "nyla/engine/gpu_upload_manager.h"
-#include "nyla/engine/input_manager.h"
-#include "nyla/engine/renderer.h"
-#include "nyla/engine/tween_manager.h"
-#include "nyla/rhi/rhi_buffer.h"
-#include "nyla/rhi/rhi_cmdlist.h"
-#include <concepts>
+#include "nyla/alloc/region_alloc.h"
+#include "nyla/rhi/rhi.h"
 #include <cstdint>
 
 namespace nyla
 {
-
-class Engine;
 
 struct EngineInitDesc
 {
     uint32_t maxFps;
     bool vsync;
 
-    RegionAlloc &rootAlloc;
+    RegionAlloc *rootAlloc;
 };
 
 struct EngineFrameBeginResult
@@ -35,73 +25,17 @@ struct EngineFrameBeginResult
 class Engine
 {
   public:
-    void Init(const EngineInitDesc &);
-    auto ShouldExit() -> bool;
+    static void Init(const EngineInitDesc &);
+    static auto ShouldExit() -> bool;
 
-    auto FrameBegin() -> EngineFrameBeginResult;
-    auto FrameEnd() -> void;
+    static auto FrameBegin() -> EngineFrameBeginResult;
+    static auto FrameEnd() -> void;
 
-    auto GetAssetManager() -> AssetManager &
-    {
-        return m_AssetManager;
-    }
+    static auto GetPermanentAlloc() -> RegionAlloc &;
 
-    auto GetUploadManager() -> GpuUploadManager &
-    {
-        return m_GpuUploadManager;
-    }
-
-    auto GetPermanentAlloc() -> RegionAlloc &
-    {
-        return m_PermanentAlloc;
-    }
-
-    auto GetPerFrameAlloc() -> RegionAlloc &
-    {
-        return m_PerFrameAlloc;
-    }
-
-    auto GetRenderer() -> Renderer &
-    {
-        return m_Renderer;
-    }
-
-    auto GetDebugTextRenderer() -> DebugTextRenderer &
-    {
-        return m_DebugTextRenderer;
-    }
-
-    auto GetInputManager() -> InputManager &
-    {
-        return m_InputManager;
-    }
-
-    auto GetTweenManager() -> TweenManager &
-    {
-        return m_TweenManager;
-    }
+    static auto GetPerFrameAlloc() -> RegionAlloc &;
 
   private:
-    RegionAlloc *m_RootAlloc;
-    RegionAlloc m_PermanentAlloc;
-    RegionAlloc m_PerFrameAlloc;
-
-    GpuUploadManager m_GpuUploadManager;
-    AssetManager m_AssetManager;
-    TweenManager m_TweenManager;
-    InputManager m_InputManager;
-
-    Renderer m_Renderer;
-    DebugTextRenderer m_DebugTextRenderer;
-
-    uint64_t m_TargetFrameDurationUs;
-
-    uint64_t m_LastFrameStart;
-    uint32_t m_DtUsAccum;
-    uint32_t m_FramesCounted;
-    uint32_t m_Fps;
-    bool m_ShouldExit;
 };
-extern Engine g_Engine;
 
 } // namespace nyla

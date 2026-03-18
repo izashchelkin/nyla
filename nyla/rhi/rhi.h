@@ -1,22 +1,183 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 #include <string_view>
 
 #include "nyla/commons/bitenum.h"
 #include "nyla/commons/byteview.h"
-#include "nyla/platform/platform.h"
-
-#include "rhi_buffer.h"
-#include "rhi_cmdlist.h"
-#include "rhi_pass.h"
-#include "rhi_pipeline.h"
-#include "rhi_sampler.h"
-#include "rhi_shader.h"
-#include "rhi_texture.h"
+#include "nyla/commons/handle.h"
+#include "nyla/commons/inline_string.h"
 
 namespace nyla
 {
+
+//
+
+enum class RhiFlags : uint32_t
+{
+    VSync = 1 << 0,
+};
+NYLA_BITENUM(RhiFlags);
+
+enum class RhiBufferUsage : uint32_t
+{
+    Vertex = 1 << 0,
+    Index = 1 << 1,
+    Uniform = 1 << 2,
+    CopySrc = 1 << 3,
+    CopyDst = 1 << 4,
+};
+NYLA_BITENUM(RhiBufferUsage);
+
+enum class RhiMemoryUsage
+{
+    Unknown = 0,
+    GpuOnly,
+    CpuToGpu,
+    GpuToCpu
+};
+
+enum class RhiBufferState
+{
+    Undefined = 0,
+    CopySrc,
+    CopyDst,
+    ShaderRead,
+    ShaderWrite,
+    Vertex,
+    Index,
+    Indirect,
+};
+
+enum class RhiQueueType
+{
+    Graphics,
+    Transfer
+};
+
+enum class RhiVertexFormat
+{
+    None,
+    R32G32B32A32Float,
+    R32G32B32Float,
+    R32G32Float,
+};
+
+enum class RhiInputRate
+{
+    PerVertex,
+    PerInstance
+};
+
+enum class RhiCullMode
+{
+    None,
+    Back,
+    Front
+};
+
+enum class RhiFrontFace
+{
+    CCW,
+    CW
+};
+
+enum class RhiFilter
+{
+    Linear,
+    Nearest,
+};
+
+enum class RhiSamplerAddressMode
+{
+    Repeat,
+    ClampToEdge,
+};
+
+enum class RhiShaderStage : uint32_t
+{
+    Vertex = 1 << 0,
+    Pixel = 1 << 1,
+};
+
+enum class RhiTextureFormat
+{
+    None,
+
+    R8_UNORM,
+
+    R8G8B8A8_sRGB,
+    B8G8R8A8_sRGB,
+
+    D32_Float,
+    D32_Float_S8_UINT,
+};
+
+enum class RhiTextureUsage
+{
+    None = 0,
+
+    ShaderSampled = 1 << 0,
+    ColorTarget = 1 << 1,
+    DepthStencil = 1 << 2,
+    TransferSrc = 1 << 3,
+    TransferDst = 1 << 4,
+    Storage = 1 << 5,
+    Present = 1 << 6,
+};
+NYLA_BITENUM(RhiTextureUsage);
+
+enum class RhiTextureState
+{
+    Undefined,
+    ColorTarget,
+    DepthTarget,
+    ShaderRead,
+    Present,
+    TransferSrc,
+    TransferDst,
+};
+
+//
+
+struct RhiTexture : Handle
+{
+};
+
+struct RhiSampledTextureView : Handle
+{
+};
+
+struct RhiRenderTargetView : Handle
+{
+};
+
+struct RhiDepthStencilView : Handle
+{
+};
+
+struct RhiBuffer : Handle
+{
+};
+
+struct RhiCmdList : Handle
+{
+};
+
+struct RhiGraphicsPipeline : Handle
+{
+};
+
+struct RhiSampler : Handle
+{
+};
+
+struct RhiShader : Handle
+{
+};
+
+//
 
 constexpr inline uint32_t kRhiMaxNumFramesInFlight = 3;
 constexpr inline uint32_t kRhiMaxNumSwapchainTextures = 3;
@@ -30,12 +191,6 @@ constexpr inline bool kRhiValidations = true;
 constexpr inline bool kRhiCheckpoints = false;
 
 //
-
-enum class RhiFlags : uint32_t
-{
-    VSync = 1 << 0,
-};
-NYLA_BITENUM(RhiFlags);
 
 struct RhiLimits
 {
@@ -58,118 +213,197 @@ struct RhiLimits
 
 struct RhiInitDesc
 {
-    PlatformWindow window;
     RhiFlags flags;
     RhiLimits limits;
+};
+
+struct RhiBufferDesc
+{
+    uint64_t size;
+    RhiBufferUsage bufferUsage;
+    RhiMemoryUsage memoryUsage;
+};
+
+struct RhiPassDesc
+{
+    RhiRenderTargetView rtv;
+    RhiDepthStencilView dsv;
+};
+
+struct RhiVertexBindingDesc
+{
+    uint32_t binding;
+    uint32_t stride;
+    RhiInputRate inputRate;
+};
+
+struct RhiVertexAttributeDesc
+{
+    uint32_t binding;
+    InlineString<16> semantic;
+    RhiVertexFormat format;
+    uint32_t offset;
+};
+
+struct RhiGraphicsPipelineDesc
+{
+    std::string debugName;
+
+    RhiShader vs;
+    RhiShader ps;
+
+    std::span<RhiVertexBindingDesc> vertexBindings;
+    std::span<RhiVertexAttributeDesc> vertexAttributes;
+    std::span<RhiTextureFormat> colorTargetFormats;
+    RhiTextureFormat depthFormat;
+    bool depthWriteEnabled;
+    bool depthTestEnabled;
+
+    RhiCullMode cullMode;
+    RhiFrontFace frontFace;
+};
+
+struct RhiSamplerDesc
+{
+    RhiFilter minFilter;
+    RhiFilter magFilter;
+    RhiSamplerAddressMode addressModeU;
+    RhiSamplerAddressMode addressModeV;
+    RhiSamplerAddressMode addressModeW;
+};
+
+template <> struct EnableBitMaskOps<RhiShaderStage> : std::true_type
+{
+};
+
+struct RhiShaderDesc
+{
+    RhiShaderStage stage;
+    std::span<uint32_t> code;
+};
+
+struct RhiTextureDesc
+{
+    uint32_t width;
+    uint32_t height;
+    RhiMemoryUsage memoryUsage;
+    RhiTextureUsage usage;
+    RhiTextureFormat format;
+};
+
+struct RhiTextureViewDesc
+{
+    RhiTexture texture;
+    RhiTextureFormat format;
+};
+
+struct RhiRenderTargetViewDesc
+{
+    RhiTexture texture;
+    RhiTextureFormat format;
+};
+
+struct RhiDepthStencilViewDesc
+{
+    RhiTexture texture;
+    RhiTextureFormat format;
+};
+
+struct RhiTextureInfo
+{
+    uint32_t width;
+    uint32_t height;
+    RhiTextureFormat format;
 };
 
 class Rhi
 {
   public:
-    void Init(const RhiInitDesc &);
-    auto GetNumFramesInFlight() -> uint32_t;
-    auto GetFrameIndex() -> uint32_t;
-    auto GetMinUniformBufferOffsetAlignment() -> uint32_t;
-    auto GetOptimalBufferCopyOffsetAlignment() -> uint32_t;
+    static void Init(const RhiInitDesc &);
+    static auto GetNumFramesInFlight() -> uint32_t;
+    static auto GetFrameIndex() -> uint32_t;
+    static auto GetMinUniformBufferOffsetAlignment() -> uint32_t;
+    static auto GetOptimalBufferCopyOffsetAlignment() -> uint32_t;
 
-    auto CreateBuffer(const RhiBufferDesc &) -> RhiBuffer;
-    void NameBuffer(RhiBuffer, std::string_view name);
-    void DestroyBuffer(RhiBuffer);
+    static auto CreateBuffer(const RhiBufferDesc &) -> RhiBuffer;
+    static void NameBuffer(RhiBuffer, std::string_view name);
+    static void DestroyBuffer(RhiBuffer);
 
-    auto GetBufferSize(RhiBuffer) -> uint64_t;
+    static auto GetBufferSize(RhiBuffer) -> uint64_t;
 
-    auto MapBuffer(RhiBuffer) -> char *;
-    void UnmapBuffer(RhiBuffer);
-    void BufferMarkWritten(RhiBuffer, uint32_t offset, uint32_t size);
+    static auto MapBuffer(RhiBuffer) -> char *;
+    static void UnmapBuffer(RhiBuffer);
+    static void BufferMarkWritten(RhiBuffer, uint32_t offset, uint32_t size);
 
-    void CmdCopyBuffer(RhiCmdList cmd, RhiBuffer dst, uint32_t dstOffset, RhiBuffer src, uint32_t srcOffset,
-                       uint32_t size);
-    void CmdTransitionBuffer(RhiCmdList cmd, RhiBuffer buffer, RhiBufferState newState);
-    void CmdUavBarrierBuffer(RhiCmdList cmd, RhiBuffer buffer);
+    static void CmdCopyBuffer(RhiCmdList cmd, RhiBuffer dst, uint32_t dstOffset, RhiBuffer src, uint32_t srcOffset,
+                              uint32_t size);
+    static void CmdTransitionBuffer(RhiCmdList cmd, RhiBuffer buffer, RhiBufferState newState);
+    static void CmdUavBarrierBuffer(RhiCmdList cmd, RhiBuffer buffer);
 
-    auto CreateCmdList(RhiQueueType queueType) -> RhiCmdList;
-    void NameCmdList(RhiCmdList, std::string_view name);
-    void DestroyCmdList(RhiCmdList cmd);
+    static auto CreateCmdList(RhiQueueType queueType) -> RhiCmdList;
+    static void NameCmdList(RhiCmdList, std::string_view name);
+    static void DestroyCmdList(RhiCmdList cmd);
+    static void ResetCmdList(RhiCmdList cmd);
 
-    auto CmdSetCheckpoint(RhiCmdList cmd, uint64_t data) -> uint64_t;
-    auto GetLastCheckpointData(RhiQueueType queueType) -> uint64_t;
+    static auto CmdSetCheckpoint(RhiCmdList cmd, uint64_t data) -> uint64_t;
+    static auto GetLastCheckpointData(RhiQueueType queueType) -> uint64_t;
 
-    auto FrameBegin() -> RhiCmdList;
-    void FrameEnd();
+    static auto FrameBegin() -> RhiCmdList;
+    static void FrameEnd();
 
-    auto FrameGetCmdList() -> RhiCmdList;
+    static auto FrameGetCmdList() -> RhiCmdList;
 
-#if 0
-    auto CreateDescriptorSetLayout(const RhiDescriptorSetLayoutDesc &) -> RhiDescriptorSetLayout;
-    void DestroyDescriptorSetLayout(RhiDescriptorSetLayout);
+    static void PassBegin(RhiPassDesc);
+    static void PassEnd();
 
-    auto CreateDescriptorSet(RhiDescriptorSetLayout) -> RhiDescriptorSet;
-    void DestroyDescriptorSet(RhiDescriptorSet);
-    void WriteDescriptors(std::span<const RhiDescriptorWriteDesc>);
-#endif
+    static auto GetVertexFormatSize(RhiVertexFormat) -> uint32_t;
 
-    void PassBegin(RhiPassDesc);
-    void PassEnd();
+    static auto CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &) -> RhiGraphicsPipeline;
+    static void NameGraphicsPipeline(RhiGraphicsPipeline, std::string_view name);
+    static void DestroyGraphicsPipeline(RhiGraphicsPipeline);
 
-    auto GetVertexFormatSize(RhiVertexFormat) -> uint32_t;
+    static void CmdBindGraphicsPipeline(RhiCmdList, RhiGraphicsPipeline);
+    static void CmdBindVertexBuffers(RhiCmdList cmd, uint32_t firstBinding, std::span<const RhiBuffer> buffers,
+                                     std::span<const uint64_t> offsets);
+    static void CmdBindIndexBuffer(RhiCmdList cmd, RhiBuffer buffer, uint64_t offset);
+    static void CmdPushGraphicsConstants(RhiCmdList cmd, uint32_t offset, RhiShaderStage stage, ByteView data);
+    static void CmdDraw(RhiCmdList cmd, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
+                        uint32_t firstInstance);
+    static void CmdDrawIndexed(RhiCmdList cmd, uint32_t indexCount, int32_t vertexOffset, uint32_t instanceCount,
+                               uint32_t firstIndex, uint32_t firstInstance);
 
-    auto CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &) -> RhiGraphicsPipeline;
-    void NameGraphicsPipeline(RhiGraphicsPipeline, std::string_view name);
-    void DestroyGraphicsPipeline(RhiGraphicsPipeline);
+    static auto CreateSampler(const RhiSamplerDesc &) -> RhiSampler;
+    static void DestroySampler(RhiSampler);
 
-    void CmdBindGraphicsPipeline(RhiCmdList, RhiGraphicsPipeline);
-    void CmdBindVertexBuffers(RhiCmdList cmd, uint32_t firstBinding, std::span<const RhiBuffer> buffers,
-                              std::span<const uint64_t> offsets);
-    void CmdBindIndexBuffer(RhiCmdList cmd, RhiBuffer buffer, uint64_t offset);
-#if 0
-    void CmdBindGraphicsBindGroup(RhiCmdList, uint32_t setIndex, RhiDescriptorSet bindGroup,
-                                  std::span<const uint32_t> dynamicOffsets);
-#endif
-    void CmdPushGraphicsConstants(RhiCmdList cmd, uint32_t offset, RhiShaderStage stage, ByteView data);
-    void CmdDraw(RhiCmdList cmd, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
-                 uint32_t firstInstance);
-    void CmdDrawIndexed(RhiCmdList cmd, uint32_t indexCount, int32_t vertexOffset, uint32_t instanceCount,
-                        uint32_t firstIndex, uint32_t firstInstance);
+    static auto CreateShader(const RhiShaderDesc &) -> RhiShader;
+    static void DestroyShader(RhiShader);
 
-    auto CreateSampler(const RhiSamplerDesc &) -> RhiSampler;
-    void DestroySampler(RhiSampler);
+    static auto CreateTexture(const RhiTextureDesc &) -> RhiTexture;
+    static void DestroyTexture(RhiTexture);
+    static auto GetTextureInfo(RhiTexture) -> RhiTextureInfo;
+    static void CmdTransitionTexture(RhiCmdList, RhiTexture, RhiTextureState);
+    static void CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, uint32_t srcOffset, uint32_t size);
+    static void CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiTexture src);
 
-    auto CreateShader(const RhiShaderDesc &) -> RhiShader;
-    void DestroyShader(RhiShader);
+    static auto CreateSampledTextureView(const RhiTextureViewDesc &) -> RhiSampledTextureView;
+    static void DestroySampledTextureView(RhiSampledTextureView);
+    static auto GetTexture(RhiSampledTextureView srv) -> RhiTexture;
 
-    auto CreateTexture(const RhiTextureDesc &) -> RhiTexture;
-    void DestroyTexture(RhiTexture);
-    auto GetTextureInfo(RhiTexture) -> RhiTextureInfo;
-    void CmdTransitionTexture(RhiCmdList, RhiTexture, RhiTextureState);
-    void CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, uint32_t srcOffset, uint32_t size);
-    void CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiTexture src);
+    static auto CreateRenderTargetView(const RhiRenderTargetViewDesc &) -> RhiRenderTargetView;
+    static void DestroyRenderTargetView(RhiRenderTargetView);
+    static auto GetTexture(RhiRenderTargetView srv) -> RhiTexture;
 
-    auto CreateSampledTextureView(const RhiTextureViewDesc &) -> RhiSampledTextureView;
-    void DestroySampledTextureView(RhiSampledTextureView);
-    auto GetTexture(RhiSampledTextureView srv) -> RhiTexture;
+    static auto CreateDepthStencilView(const RhiDepthStencilViewDesc &desc) -> RhiDepthStencilView;
+    static void DestroyDepthStencilView(RhiDepthStencilView textureView);
+    static auto GetTexture(RhiDepthStencilView dsv) -> RhiTexture;
 
-    auto CreateRenderTargetView(const RhiRenderTargetViewDesc &) -> RhiRenderTargetView;
-    void DestroyRenderTargetView(RhiRenderTargetView);
-    auto GetTexture(RhiRenderTargetView srv) -> RhiTexture;
+    static auto GetBackbufferView() -> RhiRenderTargetView;
+    static void TriggerSwapchainRecreate();
 
-    auto CreateDepthStencilView(const RhiDepthStencilViewDesc &desc) -> RhiDepthStencilView;
-    void DestroyDepthStencilView(RhiDepthStencilView textureView);
-    auto GetTexture(RhiDepthStencilView dsv) -> RhiTexture;
-
-    auto GetBackbufferView() -> RhiRenderTargetView;
-    void TriggerSwapchainRecreate();
-
-    //
-
-    void SetFrameConstant(RhiCmdList cmd, std::span<const std::byte> data);
-    void SetPassConstant(RhiCmdList cmd, std::span<const std::byte> data);
-    void SetDrawConstant(RhiCmdList cmd, std::span<const std::byte> data);
-    void SetLargeDrawConstant(RhiCmdList cmd, std::span<const std::byte> data);
-
-  private:
-    class Impl;
-    Impl *m_Impl;
+    static void SetFrameConstant(RhiCmdList cmd, std::span<const std::byte> data);
+    static void SetPassConstant(RhiCmdList cmd, std::span<const std::byte> data);
+    static void SetDrawConstant(RhiCmdList cmd, std::span<const std::byte> data);
+    static void SetLargeDrawConstant(RhiCmdList cmd, std::span<const std::byte> data);
 };
-extern Rhi g_Rhi;
 
 } // namespace nyla

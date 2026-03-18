@@ -1,0 +1,13 @@
+# src=https://ftp.gnu.org/gnu/bash/bash-5.3.tar.gz
+# sig=https://ftp.gnu.org/gnu/bash/bash-5.3.tar.gz.sig
+# checksum=
+
+cd $NYLAROOT/build/sources/bash*
+make distclean || echo already clean
+./configure          \
+	--prefix=/usr    \
+	--disable-static
+make
+make DESTDIR=$DESTDIR install
+
+rm $DESTDIR/usr/share/info/dir

@@ -1,0 +1,15 @@
+cd $NYLAROOT/build/sources/ncurses*
+make distclean || echo already clean
+
+./configure --prefix=/usr           \
+            --mandir=/usr/share/man \
+            --with-shared           \
+            --without-debug         \
+            --without-normal        \
+            --enable-pc-files       \
+            --enable-widec          \
+	    --with-versioned-syms   \
+	    --disable-static
+
+make
+make DESTDIR=$DESTDIR install

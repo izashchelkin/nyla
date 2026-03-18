@@ -1,5 +1,5 @@
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(FUSE REQUIRED fuse3)
+pkg_check_modules(FUSE fuse3)
 
 add_library(nyla_debugfs
     debugfs.cc
@@ -15,6 +15,5 @@ target_include_directories(nyla_debugfs
 
 target_link_libraries(nyla_debugfs
     PUBLIC
-        nyla::commons
         ${FUSE_LIBRARIES}
 )

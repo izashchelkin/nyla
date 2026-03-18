@@ -1,0 +1,12 @@
+cd $NYLAROOT/build/sources/brotli*
+
+rm -rf out
+mkdir out
+cd out
+
+cmake -DCMAKE_BUILD_TYPE=Release  \
+      -DCMAKE_INSTALL_PREFIX=/usr \
+      ..
+
+cmake --build . --config Release -j$(nproc)
+cmake --install .

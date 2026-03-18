@@ -1,0 +1,10 @@
+cd $NYLAROOT/build/sources/curl*
+make clean || echo already clean
+./configure --prefix=/usr       \
+            --disable-static    \
+            --with-openssl      \
+            --with-zlib         \
+            --disable-ldap      \
+            --without-libidn2   \
+            --without-libsasl2
+make DESTDIR=$DESTDIR install

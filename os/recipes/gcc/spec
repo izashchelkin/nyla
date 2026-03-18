@@ -1,0 +1,20 @@
+cd $NYLAROOT/build/sources/gcc-*
+make distclean || echo already clean
+
+./configure               \
+    --prefix=/usr         \
+    --disable-multilib    \
+    --with-system-zlib    \
+    --enable-default-pie  \
+    --enable-default-ssp  \
+    --enable-host-pie     \
+    --disable-fixincludes \
+    --disable-werror      \
+    --enable-languages=c,c++,fortran
+
+#--enable-languages=c,c++,fortran,go,objc,obj-c++,m2
+
+make
+make DESTDIR=$DESTDIR install
+
+rm $DESTDIR/usr/share/info/dir

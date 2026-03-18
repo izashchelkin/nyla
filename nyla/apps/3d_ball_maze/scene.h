@@ -13,4 +13,16 @@ class Scene
   private:
 };
 
+class GameScene : Scene
+{
+  public:
+    void Process(Game &game, RhiCmdList cmd, float dt, RhiRenderTargetView rtv, RhiDepthStencilView dsv) final;
+};
+
+class LevelEditorScene : Scene
+{
+  public:
+    void Process(Game &game, RhiCmdList cmd, float dt, RhiRenderTargetView rtv, RhiDepthStencilView dsv) final;
+};
+
 } // namespace nyla

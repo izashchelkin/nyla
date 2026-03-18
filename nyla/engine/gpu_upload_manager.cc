@@ -2,44 +2,70 @@
 
 #include "nyla/commons/align.h"
 #include "nyla/commons/assert.h"
+#include "nyla/commons/byteliterals.h"
 #include "nyla/commons/log.h"
 #include "nyla/rhi/rhi.h"
-#include "nyla/rhi/rhi_buffer.h"
-#include "nyla/rhi/rhi_cmdlist.h"
 #include <cstdint>
 
 namespace nyla
 {
 
+namespace
+{
+
 constexpr uint64_t kPerFrameUploadMaxSize = 16_MiB;
+
+RhiBuffer m_StagingBuffer;
+uint64_t m_StagingBufferAt;
+
+uint64_t m_StaticVertexBufferSize;
+uint64_t m_StaticVertexBufferAt;
+RhiBuffer m_StaticVertexBuffer;
+
+uint64_t m_StaticIndexBufferSize;
+uint64_t m_StaticIndexBufferAt;
+RhiBuffer m_StaticIndexBuffer;
+
+auto PrepareCopySrc(uint64_t copySize) -> uint64_t
+{
+    AlignUp<uint64_t>(m_StagingBufferAt, Rhi::GetOptimalBufferCopyOffsetAlignment());
+    NYLA_ASSERT(m_StagingBufferAt + copySize <= kPerFrameUploadMaxSize);
+
+    Rhi::BufferMarkWritten(m_StagingBuffer, m_StagingBufferAt, copySize);
+
+    const uint64_t ret = kPerFrameUploadMaxSize * Rhi::GetFrameIndex() + m_StagingBufferAt;
+    return ret;
+}
+
+} // namespace
 
 void GpuUploadManager::Init()
 {
     m_StagingBufferAt = 0;
-    m_StagingBuffer = g_Rhi.CreateBuffer(RhiBufferDesc{
-        .size = kPerFrameUploadMaxSize * g_Rhi.GetNumFramesInFlight(),
+    m_StagingBuffer = Rhi::CreateBuffer(RhiBufferDesc{
+        .size = kPerFrameUploadMaxSize * Rhi::GetNumFramesInFlight(),
         .bufferUsage = RhiBufferUsage::CopySrc,
         .memoryUsage = RhiMemoryUsage::CpuToGpu,
     });
-    g_Rhi.NameBuffer(m_StagingBuffer, "StagingBuffer");
+    Rhi::NameBuffer(m_StagingBuffer, "StagingBuffer");
 
     m_StaticVertexBufferSize = 1_GiB;
     m_StaticVertexBufferAt = 0;
-    m_StaticVertexBuffer = g_Rhi.CreateBuffer({
+    m_StaticVertexBuffer = Rhi::CreateBuffer({
         .size = m_StaticVertexBufferSize,
         .bufferUsage = RhiBufferUsage::Vertex | RhiBufferUsage::CopyDst,
         .memoryUsage = RhiMemoryUsage::GpuOnly,
     });
-    g_Rhi.NameBuffer(m_StaticVertexBuffer, "StaticVertexBuffer");
+    Rhi::NameBuffer(m_StaticVertexBuffer, "StaticVertexBuffer");
 
     m_StaticIndexBufferSize = 256_MiB;
     m_StaticIndexBufferAt = 0;
-    m_StaticIndexBuffer = g_Rhi.CreateBuffer({
+    m_StaticIndexBuffer = Rhi::CreateBuffer({
         .size = m_StaticIndexBufferSize,
         .bufferUsage = RhiBufferUsage::Index | RhiBufferUsage::CopyDst,
         .memoryUsage = RhiMemoryUsage::GpuOnly,
     });
-    g_Rhi.NameBuffer(m_StaticIndexBuffer, "StaticIndexBuffer");
+    Rhi::NameBuffer(m_StaticIndexBuffer, "StaticIndexBuffer");
 }
 
 void GpuUploadManager::FrameBegin()
@@ -47,25 +73,14 @@ void GpuUploadManager::FrameBegin()
     m_StagingBufferAt = 0;
 }
 
-auto GpuUploadManager::PrepareCopySrc(uint64_t copySize) -> uint64_t
-{
-    AlignUp<uint64_t>(m_StagingBufferAt, g_Rhi.GetOptimalBufferCopyOffsetAlignment());
-    NYLA_ASSERT(m_StagingBufferAt + copySize <= kPerFrameUploadMaxSize);
-
-    g_Rhi.BufferMarkWritten(m_StagingBuffer, m_StagingBufferAt, copySize);
-
-    const uint64_t ret = kPerFrameUploadMaxSize * g_Rhi.GetFrameIndex() + m_StagingBufferAt;
-    return ret;
-}
-
 auto GpuUploadManager::CmdCopyBuffer(RhiCmdList cmd, RhiBuffer dst, uint64_t dstOffset, uint64_t copySize) -> char *
 {
     uint64_t offset = PrepareCopySrc(copySize);
 
-    g_Rhi.CmdCopyBuffer(cmd, dst, dstOffset, m_StagingBuffer, offset, copySize);
+    Rhi::CmdCopyBuffer(cmd, dst, dstOffset, m_StagingBuffer, offset, copySize);
     m_StagingBufferAt += copySize;
 
-    char *ret = g_Rhi.MapBuffer(m_StagingBuffer) + offset;
+    char *ret = Rhi::MapBuffer(m_StagingBuffer) + offset;
     return ret;
 }
 
@@ -73,10 +88,10 @@ auto GpuUploadManager::CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, uint64_t c
 {
     uint64_t offset = PrepareCopySrc(copySize);
 
-    g_Rhi.CmdCopyTexture(cmd, dst, m_StagingBuffer, offset, copySize);
+    Rhi::CmdCopyTexture(cmd, dst, m_StagingBuffer, offset, copySize);
     m_StagingBufferAt += copySize;
 
-    char *ret = g_Rhi.MapBuffer(m_StagingBuffer) + offset;
+    char *ret = Rhi::MapBuffer(m_StagingBuffer) + offset;
     return ret;
 }
 
@@ -100,12 +115,12 @@ auto GpuUploadManager::CmdCopyStaticIndices(RhiCmdList cmd, uint32_t copySize, u
 
 void GpuUploadManager::CmdBindStaticMeshVertexBuffer(RhiCmdList cmd, uint64_t offset)
 {
-    g_Rhi.CmdBindVertexBuffers(cmd, 0, {&m_StaticVertexBuffer, 1}, {&offset, 1});
+    Rhi::CmdBindVertexBuffers(cmd, 0, {&m_StaticVertexBuffer, 1}, {&offset, 1});
 }
 
 void GpuUploadManager::CmdBindStaticMeshIndexBuffer(RhiCmdList cmd, uint64_t offset)
 {
-    g_Rhi.CmdBindIndexBuffer(cmd, m_StaticIndexBuffer, offset);
+    Rhi::CmdBindIndexBuffer(cmd, m_StaticIndexBuffer, offset);
 }
 
 } // namespace nyla

@@ -1,0 +1,11 @@
+cd $NYLAROOT/build/sources/gmp*
+make distclean || echo already clean
+./configure              \
+	--prefix=/usr    \
+	--disable-static \
+	ABI=64           \
+	CFLAGS="-O2 -pedantic -std=gnu17"
+make
+make DESTDIR=$DESTDIR install
+
+rm $DESTDIR/usr/share/info/dir
