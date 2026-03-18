@@ -13,22 +13,21 @@
 #include "nyla/rhi/rhi.h"
 #include "vulkan/vulkan_core.h"
 
+#define spv_enable_utility_code
+
 // clang-format off
 #if defined(__linux__)
 #include "nyla/platform/linux/platform_linux.h"
 #include "vulkan/vulkan_xcb.h"
+
+#include <spirv/unified1/spirv.hpp>
 #else
 #include "nyla/platform/windows/platform_windows.h"
 #include "vulkan/vulkan_win32.h"
-#endif
-// clang-format on
 
-#define spv_enable_utility_code
-#if defined(__linux__)
-#include <spirv/unified1/spirv.hpp>
-#else
 #include <spirv-headers/spirv.hpp>
 #endif
+// clang-format on
 
 #define VK_GET_INSTANCE_PROC_ADDR(name) reinterpret_cast<PFN_##name>(vkGetInstanceProcAddr(m_Instance, #name))
 #define VK_CHECK(res) VkCheckImpl(res)
