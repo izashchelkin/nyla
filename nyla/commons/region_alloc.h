@@ -1,13 +1,12 @@
 #pragma once
 
 #include <cstdint>
-#include <cstring>
-#include <span>
 
 #include "nyla/commons/align.h"
 #include "nyla/commons/assert.h"
 #include "nyla/commons/path.h"
-#include "nyla/platform/platform.h"
+#include "nyla/commons/platform.h"
+#include "nyla/commons/str.h"
 
 namespace nyla
 {
@@ -72,27 +71,27 @@ class RegionAlloc
         return p;
     }
 
-    template <typename T> auto PushCopySpan(std::span<const T> data) -> std::span<T>
+    template <typename T> auto PushCopySpan(Span<const T> data) -> Span<T>
     {
-        std::span<T> p = PushArr<T>(data.size());
-        memcpy(p, data.data(), data.size_bytes());
+        Span<T> p = PushArr<T>(data.size());
+        MemCpy(p, data.data(), data.size_bytes());
         return p;
     }
 
-    auto PushCopyStr(Str data) -> std::span<char>
+    auto PushCopyStr(Str data) -> Span<char>
     {
-        std::span<char> p = PushArr<char>(data.Size());
-        memcpy(p.data(), data.Data(), data.Size());
+        Span<char> p = PushArr<char>(data.Size());
+        MemCpy(p.Data(), data.Data(), data.Size());
         return p;
     }
 
-    template <typename T> auto PushArr(uint32_t n) -> std::span<T>
+    template <typename T> auto PushArr(uint32_t n) -> Span<T>
     {
         static_assert(std::is_trivially_destructible_v<T>);
         static_assert(AlignedUp(sizeof(T), alignof(T)) == sizeof(T));
 
         T *const p = reinterpret_cast<T *>(PushBytes(sizeof(T) * n, alignof(T)));
-        return std::span{p, n};
+        return Span{p, n};
     }
 
     auto PushSubAlloc(uint64_t size) -> RegionAlloc

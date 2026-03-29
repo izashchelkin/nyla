@@ -1,12 +1,13 @@
 #pragma once
 
 #include <cstdint>
-#include <span>
 
 #include "nyla/commons/assert.h"
 #include "nyla/commons/bitenum.h"
 #include "nyla/commons/byteliterals.h"
+#include "nyla/commons/dllapi.h"
 #include "nyla/commons/path.h"
+#include "nyla/commons/span.h"
 #include "nyla/commons/vec.h"
 
 namespace nyla
@@ -67,10 +68,7 @@ struct PlatformInitDesc
     bool open;
 };
 
-struct FileHandle
-{
-    void *handle;
-};
+using FileHandle = void *;
 
 enum class FileOpenMode
 {
@@ -80,7 +78,7 @@ enum class FileOpenMode
 };
 NYLA_BITENUM(FileOpenMode);
 
-class Platform
+class NYLA_API Platform
 {
   public:
     static constexpr inline uint64_t kPageAllocMinSize = 64_KiB;
@@ -94,7 +92,7 @@ class Platform
     static auto GetMonotonicTimeMicros() -> uint64_t;
     static auto GetMonotonicTimeNanos() -> uint64_t;
 
-    static auto Spawn(std::span<const char *const> cmd) -> bool;
+    static auto Spawn(Span<const char *const> cmd) -> bool;
 
     static void Init(const PlatformInitDesc &desc);
     static void WinOpen();
@@ -107,28 +105,33 @@ class Platform
     static auto GetGamepadLeftTrigger(uint32_t index) -> float;
     static auto GetGamepadRightTrigger(uint32_t index) -> float;
 
+    static auto GetStdin() -> FileHandle;
+    static auto GetStdout() -> FileHandle;
+    static auto GetStderr() -> FileHandle;
+
     static auto FileValid(FileHandle file) -> bool;
     static auto FileOpen(const Path &path, FileOpenMode mode) -> FileHandle;
     static void FileClose(FileHandle file);
     static auto FileRead(FileHandle file, uint32_t size, char *out) -> uint32_t;
     static auto FileWrite(FileHandle file, uint32_t size, const char *in) -> uint32_t;
+    static void FileSeek(FileHandle file, int64_t at);
+    static auto FileTell(FileHandle file) -> uint64_t;
+
+    static void ParseStdArgs(Str *args, uint32_t len);
+
+    //
 
     template <typename T> static void FileWrite(FileHandle file, const T &data)
     {
         NYLA_ASSERT(FileWrite(file, sizeof(data), reinterpret_cast<const char *>(&data)) == sizeof(data));
     }
 
-    template <typename T> static void FileWriteSpan(FileHandle file, std::span<T> data)
+    template <typename T> static void FileWriteSpan(FileHandle file, Span<T> data)
     {
-        uint64_t expectedSize = sizeof(data[0]) * data.size();
+        uint64_t expectedSize = sizeof(data[0]) * data.Size();
         NYLA_ASSERT(FileWrite(file, expectedSize, reinterpret_cast<const char *>(&data[0])) == expectedSize);
     }
-
-    static void FileSeek(FileHandle file, int64_t at);
-    static auto FileTell(FileHandle file) -> uint64_t;
 };
-
-auto PlatformMain(std::span<const char *> argv) -> int;
 
 enum class KeyPhysical
 {

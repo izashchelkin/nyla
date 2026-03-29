@@ -42,6 +42,11 @@ inline void MemSet(void *dest, uint8_t value, uint64_t size)
 #endif
 }
 
+inline void MemZero(void *dest, uint64_t size)
+{
+    MemSet(dest, 0, size);
+}
+
 auto CStrLen(const char *str) -> uint64_t;
 auto MemEq(const char *p1, const char *p2, uint64_t len) -> bool;
 auto MemStartsWith(const char *str, uint64_t strLen, const char *prefix, uint64_t prefixLen) -> bool;

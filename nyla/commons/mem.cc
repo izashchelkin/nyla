@@ -105,4 +105,21 @@ auto MemEndsWith(const char *str, uint64_t strLen, const char *suffix, uint64_t 
         return MemEq(str + strLen - suffixLen, suffix, suffixLen);
 }
 
+//
+
+extern "C"
+{
+    void *memcpy(void *d, const void *s, size_t n)
+    {
+        nyla::MemCpy(d, s, (uint64_t)n);
+        return d;
+    }
+
+    void *memset(void *d, int v, size_t n)
+    {
+        nyla::MemSet(d, (uint8_t)v, (uint64_t)n);
+        return d;
+    }
+}
+
 } // namespace nyla

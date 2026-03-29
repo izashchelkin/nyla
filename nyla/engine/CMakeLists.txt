@@ -22,7 +22,7 @@ if (${HAS_RHI})
 
     target_link_libraries(${TARGET}
         PUBLIC
-            nyla::platform
+            nyla::commons
             nyla::platform::dir_watch
             nyla::rhi
             nyla::formats::gltf

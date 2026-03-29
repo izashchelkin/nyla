@@ -13,28 +13,45 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 include_directories(${PROJECT_SOURCE_DIR})
 
+add_definitions(-D_ITERATOR_DEBUG_LEVEL=0)
+
 if(MSVC)
-    add_link_options(
-        "/NODEFAULTLIB"
+    foreach(flag_var 
+            CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
+            CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE)
+        
+        string(REPLACE "/RTC1" "" ${flag_var} "${${flag_var}}")
+        string(REPLACE "/EHsc" "" ${flag_var} "${${flag_var}}")
+    endforeach()
+
+    add_compile_options(
+        "/GS-"           
+        "/GR-"          
+        "/EHs-c-"         
+        "/Oi-"             
+        "/Zc:threadSafeInit-"
     )
     
-    add_compile_options(
-        "/GS-"      # Disable buffer security check 
-        "/GR-"      # Disable RTTI 
-        "/EHs-c-"   # Disable C++ exceptions 
+    add_link_options(
+        "/NODEFAULTLIB"     
+        "/SUBSYSTEM:WINDOWS" 
+        "/STACK:0x100000,0x100000"
     )
 
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /NOENTRY")
+
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
-    add_link_options(
-        "-nostdlib" 
-        "-nodefaultlibs"
+    add_compile_options(
+        "-ffreestanding"    
+        "-fno-builtin"       
+        "-fno-stack-protector"
+        "-fno-exceptions"
+        "-fno-rtti"
     )
     
-    add_compile_options(
-        "-fno-builtin"         # Stop compiler from replacing loops
-        "-fno-exceptions"      # Disable C++ exceptions
-        "-fno-rtti"            # Disable RTTI
-        "-fno-stack-protector" # Disable stack guards
+    add_link_options(
+        "-nostdlib"            
+        "-nodefaultlibs"      
     )
 endif()
 

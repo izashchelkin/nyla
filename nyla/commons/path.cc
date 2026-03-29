@@ -1,5 +1,5 @@
 #include "nyla/commons/path.h"
-#include "nyla/alloc/region_alloc.h"
+#include "nyla/commons/region_alloc.h"
 #include "nyla/commons/str.h"
 
 namespace nyla

@@ -11,7 +11,7 @@ if (UNIX AND NOT APPLE)
 
     target_link_libraries(wm
         PRIVATE
-        nyla::platform::linux
+        nyla::commons
         xcb-screensaver
     )
 

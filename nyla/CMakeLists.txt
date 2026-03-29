@@ -1,8 +1,6 @@
 # set(CMAKE_CXX_CLANG_TIDY "clang-tidy")
 
 add_subdirectory(commons)
-add_subdirectory(platform)
-add_subdirectory(alloc)
 
 add_subdirectory(rhi)
 add_subdirectory(asset)

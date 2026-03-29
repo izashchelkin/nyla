@@ -1,15 +1,16 @@
-#include "nyla/platform/windows/platform_windows.h"
+#include "nyla/commons/windows/platform_windows.h"
 
 #include <cstdint>
-#include <immintrin.h>
-#include <limits>
 
 #include "nyla/commons/align.h"
 #include "nyla/commons/assert.h"
 #include "nyla/commons/byteliterals.h"
+#include "nyla/commons/dllapi.h"
 #include "nyla/commons/inline_ring.h"
-#include "nyla/platform/platform.h"
-#include "platform_windows.h"
+#include "nyla/commons/intrin.h"
+#include "nyla/commons/limits.h"
+#include "nyla/commons/platform.h"
+#include "nyla/commons/str.h"
 
 auto CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) -> LRESULT;
 
@@ -28,7 +29,7 @@ HINSTANCE g_HInstance{};
 HWND g_HWnd{};
 RECT g_WinRect{};
 
-std::array<XINPUT_STATE, 1> g_Gamepads{};
+Array<XINPUT_STATE, 1> g_Gamepads{{}};
 
 static inline constexpr uint32_t kFlagQuit = 1 << 0;
 static inline constexpr uint32_t kFlagWinResize = 1 << 1;
@@ -44,11 +45,13 @@ namespace
 
 auto GetPerformanceFreq() -> uint64_t
 {
-    static const auto freq = [] -> uint64_t {
+    static uint64_t freq = 0;
+    if (freq == 0)
+    {
         LARGE_INTEGER freq;
         QueryPerformanceFrequency(&freq);
         return static_cast<uint64_t>(freq.QuadPart);
-    }();
+    };
     return freq;
 }
 
@@ -71,7 +74,7 @@ auto TicksTo(uint64_t ticks, uint64_t scale) -> uint64_t
 
 } // namespace
 
-auto Platform::GetMonotonicTimeMillis() -> uint64_t
+auto NYLA_API Platform::GetMonotonicTimeMillis() -> uint64_t
 {
     return TicksTo(GetPerformanceTicks(), 1'000ULL);
 }
@@ -238,11 +241,11 @@ namespace
 
 auto GetGamepadStick(auto rawX, auto rawY, auto rawDeadzone) -> float2
 {
-    const float x = (float)rawX / (float)std::numeric_limits<int16_t>::max();
-    const float y = (float)rawY / (float)std::numeric_limits<int16_t>::max();
+    const float x = (float)rawX / (float)Limits<int16_t>::Max();
+    const float y = (float)rawY / (float)Limits<int16_t>::Max();
 
-    const float magnitude = std::sqrt(x * x + y * y);
-    const float deadzone = (float)rawDeadzone / (float)std::numeric_limits<int16_t>::max();
+    const float magnitude = Sqrt(x * x + y * y);
+    const float deadzone = (float)rawDeadzone / (float)Limits<int16_t>::Max();
 
     if (magnitude < deadzone)
     {
@@ -257,8 +260,8 @@ auto GetGamepadStick(auto rawX, auto rawY, auto rawDeadzone) -> float2
 
 auto GetGamepadTrigger(uint8_t rawValue, uint8_t rawDeadzone) -> float
 {
-    const float val = (float)rawValue / (float)std::numeric_limits<uint8_t>::max();
-    const float deadzone = (float)rawDeadzone / (float)std::numeric_limits<uint8_t>::max();
+    const float val = (float)rawValue / (float)Limits<uint8_t>::Max();
+    const float deadzone = (float)rawDeadzone / (float)Limits<uint8_t>::Max();
 
     if (val < deadzone)
     {
@@ -539,7 +542,7 @@ auto WindowsPlatform::ScanCodeToKeyPhysical(uint8_t scanCode, bool extended) -> 
 
 auto Platform::FileValid(FileHandle file) -> bool
 {
-    auto hFile = reinterpret_cast<HANDLE>(file.handle);
+    auto hFile = reinterpret_cast<HANDLE>(file);
     return hFile != nullptr && hFile != INVALID_HANDLE_VALUE;
 }
 
@@ -583,7 +586,7 @@ auto Platform::FileOpen(const Path &path, FileOpenMode mode) -> FileHandle
         }
     }
 
-    return {reinterpret_cast<void *>(hFile)};
+    return reinterpret_cast<void *>(hFile);
 }
 
 void Platform::FileClose(FileHandle file)
@@ -591,13 +594,13 @@ void Platform::FileClose(FileHandle file)
     if (!FileValid(file))
         return;
 
-    auto hFile = reinterpret_cast<HANDLE>(file.handle);
+    auto hFile = reinterpret_cast<HANDLE>(file);
     CloseHandle(hFile);
 }
 
 auto Platform::FileRead(FileHandle file, uint32_t size, char *out) -> uint32_t
 {
-    auto hFile = reinterpret_cast<HANDLE>(file.handle);
+    auto hFile = reinterpret_cast<HANDLE>(file);
     DWORD bytesRead = 0;
 
     ReadFile(hFile,      // hFile
@@ -611,7 +614,7 @@ auto Platform::FileRead(FileHandle file, uint32_t size, char *out) -> uint32_t
 
 auto Platform::FileWrite(FileHandle file, uint32_t size, const char *in) -> uint32_t
 {
-    auto hFile = reinterpret_cast<HANDLE>(file.handle);
+    auto hFile = reinterpret_cast<HANDLE>(file);
     DWORD bytesWritten = 0;
 
     WriteFile(hFile,         // hFile
@@ -625,7 +628,7 @@ auto Platform::FileWrite(FileHandle file, uint32_t size, const char *in) -> uint
 
 void Platform::FileSeek(FileHandle file, int64_t at)
 {
-    auto hFile = reinterpret_cast<HANDLE>(file.handle);
+    auto hFile = reinterpret_cast<HANDLE>(file);
 
     LARGE_INTEGER distanceToMove;
     distanceToMove.QuadPart = at;
@@ -639,7 +642,7 @@ void Platform::FileSeek(FileHandle file, int64_t at)
 
 auto Platform::FileTell(FileHandle file) -> uint64_t
 {
-    auto hFile = reinterpret_cast<HANDLE>(file.handle);
+    auto hFile = reinterpret_cast<HANDLE>(file);
 
     LARGE_INTEGER distanceToMove{};
     LARGE_INTEGER newFilePointer{};
@@ -655,83 +658,102 @@ auto Platform::FileTell(FileHandle file) -> uint64_t
     }
 }
 
-} // namespace nyla
-
-auto WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, int nCmdShow) -> int
+auto Platform::GetStdin() -> FileHandle
 {
-    using namespace nyla;
+    return GetStdHandle(STD_INPUT_HANDLE);
+}
 
-#ifndef NDEBUG
-    NYLA_ASSERT(AllocConsole());
+auto Platform::GetStdout() -> FileHandle
+{
+    return GetStdHandle(STD_OUTPUT_HANDLE);
+}
 
-    FILE *f;
-    freopen_s(&f, "CONOUT$", "w", stdout);
-    freopen_s(&f, "CONOUT$", "w", stderr);
-    freopen_s(&f, "CONIN$", "r", stdin);
-#endif
+auto Platform::GetStderr() -> FileHandle
+{
+    return GetStdHandle(STD_ERROR_HANDLE);
+}
 
-    // 1. Get the full ANSI command line (includes the executable path)
-    const char *rawCmdLine = GetCommandLineA();
-
-    // Calculate length manually (no CRT strlen)
-    size_t len = 0;
-    while (rawCmdLine[len] != '\0')
-        len++;
-
-    // 2. Allocate a mutable copy using the native Win32 Heap (no CRT malloc/new)
-    char *cmdCopy = static_cast<char *>(HeapAlloc(GetProcessHeap(), 0, len + 1));
-    for (size_t i = 0; i <= len; ++i)
-    {
-        cmdCopy[i] = rawCmdLine[i];
-    }
-
-    // 3. Parse the string in-place (strip quotes and replace spaces with null terminators)
-    constexpr size_t kMaxArgs = 256;
-    const char *argv[kMaxArgs];
-    size_t argc = 0;
-
-    char *src = cmdCopy;
-    char *dst = cmdCopy;
+void Platform::ParseStdArgs(Str *args, uint32_t len)
+{
     bool inQuotes = false;
-    bool newArg = true;
+    auto cmdLine = Str{GetCommandLineA()};
 
-    while (*src != '\0' && argc < kMaxArgs)
+    const char *lastArgStart = cmdLine.Data();
+    uint32_t lastArgLen = 0;
+
+    uint32_t iarg = 0;
+    for (char ch : cmdLine)
     {
-        if (newArg)
-        {
-            // Skip leading whitespace
-            while (*src == ' ' || *src == '\t')
-                src++;
-            if (*src == '\0')
-                break;
+        bool cut = false;
 
-            argv[argc++] = dst;
-            newArg = false;
-        }
-
-        if (*src == '"')
+        if (ch == '"')
         {
             inQuotes = !inQuotes;
-            src++; // Skip the quote character
-        }
-        else if ((*src == ' ' || *src == '\t') && !inQuotes)
-        {
-            *dst++ = '\0'; // Terminate the current argument
-            src++;
-            newArg = true;
+            if (!inQuotes)
+                cut = true;
         }
         else
         {
-            *dst++ = *src++; // Shift characters left if we stripped quotes
+            if (!inQuotes && ch == ' ')
+                cut = true;
+        }
+
+        if (cut)
+        {
+            args[iarg++] = Str{lastArgStart, lastArgLen};
+            lastArgStart += lastArgLen + 2;
+            lastArgLen = 0;
+        }
+        else
+        {
+            ++lastArgLen;
         }
     }
-    *dst = '\0'; // Safely terminate the final string
+    NYLA_ASSERT(!inQuotes);
 
-    const int retCode = PlatformMain(std::span<const char *>{(const char **)__argv, (uint32_t)__argc});
+    if (lastArgLen > 0)
+        args[iarg++] = Str{lastArgStart, lastArgLen};
+}
+
+auto __declspec(dllexport) EntryPointWin32(int (*fnMain)(), HINSTANCE hInstance, HINSTANCE hPrevInstance,
+                                           PSTR lpCmdLine, int nCmdShow) -> int
+{
+#ifndef NDEBUG
+    NYLA_ASSERT(AllocConsole());
+
+    void *hConOut =
+        CreateFileA("CONOUT$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr);
+    void *hConIn =
+        CreateFileA("CONIN$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
+
+    SetStdHandle(STD_INPUT_HANDLE, hConIn);
+    SetStdHandle(STD_OUTPUT_HANDLE, hConOut);
+    SetStdHandle(STD_ERROR_HANDLE, hConOut);
+#endif
+
+    const int retCode = fnMain();
 
 #ifndef NDEBUG
-    getc(stdin);
+    DWORD read;
+    INPUT_RECORD ir;
+    ReadConsoleInputA(GetStdHandle(STD_INPUT_HANDLE), &ir, 1, &read);
 #endif
 
     return retCode;
+}
+
+} // namespace nyla
+
+extern "C"
+{
+    int _fltused = 0;
+    void __cdecl _RTC_InitBase()
+    {
+    }
+    void __cdecl _RTC_Shutdown()
+    {
+    }
+    void __cdecl _RTC_CheckStackVars(void *, void *)
+    {
+    }
 }

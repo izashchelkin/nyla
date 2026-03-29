@@ -1,7 +1,6 @@
 #pragma once
 
-#include <cstdio>  // IWYU pragma: keep
-#include <cstdlib> // IWYU pragma: keep
+#include "nyla/commons/fmt.h"
 
 #if defined(_MSC_VER)
 #define NYLA_DEBUGBREAK() __debugbreak()
@@ -26,10 +25,9 @@
     {                                                                                                                  \
         if (!(cond))                                                                                                   \
         {                                                                                                              \
-            std::fprintf(stderr, "%s:%d: assertion failed: %s\n", __FILE__, __LINE__, #cond);                          \
-            std::fflush(stderr);                                                                                       \
+            NYLA_LOG("%s:%d: assertion failed: %s", __FILE__, __LINE__, #cond);                                        \
             NYLA_DEBUGBREAK();                                                                                         \
-            std::abort();                                                                                              \
+            *(volatile int *)(0) = 0;                                                                                  \
         }                                                                                                              \
     } while (0)
 

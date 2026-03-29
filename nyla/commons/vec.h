@@ -1,16 +1,12 @@
 #pragma once
 
-#include "nyla/commons/assert.h"
-
-#include <algorithm>
-#include <array>
-#include <cmath>
-#include <complex>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
-#include <initializer_list>
-#include <ranges>
+
+#include "nyla/commons/array.h"
+#include "nyla/commons/complex.h"
+#include "nyla/commons/minmax.h"
 
 namespace nyla
 {
@@ -24,7 +20,7 @@ template <typename T, uint32_t N> class Vec
         requires std::convertible_to<K, T>
     constexpr explicit Vec(const Vec<K, M> &v)
     {
-        auto count = std::min<uint32_t>(N, M);
+        auto count = Min(N, M);
         for (uint32_t i = 0; i < count; ++i)
             m_Data[i] = static_cast<T>(v[i]);
     }
@@ -41,9 +37,9 @@ template <typename T, uint32_t N> class Vec
     {
     }
 
-    constexpr Vec(std::complex<T> c)
+    constexpr Vec(Complex<T> c)
         requires(N == 2)
-        : m_Data{c.imag(), c.real()}
+        : m_Data{c.Real(), c.Imag()}
     {
     }
 
@@ -59,10 +55,10 @@ template <typename T, uint32_t N> class Vec
     {
     }
 
-    constexpr explicit operator std::complex<T>() const
+    constexpr explicit operator Complex<T>() const
         requires(N == 2)
     {
-        return std::complex{m_Data[1], m_Data[0]};
+        return Complex{m_Data[1], m_Data[0]};
     }
 
     [[nodiscard]] constexpr auto data() const -> const T *
@@ -73,14 +69,12 @@ template <typename T, uint32_t N> class Vec
     [[nodiscard]]
     constexpr auto operator[](size_t i) const -> const T &
     {
-        NYLA_ASSERT(i < N);
         return m_Data[i];
     }
 
     [[nodiscard]]
     constexpr auto operator[](size_t i) -> T &
     {
-        NYLA_ASSERT(i < N);
         return m_Data[i];
     }
 
@@ -116,7 +110,7 @@ template <typename T, uint32_t N> class Vec
     [[nodiscard]]
     constexpr auto Len() const -> T
     {
-        return std::sqrt(LenSqr());
+        return Sqrt(LenSqr());
     }
 
     //
@@ -210,7 +204,7 @@ template <typename T, uint32_t N> class Vec
     }
 
   private:
-    std::array<T, N> m_Data;
+    Array<T, N> m_Data;
 };
 
 using float4 = Vec<float, 4>;

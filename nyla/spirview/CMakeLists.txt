@@ -7,5 +7,5 @@ target_sources(nyla_spirview_bin
 
 target_link_libraries(nyla_spirview_bin
     PUBLIC
-        nyla::platform
+        nyla::commons
 )

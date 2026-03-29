@@ -1,10 +1,10 @@
 #pragma once
 
+#include "nyla/commons/array.h"
 #include "nyla/commons/assert.h"
 
-#include <array>
+#include <concepts>
 #include <cstdint>
-#include <span>
 
 namespace nyla
 {
@@ -86,7 +86,7 @@ template <typename T, uint32_t N> class InlineRing
     }
 
   private:
-    std::array<T, N> m_Data;
+    Array<T, N> m_Data;
     size_type m_Write{};
     size_type m_Read{};
 };
