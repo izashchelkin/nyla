@@ -5,11 +5,6 @@ target_sources(nyla_spirview_bin
         main.cc
 )
 
-target_include_directories(nyla_spirview_bin
-    PUBLIC
-        ${PROJECT_SOURCE_DIR}  
-)
-
 target_link_libraries(nyla_spirview_bin
     PUBLIC
         nyla::platform

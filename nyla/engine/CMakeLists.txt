@@ -20,11 +20,6 @@ if (${HAS_RHI})
             tween_manager.cc
     )
 
-    target_include_directories(${TARGET}
-        PUBLIC
-        ${PROJECT_SOURCE_DIR}
-    )
-
     target_link_libraries(${TARGET}
         PUBLIC
             nyla::platform

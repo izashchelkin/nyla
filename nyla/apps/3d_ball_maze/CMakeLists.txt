@@ -15,8 +15,6 @@ if (${HAS_ENGINE})
         level_editor_scene.cc
     )
 
-    target_include_directories(${TARGET} PRIVATE ${PROJECT_SOURCE_DIR})
-
     target_link_libraries(${TARGET} PRIVATE nyla::engine)
 
     if (WIN32)

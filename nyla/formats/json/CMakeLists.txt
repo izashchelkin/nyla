@@ -10,8 +10,3 @@ target_sources(${TARGET}
         json.h
         json_value.h
 )
-
-target_include_directories(${TARGET}
-    PUBLIC
-        ${PROJECT_SOURCE_DIR}
-)

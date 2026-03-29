@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <immintrin.h>
 #include <limits>
-#include <span>
 
 #include "nyla/commons/align.h"
 #include "nyla/commons/assert.h"
@@ -538,6 +537,124 @@ auto WindowsPlatform::ScanCodeToKeyPhysical(uint8_t scanCode, bool extended) -> 
     }
 }
 
+auto Platform::FileValid(FileHandle file) -> bool
+{
+    auto hFile = reinterpret_cast<HANDLE>(file.handle);
+    return hFile != nullptr && hFile != INVALID_HANDLE_VALUE;
+}
+
+auto Platform::FileOpen(const Path &path, FileOpenMode mode) -> FileHandle
+{
+    DWORD dwDesiredAccess = 0;
+    DWORD dwCreationDisposition = 0;
+
+    if (Any(mode & FileOpenMode::Read))
+    {
+        dwDesiredAccess |= GENERIC_READ;
+        dwCreationDisposition = OPEN_EXISTING;
+    }
+
+    if (Any(mode & FileOpenMode::Append))
+    {
+        dwDesiredAccess |= GENERIC_WRITE;
+        dwCreationDisposition = OPEN_ALWAYS;
+    }
+    if (Any(mode & FileOpenMode::Write))
+    {
+        dwDesiredAccess |= GENERIC_WRITE;
+        dwCreationDisposition = CREATE_ALWAYS;
+    }
+
+    auto hFile = CreateFileA(path.CStr(), // lpFileName
+                             dwDesiredAccess,
+                             FILE_SHARE_READ, // dwShareMode
+                             nullptr,         // lpSecurityAttributes
+                             dwCreationDisposition,
+                             FILE_ATTRIBUTE_NORMAL, // dwFlagsAndAttributes
+                             nullptr                // hTemplateFile
+    );
+
+    if (hFile && hFile != INVALID_HANDLE_VALUE)
+    {
+        if (Any(mode & FileOpenMode::Append))
+        {
+            LARGE_INTEGER distanceToMove{};
+            SetFilePointerEx(hFile, distanceToMove, nullptr, FILE_END);
+        }
+    }
+
+    return {reinterpret_cast<void *>(hFile)};
+}
+
+void Platform::FileClose(FileHandle file)
+{
+    if (!FileValid(file))
+        return;
+
+    auto hFile = reinterpret_cast<HANDLE>(file.handle);
+    CloseHandle(hFile);
+}
+
+auto Platform::FileRead(FileHandle file, uint32_t size, char *out) -> uint32_t
+{
+    auto hFile = reinterpret_cast<HANDLE>(file.handle);
+    DWORD bytesRead = 0;
+
+    ReadFile(hFile,      // hFile
+             out,        // lpBuffer
+             size,       // nNumberOfBytesToRead
+             &bytesRead, // lpNumberOfBytesRead
+             nullptr     // lpOverlapped
+    );
+    return bytesRead;
+}
+
+auto Platform::FileWrite(FileHandle file, uint32_t size, const char *in) -> uint32_t
+{
+    auto hFile = reinterpret_cast<HANDLE>(file.handle);
+    DWORD bytesWritten = 0;
+
+    WriteFile(hFile,         // hFile
+              in,            // lpBuffer
+              size,          // nNumberOfBytesToWrite
+              &bytesWritten, // lpNumberOfBytesWritten
+              nullptr        // lpOverlapped
+    );
+    return bytesWritten;
+}
+
+void Platform::FileSeek(FileHandle file, int64_t at)
+{
+    auto hFile = reinterpret_cast<HANDLE>(file.handle);
+
+    LARGE_INTEGER distanceToMove;
+    distanceToMove.QuadPart = at;
+
+    SetFilePointerEx(hFile,          // hFile
+                     distanceToMove, // liDistanceToMove
+                     nullptr,        // lpNewFilePointer
+                     FILE_BEGIN      // dwMoveMethod
+    );
+}
+
+auto Platform::FileTell(FileHandle file) -> uint64_t
+{
+    auto hFile = reinterpret_cast<HANDLE>(file.handle);
+
+    LARGE_INTEGER distanceToMove{};
+    LARGE_INTEGER newFilePointer{};
+
+    if (SetFilePointerEx(hFile, distanceToMove, &newFilePointer, FILE_CURRENT))
+    {
+        return newFilePointer.QuadPart;
+    }
+    else
+    { // failed
+        NYLA_ASSERT(false);
+        return 0ULL;
+    }
+}
+
 } // namespace nyla
 
 auto WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, int nCmdShow) -> int
@@ -552,6 +669,63 @@ auto WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine
     freopen_s(&f, "CONOUT$", "w", stderr);
     freopen_s(&f, "CONIN$", "r", stdin);
 #endif
+
+    // 1. Get the full ANSI command line (includes the executable path)
+    const char *rawCmdLine = GetCommandLineA();
+
+    // Calculate length manually (no CRT strlen)
+    size_t len = 0;
+    while (rawCmdLine[len] != '\0')
+        len++;
+
+    // 2. Allocate a mutable copy using the native Win32 Heap (no CRT malloc/new)
+    char *cmdCopy = static_cast<char *>(HeapAlloc(GetProcessHeap(), 0, len + 1));
+    for (size_t i = 0; i <= len; ++i)
+    {
+        cmdCopy[i] = rawCmdLine[i];
+    }
+
+    // 3. Parse the string in-place (strip quotes and replace spaces with null terminators)
+    constexpr size_t kMaxArgs = 256;
+    const char *argv[kMaxArgs];
+    size_t argc = 0;
+
+    char *src = cmdCopy;
+    char *dst = cmdCopy;
+    bool inQuotes = false;
+    bool newArg = true;
+
+    while (*src != '\0' && argc < kMaxArgs)
+    {
+        if (newArg)
+        {
+            // Skip leading whitespace
+            while (*src == ' ' || *src == '\t')
+                src++;
+            if (*src == '\0')
+                break;
+
+            argv[argc++] = dst;
+            newArg = false;
+        }
+
+        if (*src == '"')
+        {
+            inQuotes = !inQuotes;
+            src++; // Skip the quote character
+        }
+        else if ((*src == ' ' || *src == '\t') && !inQuotes)
+        {
+            *dst++ = '\0'; // Terminate the current argument
+            src++;
+            newArg = true;
+        }
+        else
+        {
+            *dst++ = *src++; // Shift characters left if we stripped quotes
+        }
+    }
+    *dst = '\0'; // Safely terminate the final string
 
     const int retCode = PlatformMain(std::span<const char *>{(const char **)__argv, (uint32_t)__argc});
 

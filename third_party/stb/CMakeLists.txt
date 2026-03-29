@@ -7,8 +7,3 @@ target_sources(${TARGET}
     PUBLIC
         stb_image.h
 )
-
-target_include_directories(${TARGET}
-    PUBLIC
-        ${PROJECT_SOURCE_DIR}
-)

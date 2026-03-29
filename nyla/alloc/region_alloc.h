@@ -1,58 +1,23 @@
 #pragma once
 
-#include "nyla/commons/align.h"
-#include "nyla/commons/assert.h"
-#include "nyla/platform/platform.h"
 #include <cstdint>
 #include <cstring>
 #include <span>
 
+#include "nyla/commons/align.h"
+#include "nyla/commons/assert.h"
+#include "nyla/commons/path.h"
+#include "nyla/platform/platform.h"
+
 namespace nyla
 {
-
-class Path;
 
 class RegionAlloc
 {
   public:
-    void Init(void *base, uint64_t maxSize, bool ownsPages)
-    {
-        NYLA_ASSERT(ownsPages || base);
+    void Init(void *base, uint64_t maxSize, bool ownsPages);
 
-        m_OwnsPages = ownsPages;
-        m_Used = 0;
-        m_Size = 0;
-        m_MaxSize = maxSize;
-
-        if (base)
-            m_Base = (char *)base;
-        else
-            m_Base = Platform::ReserveMemPages(maxSize);
-    }
-
-    auto PushBytes(uint64_t size, uint32_t align) -> char *
-    {
-        AlignUp<uint64_t>(m_Used, align);
-        char *const ret = m_Base + m_Used;
-        m_Used += size;
-
-        if (m_Used > m_Size)
-        {
-            if (m_OwnsPages)
-            {
-                AlignUp(m_Used, Platform::GetMemPageSize());
-                NYLA_ASSERT(m_Used <= m_MaxSize);
-
-                char *const p = m_Base + m_Size;
-                Platform::CommitMemPages(p, m_Used - m_Size);
-            }
-
-            m_Size = m_Used;
-        }
-
-        NYLA_ASSERT(m_Size <= m_MaxSize);
-        return ret;
-    }
+    auto PushBytes(uint64_t size, uint32_t align) -> char *;
 
     void Pop(void *p)
     {
@@ -114,10 +79,10 @@ class RegionAlloc
         return p;
     }
 
-    auto PushCopyStrView(std::string_view data) -> std::span<char>
+    auto PushCopyStr(Str data) -> std::span<char>
     {
-        std::span<char> p = PushArr<char>(data.size());
-        memcpy(p.data(), data.data(), data.size());
+        std::span<char> p = PushArr<char>(data.Size());
+        memcpy(p.data(), data.Data(), data.Size());
         return p;
     }
 
@@ -140,8 +105,22 @@ class RegionAlloc
         return subAlloc;
     }
 
-    auto PushPath() -> Path;
-    auto PushPath(std::string_view) -> Path;
+    auto PushPath() -> Path
+    {
+        Path path;
+        path.Init(this);
+        return path;
+    }
+
+    auto PushPath(Str path) -> Path
+    {
+        return PushPath().Append(path);
+    }
+
+    auto ClonePath(Path &path) -> Path
+    {
+        return PushPath().Append(path.GetStr());
+    }
 
   private:
     bool m_OwnsPages;

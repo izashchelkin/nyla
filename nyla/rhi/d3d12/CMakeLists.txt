@@ -8,11 +8,6 @@ target_sources(${TARGET}
         rhi_d3d12_swapchain.cc
 )
 
-target_include_directories(${TARGET}
-    PUBLIC
-        ${PROJECT_SOURCE_DIR}
-)
-
 find_package(Vulkan REQUIRED)
 
 target_link_libraries(${TARGET}

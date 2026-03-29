@@ -1,15 +1,13 @@
 set(TARGET nyla_alloc)
 add_library(${TARGET})
-add_library(nyla::alloc LIAS ${TARGET})
+add_library(nyla::alloc ALIAS ${TARGET})
 
 target_sources(${TARGET}
-    INTERFACE
-        region_alloc.h
-)
-
-target_include_directories(${TARGET}
+    PRIVATE
+        region_alloc.cc
     PUBLIC
-        ${PROJECT_SOURCE_DIR}
+        region_alloc.h
+        mutstr.h
 )
 
 target_link_libraries(${TARGET}
@@ -28,11 +26,6 @@ endif()
 target_sources(${REGION_ALLOC_TEST}
     PRIVATE
       region_alloc_test.cc
-)
-
-target_include_directories(${REGION_ALLOC_TEST}
-    PUBLIC
-        ${PROJECT_SOURCE_DIR}
 )
 
 target_link_libraries(${REGION_ALLOC_TEST}

@@ -17,11 +17,14 @@
 namespace nyla
 {
 
+// TODO: we need a real asset system!
+
 namespace
 {
 
 struct TextureData
 {
+    bool isStatic;
     std::string path;
     bool needsUpload;
 
@@ -31,7 +34,7 @@ struct TextureData
     uint32_t height = 0;
     uint32_t channels = 0;
 };
-HandlePool<AssetManager::Texture, TextureData, 128> m_Textures;
+HandlePool<AssetManager::Texture, TextureData, 128> g_Textures;
 
 struct MeshData
 {
@@ -48,20 +51,7 @@ struct MeshData
 
     bool needsUpload;
 };
-HandlePool<AssetManager::Mesh, MeshData, 128> m_Meshes;
-
-struct MeshPrimitiveData
-{
-};
-HandlePool<AssetManager::Mesh, MeshData, 128> m_MeshPrimitives;
-
-//
-
-struct GltfMeshUploadQueueEntry
-{
-    char *path;
-};
-RegionAlloc m_GltfMeshUploadQueue;
+HandlePool<AssetManager::Mesh, MeshData, 128> g_Meshes;
 
 } // namespace
 
@@ -131,7 +121,7 @@ void AssetManager::Init()
 
 void AssetManager::Flush()
 {
-    for (auto &slot : m_Textures)
+    for (auto &slot : g_Textures)
     {
         if (slot.used)
         {
@@ -142,7 +132,7 @@ void AssetManager::Flush()
         }
     }
 
-    for (auto &slot : m_Meshes)
+    for (auto &slot : g_Meshes)
     {
         if (slot.used)
         {
@@ -153,9 +143,9 @@ void AssetManager::Flush()
 
 void AssetManager::Upload(RhiCmdList cmd)
 {
-    for (uint32_t i = 0; i < m_Meshes.size(); ++i)
+    for (uint32_t i = 0; i < g_Meshes.size(); ++i)
     {
-        auto &slot = *(m_Meshes.begin() + i);
+        auto &slot = *(g_Meshes.begin() + i);
         if (!slot.used)
             continue;
 
@@ -317,9 +307,9 @@ void AssetManager::Upload(RhiCmdList cmd)
         meshData.needsUpload = false;
     }
 
-    for (uint32_t i = 0; i < m_Textures.size(); ++i)
+    for (uint32_t i = 0; i < g_Textures.size(); ++i)
     {
-        auto &slot = *(m_Textures.begin() + i);
+        auto &slot = *(g_Textures.begin() + i);
         if (!slot.used)
             continue;
 
@@ -374,7 +364,7 @@ void AssetManager::Upload(RhiCmdList cmd)
 
 auto AssetManager::DeclareTexture(std::string_view path) -> Texture
 {
-    return m_Textures.Acquire(TextureData{
+    return g_Textures.Acquire(TextureData{
         .path = std::string{path},
         .needsUpload = true,
     });
@@ -382,7 +372,7 @@ auto AssetManager::DeclareTexture(std::string_view path) -> Texture
 
 auto AssetManager::GetRhiSampledTextureView(Texture texture, RhiSampledTextureView &out) -> bool
 {
-    const auto &data = m_Textures.ResolveData(texture);
+    const auto &data = g_Textures.ResolveData(texture);
     if (HandleIsSet(data.texture))
     {
         out = data.textureView;
@@ -394,7 +384,7 @@ auto AssetManager::GetRhiSampledTextureView(Texture texture, RhiSampledTextureVi
 
 auto AssetManager::GetRhiSampledTextureView(Mesh mesh, RhiSampledTextureView &out) -> bool
 {
-    const auto &data = m_Meshes.ResolveData(mesh);
+    const auto &data = g_Meshes.ResolveData(mesh);
     if (HandleIsSet(data.texture))
         return GetRhiSampledTextureView(data.texture, out);
     else
@@ -403,7 +393,7 @@ auto AssetManager::GetRhiSampledTextureView(Mesh mesh, RhiSampledTextureView &ou
 
 auto AssetManager::DeclareMesh(std::string_view path) -> Mesh
 {
-    return m_Meshes.Acquire(MeshData{
+    return g_Meshes.Acquire(MeshData{
         .isStatic = false,
         .gltfPath = Engine::GetPermanentAlloc().PushPath(path),
         .needsUpload = true,
@@ -412,7 +402,7 @@ auto AssetManager::DeclareMesh(std::string_view path) -> Mesh
 
 auto AssetManager::DeclareStaticMesh(std::span<const char> vertexData, std::span<const uint16_t> indices) -> Mesh
 {
-    return m_Meshes.Acquire(MeshData{
+    return g_Meshes.Acquire(MeshData{
         .isStatic = true,
         .vertexData = vertexData,
         .indices = indices,
@@ -422,7 +412,7 @@ auto AssetManager::DeclareStaticMesh(std::span<const char> vertexData, std::span
 
 void AssetManager::CmdBindMesh(RhiCmdList cmd, Mesh mesh)
 {
-    const auto &meshData = m_Meshes.ResolveData(mesh);
+    const auto &meshData = g_Meshes.ResolveData(mesh);
     NYLA_ASSERT(!meshData.needsUpload);
 
     GpuUploadManager::CmdBindStaticMeshVertexBuffer(cmd, meshData.vertexBufferOffset);
@@ -431,7 +421,7 @@ void AssetManager::CmdBindMesh(RhiCmdList cmd, Mesh mesh)
 
 void AssetManager::CmdDrawMesh(RhiCmdList cmd, AssetManager::Mesh mesh)
 {
-    const auto &meshData = m_Meshes.ResolveData(mesh);
+    const auto &meshData = g_Meshes.ResolveData(mesh);
     NYLA_ASSERT(!meshData.needsUpload);
 
     Rhi::CmdDrawIndexed(cmd, meshData.indexCount, 0, 1, 0, 0);

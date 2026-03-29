@@ -9,11 +9,6 @@ if (UNIX AND NOT APPLE)
         window_manager.cc
     )
 
-    target_include_directories(wm
-        PRIVATE
-        ${PROJECT_SOURCE_DIR}
-    )
-
     target_link_libraries(wm
         PRIVATE
         nyla::platform::linux

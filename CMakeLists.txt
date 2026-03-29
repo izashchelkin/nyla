@@ -11,6 +11,33 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 # set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+include_directories(${PROJECT_SOURCE_DIR})
+
+if(MSVC)
+    add_link_options(
+        "/NODEFAULTLIB"
+    )
+    
+    add_compile_options(
+        "/GS-"      # Disable buffer security check 
+        "/GR-"      # Disable RTTI 
+        "/EHs-c-"   # Disable C++ exceptions 
+    )
+
+elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+    add_link_options(
+        "-nostdlib" 
+        "-nodefaultlibs"
+    )
+    
+    add_compile_options(
+        "-fno-builtin"         # Stop compiler from replacing loops
+        "-fno-exceptions"      # Disable C++ exceptions
+        "-fno-rtti"            # Disable RTTI
+        "-fno-stack-protector" # Disable stack guards
+    )
+endif()
+
 add_subdirectory(nyla)
 add_subdirectory(third_party)
 

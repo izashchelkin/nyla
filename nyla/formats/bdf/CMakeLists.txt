@@ -13,8 +13,3 @@ target_link_libraries(${TARGET}
     PUBLIC
         nyla::platform
 )
-
-target_include_directories(${TARGET}
-    PUBLIC
-        ${PROJECT_SOURCE_DIR}
-)

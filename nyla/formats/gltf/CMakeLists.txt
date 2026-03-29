@@ -9,11 +9,6 @@ target_sources(${TARGET}
         gltf.h
 )
 
-target_include_directories(${TARGET}
-    PUBLIC
-        ${PROJECT_SOURCE_DIR}
-)
-
 target_link_libraries(${TARGET}
     PUBLIC
         nyla::formats::json

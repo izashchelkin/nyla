@@ -22,7 +22,6 @@ target_sources(${TARGET}
 
 target_include_directories(${TARGET}
     PUBLIC
-        ${PROJECT_SOURCE_DIR}
         ${DBUS_INCLUDE_DIRS}
 )
 

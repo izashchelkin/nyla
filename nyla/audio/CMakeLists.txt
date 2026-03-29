@@ -7,11 +7,6 @@ target_sources(${TARGET}
         wave.cc
 )
 
-target_include_directories(${TARGET}
-    PUBLIC
-        ${PROJECT_SOURCE_DIR}
-)
-
 #
 
 set(TARGET_EXEC nyla_audio_main)
@@ -20,11 +15,6 @@ add_executable(${TARGET_EXEC})
 target_sources(${TARGET_EXEC}
     PRIVATE
         main.cc
-)
-
-target_include_directories(${TARGET_EXEC}
-    PUBLIC
-        ${PROJECT_SOURCE_DIR}
 )
 
 target_link_libraries(${TARGET_EXEC}

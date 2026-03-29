@@ -9,7 +9,6 @@ add_library(nyla::debugfs ALIAS nyla_debugfs)
 
 target_include_directories(nyla_debugfs
     PUBLIC
-        ${PROJECT_SOURCE_DIR}
         ${FUSE_INCLUDE_DIRS}
 )
 

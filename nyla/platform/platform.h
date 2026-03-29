@@ -1,15 +1,13 @@
 #pragma once
 
+#include <cstdint>
+#include <span>
+
 #include "nyla/commons/assert.h"
 #include "nyla/commons/bitenum.h"
 #include "nyla/commons/byteliterals.h"
+#include "nyla/commons/path.h"
 #include "nyla/commons/vec.h"
-#include <cstdint>
-#include <fstream>
-#include <span>
-#include <string>
-#include <string_view>
-#include <vector>
 
 namespace nyla
 {
@@ -69,6 +67,19 @@ struct PlatformInitDesc
     bool open;
 };
 
+struct FileHandle
+{
+    void *handle;
+};
+
+enum class FileOpenMode
+{
+    Read = 1 << 0,
+    Write = 1 << 1,
+    Append = 1 << 2,
+};
+NYLA_BITENUM(FileOpenMode);
+
 class Platform
 {
   public:
@@ -96,33 +107,25 @@ class Platform
     static auto GetGamepadLeftTrigger(uint32_t index) -> float;
     static auto GetGamepadRightTrigger(uint32_t index) -> float;
 
-    // TODO: move this
+    static auto FileValid(FileHandle file) -> bool;
+    static auto FileOpen(const Path &path, FileOpenMode mode) -> FileHandle;
+    static void FileClose(FileHandle file);
+    static auto FileRead(FileHandle file, uint32_t size, char *out) -> uint32_t;
+    static auto FileWrite(FileHandle file, uint32_t size, const char *in) -> uint32_t;
 
-    static auto ReadFile(std::string_view filename) -> std::vector<std::byte>
+    template <typename T> static void FileWrite(FileHandle file, const T &data)
     {
-        std::ifstream file(std::string{filename}, std::ios::ate | std::ios::binary);
-        return ReadFileInternal(file);
+        NYLA_ASSERT(FileWrite(file, sizeof(data), reinterpret_cast<const char *>(&data)) == sizeof(data));
     }
 
-    static auto ReadFile(const std::string &filename) -> std::vector<std::byte>
+    template <typename T> static void FileWriteSpan(FileHandle file, std::span<T> data)
     {
-        std::ifstream file(filename, std::ios::ate | std::ios::binary);
-        return ReadFileInternal(file);
+        uint64_t expectedSize = sizeof(data[0]) * data.size();
+        NYLA_ASSERT(FileWrite(file, expectedSize, reinterpret_cast<const char *>(&data[0])) == expectedSize);
     }
 
-  private:
-    static auto ReadFileInternal(std::ifstream &file) -> std::vector<std::byte>
-    {
-        NYLA_ASSERT(file.is_open());
-
-        std::vector<std::byte> buffer(file.tellg());
-
-        file.seekg(0);
-        file.read(reinterpret_cast<char *>(buffer.data()), static_cast<long>(buffer.size()));
-
-        file.close();
-        return buffer;
-    }
+    static void FileSeek(FileHandle file, int64_t at);
+    static auto FileTell(FileHandle file) -> uint64_t;
 };
 
 auto PlatformMain(std::span<const char *> argv) -> int;
