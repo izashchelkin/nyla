@@ -1,8 +1,9 @@
+#include "nyla/commons/dllapi.h"
 #include <cstdint>
 
 namespace nyla
 {
 
-auto CStrLen(const char *str) -> uint64_t;
+auto NYLA_API CStrLen(const char *str) -> uint64_t;
 
 }

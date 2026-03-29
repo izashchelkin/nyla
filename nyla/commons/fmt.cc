@@ -1,21 +1,14 @@
 #include <cstdarg>
+#include <cstdint>
 
-#include "nyla/commons/assert.h"
+#include "nyla/commons/byteparser.h"
 #include "nyla/commons/fmt.h"
 #include "nyla/commons/platform.h"
+#include "nyla/commons/str.h"
+#include "nyla/commons/word.h"
 
 namespace nyla
 {
-
-void LogWrapper(const char *fmt, ...)
-{
-    auto err = Platform::GetStderr();
-    va_list args;
-    va_start(args, fmt);
-    FmtWrite(err, fmt, args);
-    va_end(args);
-    Platform::FileWrite(err, 1, "\n");
-}
 
 namespace
 {
@@ -56,69 +49,91 @@ auto S64ToBuffer(char *buf, int64_t val) -> uint32_t
 
 } // namespace
 
-void FmtWrite(FileHandle handle, const char *fmt, va_list args)
+void NYLA_API FmtWrite(FileHandle handle, Str fmt, va_list args)
 {
-    const char *p = fmt;
-    while (*p)
-    {
-        if (*p == '%' && *(p + 1))
-        {
-            p++; // Skip '%'
+    ByteParser parser;
+    parser.Init(fmt.Data(), fmt.Size());
 
-            // Handle %.*s (The StrView / NYLA_SV_FMT logic)
-            if (*p == '.' && *(p + 1) == '*' && *(p + 2) == 's')
+    while (parser.Left() > 0)
+    {
+        char ch = parser.Pop();
+
+        switch (ch)
+        {
+        case '%': {
+            char ch1 = parser.Left() ? parser.Pop() : '\0';
+
+            switch (ch1)
             {
-                int len = va_arg(args, int);
-                const char *str = va_arg(args, const char *);
-                Platform::FileWrite(handle, (uint32_t)len, str);
-                p += 3;
-                continue;
+
+            case '.': {
+                char ch2 = parser.Left() ? parser.Pop() : '\0';
+                char ch3 = parser.Left() ? parser.Pop() : '\0';
+
+                switch ((uint32_t)(ch2 | (ch3 << 8)))
+                {
+                case DWord("*s\0\0"): {
+                    uint32_t len = va_arg(args, uint32_t);
+                    const char *str = va_arg(args, const char *);
+                    Platform::FileWrite(handle, (uint32_t)len, str);
+                    break;
+                }
+
+                default: {
+                    NYLA_ASSERT(false);
+                    break;
+                }
+                }
+
+                break;
             }
 
-            // Handle basic types
-            switch (*p)
-            {
-            case 's': { // %s - Null-terminated string
+            case 's': {
                 const char *s = va_arg(args, const char *);
                 Platform::FileWrite(handle, (uint32_t)CStrLen(s), s);
                 break;
             }
-            case 'd': { // %d - Signed integer
+            case 'd': {
                 char buf[32];
                 uint32_t len = S64ToBuffer(buf, va_arg(args, int));
                 Platform::FileWrite(handle, len, buf);
                 break;
             }
-            case 'u': { // %u - Unsigned integer
+            case 'u': {
                 char buf[32];
                 uint32_t len = U64ToBuffer(buf, va_arg(args, uint32_t));
                 Platform::FileWrite(handle, len, buf);
                 break;
             }
-            case 'p': { // %p - Pointer (Hex)
-                // Note: You'd need a HexToBuffer helper for this
+            case 'p': {
                 Platform::FileWrite(handle, 11, "0x[pointer]");
                 break;
             }
-            case '%': { // %% - Literal percent
+            case '%': {
                 Platform::FileWrite(handle, 1, "%");
                 break;
             }
-            default: {
+
+            default:
                 NYLA_ASSERT(false);
-            }
-            }
-        }
-        else
-        {
-            const char *start = p;
-            while (*p && *p != '%')
-                p++;
-            Platform::FileWrite(handle, (uint32_t)(p - start), start);
-            if (!*p)
                 break;
+            }
+
+            break;
         }
-        p++;
+
+        default: {
+            const char *start = &parser.Peek() - 1;
+            while (parser.Left() && parser.Peek() != '%')
+                parser.Advance();
+
+            Platform::FileWrite(handle, (uint32_t)(&parser.Peek() - start), start);
+            break;
+        }
+        }
     }
+
+    Platform::FileWrite(handle, 1, "\n");
 }
+
 } // namespace nyla

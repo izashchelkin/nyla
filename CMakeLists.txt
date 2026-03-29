@@ -35,7 +35,7 @@ if(MSVC)
     add_link_options(
         "/NODEFAULTLIB"     
         "/SUBSYSTEM:WINDOWS" 
-        "/STACK:0x100000,0x100000"
+        "/STACK:0x4000,0x4000"
     )
 
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /NOENTRY")
@@ -54,6 +54,10 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
         "-nodefaultlibs"      
     )
 endif()
+
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
 add_subdirectory(nyla)
 add_subdirectory(third_party)

@@ -2,12 +2,13 @@
 
 #include <cstdint>
 
+#include "nyla/commons/dllapi.h"
 #include "nyla/commons/mem.h"
 
 namespace nyla
 {
 
-class Str
+class NYLA_API Str
 {
     using Iterator = char *;
     using ConstIterator = const char *;
@@ -18,6 +19,10 @@ class Str
     }
 
     Str() : Str{nullptr, 0ULL}
+    {
+    }
+
+    template <uint64_t N> explicit Str(const char data[N]) : Str(data, N)
     {
     }
 
@@ -38,7 +43,7 @@ class Str
     }
 
     [[nodiscard]]
-    auto operator[](uint64_t i) const -> char
+    auto operator[](uint64_t i) const -> const char &
     {
         return m_Data[i];
     }

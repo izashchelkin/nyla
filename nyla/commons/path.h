@@ -1,13 +1,14 @@
 #pragma once
 
+#include "nyla/commons/dllapi.h"
 #include "nyla/commons/str.h"
 
 namespace nyla
 {
 
-class RegionAlloc;
+class NYLA_API RegionAlloc;
 
-class Path
+class NYLA_API Path
 {
   public:
     [[nodiscard]]

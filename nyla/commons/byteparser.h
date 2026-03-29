@@ -1,6 +1,6 @@
 #pragma once
 
-#include "nyla/commons/assert.h"
+#include "nyla/commons/platform.h"
 #include <cstdint>
 #include <string_view>
 
@@ -14,6 +14,11 @@ class ByteParser
     {
         m_At = base;
         m_Left = size;
+    }
+
+    constexpr auto Left() -> uint64_t
+    {
+        return m_Left;
     }
 
     [[nodiscard]]

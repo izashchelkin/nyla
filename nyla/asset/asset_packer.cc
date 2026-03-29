@@ -6,11 +6,12 @@
 #include "nyla/commons/fmt.h"
 #include "nyla/commons/platform.h"
 #include "nyla/commons/region_alloc.h"
+#include "nyla/commons/str.h"
 
 namespace nyla
 {
 
-__declspec(dllexport) auto PlatformMain() -> int
+auto PlatformMain() -> int
 {
     Platform::Init({});
 
@@ -18,12 +19,19 @@ __declspec(dllexport) auto PlatformMain() -> int
     rootAlloc.Init(nullptr, 64_GiB, true);
 
     auto args = rootAlloc.PushArr<Str>(256);
+    MemZero(&args);
+
     Platform::ParseStdArgs(args.Data(), args.Size());
 
     if (args.Size() < 2)
     {
         NYLA_LOG("usage: %s [output] {[input] [processor config]}", args[0]);
         return 1;
+    }
+
+    for (auto arg : args)
+    {
+        NYLA_LOG("" NYLA_SV_FMT, NYLA_SV_ARG(arg));
     }
 
     NYLA_LOG("Writing into %s", args[2]);
@@ -41,6 +49,8 @@ __declspec(dllexport) auto PlatformMain() -> int
         scratch.PushCopyStr(arg);
         scratch.PushCopyStr(Str{"\""});
     }
+
+    NYLA_DEBUGBREAK();
 
     Platform::FileWrite(outputFile, AssetPackerHeader{.count = scratch.GetBytesUsed()});
     Platform::FileWriteSpan(outputFile, Span{scratch.GetBase(), scratch.GetBytesUsed()});

@@ -2,8 +2,8 @@
 
 #include <cstdint>
 
-#include "nyla/commons/str.h"
 #include "nyla/alloc/region_alloc.h"
+#include "nyla/commons/str.h"
 
 namespace nyla
 {

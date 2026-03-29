@@ -9,7 +9,6 @@ namespace nyla
 
 auto CStrLen(const char *str) -> uint64_t
 {
-    // Align pointer to nearest 16-byte boundary to prevent page-faults
     const char *alignedPtr = reinterpret_cast<const char *>(reinterpret_cast<uintptr_t>(str) & ~15ULL);
     __m128i zero = _mm_setzero_si128();
 
@@ -17,7 +16,6 @@ auto CStrLen(const char *str) -> uint64_t
     __m128i cmp = _mm_cmpeq_epi8(chunk, zero);
     int mask = _mm_movemask_epi8(cmp);
 
-    // Mask out garbage bytes before the actual start of the string
     int offset = reinterpret_cast<uintptr_t>(str) & 15;
     mask >>= offset;
 
@@ -103,23 +101,6 @@ auto MemEndsWith(const char *str, uint64_t strLen, const char *suffix, uint64_t 
         return false;
     else
         return MemEq(str + strLen - suffixLen, suffix, suffixLen);
-}
-
-//
-
-extern "C"
-{
-    void *memcpy(void *d, const void *s, size_t n)
-    {
-        nyla::MemCpy(d, s, (uint64_t)n);
-        return d;
-    }
-
-    void *memset(void *d, int v, size_t n)
-    {
-        nyla::MemSet(d, (uint8_t)v, (uint64_t)n);
-        return d;
-    }
 }
 
 } // namespace nyla

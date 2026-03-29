@@ -1,8 +1,8 @@
 #pragma once
 
+#include <cstdarg>
 #include <cstdint>
 
-#include "nyla/commons/assert.h"
 #include "nyla/commons/bitenum.h"
 #include "nyla/commons/byteliterals.h"
 #include "nyla/commons/dllapi.h"
@@ -12,6 +12,52 @@
 
 namespace nyla
 {
+
+#define NYLA_LOG(fmt, ...) ::nyla::Platform::FileWriteFmt(::nyla::Platform::GetStderr(), Str{fmt}, ##__VA_ARGS__)
+
+#define NYLA_SV_FMT "%.*s"
+#define NYLA_SV_ARG(sv) (uint32_t)(sv).Size(), (sv).Data()
+
+#if defined(_MSC_VER)
+#define NYLA_DEBUGBREAK() __debugbreak()
+#elif defined(__clang__)
+#if __has_builtin(__builtin_debugtrap)
+#define NYLA_DEBUGBREAK() __builtin_debugtrap()
+#else
+#define NYLA_DEBUGBREAK() __builtin_trap()
+#endif
+#elif defined(__GNUC__)
+#define NYLA_DEBUGBREAK() __builtin_trap()
+#else
+#define NYLA_DEBUGBREAK()                                                                                              \
+    do                                                                                                                 \
+    {                                                                                                                  \
+        *(volatile int *)0 = 0;                                                                                        \
+    } while (0)
+#endif
+
+#define NYLA_ASSERT(cond)                                                                                              \
+    do                                                                                                                 \
+    {                                                                                                                  \
+        if (!(cond))                                                                                                   \
+        {                                                                                                              \
+            NYLA_LOG("%s:%d: assertion failed: %s", __FILE__, __LINE__, #cond);                                        \
+            NYLA_DEBUGBREAK();                                                                                         \
+            *(volatile int *)(0) = 0;                                                                                  \
+        }                                                                                                              \
+    } while (0)
+
+#ifdef NDEBUG
+#define NYLA_DASSERT(cond)                                                                                             \
+    do                                                                                                                 \
+    {                                                                                                                  \
+        (void)sizeof(cond);                                                                                            \
+    } while (0)
+#else
+#define NYLA_DASSERT(cond) NYLA_ASSERT(cond)
+#endif
+
+//
 
 enum class KeyPhysical;
 
@@ -68,8 +114,6 @@ struct PlatformInitDesc
     bool open;
 };
 
-using FileHandle = void *;
-
 enum class FileOpenMode
 {
     Read = 1 << 0,
@@ -77,6 +121,10 @@ enum class FileOpenMode
     Append = 1 << 2,
 };
 NYLA_BITENUM(FileOpenMode);
+
+using FileHandle = void *;
+
+void NYLA_API FmtWrite(FileHandle handle, Str fmt, va_list args);
 
 class NYLA_API Platform
 {
@@ -130,6 +178,14 @@ class NYLA_API Platform
     {
         uint64_t expectedSize = sizeof(data[0]) * data.Size();
         NYLA_ASSERT(FileWrite(file, expectedSize, reinterpret_cast<const char *>(&data[0])) == expectedSize);
+    }
+
+    static void FileWriteFmt(FileHandle file, Str fmt, ...)
+    {
+        va_list args;
+        va_start(args, fmt);
+        FmtWrite(file, fmt, args);
+        va_end(args);
     }
 };
 

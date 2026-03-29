@@ -6,6 +6,7 @@
 #include "nyla/commons/assert.h"
 #include "nyla/commons/byteliterals.h"
 #include "nyla/commons/dllapi.h"
+#include "nyla/commons/fmt.h"
 #include "nyla/commons/inline_ring.h"
 #include "nyla/commons/intrin.h"
 #include "nyla/commons/limits.h"
@@ -74,7 +75,7 @@ auto TicksTo(uint64_t ticks, uint64_t scale) -> uint64_t
 
 } // namespace
 
-auto NYLA_API Platform::GetMonotonicTimeMillis() -> uint64_t
+auto Platform::GetMonotonicTimeMillis() -> uint64_t
 {
     return TicksTo(GetPerformanceTicks(), 1'000ULL);
 }
@@ -673,50 +674,59 @@ auto Platform::GetStderr() -> FileHandle
     return GetStdHandle(STD_ERROR_HANDLE);
 }
 
-void Platform::ParseStdArgs(Str *args, uint32_t len)
+void Platform::ParseStdArgs(Str *args, uint32_t maxArgs)
 {
-    bool inQuotes = false;
     auto cmdLine = Str{GetCommandLineA()};
+    const char *cursor = cmdLine.Data();
+    bool inQuotes = false;
+    uint32_t argCount = 0;
 
-    const char *lastArgStart = cmdLine.Data();
-    uint32_t lastArgLen = 0;
+    const char *argStart = nullptr;
 
-    uint32_t iarg = 0;
-    for (char ch : cmdLine)
+    for (uint32_t i = 0; i < cmdLine.Size() && argCount < maxArgs; ++i)
     {
-        bool cut = false;
+        char ch = cmdLine[i];
 
         if (ch == '"')
         {
             inQuotes = !inQuotes;
-            if (!inQuotes)
-                cut = true;
+            if (inQuotes)
+                argStart = &cmdLine[i + 1]; // Start after the quote
+            else
+            {
+                // Closing quote: Save the string between argStart and here
+                args[argCount++] = Str{argStart, (uint32_t)(&cmdLine[i] - argStart)};
+                argStart = nullptr;
+            }
         }
-        else
+        else if (!inQuotes)
         {
-            if (!inQuotes && ch == ' ')
-                cut = true;
-        }
-
-        if (cut)
-        {
-            args[iarg++] = Str{lastArgStart, lastArgLen};
-            lastArgStart += lastArgLen + 2;
-            lastArgLen = 0;
-        }
-        else
-        {
-            ++lastArgLen;
+            if (ch == ' ')
+            {
+                if (argStart) // We were in a word, and just hit a space
+                {
+                    args[argCount++] = Str{argStart, (uint32_t)(&cmdLine[i] - argStart)};
+                    argStart = nullptr;
+                }
+            }
+            else if (!argStart) // We weren't in a word, and just hit a character
+            {
+                argStart = &cmdLine[i];
+            }
         }
     }
-    NYLA_ASSERT(!inQuotes);
 
-    if (lastArgLen > 0)
-        args[iarg++] = Str{lastArgStart, lastArgLen};
+    // Capture the trailing argument if there was no trailing space/quote
+    if (argStart && argCount < maxArgs)
+    {
+        args[argCount++] = Str{argStart, (uint32_t)((cmdLine.Data() + cmdLine.Size()) - argStart)};
+    }
+
+    NYLA_ASSERT(!inQuotes);
 }
 
-auto __declspec(dllexport) EntryPointWin32(int (*fnMain)(), HINSTANCE hInstance, HINSTANCE hPrevInstance,
-                                           PSTR lpCmdLine, int nCmdShow) -> int
+auto NYLA_API EntryPointWin32(int (*fnMain)(), HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
+                              int nCmdShow) -> int
 {
 #ifndef NDEBUG
     NYLA_ASSERT(AllocConsole());

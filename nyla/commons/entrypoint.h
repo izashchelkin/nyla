@@ -1,6 +1,6 @@
-#define NYLA_ENTRYPOINT
+#include "nyla/commons/dllapi.h"
 
-namespace
+namespace nyla
 {
 
 auto PlatformMain() -> int;
@@ -30,14 +30,14 @@ extern "C"
 namespace nyla
 {
 
-auto __declspec(dllimport) EntryPointWin32(int (*fnMain)(), HINSTANCE hInstance, HINSTANCE hPrevInstance,
-                                           PSTR lpCmdLine, int nCmdShow) -> int;
+auto NYLA_API EntryPointWin32(int (*fnMain)(), HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
+                              int nCmdShow) -> int;
 
 }
 
 auto WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, int nCmdShow) -> int
 {
-    return nyla::EntryPointWin32(PlatformMain, hInstance, hPrevInstance, lpCmdLine, nCmdShow);
+    return nyla::EntryPointWin32(nyla::PlatformMain, hInstance, hPrevInstance, lpCmdLine, nCmdShow);
 }
 
 #else

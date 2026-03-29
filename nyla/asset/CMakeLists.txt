@@ -3,7 +3,7 @@ set(TARGET_PACKER nyla_asset_packer)
 if(WIN32)
     add_executable(${TARGET_PACKER} WIN32)
 
-    add_link_options(${TARGET_PACKER} "/ENTRY:WinMain")
+    target_link_options(${TARGET_PACKER} PRIVATE "/ENTRY:WinMain")
 else()
     add_executable(${TARGET_PACKER})
 endif()
