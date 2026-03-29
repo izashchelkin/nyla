@@ -62,8 +62,10 @@ CheckOptions:
   - key: readability-identifier-naming.ConstexprVariablePrefix
     value: k
  
+  # - key: readability-identifier-naming.MethodIgnoredRegexp
+  #   value: '^(data|size|begin|end|cbegin|cend|empty|max_size|resize|clear|push_back|pop_back|emplace_back|front|back|erase)$'
   - key: readability-identifier-naming.MethodIgnoredRegexp
-    value: '^(data|size|begin|end|cbegin|cend|empty|max_size|resize|clear|push_back|pop_back|emplace_back|front|back|erase)$'
+    value: '^(begin|end|cbegin|cend)$'
 
 HeaderFilterRegex: 'nyla/nyla/.*'
 FormatStyle: none

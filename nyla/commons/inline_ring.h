@@ -9,7 +9,7 @@
 namespace nyla
 {
 
-template <typename T, uint32_t N> class InlineRing
+template <typename T, uint32_t N> class alignas(8) InlineRing
 {
     static_assert(std::is_trivially_destructible_v<T>);
 
@@ -29,8 +29,8 @@ template <typename T, uint32_t N> class InlineRing
 
   public:
     using value_type = T;
-    using size_type = uint32_t;
-    using difference_type = int32_t;
+    using size_type = uint64_t;
+    using difference_type = int64_t;
     using reference = T &;
     using const_reference = const T &;
     using pointer = T *;

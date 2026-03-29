@@ -1,10 +1,13 @@
 #pragma once
 
-#include "nyla/commons/assert.h"
-#include <array>
 #include <cstdint>
-#include <cstring>
-#include <string_view>
+
+#include "nyla/commons/array.h"
+#include "nyla/commons/platform.h"
+#include "nyla/commons/str.h"
+
+namespace nyla
+{
 
 template <uint32_t N> class InlineString
 {
@@ -13,20 +16,16 @@ template <uint32_t N> class InlineString
     {
     }
 
-    InlineString(const char *str) : InlineString(std::string_view{str, strlen(str)})
+    InlineString(Str str) : m_Size{str.Size()}
     {
-    }
-
-    InlineString(std::string_view str) : m_Size{static_cast<uint32_t>(str.size())}
-    {
-        NYLA_ASSERT(m_Size <= N);
-        memcpy(m_Data.data(), str.data(), m_Size);
+        NYLA_DASSERT(m_Size <= N);
+        MemCpy(m_Data.Data(), str.Data(), m_Size);
         m_Data[m_Size + 1] = '\0';
     }
 
     void AppendChar(char ch)
     {
-        NYLA_ASSERT(m_Size < N);
+        NYLA_DASSERT(m_Size < N);
         m_Data[m_Size++] = ch;
         m_Data[m_Size] = '\0';
     }
@@ -48,24 +47,14 @@ template <uint32_t N> class InlineString
     }
 
     [[nodiscard]]
-    auto StringView() const -> std::string_view
+    auto GetStr() const -> Str
     {
-        return std::string_view{m_Data.data(), m_Size};
+        return Str{m_Data.data(), m_Size};
     }
 
-    template <uint32_t M> auto operator==(const InlineString<M> rhs) const -> bool
+    auto operator==(Str rhs) const -> bool
     {
-        return this->StringView() == rhs.StringView();
-    }
-
-    auto operator==(std::string_view rhs) const -> bool
-    {
-        return this->StringView() == rhs;
-    }
-
-    auto operator==(const char *rhs) const -> bool
-    {
-        return this->StringView() == std::string_view{rhs};
+        return this->GetStr() == rhs;
     }
 
     void AsciiToUpper()
@@ -81,6 +70,8 @@ template <uint32_t N> class InlineString
     }
 
   private:
-    uint32_t m_Size;
-    std::array<char, N + 1> m_Data;
+    uint64_t m_Size;
+    Array<char, N + 1> m_Data;
 };
+
+} // namespace nyla

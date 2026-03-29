@@ -56,6 +56,12 @@ template <typename T> class Span
     }
 
     [[nodiscard]]
+    auto ByteSize() const -> uint64_t
+    {
+        return m_Size * sizeof(T);
+    }
+
+    [[nodiscard]]
     auto begin() const -> ConstIterator
     {
         return Data();

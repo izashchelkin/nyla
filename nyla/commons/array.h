@@ -1,14 +1,17 @@
 #pragma once
 
 #include <cstdint>
+#include <type_traits>
+
+#include "nyla/commons/str.h"
 
 namespace nyla
 {
 
-template <typename T, uint64_t N> class Array
+template <typename T, uint64_t N> class alignas(RequiredAlignment<T>::value) Array
 {
-    using Iterator = T *;
-    using ConstIterator = const T *;
+    static_assert(std::is_trivially_constructible<T>());
+    static_assert(std::is_trivially_destructible<T>());
 
   public:
     Array() : m_Data{}
@@ -73,35 +76,53 @@ template <typename T, uint64_t N> class Array
     [[nodiscard]]
     auto Size() const -> uint64_t
     {
-        return Size();
+        return N;
     }
 
     [[nodiscard]]
-    auto begin() const -> ConstIterator
+    auto MaxSize() const -> uint64_t
+    {
+        return N;
+    }
+
+    [[nodiscard]]
+    auto begin() -> T *
     {
         return Data();
     }
 
     [[nodiscard]]
-    auto cbegin() const -> ConstIterator
+    auto begin() const -> const T *
     {
         return Data();
     }
 
     [[nodiscard]]
-    auto end() const -> ConstIterator
+    auto cbegin() const -> const T *
+    {
+        return Data();
+    }
+
+    [[nodiscard]]
+    auto end() -> T *
     {
         return Data() + Size();
     }
 
     [[nodiscard]]
-    auto cend() const -> ConstIterator
+    auto end() const -> const T *
+    {
+        return Data() + Size();
+    }
+
+    [[nodiscard]]
+    auto cend() const -> const T *
     {
         return Data() + Size();
     }
 
   private:
-    T m_Data[N];
+    T m_Data[(sizeof(T) * N + RequiredAlignment<T>::value - 1) / sizeof(T)];
 };
 
 } // namespace nyla

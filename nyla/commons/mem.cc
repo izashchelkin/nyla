@@ -1,6 +1,7 @@
 #include "nyla/commons/mem.h"
 #include "nyla/commons/cstr.h"
 #include "nyla/commons/intrin.h"
+#include "nyla/commons/platform.h"
 
 #include <cstdint>
 

@@ -5,6 +5,11 @@
 namespace nyla
 {
 
+template <typename T> constexpr auto CeilDiv(T a, T b) -> T
+{
+    return (a + b - 1) / b;
+}
+
 inline auto Sqrt(float val) -> float
 {
 #if defined(_MSC_VER)

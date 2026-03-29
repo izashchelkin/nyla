@@ -3,7 +3,6 @@
 #include <cstdint>
 
 #include "nyla/commons/align.h"
-#include "nyla/commons/assert.h"
 #include "nyla/commons/path.h"
 #include "nyla/commons/platform.h"
 #include "nyla/commons/str.h"
@@ -14,9 +13,11 @@ namespace nyla
 class RegionAlloc
 {
   public:
+    static constexpr inline uint64_t kMinAlign = 16;
+
     void Init(void *base, uint64_t maxSize, bool ownsPages);
 
-    auto PushBytes(uint64_t size, uint32_t align) -> char *;
+    auto PushBytes(uint64_t size, uint64_t align) -> char *;
 
     void Pop(void *p)
     {

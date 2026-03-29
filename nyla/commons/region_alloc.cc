@@ -4,6 +4,7 @@
 
 #include "nyla/commons/align.h"
 #include "nyla/commons/log.h"
+#include "nyla/commons/minmax.h"
 #include "nyla/commons/path.h"
 #include "nyla/commons/platform.h"
 
@@ -25,9 +26,9 @@ void RegionAlloc::Init(void *base, uint64_t maxSize, bool ownsPages)
         m_Base = Platform::ReserveMemPages(maxSize);
 }
 
-auto RegionAlloc::PushBytes(uint64_t size, uint32_t align) -> char *
+auto RegionAlloc::PushBytes(uint64_t size, uint64_t align) -> char *
 {
-    AlignUp<uint64_t>(m_Used, align);
+    AlignUp<uint64_t>(m_Used, Max(kMinAlign, align));
     char *const ret = m_Base + m_Used;
     m_Used += size;
 

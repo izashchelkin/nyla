@@ -30,6 +30,17 @@ class NYLA_API Str
     {
     }
 
+    auto operator==(Str rhs) const -> bool
+    {
+        if (this->Size() != rhs.Size())
+            return false;
+
+        if (this->Data() == rhs.Data())
+            return true;
+        else
+            return MemEq(this->Data(), rhs.Data(), rhs.Size());
+    }
+
     [[nodiscard]]
     auto StartWith(Str prefix) const -> bool
     {
