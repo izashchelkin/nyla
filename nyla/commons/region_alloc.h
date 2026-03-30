@@ -1,35 +1,36 @@
 #pragma once
 
 #include <cstdint>
+#include <type_traits>
 
 #include "nyla/commons/align.h"
-#include "nyla/commons/path.h"
-#include "nyla/commons/platform.h"
-#include "nyla/commons/str.h"
+#include "nyla/commons/span.h"
 
 namespace nyla
 {
 
-class RegionAlloc
+struct NYLA_API RegionAlloc
 {
-  public:
     static constexpr inline uint64_t kMinAlign = 16;
+
+    bool m_OwnsPages;
+    char *m_Base;
+    uint64_t m_Size;
+    uint64_t m_MaxSize;
+    uint64_t m_Used;
 
     void Init(void *base, uint64_t maxSize, bool ownsPages);
 
     auto PushBytes(uint64_t size, uint64_t align) -> char *;
 
-    void Pop(void *p)
-    {
-        m_Used = (char *)p - m_Base;
-        NYLA_ASSERT(m_Used <= m_Size);
-    }
+    void Pop(void *p);
 
     void Reset()
     {
         m_Used = 0;
     }
 
+    [[nodiscard]]
     auto GetBase() -> char *
     {
         return m_Base;
@@ -47,11 +48,19 @@ class RegionAlloc
         return m_Used;
     }
 
+    [[nodiscard]]
     auto GetAt() -> char *
     {
         return m_Base + m_Used;
     }
 
+    [[nodiscard]]
+    auto GetAt() const -> const char *
+    {
+        return m_Base + m_Used;
+    }
+
+    [[nodiscard]]
     auto GetMaxSize() -> uint32_t
     {
         return m_MaxSize;
@@ -74,8 +83,8 @@ class RegionAlloc
 
     template <typename T> auto PushCopySpan(Span<const T> data) -> Span<T>
     {
-        Span<T> p = PushArr<T>(data.size());
-        MemCpy(p, data.data(), data.size_bytes());
+        Span<T> p = PushArr<T>(data.m_Size());
+        MemCpy(p, data.m_Data(), data.size_bytes());
         return p;
     }
 
@@ -86,8 +95,10 @@ class RegionAlloc
         return p;
     }
 
-    template <typename T> auto PushArr(uint32_t n) -> Span<T>
+    template <typename T> auto PushArr(uint64_t n) -> Span<T>
     {
+        uint64_t s = sizeof(T) * n;
+
         static_assert(std::is_trivially_destructible_v<T>);
         static_assert(AlignedUp(sizeof(T), alignof(T)) == sizeof(T));
 
@@ -95,39 +106,7 @@ class RegionAlloc
         return Span{p, n};
     }
 
-    auto PushSubAlloc(uint64_t size) -> RegionAlloc
-    {
-        AlignUp(size, Platform::GetMemPageSize());
-
-        void *const p = PushBytes(size, Platform::GetMemPageSize());
-        RegionAlloc subAlloc{};
-        subAlloc.Init(p, size, false);
-        return subAlloc;
-    }
-
-    auto PushPath() -> Path
-    {
-        Path path;
-        path.Init(this);
-        return path;
-    }
-
-    auto PushPath(Str path) -> Path
-    {
-        return PushPath().Append(path);
-    }
-
-    auto ClonePath(Path &path) -> Path
-    {
-        return PushPath().Append(path.GetStr());
-    }
-
-  private:
-    bool m_OwnsPages;
-    char *m_Base;
-    uint64_t m_Size;
-    uint64_t m_MaxSize;
-    uint64_t m_Used;
+    auto PushSubAlloc(uint64_t size) -> RegionAlloc;
 };
 
 } // namespace nyla

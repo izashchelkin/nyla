@@ -1,3 +1,5 @@
+#pragma once
+
 #include <cstddef>
 #include <cstdint>
 #include <type_traits>
@@ -10,9 +12,7 @@ namespace nyla
 
 template <typename T> struct RequiredAlignment
 {
-    static_assert(alignof(std::max_align_t) == 16);
-
-    static constexpr size_t kValue = (alignof(T) > 16) ? alignof(T) : 16;
+    static constexpr size_t value = (alignof(T) > 16) ? alignof(T) : 16;
 };
 
 inline auto Load64(const void *ptr) -> uint64_t

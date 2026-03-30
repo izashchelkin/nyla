@@ -1,15 +1,12 @@
 #pragma once
 
 #include "nyla/commons/array.h"
-#include "nyla/commons/assert.h"
-
-#include <concepts>
 #include <cstdint>
 
 namespace nyla
 {
 
-template <typename T, uint32_t N> class alignas(8) InlineRing
+template <typename T, uint32_t N> class InlineRing
 {
     static_assert(std::is_trivially_destructible_v<T>);
 

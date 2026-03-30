@@ -3,15 +3,13 @@
 #include <cstdint>
 
 #include "nyla/commons/align.h"
-#include "nyla/commons/assert.h"
 #include "nyla/commons/byteliterals.h"
 #include "nyla/commons/dllapi.h"
-#include "nyla/commons/fmt.h"
 #include "nyla/commons/inline_ring.h"
 #include "nyla/commons/intrin.h"
 #include "nyla/commons/limits.h"
+#include "nyla/commons/mem.h"
 #include "nyla/commons/platform.h"
-#include "nyla/commons/str.h"
 
 auto CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) -> LRESULT;
 
@@ -30,7 +28,7 @@ HINSTANCE g_HInstance{};
 HWND g_HWnd{};
 RECT g_WinRect{};
 
-Array<XINPUT_STATE, 1> g_Gamepads{{}};
+Array<XINPUT_STATE, 1> g_Gamepads{};
 
 static inline constexpr uint32_t kFlagQuit = 1 << 0;
 static inline constexpr uint32_t kFlagWinResize = 1 << 1;
@@ -231,7 +229,7 @@ void WindowsPlatform::SetHInstance(HINSTANCE hInstance)
 auto Platform::UpdateGamepad(uint32_t index) -> bool
 {
     auto &state = g_Gamepads[index];
-    ZeroMemory(&state.Gamepad, sizeof(state.Gamepad));
+    MemZero(&state.Gamepad);
 
     const DWORD dwResult = XInputGetState(0, &state);
     return (dwResult == ERROR_SUCCESS);
@@ -676,7 +674,7 @@ auto Platform::GetStderr() -> FileHandle
 
 void Platform::ParseStdArgs(Str *args, uint32_t maxArgs)
 {
-    auto cmdLine = Str{GetCommandLineA()};
+    auto cmdLine = AsStr(GetCommandLineA());
     const char *cursor = cmdLine.Data();
     bool inQuotes = false;
     uint32_t argCount = 0;
@@ -731,9 +729,9 @@ auto NYLA_API EntryPointWin32(int (*fnMain)(), HINSTANCE hInstance, HINSTANCE hP
 #ifndef NDEBUG
     NYLA_ASSERT(AllocConsole());
 
-    void *hConOut =
+    HANDLE hConOut =
         CreateFileA("CONOUT$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr);
-    void *hConIn =
+    HANDLE hConIn =
         CreateFileA("CONIN$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
 
     SetStdHandle(STD_INPUT_HANDLE, hConIn);
@@ -744,9 +742,18 @@ auto NYLA_API EntryPointWin32(int (*fnMain)(), HINSTANCE hInstance, HINSTANCE hP
     const int retCode = fnMain();
 
 #ifndef NDEBUG
-    DWORD read;
-    INPUT_RECORD ir;
-    ReadConsoleInputA(GetStdHandle(STD_INPUT_HANDLE), &ir, 1, &read);
+    for (;;)
+    {
+        INPUT_RECORD ir;
+        DWORD read;
+        if (ReadConsoleInputA(hConIn, &ir, 1, &read) && read > 0)
+        {
+            if (ir.EventType == KEY_EVENT && ir.Event.KeyEvent.bKeyDown)
+                break;
+        }
+    }
+
+    PostMessage(GetConsoleWindow(), WM_CLOSE, 0, 0);
 #endif
 
     return retCode;

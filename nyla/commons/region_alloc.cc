@@ -5,11 +5,16 @@
 #include "nyla/commons/align.h"
 #include "nyla/commons/log.h"
 #include "nyla/commons/minmax.h"
-#include "nyla/commons/path.h"
 #include "nyla/commons/platform.h"
 
 namespace nyla
 {
+
+void RegionAlloc::Pop(void *p)
+{
+    m_Used = (char *)p - m_Base;
+    NYLA_ASSERT(m_Used <= m_Size);
+}
 
 void RegionAlloc::Init(void *base, uint64_t maxSize, bool ownsPages)
 {
@@ -26,14 +31,16 @@ void RegionAlloc::Init(void *base, uint64_t maxSize, bool ownsPages)
         m_Base = Platform::ReserveMemPages(maxSize);
 }
 
-auto RegionAlloc::PushBytes(uint64_t size, uint64_t align) -> char *
+auto RegionAlloc::PushBytes(uint64_t requestedSize, uint64_t align) -> char *
 {
     AlignUp<uint64_t>(m_Used, Max(kMinAlign, align));
     char *const ret = m_Base + m_Used;
-    m_Used += size;
+    m_Used += requestedSize;
 
     if (m_Used > m_Size)
     {
+        NYLA_ASSERT(m_Used <= m_MaxSize);
+
         if (m_OwnsPages)
         {
             AlignUp(m_Used, Platform::GetMemPageSize());
@@ -43,11 +50,18 @@ auto RegionAlloc::PushBytes(uint64_t size, uint64_t align) -> char *
             Platform::CommitMemPages(p, m_Used - m_Size);
         }
 
-        m_Size = m_Used;
+        this->m_Size = m_Used;
     }
 
-    NYLA_ASSERT(m_Size <= m_MaxSize);
     return ret;
+}
+
+auto RegionAlloc::PushSubAlloc(uint64_t requestedSize) -> RegionAlloc
+{
+    void *const p = PushBytes(requestedSize, Platform::GetMemPageSize());
+    RegionAlloc subAlloc{};
+    subAlloc.Init(p, requestedSize, false);
+    return subAlloc;
 }
 
 } // namespace nyla

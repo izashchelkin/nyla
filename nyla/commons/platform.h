@@ -13,7 +13,7 @@
 namespace nyla
 {
 
-#define NYLA_LOG(fmt, ...) ::nyla::Platform::FileWriteFmt(::nyla::Platform::GetStderr(), Str{fmt}, ##__VA_ARGS__)
+#define NYLA_LOG(fmt, ...) ::nyla::Platform::FileWriteFmt(::nyla::Platform::GetStderr(), AsStr(fmt), ##__VA_ARGS__)
 
 #define NYLA_SV_FMT "%.*s"
 #define NYLA_SV_ARG(sv) (uint32_t)(sv).Size(), (sv).Data()

@@ -10,45 +10,18 @@ namespace nyla
 
 auto CStrLen(const char *str) -> uint64_t
 {
-    const char *alignedPtr = reinterpret_cast<const char *>(reinterpret_cast<uintptr_t>(str) & ~15ULL);
+    // NYLA_ASSERT(reinterpret_cast<uintptr_t>(str) % 16 == 0);
+
     __m128i zero = _mm_setzero_si128();
-
-    __m128i chunk = _mm_load_si128(reinterpret_cast<const __m128i *>(alignedPtr));
-    __m128i cmp = _mm_cmpeq_epi8(chunk, zero);
-    int mask = _mm_movemask_epi8(cmp);
-
-    int offset = reinterpret_cast<uintptr_t>(str) & 15;
-    mask >>= offset;
-
-    if (mask != 0)
+    for (const char *ptr = str;; ptr += 16)
     {
-#if defined(_MSC_VER)
-        unsigned long index;
-        _BitScanForward(&index, mask);
-        return index;
-#else
-        return __builtin_ctz(mask);
-#endif
-    }
-
-    alignedPtr += 16;
-    while (true)
-    {
-        chunk = _mm_load_si128(reinterpret_cast<const __m128i *>(alignedPtr));
-        cmp = _mm_cmpeq_epi8(chunk, zero);
-        mask = _mm_movemask_epi8(cmp);
-
-        if (mask != 0)
+        int cmp = _mm_movemask_epi8(_mm_cmpeq_epi8(_mm_loadu_si128((const __m128i *)ptr), zero));
+        if (cmp)
         {
-#if defined(_MSC_VER)
             unsigned long index;
-            _BitScanForward(&index, mask);
-            return (alignedPtr - str) + index;
-#else
-            return (alignedPtr - str) + __builtin_ctz(mask);
-#endif
+            NYLA_DASSERT(_BitScanForward(&index, cmp));
+            return (ptr - str) + index;
         }
-        alignedPtr += 16;
     }
 }
 

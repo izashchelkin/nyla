@@ -3,56 +3,28 @@
 #include <cstdint>
 #include <type_traits>
 
-#include "nyla/commons/str.h"
+#include "nyla/commons/mem.h"
 
 namespace nyla
 {
 
-template <typename T, uint64_t N> class alignas(RequiredAlignment<T>::value) Array
+template <typename T, uint64_t N> struct alignas(RequiredAlignment<T>::value) Array
 {
     static_assert(std::is_trivially_constructible<T>());
     static_assert(std::is_trivially_destructible<T>());
 
-  public:
-    Array() : m_Data{}
-    {
-    }
-
-    Array(const T &first)
-        requires(N == 1)
-        : m_Data{first}
-    {
-        m_Data[0] = first;
-    }
-
-    Array(const T &first, const T &second)
-        requires(N == 2)
-        : m_Data{first, second}
-    {
-    }
-
-    Array(const T &first, const T &second, const T &third)
-        requires(N == 3)
-        : m_Data{first, second, third}
-    {
-    }
-
-    Array(const T &first, const T &second, const T &third, const T &forth)
-        requires(N == 4)
-        : m_Data{first, second, third, forth}
-    {
-    }
+    T data[N];
 
     [[nodiscard]]
     auto operator[](uint64_t i) -> T &
     {
-        return m_Data[i];
+        return data[i];
     }
 
     [[nodiscard]]
     auto operator[](uint64_t i) const -> const T &
     {
-        return m_Data[i];
+        return data[i];
     }
 
     [[nodiscard]]
@@ -64,13 +36,13 @@ template <typename T, uint64_t N> class alignas(RequiredAlignment<T>::value) Arr
     [[nodiscard]]
     auto Data() -> T *
     {
-        return m_Data;
+        return data;
     }
 
     [[nodiscard]]
     auto Data() const -> const T *
     {
-        return m_Data;
+        return data;
     }
 
     [[nodiscard]]
@@ -120,9 +92,6 @@ template <typename T, uint64_t N> class alignas(RequiredAlignment<T>::value) Arr
     {
         return Data() + Size();
     }
-
-  private:
-    T m_Data[(sizeof(T) * N + RequiredAlignment<T>::value - 1) / sizeof(T)];
 };
 
 } // namespace nyla

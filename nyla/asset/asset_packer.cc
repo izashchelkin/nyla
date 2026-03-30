@@ -4,6 +4,7 @@
 #include "nyla/commons/assert.h"
 #include "nyla/commons/entrypoint.h"
 #include "nyla/commons/fmt.h"
+#include "nyla/commons/path.h"
 #include "nyla/commons/platform.h"
 #include "nyla/commons/region_alloc.h"
 #include "nyla/commons/str.h"
@@ -19,7 +20,6 @@ auto PlatformMain() -> int
     rootAlloc.Init(nullptr, 64_GiB, true);
 
     auto args = rootAlloc.PushArr<Str>(256);
-    MemZero(&args);
 
     Platform::ParseStdArgs(args.Data(), args.Size());
 
@@ -31,26 +31,26 @@ auto PlatformMain() -> int
 
     for (auto arg : args)
     {
-        NYLA_LOG("" NYLA_SV_FMT, NYLA_SV_ARG(arg));
+        if (!arg.Empty())
+            NYLA_LOG("" NYLA_SV_FMT, NYLA_SV_ARG(arg));
     }
 
-    NYLA_LOG("Writing into %s", args[2]);
+    NYLA_LOG("Writing into " NYLA_SV_FMT, NYLA_SV_ARG(args[1]));
 
+    auto scratch = rootAlloc.PushSubAlloc(1 << 20);
     const FileHandle outputFile =
-        Platform::FileOpen(rootAlloc.PushPath(Str{args[2]}), FileOpenMode::Append | FileOpenMode::Write);
+        Platform::FileOpen(CreatePath(scratch, args[1]), FileOpenMode::Append | FileOpenMode::Write);
     NYLA_ASSERT(Platform::FileValid(outputFile));
 
-    auto scratch = rootAlloc.PushSubAlloc(1024);
+    scratch.Reset();
 
     for (uint32_t i = 1; i < args.Size(); ++i)
     {
-        auto arg = Str{args[i]};
-        scratch.PushCopyStr(Str{" \""});
+        Str arg = args[i];
+        scratch.PushCopyStr(AsStr(" \""));
         scratch.PushCopyStr(arg);
-        scratch.PushCopyStr(Str{"\""});
+        scratch.PushCopyStr(AsStr("\""));
     }
-
-    NYLA_DEBUGBREAK();
 
     Platform::FileWrite(outputFile, AssetPackerHeader{.count = scratch.GetBytesUsed()});
     Platform::FileWriteSpan(outputFile, Span{scratch.GetBase(), scratch.GetBytesUsed()});
@@ -59,8 +59,8 @@ auto PlatformMain() -> int
 
     for (uint32_t i = 2; i < args.Size();)
     {
-        auto dataPath = Str{args[i++]};
-        auto processorConfig = Str{args[i++]};
+        Str dataPath = args[i++];
+        Str processorConfig = args[i++];
 
         // NYLA_LOG("Packing " NYLA_SV_FMT " using config " NYLA_SV_FMT, NYLA_SV_ARG(dataPath),
         //          NYLA_SV_ARG(processorConfig));

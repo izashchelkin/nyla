@@ -18,13 +18,13 @@ template <typename T, uint64_t N> class InlineVec
 
     InlineVec(Span<T> elems) : m_Size{elems.Size()}
     {
-        NYLA_ASSERT(elems.size() <= N);
+        NYLA_ASSERT(elems.m_Size() <= N);
         MemCpy(m_Data.Data(), elems.Data(), elems.ByteSize());
     }
 
     InlineVec(Span<const T> elems) : m_Size(elems.Size())
     {
-        NYLA_ASSERT(elems.size() <= N);
+        NYLA_ASSERT(elems.m_Size() <= N);
         MemCpy(m_Data.Data(), elems.Data(), elems.ByteSize());
     }
 
