@@ -1,21 +1,18 @@
 #pragma once
 
-#include <array>
-#include <cstddef>
 #include <cstdint>
-#include <utility>
 
-#include "nyla/commons/assert.h"
+#include "nyla/commons/array.h"
 #include "nyla/commons/handle.h"
+#include "nyla/commons/platform.h"
+#include "nyla/commons/tuple.h"
 
 namespace nyla
 {
 
-template <typename HandleType, typename DataType, uint32_t Size> class HandlePool
+template <typename HandleType, typename DataType, uint64_t SlotCapacity> class HandlePool
 {
   public:
-    static constexpr uint32_t kCapacity = Size;
-
     struct Slot
     {
         DataType data;
@@ -29,74 +26,64 @@ template <typename HandleType, typename DataType, uint32_t Size> class HandlePoo
         }
     };
 
-    using value_type = Slot;
-    using size_type = uint32_t;
-    using difference_type = int32_t;
-    using reference = Slot &;
-    using const_reference = const Slot &;
-    using pointer = Slot *;
-    using const_pointer = const Slot *;
-    using iterator = Slot *;
-    using const_iterator = const Slot *;
-
     [[nodiscard]]
-    auto data() const -> const_pointer
+    auto Data() const -> const Slot *
     {
         return m_Slots.data();
     }
 
     [[nodiscard]]
-    auto data() -> pointer
+    auto Data() -> Slot *
     {
         return m_Slots.data();
     }
 
     [[nodiscard]]
-    constexpr auto size() const -> size_type
+    constexpr auto Size() const -> uint64_t
     {
-        return Size;
+        return SlotCapacity;
     }
 
     [[nodiscard]]
-    constexpr auto max_size() const -> size_type
+    constexpr auto MaxSize() const -> uint64_t
     {
-        return Size;
+        return SlotCapacity;
     }
 
     [[nodiscard]]
-    auto begin() -> iterator
+    auto begin() -> Slot *
     {
         return m_Slots.data();
     }
 
     [[nodiscard]]
-    auto end() -> iterator
-    {
-        return m_Slots.data() + kCapacity;
-    }
-
-    [[nodiscard]]
-    auto begin() const -> const_iterator
+    auto begin() const -> const Slot *
     {
         return m_Slots.data();
     }
 
     [[nodiscard]]
-    auto end() const -> const_iterator
-    {
-        return m_Slots.data() + kCapacity;
-    }
-
-    [[nodiscard]]
-    auto cbegin() const -> const_iterator
+    auto cbegin() const -> const Slot *
     {
         return m_Slots.data();
     }
 
     [[nodiscard]]
-    auto cend() const -> const_iterator
+    auto end() -> Slot *
     {
-        return m_Slots.data() + kCapacity;
+        return m_Slots.data() + MaxSize();
+    }
+
+    [[nodiscard]]
+    auto end() const -> const Slot *
+    {
+        return m_Slots.data() + MaxSize();
+    }
+
+    [[nodiscard]]
+    auto cend() const -> const Slot *
+    {
+        return m_Slots.data() + MaxSize();
     }
 
     auto operator[](uint32_t i) -> Slot &
@@ -115,7 +102,7 @@ template <typename HandleType, typename DataType, uint32_t Size> class HandlePoo
     {
         HandleType ret{};
 
-        for (uint32_t i = 0; i < Size; ++i)
+        for (uint32_t i = 0; i < MaxSize(); ++i)
         {
             Slot &slot = m_Slots[i];
             if (slot.used)
@@ -135,9 +122,9 @@ template <typename HandleType, typename DataType, uint32_t Size> class HandlePoo
         return {};
     }
 
-    auto TryResolveSlot(HandleType handle) -> std::pair<bool, Slot *>
+    auto TryResolveSlot(HandleType handle) -> Pair<bool, Slot *>
     {
-        NYLA_ASSERT(handle.index < Size);
+        NYLA_ASSERT(handle.index < MaxSize());
 
         if (!handle.gen)
             return {false, nullptr};
@@ -176,7 +163,7 @@ template <typename HandleType, typename DataType, uint32_t Size> class HandlePoo
     }
 
   private:
-    std::array<Slot, static_cast<size_t>(Size)> m_Slots;
+    Array<Slot, SlotCapacity> m_Slots;
 };
 
 } // namespace nyla

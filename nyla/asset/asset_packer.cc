@@ -1,13 +1,11 @@
 #include <cstdint>
 
 #include "nyla/asset/asset.h"
-#include "nyla/commons/assert.h"
 #include "nyla/commons/entrypoint.h"
 #include "nyla/commons/fmt.h"
 #include "nyla/commons/path.h"
 #include "nyla/commons/platform.h"
 #include "nyla/commons/region_alloc.h"
-#include "nyla/commons/str.h"
 
 namespace nyla
 {
@@ -39,7 +37,7 @@ auto PlatformMain() -> int
 
     auto scratch = rootAlloc.PushSubAlloc(1 << 20);
     const FileHandle outputFile =
-        Platform::FileOpen(CreatePath(scratch, args[1]), FileOpenMode::Append | FileOpenMode::Write);
+        Platform::FileOpen(CreatePath(scratch, args[1]).CStr(), FileOpenMode::Append | FileOpenMode::Write);
     NYLA_ASSERT(Platform::FileValid(outputFile));
 
     scratch.Reset();

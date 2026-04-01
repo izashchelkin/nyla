@@ -4,7 +4,6 @@
 
 #include "nyla/commons/array.h"
 #include "nyla/commons/span.h"
-#include "nyla/commons/str.h"
 
 namespace nyla
 {
@@ -12,22 +11,6 @@ namespace nyla
 template <typename T, uint64_t N> class InlineVec
 {
   public:
-    InlineVec() : m_Size{0}
-    {
-    }
-
-    InlineVec(Span<T> elems) : m_Size{elems.Size()}
-    {
-        NYLA_ASSERT(elems.m_Size() <= N);
-        MemCpy(m_Data.Data(), elems.Data(), elems.ByteSize());
-    }
-
-    InlineVec(Span<const T> elems) : m_Size(elems.Size())
-    {
-        NYLA_ASSERT(elems.m_Size() <= N);
-        MemCpy(m_Data.Data(), elems.Data(), elems.ByteSize());
-    }
-
     [[nodiscard]] auto Data() -> T *
     {
         return m_Data.Data();
@@ -53,6 +36,11 @@ template <typename T, uint64_t N> class InlineVec
         return m_Size;
     }
 
+    [[nodiscard]] auto Size32() const -> uint32_t
+    {
+        return m_Size;
+    }
+
     [[nodiscard]] auto Empty() const -> bool
     {
         return m_Size == 0;
@@ -66,13 +54,13 @@ template <typename T, uint64_t N> class InlineVec
     [[nodiscard]] auto operator[](uint64_t i) -> T &
     {
         NYLA_ASSERT(i < m_Size);
-        return GetPtr()[i];
+        return Data()[i];
     }
 
     [[nodiscard]] auto operator[](uint64_t i) const -> const T &
     {
         NYLA_ASSERT(i < m_Size);
-        return GetPtr()[i];
+        return Data()[i];
     }
 
     [[nodiscard]] auto begin() -> T *
@@ -82,12 +70,12 @@ template <typename T, uint64_t N> class InlineVec
 
     [[nodiscard]] auto begin() const -> const T *
     {
-        return GetPtr();
+        return Data();
     }
 
     [[nodiscard]] auto cbegin() const -> const T *
     {
-        return GetPtr();
+        return Data();
     }
 
     [[nodiscard]] auto end() -> T *
@@ -97,12 +85,12 @@ template <typename T, uint64_t N> class InlineVec
 
     [[nodiscard]] auto end() const -> const T *
     {
-        return GetPtr() + m_Size;
+        return Data() + m_Size;
     }
 
     [[nodiscard]] auto cend() const -> const T *
     {
-        return GetPtr() + m_Size;
+        return Data() + m_Size;
     }
 
     auto Front() -> T &
@@ -134,6 +122,14 @@ template <typename T, uint64_t N> class InlineVec
     {
         NYLA_ASSERT(m_Size < N);
         T *p = Data() + m_Size++;
+        return *p;
+    }
+
+    template <class... Args> auto PushBack(const T &value) -> T &
+    {
+        NYLA_ASSERT(m_Size < N);
+        T *p = Data() + m_Size++;
+        *p = value;
         return *p;
     }
 

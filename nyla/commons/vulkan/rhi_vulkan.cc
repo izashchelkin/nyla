@@ -1,35 +1,41 @@
-#include "nyla/rhi/vulkan/rhi_vulkan.h"
+#include "nyla/commons/vulkan/rhi_vulkan.h"
 
 #include <cstdint>
-#include <cstring>
-#include <limits>
-#include <vector>
 
-#include "nyla/commons/assert.h"
+#include <vulkan/vk_enum_string_helper.h>
+#include <vulkan/vulkan_core.h>
+
+#include "nyla/commons/array.h"
 #include "nyla/commons/bitenum.h"
+#include "nyla/commons/collections.h"
+#include "nyla/commons/handle_pool.h"
 #include "nyla/commons/inline_vec.h"
+#include "nyla/commons/limits.h"
 #include "nyla/commons/log.h"
-#include "nyla/platform/platform.h"
-#include "nyla/rhi/rhi.h"
-#include "vulkan/vulkan_core.h"
+#include "nyla/commons/mem.h"
+#include "nyla/commons/platform.h"
+#include "nyla/commons/region_alloc.h"
+#include "nyla/commons/rhi.h"
+#include "nyla/commons/span.h"
+#include "nyla/spirview/spirview.h"
 
 #define spv_enable_utility_code
 
 // clang-format off
 #if defined(__linux__)
-#include "nyla/platform/linux/platform_linux.h"
+#include "nyla/commons/linux/platform_linux.h"
 #include "vulkan/vulkan_xcb.h"
 
 #include <spirv/unified1/spirv.hpp>
 #else
-#include "nyla/platform/windows/platform_windows.h"
+#include "nyla/commons/windows/platform_windows.h"
 #include "vulkan/vulkan_win32.h"
 
 #include <spirv-headers/spirv.hpp>
 #endif
 // clang-format on
 
-#define VK_GET_INSTANCE_PROC_ADDR(name) reinterpret_cast<PFN_##name>(vkGetInstanceProcAddr(m_Instance, #name))
+#define VK_GET_INSTANCE_PROC_ADDR(name) reinterpret_cast<PFN_##name>(vkGetInstanceProcAddr(g_State->m_Instance, #name))
 #define VK_CHECK(res) VkCheckImpl(res)
 
 namespace nyla
@@ -94,7 +100,7 @@ struct VulkanPipelineData
 
 struct VulkanShaderData
 {
-    InlineVec<uint32_t, 1 << 18> *spv;
+    Span<uint32_t> spv;
 };
 
 struct VulkanTextureData
@@ -161,7 +167,7 @@ auto ConvertMemoryUsageIntoVkMemoryPropertyFlags(RhiMemoryUsage usage) -> VkMemo
 
     switch (usage)
     {
-    case nyla::RhiMemoryUsage::Unknown:
+    case RhiMemoryUsage::Unknown:
         break;
     case RhiMemoryUsage::GpuOnly:
         return VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
@@ -432,7 +438,7 @@ auto GetVertexFormatSize(RhiVertexFormat format) -> uint32_t
 {
     switch (format)
     {
-    case nyla::RhiVertexFormat::None:
+    case RhiVertexFormat::None:
         break;
     case RhiVertexFormat::R32G32Float:
         return 8;
@@ -489,83 +495,88 @@ inline auto VkCheckImpl(VkResult res)
 
 //
 
-HandlePool<RhiCmdList, VulkanCmdListData, 16> m_CmdLists;
-
-HandlePool<RhiShader, VulkanShaderData, 16> m_Shaders;
-HandlePool<RhiGraphicsPipeline, VulkanPipelineData, 16> m_GraphicsPipelines;
-
-HandlePool<RhiBuffer, VulkanBufferData, 16> m_Buffers;
-HandlePool<RhiBuffer, VulkanBufferViewData, 16> m_CBVs;
-
-HandlePool<RhiTexture, VulkanTextureData, 128> m_Textures;
-HandlePool<RhiRenderTargetView, VulkanTextureViewData, 8> m_RenderTargetViews;
-HandlePool<RhiDepthStencilView, VulkanTextureViewData, 8> m_DepthStencilViews;
-HandlePool<RhiSampledTextureView, VulkanTextureViewData, 128> m_SampledTextureViews;
-
-HandlePool<RhiSampler, VulkanSamplerData, 16> m_Samplers;
-
-VkAllocationCallbacks *m_Alloc;
-
-RhiFlags m_Flags;
-RhiLimits m_Limits;
-
-VkInstance m_Instance;
-VkDevice m_Dev;
-VkPhysicalDevice m_PhysDev;
-VkPhysicalDeviceProperties m_PhysDevProps;
-VkPhysicalDeviceMemoryProperties m_PhysDevMemProps;
-VkDescriptorPool m_DescriptorPool;
-
 struct DescriptorTable
 {
     VkDescriptorSetLayout layout;
     VkDescriptorSet set;
 };
 
-DescriptorTable m_ConstantsDescriptorTable;
-RhiBuffer m_ConstantsUniformBuffer;
-DescriptorTable m_TexturesDescriptorTable;
-DescriptorTable m_SamplersDescriptorTable;
+struct RhiGlobalState
+{
+    RegionAlloc rootAlloc;
 
-VkSurfaceKHR m_Surface;
-VkSwapchainKHR m_Swapchain;
-bool m_SwapchainUsable = true;
-bool m_RecreateSwapchain = true;
+    HandlePool<RhiCmdList, VulkanCmdListData, 16> m_CmdLists;
 
-InlineVec<RhiRenderTargetView, kRhiMaxNumSwapchainTextures> m_SwapchainRTVs;
-uint32_t m_SwapchainTextureIndex;
+    HandlePool<RhiShader, VulkanShaderData, 16> m_Shaders;
+    HandlePool<RhiGraphicsPipeline, VulkanPipelineData, 16> m_GraphicsPipelines;
 
-std::array<VkSemaphore, kRhiMaxNumSwapchainTextures> m_RenderFinishedSemaphores;
-std::array<VkSemaphore, kRhiMaxNumFramesInFlight> m_SwapchainAcquireSemaphores;
+    HandlePool<RhiBuffer, VulkanBufferData, 16> m_Buffers;
+    HandlePool<RhiBuffer, VulkanBufferViewData, 16> m_CBVs;
 
-DeviceQueue m_GraphicsQueue;
-uint32_t m_FrameIndex;
-std::array<RhiCmdList, kRhiMaxNumFramesInFlight> m_GraphicsQueueCmd;
-std::array<uint64_t, kRhiMaxNumFramesInFlight> m_GraphicsQueueCmdDone;
+    HandlePool<RhiTexture, VulkanTextureData, 128> m_Textures;
+    HandlePool<RhiRenderTargetView, VulkanTextureViewData, 8> m_RenderTargetViews;
+    HandlePool<RhiDepthStencilView, VulkanTextureViewData, 8> m_DepthStencilViews;
+    HandlePool<RhiSampledTextureView, VulkanTextureViewData, 128> m_SampledTextureViews;
 
-DeviceQueue m_TransferQueue;
-RhiCmdList m_TransferQueueCmd;
-uint64_t m_TransferQueueCmdDone;
+    HandlePool<RhiSampler, VulkanSamplerData, 16> m_Samplers;
+
+    VkAllocationCallbacks *vkAlloc;
+
+    RhiFlags m_Flags;
+    RhiLimits m_Limits;
+
+    VkInstance m_Instance;
+    VkDevice m_Dev;
+    VkPhysicalDevice m_PhysDev;
+    VkPhysicalDeviceProperties m_PhysDevProps;
+    VkPhysicalDeviceMemoryProperties m_PhysDevMemProps;
+    VkDescriptorPool m_DescriptorPool;
+
+    DescriptorTable m_ConstantsDescriptorTable;
+    RhiBuffer m_ConstantsUniformBuffer;
+    DescriptorTable m_TexturesDescriptorTable;
+    DescriptorTable m_SamplersDescriptorTable;
+
+    VkSurfaceKHR m_Surface;
+    VkSwapchainKHR m_Swapchain;
+    bool m_SwapchainUsable = true;
+    bool m_RecreateSwapchain = true;
+
+    InlineVec<RhiRenderTargetView, kRhiMaxNumSwapchainTextures> m_SwapchainRTVs{};
+    uint32_t m_SwapchainTextureIndex;
+
+    Array<VkSemaphore, kRhiMaxNumSwapchainTextures> m_RenderFinishedSemaphores;
+    Array<VkSemaphore, kRhiMaxNumFramesInFlight> m_SwapchainAcquireSemaphores;
+
+    DeviceQueue m_GraphicsQueue;
+    uint32_t m_FrameIndex;
+    Array<RhiCmdList, kRhiMaxNumFramesInFlight> m_GraphicsQueueCmd;
+    Array<uint64_t, kRhiMaxNumFramesInFlight> m_GraphicsQueueCmdDone;
+
+    DeviceQueue m_TransferQueue;
+    RhiCmdList m_TransferQueueCmd;
+    uint64_t m_TransferQueueCmdDone;
+};
+RhiGlobalState *g_State;
 
 //
 
-void VulkanNameHandle(VkObjectType type, uint64_t handle, std::string_view name)
+void VulkanNameHandle(VkObjectType type, uint64_t handle, Str name)
 {
-    auto nameCopy = std::string{name};
     const VkDebugUtilsObjectNameInfoEXT nameInfo{
         .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
         .objectType = type,
         .objectHandle = handle,
-        .pObjectName = nameCopy.c_str(),
+        .pObjectName = name.Data(),
     };
 
     static auto fn = VK_GET_INSTANCE_PROC_ADDR(vkSetDebugUtilsObjectNameEXT);
-    fn(m_Dev, &nameInfo);
+    fn(g_State->m_Dev, &nameInfo);
 }
 
 auto CbvOffset(uint32_t offset) -> uint32_t
 {
-    return AlignedUp<uint32_t>(offset, m_PhysDevProps.limits.minUniformBufferOffsetAlignment);
+    return AlignedUp<uint32_t>(offset, g_State->m_PhysDevProps.limits.minUniformBufferOffsetAlignment);
 }
 
 auto FindMemoryTypeIndex(VkMemoryRequirements memRequirements, VkMemoryPropertyFlags properties) -> uint32_t
@@ -574,7 +585,7 @@ auto FindMemoryTypeIndex(VkMemoryRequirements memRequirements, VkMemoryPropertyF
 
     static const VkPhysicalDeviceMemoryProperties memPropertities = [] -> VkPhysicalDeviceMemoryProperties {
         VkPhysicalDeviceMemoryProperties memPropertities;
-        vkGetPhysicalDeviceMemoryProperties(m_PhysDev, &memPropertities);
+        vkGetPhysicalDeviceMemoryProperties(g_State->m_PhysDev, &memPropertities);
         return memPropertities;
     }();
 
@@ -676,20 +687,20 @@ auto GetDeviceQueue(RhiQueueType queueType) -> DeviceQueue &
     switch (queueType)
     {
     case RhiQueueType::Graphics:
-        return m_GraphicsQueue;
+        return g_State->m_GraphicsQueue;
     case RhiQueueType::Transfer:
-        return m_TransferQueue;
+        return g_State->m_TransferQueue;
     }
     NYLA_ASSERT(false);
-    return m_GraphicsQueue;
+    return g_State->m_GraphicsQueue;
 }
 
 void CmdDrawInternal(VulkanCmdListData &cmdData)
 {
     VkCommandBuffer cmdbuf = cmdData.cmdbuf;
-    const VulkanPipelineData &pipelineData = m_GraphicsPipelines.ResolveData(cmdData.boundGraphicsPipeline);
+    const VulkanPipelineData &pipelineData = g_State->m_GraphicsPipelines.ResolveData(cmdData.boundGraphicsPipeline);
 
-    const std::array<uint32_t, 4> offsets{
+    const Array<uint32_t, 4> offsets{
         cmdData.frameConstantHead,
         cmdData.passConstantHead,
         cmdData.drawConstantHead,
@@ -697,24 +708,25 @@ void CmdDrawInternal(VulkanCmdListData &cmdData)
     };
 
     vkCmdBindDescriptorSets(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineData.layout, 0, 1,
-                            &m_ConstantsDescriptorTable.set, offsets.size(), offsets.data());
+                            &g_State->m_ConstantsDescriptorTable.set, offsets.Size(), offsets.Data());
 
-    cmdData.drawConstantHead += CbvOffset(m_Limits.drawConstantSize);
-    cmdData.largeDrawConstantHead += CbvOffset(m_Limits.largeDrawConstantSize);
+    cmdData.drawConstantHead += CbvOffset(g_State->m_Limits.drawConstantSize);
+    cmdData.largeDrawConstantHead += CbvOffset(g_State->m_Limits.largeDrawConstantSize);
 }
 
 void CreateSwapchain()
 {
-    VkSwapchainKHR oldSwapchain = m_Swapchain;
+    VkSwapchainKHR oldSwapchain = g_State->m_Swapchain;
 
     static bool logPresentModes = true;
     VkPresentModeKHR presentMode = [] -> VkPresentModeKHR {
-        std::vector<VkPresentModeKHR> presentModes;
+        InlineVec<VkPresentModeKHR, 16> presentModes;
         uint32_t presentModeCount = 0;
-        vkGetPhysicalDeviceSurfacePresentModesKHR(m_PhysDev, m_Surface, &presentModeCount, nullptr);
+        vkGetPhysicalDeviceSurfacePresentModesKHR(g_State->m_PhysDev, g_State->m_Surface, &presentModeCount, nullptr);
 
-        presentModes.resize(presentModeCount);
-        vkGetPhysicalDeviceSurfacePresentModesKHR(m_PhysDev, m_Surface, &presentModeCount, presentModes.data());
+        presentModes.Resize(presentModeCount);
+        vkGetPhysicalDeviceSurfacePresentModesKHR(g_State->m_PhysDev, g_State->m_Surface, &presentModeCount,
+                                                  presentModes.Data());
 
         VkPresentModeKHR bestMode = VK_PRESENT_MODE_FIFO_KHR;
         for (VkPresentModeKHR presentMode : presentModes)
@@ -727,11 +739,11 @@ void CreateSwapchain()
             {
 
             case VK_PRESENT_MODE_FIFO_LATEST_READY_KHR: {
-                better = !Any(m_Flags & RhiFlags::VSync);
+                better = !Any(g_State->m_Flags & RhiFlags::VSync);
                 break;
             }
             case VK_PRESENT_MODE_IMMEDIATE_KHR: {
-                better = !Any(m_Flags & RhiFlags::VSync) && bestMode != VK_PRESENT_MODE_FIFO_LATEST_READY_KHR;
+                better = !Any(g_State->m_Flags & RhiFlags::VSync) && bestMode != VK_PRESENT_MODE_FIFO_LATEST_READY_KHR;
                 break;
             }
 
@@ -756,14 +768,17 @@ void CreateSwapchain()
     }();
 
     VkSurfaceCapabilitiesKHR surfaceCapabilities;
-    VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_PhysDev, m_Surface, &surfaceCapabilities));
+    VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(g_State->m_PhysDev, g_State->m_Surface, &surfaceCapabilities));
 
     auto surfaceFormat = [] -> VkSurfaceFormatKHR {
         uint32_t surfaceFormatCount;
-        VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(m_PhysDev, m_Surface, &surfaceFormatCount, nullptr));
+        VK_CHECK(
+            vkGetPhysicalDeviceSurfaceFormatsKHR(g_State->m_PhysDev, g_State->m_Surface, &surfaceFormatCount, nullptr));
 
-        std::vector<VkSurfaceFormatKHR> surfaceFormats(surfaceFormatCount);
-        vkGetPhysicalDeviceSurfaceFormatsKHR(m_PhysDev, m_Surface, &surfaceFormatCount, surfaceFormats.data());
+        InlineVec<VkSurfaceFormatKHR, 16> surfaceFormats;
+        surfaceFormats.Resize(surfaceFormatCount);
+        vkGetPhysicalDeviceSurfaceFormatsKHR(g_State->m_PhysDev, g_State->m_Surface, &surfaceFormatCount,
+                                             surfaceFormats.Data());
 
         auto it = std::ranges::find_if(surfaceFormats, [](VkSurfaceFormatKHR surfaceFormat) -> bool {
             return surfaceFormat.format == VK_FORMAT_B8G8R8A8_SRGB &&
@@ -779,10 +794,10 @@ void CreateSwapchain()
 
         const PlatformWindowSize windowSize = Platform::WinGetSize();
         return VkExtent2D{
-            .width = std::clamp(windowSize.width, surfaceCapabilities.minImageExtent.width,
-                                surfaceCapabilities.maxImageExtent.width),
-            .height = std::clamp(windowSize.height, surfaceCapabilities.minImageExtent.height,
-                                 surfaceCapabilities.maxImageExtent.height),
+            .width = Clamp(windowSize.width, surfaceCapabilities.minImageExtent.width,
+                           surfaceCapabilities.maxImageExtent.width),
+            .height = Clamp(windowSize.height, surfaceCapabilities.minImageExtent.height,
+                            surfaceCapabilities.maxImageExtent.height),
         };
     }();
 
@@ -793,7 +808,7 @@ void CreateSwapchain()
 
     const VkSwapchainCreateInfoKHR createInfo{
         .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-        .surface = m_Surface,
+        .surface = g_State->m_Surface,
         .minImageCount = swapchainMinImageCount,
         .imageFormat = surfaceFormat.format,
         .imageColorSpace = surfaceFormat.colorSpace,
@@ -805,31 +820,31 @@ void CreateSwapchain()
         .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
         .presentMode = presentMode,
         .clipped = VK_TRUE,
-        .oldSwapchain = m_Swapchain,
+        .oldSwapchain = g_State->m_Swapchain,
     };
-    VK_CHECK(vkCreateSwapchainKHR(m_Dev, &createInfo, nullptr, &m_Swapchain));
+    VK_CHECK(vkCreateSwapchainKHR(g_State->m_Dev, &createInfo, nullptr, &g_State->m_Swapchain));
 
     uint32_t swapchainTexturesCount;
-    vkGetSwapchainImagesKHR(m_Dev, m_Swapchain, &swapchainTexturesCount, nullptr);
+    vkGetSwapchainImagesKHR(g_State->m_Dev, g_State->m_Swapchain, &swapchainTexturesCount, nullptr);
 
     NYLA_ASSERT(swapchainTexturesCount <= kRhiMaxNumSwapchainTextures);
-    std::array<VkImage, kRhiMaxNumSwapchainTextures> swapchainImages;
+    Array<VkImage, kRhiMaxNumSwapchainTextures> swapchainImages;
 
-    vkGetSwapchainImagesKHR(m_Dev, m_Swapchain, &swapchainTexturesCount, swapchainImages.data());
+    vkGetSwapchainImagesKHR(g_State->m_Dev, g_State->m_Swapchain, &swapchainTexturesCount, swapchainImages.Data());
 
     for (size_t i = 0; i < swapchainMinImageCount; ++i)
     {
         RhiTexture texture;
         RhiRenderTargetView rtv;
 
-        if (m_SwapchainRTVs.size() > i)
+        if (g_State->m_SwapchainRTVs.Size() > i)
         {
-            rtv = m_SwapchainRTVs[i];
-            VulkanTextureViewData &rtvData = m_RenderTargetViews.ResolveData(rtv);
+            rtv = g_State->m_SwapchainRTVs[i];
+            VulkanTextureViewData &rtvData = g_State->m_RenderTargetViews.ResolveData(rtv);
             rtvData.format = surfaceFormat.format;
 
             texture = rtvData.texture;
-            VulkanTextureData &textureData = m_Textures.ResolveData(texture);
+            VulkanTextureData &textureData = g_State->m_Textures.ResolveData(texture);
             textureData.image = swapchainImages[i];
             textureData.state = RhiTextureState::Present;
             textureData.layout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -837,7 +852,7 @@ void CreateSwapchain()
             textureData.extent = VkExtent3D{surfaceExtent.width, surfaceExtent.height, 1};
             textureData.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 
-            vkDestroyImageView(m_Dev, rtvData.imageView, m_Alloc);
+            vkDestroyImageView(g_State->m_Dev, rtvData.imageView, g_State->vkAlloc);
 
             const VkImageViewCreateInfo imageViewCreateInfo{
                 .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -853,7 +868,7 @@ void CreateSwapchain()
                         .layerCount = 1,
                     },
             };
-            vkCreateImageView(m_Dev, &imageViewCreateInfo, m_Alloc, &rtvData.imageView);
+            vkCreateImageView(g_State->m_Dev, &imageViewCreateInfo, g_State->vkAlloc, &rtvData.imageView);
         }
         else
         {
@@ -866,18 +881,18 @@ void CreateSwapchain()
                 .extent = VkExtent3D{surfaceExtent.width, surfaceExtent.height, 1},
             };
 
-            texture = m_Textures.Acquire(textureData);
+            texture = g_State->m_Textures.Acquire(textureData);
 
             rtv = Rhi::CreateRenderTargetView(RhiRenderTargetViewDesc{
                 .texture = texture,
             });
 
-            m_SwapchainRTVs.emplace_back(rtv);
+            g_State->m_SwapchainRTVs.PushBack(rtv);
         }
     }
 
     if (oldSwapchain)
-        vkDestroySwapchainKHR(m_Dev, oldSwapchain, m_Alloc);
+        vkDestroySwapchainKHR(g_State->m_Dev, oldSwapchain, g_State->vkAlloc);
 }
 
 auto CreateTimeline(uint64_t initialValue) -> VkSemaphore
@@ -894,7 +909,7 @@ auto CreateTimeline(uint64_t initialValue) -> VkSemaphore
     };
 
     VkSemaphore semaphore;
-    vkCreateSemaphore(m_Dev, &semaphoreCreateInfo, nullptr, &semaphore);
+    vkCreateSemaphore(g_State->m_Dev, &semaphoreCreateInfo, nullptr, &semaphore);
     return semaphore;
 }
 
@@ -909,12 +924,12 @@ void WaitTimeline(VkSemaphore timeline, uint64_t waitValue)
         .pValues = &waitValue,
     };
 
-    VK_CHECK(vkWaitSemaphores(m_Dev, &waitInfo, 1e9));
+    VK_CHECK(vkWaitSemaphores(g_State->m_Dev, &waitInfo, 1e9));
 
 #if 0
     {
         uint64_t currentValue = -1;
-        vkGetSemaphoreCounterValue(m_Dev, timeline, &currentValue);
+        vkGetSemaphoreCounterValue(g_State->m_Dev, timeline, &currentValue);
         DebugBreak();
 
         VkSemaphoreSignalInfo info{
@@ -922,9 +937,9 @@ void WaitTimeline(VkSemaphore timeline, uint64_t waitValue)
             .semaphore = timeline,
             .value = waitValue,
         };
-        VK_CHECK(vkSignalSemaphore(m_Dev, &info));
+        VK_CHECK(vkSignalSemaphore(g_State->m_Dev, &info));
 
-        vkGetSemaphoreCounterValue(m_Dev, m_GraphicsQueue.timeline, &currentValue);
+        vkGetSemaphoreCounterValue(g_State->m_Dev, g_State->m_GraphicsQueue.timeline, &currentValue);
         DebugBreak();
     }
 #endif
@@ -939,27 +954,27 @@ void WriteDescriptorTables()
     InlineVec<VkDescriptorBufferInfo, kMaxDescriptorUpdates> descriptorBufferInfos;
 
     { // TEXTURES
-        for (uint32_t i = 0; i < m_SampledTextureViews.size(); ++i)
+        for (uint32_t i = 0; i < g_State->m_SampledTextureViews.Size(); ++i)
         {
-            auto &slot = m_SampledTextureViews[i];
+            auto &slot = g_State->m_SampledTextureViews[i];
             if (!slot.used)
                 continue;
             if (slot.data.descriptorWritten)
                 continue;
 
             const VulkanTextureViewData &textureViewData = slot.data;
-            const VulkanTextureData &textureData = m_Textures.ResolveData(textureViewData.texture);
+            const VulkanTextureData &textureData = g_State->m_Textures.ResolveData(textureViewData.texture);
 
-            VkWriteDescriptorSet &vulkanSetWrite = descriptorWrites.emplace_back(VkWriteDescriptorSet{
+            VkWriteDescriptorSet &vulkanSetWrite = descriptorWrites.PushBack(VkWriteDescriptorSet{
                 .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                .dstSet = m_TexturesDescriptorTable.set,
+                .dstSet = g_State->m_TexturesDescriptorTable.set,
                 .dstBinding = 0,
                 .dstArrayElement = i,
                 .descriptorCount = 1,
                 .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
             });
 
-            vulkanSetWrite.pImageInfo = &descriptorImageInfos.emplace_back(VkDescriptorImageInfo{
+            vulkanSetWrite.pImageInfo = &descriptorImageInfos.PushBack(VkDescriptorImageInfo{
                 .imageView = textureViewData.imageView,
                 .imageLayout = textureData.layout,
             });
@@ -969,9 +984,9 @@ void WriteDescriptorTables()
     }
 
     { // SAMPLERS
-        for (uint32_t i = 0; i < m_Samplers.size(); ++i)
+        for (uint32_t i = 0; i < g_State->m_Samplers.Size(); ++i)
         {
-            auto &slot = m_Samplers[i];
+            auto &slot = g_State->m_Samplers[i];
             if (!slot.used)
                 continue;
             if (slot.data.descriptorWritten)
@@ -979,16 +994,16 @@ void WriteDescriptorTables()
 
             const VulkanSamplerData &samplerData = slot.data;
 
-            VkWriteDescriptorSet &vulkanSetWrite = descriptorWrites.emplace_back(VkWriteDescriptorSet{
+            VkWriteDescriptorSet &vulkanSetWrite = descriptorWrites.PushBack(VkWriteDescriptorSet{
                 .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                .dstSet = m_SamplersDescriptorTable.set,
+                .dstSet = g_State->m_SamplersDescriptorTable.set,
                 .dstBinding = 0,
                 .dstArrayElement = i,
                 .descriptorCount = 1,
                 .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
             });
 
-            vulkanSetWrite.pImageInfo = &descriptorImageInfos.emplace_back(VkDescriptorImageInfo{
+            vulkanSetWrite.pImageInfo = &descriptorImageInfos.PushBack(VkDescriptorImageInfo{
                 .sampler = samplerData.sampler,
             });
 
@@ -996,19 +1011,25 @@ void WriteDescriptorTables()
         }
     }
 
-    vkUpdateDescriptorSets(m_Dev, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
+    vkUpdateDescriptorSets(g_State->m_Dev, descriptorWrites.Size(), descriptorWrites.Data(), 0, nullptr);
 }
 
 } // namespace
 
 void Rhi::Init(const RhiInitDesc &rhiDesc)
 {
+    {
+        auto rootAlloc = rhiDesc.rootAlloc;
+        g_State = rootAlloc.Push(RhiGlobalState{});
+        g_State->rootAlloc = rootAlloc;
+    }
+
     constexpr uint32_t kInvalidIndex = std::numeric_limits<uint32_t>::max();
 
     NYLA_ASSERT(rhiDesc.limits.numFramesInFlight <= kRhiMaxNumFramesInFlight);
 
-    m_Flags = rhiDesc.flags;
-    m_Limits = rhiDesc.limits;
+    g_State->m_Flags = rhiDesc.flags;
+    g_State->m_Limits = rhiDesc.limits;
 
     const VkApplicationInfo appInfo{
         .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
@@ -1020,17 +1041,17 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
     };
 
     InlineVec<const char *, 4> enabledInstanceExtensions;
-    enabledInstanceExtensions.emplace_back(VK_KHR_SURFACE_EXTENSION_NAME);
+    enabledInstanceExtensions.PushBack(VK_KHR_SURFACE_EXTENSION_NAME);
 #if defined(__linux__)
-    enabledInstanceExtensions.emplace_back(VK_KHR_XCB_SURFACE_EXTENSION_NAME);
+    enabledInstanceExtensions.PushBack(VK_KHR_XCB_SURFACE_EXTENSION_NAME);
 #else
-    enabledInstanceExtensions.emplace_back(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
+    enabledInstanceExtensions.PushBack(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
 #endif
 
     InlineVec<const char *, 2> instanceLayers;
     if (kRhiValidations)
     {
-        instanceLayers.emplace_back("VK_LAYER_KHRONOS_validation");
+        instanceLayers.PushBack("VK_LAYER_KHRONOS_validation");
     }
 
     InlineVec<VkValidationFeatureEnableEXT, 4> validationEnabledFeatures;
@@ -1038,9 +1059,9 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
     VkValidationFeaturesEXT validationFeatures = {
         .sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT,
         .enabledValidationFeatureCount = 0,
-        .pEnabledValidationFeatures = validationEnabledFeatures.data(),
+        .pEnabledValidationFeatures = validationEnabledFeatures.Data(),
         .disabledValidationFeatureCount = 0,
-        .pDisabledValidationFeatures = validationDisabledFeatures.data(),
+        .pDisabledValidationFeatures = validationDisabledFeatures.Data(),
     };
 
     VkDebugUtilsMessengerCreateInfoEXT debugMessengerCreateInfo = {
@@ -1055,20 +1076,20 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
         .pUserData = nullptr,
     };
 
-    std::vector<VkLayerProperties> layers;
     uint32_t layerCount;
     vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
 
-    layers.resize(layerCount);
-    vkEnumerateInstanceLayerProperties(&layerCount, layers.data());
+    InlineVec<VkLayerProperties, 256> layers;
+    layers.Resize(layerCount);
+    vkEnumerateInstanceLayerProperties(&layerCount, layers.Data());
 
     {
-        std::vector<VkExtensionProperties> instanceExtensions;
+        InlineVec<VkExtensionProperties, 256> instanceExtensions;
         uint32_t instanceExtensionsCount;
         vkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionsCount, nullptr);
 
-        instanceExtensions.resize(instanceExtensionsCount);
-        vkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionsCount, instanceExtensions.data());
+        instanceExtensions.Resize(instanceExtensionsCount);
+        vkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionsCount, instanceExtensions.Data());
 
         NYLA_LOG("");
         NYLA_LOG("%d Instance Extensions available", instanceExtensionsCount);
@@ -1080,18 +1101,18 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
     }
 
     NYLA_LOG("");
-    NYLA_LOG("%zd Layers available", layers.size());
+    NYLA_LOG("%zd Layers available", layers.Size());
     for (uint32_t i = 0; i < layerCount; ++i)
     {
         const auto &layer = layers[i];
         NYLA_LOG("    %s", layer.layerName);
 
-        std::vector<VkExtensionProperties> layerExtensions;
+        InlineVec<VkExtensionProperties, 256> layerExtensions;
         uint32_t layerExtensionProperties;
         vkEnumerateInstanceExtensionProperties(layer.layerName, &layerExtensionProperties, nullptr);
 
-        layerExtensions.resize(layerExtensionProperties);
-        vkEnumerateInstanceExtensionProperties(layer.layerName, &layerExtensionProperties, layerExtensions.data());
+        layerExtensions.Resize(layerExtensionProperties);
+        vkEnumerateInstanceExtensionProperties(layer.layerName, &layerExtensionProperties, layerExtensions.Data());
 
         for (uint32_t i = 0; i < layerExtensionProperties; ++i)
         {
@@ -1107,62 +1128,64 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
     {
         if constexpr (false)
         {
-            validationEnabledFeatures.emplace_back(VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT);
-            validationEnabledFeatures.emplace_back(VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_RESERVE_BINDING_SLOT_EXT);
-            validationEnabledFeatures.emplace_back(VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT);
-            validationEnabledFeatures.emplace_back(VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT);
-            validationFeatures.enabledValidationFeatureCount = validationEnabledFeatures.size();
+            validationEnabledFeatures.PushBack(VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT);
+            validationEnabledFeatures.PushBack(VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_RESERVE_BINDING_SLOT_EXT);
+            validationEnabledFeatures.PushBack(VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT);
+            validationEnabledFeatures.PushBack(VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT);
+            validationFeatures.enabledValidationFeatureCount = validationEnabledFeatures.Size();
 
-            validationDisabledFeatures.emplace_back(VK_VALIDATION_FEATURE_DISABLE_CORE_CHECKS_EXT);
-            validationFeatures.disabledValidationFeatureCount = validationEnabledFeatures.size();
+            validationDisabledFeatures.PushBack(VK_VALIDATION_FEATURE_DISABLE_CORE_CHECKS_EXT);
+            validationFeatures.disabledValidationFeatureCount = validationEnabledFeatures.Size();
         }
 
         instancePNext = &debugMessengerCreateInfo;
-        enabledInstanceExtensions.emplace_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-        enabledInstanceExtensions.emplace_back(VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME);
+        enabledInstanceExtensions.PushBack(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+        enabledInstanceExtensions.PushBack(VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME);
     }
 
     const VkInstanceCreateInfo instanceCreateInfo{
         .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
         .pNext = instancePNext,
         .pApplicationInfo = &appInfo,
-        .enabledLayerCount = static_cast<uint32_t>(instanceLayers.size()),
-        .ppEnabledLayerNames = instanceLayers.data(),
-        .enabledExtensionCount = static_cast<uint32_t>(enabledInstanceExtensions.size()),
-        .ppEnabledExtensionNames = enabledInstanceExtensions.data(),
+        .enabledLayerCount = static_cast<uint32_t>(instanceLayers.Size()),
+        .ppEnabledLayerNames = instanceLayers.Data(),
+        .enabledExtensionCount = static_cast<uint32_t>(enabledInstanceExtensions.Size()),
+        .ppEnabledExtensionNames = enabledInstanceExtensions.Data(),
     };
-    VK_CHECK(vkCreateInstance(&instanceCreateInfo, nullptr, &m_Instance));
+    VK_CHECK(vkCreateInstance(&instanceCreateInfo, nullptr, &g_State->m_Instance));
 
     if constexpr (kRhiValidations)
     {
         auto createDebugUtilsMessenger = VK_GET_INSTANCE_PROC_ADDR(vkCreateDebugUtilsMessengerEXT);
-        VK_CHECK(createDebugUtilsMessenger(m_Instance, &debugMessengerCreateInfo, nullptr, &debugMessenger));
+        VK_CHECK(createDebugUtilsMessenger(g_State->m_Instance, &debugMessengerCreateInfo, nullptr, &debugMessenger));
     }
 
     uint32_t numPhysDevices = 0;
-    VK_CHECK(vkEnumeratePhysicalDevices(m_Instance, &numPhysDevices, nullptr));
+    VK_CHECK(vkEnumeratePhysicalDevices(g_State->m_Instance, &numPhysDevices, nullptr));
 
-    std::vector<VkPhysicalDevice> physDevs(numPhysDevices);
-    VK_CHECK(vkEnumeratePhysicalDevices(m_Instance, &numPhysDevices, physDevs.data()));
+    InlineVec<VkPhysicalDevice, 16> physDevs;
+    physDevs.Resize(numPhysDevices);
+    VK_CHECK(vkEnumeratePhysicalDevices(g_State->m_Instance, &numPhysDevices, physDevs.Data()));
 
-    std::vector<const char *> deviceExtensions;
-    deviceExtensions.emplace_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-    deviceExtensions.emplace_back(VK_EXT_PRESENT_MODE_FIFO_LATEST_READY_EXTENSION_NAME);
-    deviceExtensions.emplace_back(VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME);
+    InlineVec<const char *, 256> deviceExtensions;
+    deviceExtensions.PushBack(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+    deviceExtensions.PushBack(VK_EXT_PRESENT_MODE_FIFO_LATEST_READY_EXTENSION_NAME);
+    deviceExtensions.PushBack(VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME);
 
     if constexpr (kRhiCheckpoints)
     {
-        deviceExtensions.emplace_back(VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_EXTENSION_NAME);
+        deviceExtensions.PushBack(VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_EXTENSION_NAME);
     }
 
     for (VkPhysicalDevice physDev : physDevs)
     {
         uint32_t extensionCount = 0;
         vkEnumerateDeviceExtensionProperties(physDev, nullptr, &extensionCount, nullptr);
-        std::vector<VkExtensionProperties> extensions(extensionCount);
-        vkEnumerateDeviceExtensionProperties(physDev, nullptr, &extensionCount, extensions.data());
+        InlineVec<VkExtensionProperties, 256> extensions;
+        extensions.Resize(256);
+        vkEnumerateDeviceExtensionProperties(physDev, nullptr, &extensionCount, extensions.Data());
 
-        uint32_t missingExtensions = deviceExtensions.size();
+        uint32_t missingExtensions = deviceExtensions.Size();
         for (auto &deviceExtension : deviceExtensions)
         {
             for (uint32_t i = 0; i < extensionCount; ++i)
@@ -1190,8 +1213,9 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
 
         uint32_t queueFamilyPropCount = 0;
         vkGetPhysicalDeviceQueueFamilyProperties(physDev, &queueFamilyPropCount, nullptr);
-        std::vector<VkQueueFamilyProperties> queueFamilyProperties(queueFamilyPropCount);
-        vkGetPhysicalDeviceQueueFamilyProperties(physDev, &queueFamilyPropCount, queueFamilyProperties.data());
+        InlineVec<VkQueueFamilyProperties, 256> queueFamilyProperties;
+        queueFamilyProperties.Resize(queueFamilyPropCount);
+        vkGetPhysicalDeviceQueueFamilyProperties(physDev, &queueFamilyPropCount, queueFamilyProperties.Data());
 
         constexpr static uint32_t kInvalidQueueFamilyIndex = std::numeric_limits<uint32_t>::max();
         uint32_t graphicsQueueIndex = kInvalidQueueFamilyIndex;
@@ -1235,42 +1259,40 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
         }
 
         // TODO: pick best device
-        m_PhysDev = physDev;
-        m_PhysDevProps = props;
-        m_PhysDevMemProps = memProps;
-        m_GraphicsQueue.queueFamilyIndex = graphicsQueueIndex;
-        m_TransferQueue.queueFamilyIndex = transferQueueIndex;
+        g_State->m_PhysDev = physDev;
+        g_State->m_PhysDevProps = props;
+        g_State->m_PhysDevMemProps = memProps;
+        g_State->m_GraphicsQueue.queueFamilyIndex = graphicsQueueIndex;
+        g_State->m_TransferQueue.queueFamilyIndex = transferQueueIndex;
 
         break;
     }
 
-    NYLA_ASSERT(m_PhysDev);
+    NYLA_ASSERT(g_State->m_PhysDev);
 
     const float queuePriority = 1.0f;
-    std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-    if (m_TransferQueue.queueFamilyIndex == kInvalidIndex)
+    InlineVec<VkDeviceQueueCreateInfo, 2> queueCreateInfos;
+    if (g_State->m_TransferQueue.queueFamilyIndex == kInvalidIndex)
     {
-        queueCreateInfos.emplace_back(VkDeviceQueueCreateInfo{
+        queueCreateInfos.PushBack(VkDeviceQueueCreateInfo{
             .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-            .queueFamilyIndex = m_GraphicsQueue.queueFamilyIndex,
+            .queueFamilyIndex = g_State->m_GraphicsQueue.queueFamilyIndex,
             .queueCount = 1,
             .pQueuePriorities = &queuePriority,
         });
     }
     else
     {
-        queueCreateInfos.reserve(2);
-
-        queueCreateInfos.emplace_back(VkDeviceQueueCreateInfo{
+        queueCreateInfos.PushBack(VkDeviceQueueCreateInfo{
             .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-            .queueFamilyIndex = m_GraphicsQueue.queueFamilyIndex,
+            .queueFamilyIndex = g_State->m_GraphicsQueue.queueFamilyIndex,
             .queueCount = 1,
             .pQueuePriorities = &queuePriority,
         });
 
-        queueCreateInfos.emplace_back(VkDeviceQueueCreateInfo{
+        queueCreateInfos.PushBack(VkDeviceQueueCreateInfo{
             .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-            .queueFamilyIndex = m_TransferQueue.queueFamilyIndex,
+            .queueFamilyIndex = g_State->m_TransferQueue.queueFamilyIndex,
             .queueCount = 1,
             .pQueuePriorities = &queuePriority,
         });
@@ -1327,23 +1349,23 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
     const VkDeviceCreateInfo deviceCreateInfo{
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
         .pNext = &features,
-        .queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size()),
-        .pQueueCreateInfos = queueCreateInfos.data(),
-        .enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size()),
-        .ppEnabledExtensionNames = deviceExtensions.data(),
+        .queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.Size()),
+        .pQueueCreateInfos = queueCreateInfos.Data(),
+        .enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.Size()),
+        .ppEnabledExtensionNames = deviceExtensions.Data(),
     };
-    VK_CHECK(vkCreateDevice(m_PhysDev, &deviceCreateInfo, nullptr, &m_Dev));
+    VK_CHECK(vkCreateDevice(g_State->m_PhysDev, &deviceCreateInfo, nullptr, &g_State->m_Dev));
 
-    vkGetDeviceQueue(m_Dev, m_GraphicsQueue.queueFamilyIndex, 0, &m_GraphicsQueue.queue);
+    vkGetDeviceQueue(g_State->m_Dev, g_State->m_GraphicsQueue.queueFamilyIndex, 0, &g_State->m_GraphicsQueue.queue);
 
-    if (m_TransferQueue.queueFamilyIndex == kInvalidIndex)
+    if (g_State->m_TransferQueue.queueFamilyIndex == kInvalidIndex)
     {
-        m_TransferQueue.queueFamilyIndex = m_GraphicsQueue.queueFamilyIndex;
-        m_TransferQueue.queue = m_GraphicsQueue.queue;
+        g_State->m_TransferQueue.queueFamilyIndex = g_State->m_GraphicsQueue.queueFamilyIndex;
+        g_State->m_TransferQueue.queue = g_State->m_GraphicsQueue.queue;
     }
     else
     {
-        vkGetDeviceQueue(m_Dev, m_TransferQueue.queueFamilyIndex, 0, &m_TransferQueue.queue);
+        vkGetDeviceQueue(g_State->m_Dev, g_State->m_TransferQueue.queueFamilyIndex, 0, &g_State->m_TransferQueue.queue);
     }
 
     auto initQueue = [](DeviceQueue &queue, RhiQueueType queueType, std::span<RhiCmdList> cmd) -> void {
@@ -1352,7 +1374,7 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
             .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
             .queueFamilyIndex = queue.queueFamilyIndex,
         };
-        VK_CHECK(vkCreateCommandPool(m_Dev, &commandPoolCreateInfo, nullptr, &queue.cmdPool));
+        VK_CHECK(vkCreateCommandPool(g_State->m_Dev, &commandPoolCreateInfo, nullptr, &queue.cmdPool));
 
         queue.timeline = CreateTimeline(0);
         queue.timelineNext = 1;
@@ -1362,20 +1384,22 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
             i = CreateCmdList(queueType);
         }
     };
-    initQueue(m_GraphicsQueue, RhiQueueType::Graphics,
-              std::span{m_GraphicsQueueCmd.data(), m_Limits.numFramesInFlight});
-    initQueue(m_TransferQueue, RhiQueueType::Transfer, std::span{&m_TransferQueueCmd, 1});
+    initQueue(g_State->m_GraphicsQueue, RhiQueueType::Graphics,
+              std::span{g_State->m_GraphicsQueueCmd.Data(), g_State->m_Limits.numFramesInFlight});
+    initQueue(g_State->m_TransferQueue, RhiQueueType::Transfer, std::span{&g_State->m_TransferQueueCmd, 1});
 
     const VkSemaphoreCreateInfo semaphoreCreateInfo{
         .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
     };
-    for (size_t i = 0; i < m_Limits.numFramesInFlight; ++i)
+    for (size_t i = 0; i < g_State->m_Limits.numFramesInFlight; ++i)
     {
-        VK_CHECK(vkCreateSemaphore(m_Dev, &semaphoreCreateInfo, nullptr, m_SwapchainAcquireSemaphores.data() + i));
+        VK_CHECK(vkCreateSemaphore(g_State->m_Dev, &semaphoreCreateInfo, nullptr,
+                                   g_State->m_SwapchainAcquireSemaphores.Data() + i));
     }
     for (size_t i = 0; i < kRhiMaxNumSwapchainTextures; ++i)
     {
-        VK_CHECK(vkCreateSemaphore(m_Dev, &semaphoreCreateInfo, nullptr, m_RenderFinishedSemaphores.data() + i));
+        VK_CHECK(vkCreateSemaphore(g_State->m_Dev, &semaphoreCreateInfo, nullptr,
+                                   g_State->m_RenderFinishedSemaphores.Data() + i));
     }
 
 #if defined(__linux__)
@@ -1384,21 +1408,21 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
         .connection = xcb_connect(nullptr, nullptr),
         .window = LinuxX11Platform::WinGetHandle(),
     };
-    VK_CHECK(vkCreateXcbSurfaceKHR(m_Instance, &surfaceCreateInfo, m_Alloc, &m_Surface));
+    VK_CHECK(vkCreateXcbSurfaceKHR(g_State->m_Instance, &surfaceCreateInfo, g_State->vkAlloc, &g_State->m_Surface));
 #else
     const VkWin32SurfaceCreateInfoKHR surfaceCreateInfo{
         .sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
         .hinstance = WindowsPlatform::GetHInstance(),
         .hwnd = WindowsPlatform::WinGetHandle(),
     };
-    vkCreateWin32SurfaceKHR(m_Instance, &surfaceCreateInfo, m_Alloc, &m_Surface);
+    vkCreateWin32SurfaceKHR(g_State->m_Instance, &surfaceCreateInfo, g_State->vkAlloc, &g_State->m_Surface);
 #endif
 
     CreateSwapchain();
 
     //
 
-    const std::array<VkDescriptorPoolSize, 4> descriptorPoolSizes{
+    const Array<VkDescriptorPoolSize, 4> descriptorPoolSizes{
         VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 16},
         VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 16},
         VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 256},
@@ -1409,28 +1433,28 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
         .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT | VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT,
         .maxSets = 16,
-        .poolSizeCount = static_cast<uint32_t>(descriptorPoolSizes.size()),
-        .pPoolSizes = descriptorPoolSizes.data(),
+        .poolSizeCount = static_cast<uint32_t>(descriptorPoolSizes.Size()),
+        .pPoolSizes = descriptorPoolSizes.Data(),
     };
-    vkCreateDescriptorPool(m_Dev, &descriptorPoolCreateInfo, nullptr, &m_DescriptorPool);
+    vkCreateDescriptorPool(g_State->m_Dev, &descriptorPoolCreateInfo, nullptr, &g_State->m_DescriptorPool);
 
     auto initDescriptorTable = [](DescriptorTable &table,
                                   const VkDescriptorSetLayoutCreateInfo &layoutCreateInfo) -> void {
-        VK_CHECK(vkCreateDescriptorSetLayout(m_Dev, &layoutCreateInfo, m_Alloc, &table.layout));
+        VK_CHECK(vkCreateDescriptorSetLayout(g_State->m_Dev, &layoutCreateInfo, g_State->vkAlloc, &table.layout));
 
         const VkDescriptorSetAllocateInfo descriptorSetAllocInfo{
             .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-            .descriptorPool = m_DescriptorPool,
+            .descriptorPool = g_State->m_DescriptorPool,
             .descriptorSetCount = 1,
             .pSetLayouts = &table.layout,
         };
 
-        VK_CHECK(vkAllocateDescriptorSets(m_Dev, &descriptorSetAllocInfo, &table.set));
+        VK_CHECK(vkAllocateDescriptorSets(g_State->m_Dev, &descriptorSetAllocInfo, &table.set));
     };
 
     { // Constants
 
-        const std::array<VkDescriptorSetLayoutBinding, 4> descriptorLayoutBindings{
+        const Array<VkDescriptorSetLayoutBinding, 4> descriptorLayoutBindings{
             VkDescriptorSetLayoutBinding{
                 .binding = 0,
                 .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
@@ -1459,54 +1483,55 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
 
         const VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{
             .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-            .bindingCount = descriptorLayoutBindings.size(),
-            .pBindings = descriptorLayoutBindings.data(),
+            .bindingCount = descriptorLayoutBindings.Size32(),
+            .pBindings = descriptorLayoutBindings.Data(),
         };
 
-        initDescriptorTable(m_ConstantsDescriptorTable, descriptorSetLayoutCreateInfo);
+        initDescriptorTable(g_State->m_ConstantsDescriptorTable, descriptorSetLayoutCreateInfo);
 
         const uint32_t bufferSize =
-            m_Limits.numFramesInFlight *
-            (CbvOffset(m_Limits.frameConstantSize) + m_Limits.maxPassCount * CbvOffset(m_Limits.passConstantSize) +
-             m_Limits.maxDrawCount * CbvOffset(m_Limits.drawConstantSize) +
-             m_Limits.maxDrawCount * CbvOffset(m_Limits.largeDrawConstantSize));
+            g_State->m_Limits.numFramesInFlight *
+            (CbvOffset(g_State->m_Limits.frameConstantSize) +
+             g_State->m_Limits.maxPassCount * CbvOffset(g_State->m_Limits.passConstantSize) +
+             g_State->m_Limits.maxDrawCount * CbvOffset(g_State->m_Limits.drawConstantSize) +
+             g_State->m_Limits.maxDrawCount * CbvOffset(g_State->m_Limits.largeDrawConstantSize));
         NYLA_LOG("Constants Buffer Size: %fmb", (double)bufferSize / 1024.0 / 1024.0);
 
-        m_ConstantsUniformBuffer = CreateBuffer(RhiBufferDesc{
+        g_State->m_ConstantsUniformBuffer = CreateBuffer(RhiBufferDesc{
             .size = bufferSize,
             .bufferUsage = RhiBufferUsage::Uniform,
             .memoryUsage = RhiMemoryUsage::CpuToGpu,
         });
-        const VkBuffer &vulkanBuffer = m_Buffers.ResolveData(m_ConstantsUniformBuffer).buffer;
+        const VkBuffer &vulkanBuffer = g_State->m_Buffers.ResolveData(g_State->m_ConstantsUniformBuffer).buffer;
 
-        const std::array<VkDescriptorBufferInfo, 4> bufferInfos{
+        const Array<VkDescriptorBufferInfo, 4> bufferInfos{
             VkDescriptorBufferInfo{
                 .buffer = vulkanBuffer,
-                .range = CbvOffset(m_Limits.frameConstantSize),
+                .range = CbvOffset(g_State->m_Limits.frameConstantSize),
             },
             VkDescriptorBufferInfo{
                 .buffer = vulkanBuffer,
-                .range = CbvOffset(m_Limits.passConstantSize),
+                .range = CbvOffset(g_State->m_Limits.passConstantSize),
             },
             VkDescriptorBufferInfo{
                 .buffer = vulkanBuffer,
-                .range = CbvOffset(m_Limits.drawConstantSize),
+                .range = CbvOffset(g_State->m_Limits.drawConstantSize),
             },
             VkDescriptorBufferInfo{
                 .buffer = vulkanBuffer,
-                .range = CbvOffset(m_Limits.largeDrawConstantSize),
+                .range = CbvOffset(g_State->m_Limits.largeDrawConstantSize),
             },
         };
 
-        InlineVec<VkWriteDescriptorSet, bufferInfos.size()> descriptorWrites;
-        for (uint32_t i = 0; i < bufferInfos.size(); ++i)
+        InlineVec<VkWriteDescriptorSet, bufferInfos.Size()> descriptorWrites;
+        for (uint32_t i = 0; i < bufferInfos.Size(); ++i)
         {
             const VkDescriptorBufferInfo &bufferInfo = bufferInfos[i];
             if (bufferInfo.range)
             {
-                descriptorWrites.emplace_back(VkWriteDescriptorSet{
+                descriptorWrites.PushBack(VkWriteDescriptorSet{
                     .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                    .dstSet = m_ConstantsDescriptorTable.set,
+                    .dstSet = g_State->m_ConstantsDescriptorTable.set,
                     .dstBinding = i,
                     .descriptorCount = 1,
                     .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
@@ -1515,7 +1540,7 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
             }
         }
 
-        vkUpdateDescriptorSets(m_Dev, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
+        vkUpdateDescriptorSets(g_State->m_Dev, descriptorWrites.Size(), descriptorWrites.Data(), 0, nullptr);
     }
 
     { // Textures
@@ -1532,7 +1557,7 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
         const VkDescriptorSetLayoutBinding descriptorLayoutBinding{
             .binding = 0,
             .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-            .descriptorCount = m_Limits.numTextureViews,
+            .descriptorCount = g_State->m_Limits.numTextureViews,
             .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
         };
 
@@ -1544,7 +1569,7 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
             .pBindings = &descriptorLayoutBinding,
         };
 
-        initDescriptorTable(m_TexturesDescriptorTable, descriptorSetLayoutCreateInfo);
+        initDescriptorTable(g_State->m_TexturesDescriptorTable, descriptorSetLayoutCreateInfo);
     }
 
     { // Samplers
@@ -1561,7 +1586,7 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
         const VkDescriptorSetLayoutBinding descriptorLayoutBinding{
             .binding = 0,
             .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
-            .descriptorCount = m_Limits.numSamplers,
+            .descriptorCount = g_State->m_Limits.numSamplers,
             .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
         };
 
@@ -1573,7 +1598,7 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
             .pBindings = &descriptorLayoutBinding,
         };
 
-        initDescriptorTable(m_SamplersDescriptorTable, descriptorSetLayoutCreateInfo);
+        initDescriptorTable(g_State->m_SamplersDescriptorTable, descriptorSetLayoutCreateInfo);
     }
 }
 
@@ -1590,10 +1615,10 @@ auto Rhi::CreateBuffer(const RhiBufferDesc &desc) -> RhiBuffer
         .usage = ConvertBufferUsageIntoVkBufferUsageFlags(desc.bufferUsage),
         .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
     };
-    VK_CHECK(vkCreateBuffer(m_Dev, &bufferCreateInfo, nullptr, &bufferData.buffer));
+    VK_CHECK(vkCreateBuffer(g_State->m_Dev, &bufferCreateInfo, nullptr, &bufferData.buffer));
 
     VkMemoryRequirements memRequirements;
-    vkGetBufferMemoryRequirements(m_Dev, bufferData.buffer, &memRequirements);
+    vkGetBufferMemoryRequirements(g_State->m_Dev, bufferData.buffer, &memRequirements);
 
     const uint32_t memoryTypeIndex =
         FindMemoryTypeIndex(memRequirements, ConvertMemoryUsageIntoVkMemoryPropertyFlags(desc.memoryUsage));
@@ -1603,41 +1628,41 @@ auto Rhi::CreateBuffer(const RhiBufferDesc &desc) -> RhiBuffer
         .memoryTypeIndex = memoryTypeIndex,
     };
 
-    VK_CHECK(vkAllocateMemory(m_Dev, &memoryAllocInfo, nullptr, &bufferData.memory));
-    VK_CHECK(vkBindBufferMemory(m_Dev, bufferData.buffer, bufferData.memory, 0));
+    VK_CHECK(vkAllocateMemory(g_State->m_Dev, &memoryAllocInfo, nullptr, &bufferData.memory));
+    VK_CHECK(vkBindBufferMemory(g_State->m_Dev, bufferData.buffer, bufferData.memory, 0));
 
-    return m_Buffers.Acquire(bufferData);
+    return g_State->m_Buffers.Acquire(bufferData);
 }
 
-void Rhi::NameBuffer(RhiBuffer buf, std::string_view name)
+void Rhi::NameBuffer(RhiBuffer buf, Str name)
 {
-    const VulkanBufferData &bufferData = m_Buffers.ResolveData(buf);
+    const VulkanBufferData &bufferData = g_State->m_Buffers.ResolveData(buf);
     VulkanNameHandle(VK_OBJECT_TYPE_BUFFER, (uint64_t)bufferData.buffer, name);
 }
 
 void Rhi::DestroyBuffer(RhiBuffer buffer)
 {
-    VulkanBufferData bufferData = m_Buffers.ReleaseData(buffer);
+    VulkanBufferData bufferData = g_State->m_Buffers.ReleaseData(buffer);
 
     if (bufferData.mapped)
     {
-        vkUnmapMemory(m_Dev, bufferData.memory);
+        vkUnmapMemory(g_State->m_Dev, bufferData.memory);
     }
-    vkDestroyBuffer(m_Dev, bufferData.buffer, nullptr);
-    vkFreeMemory(m_Dev, bufferData.memory, nullptr);
+    vkDestroyBuffer(g_State->m_Dev, bufferData.buffer, nullptr);
+    vkFreeMemory(g_State->m_Dev, bufferData.memory, nullptr);
 }
 
 auto Rhi::GetBufferSize(RhiBuffer buffer) -> uint64_t
 {
-    return m_Buffers.ResolveData(buffer).size;
+    return g_State->m_Buffers.ResolveData(buffer).size;
 }
 
 auto Rhi::MapBuffer(RhiBuffer buffer) -> char *
 {
-    const VulkanBufferData &bufferData = m_Buffers.ResolveData(buffer);
+    const VulkanBufferData &bufferData = g_State->m_Buffers.ResolveData(buffer);
     if (!bufferData.mapped)
     {
-        vkMapMemory(m_Dev, bufferData.memory, 0, VK_WHOLE_SIZE, 0, (void **)&bufferData.mapped);
+        vkMapMemory(g_State->m_Dev, bufferData.memory, 0, VK_WHOLE_SIZE, 0, (void **)&bufferData.mapped);
     }
 
     return bufferData.mapped;
@@ -1645,10 +1670,10 @@ auto Rhi::MapBuffer(RhiBuffer buffer) -> char *
 
 void Rhi::UnmapBuffer(RhiBuffer buffer)
 {
-    VulkanBufferData &bufferData = m_Buffers.ResolveData(buffer);
+    VulkanBufferData &bufferData = g_State->m_Buffers.ResolveData(buffer);
     if (bufferData.mapped)
     {
-        vkUnmapMemory(m_Dev, bufferData.memory);
+        vkUnmapMemory(g_State->m_Dev, bufferData.memory);
         bufferData.mapped = nullptr;
     }
 }
@@ -1656,10 +1681,10 @@ void Rhi::UnmapBuffer(RhiBuffer buffer)
 void Rhi::CmdCopyBuffer(RhiCmdList cmd, RhiBuffer dst, uint32_t dstOffset, RhiBuffer src, uint32_t srcOffset,
                         uint32_t size)
 {
-    const VkCommandBuffer &cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
+    const VkCommandBuffer &cmdbuf = g_State->m_CmdLists.ResolveData(cmd).cmdbuf;
 
-    VulkanBufferData &dstBufferData = m_Buffers.ResolveData(dst);
-    VulkanBufferData &srcBufferData = m_Buffers.ResolveData(src);
+    VulkanBufferData &dstBufferData = g_State->m_Buffers.ResolveData(dst);
+    VulkanBufferData &srcBufferData = g_State->m_Buffers.ResolveData(src);
 
     EnsureHostWritesVisible(cmdbuf, srcBufferData);
 
@@ -1673,8 +1698,8 @@ void Rhi::CmdCopyBuffer(RhiCmdList cmd, RhiBuffer dst, uint32_t dstOffset, RhiBu
 
 void Rhi::CmdTransitionBuffer(RhiCmdList cmd, RhiBuffer buffer, RhiBufferState newState)
 {
-    const VkCommandBuffer &cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
-    VulkanBufferData &bufferData = m_Buffers.ResolveData(buffer);
+    const VkCommandBuffer &cmdbuf = g_State->m_CmdLists.ResolveData(cmd).cmdbuf;
+    VulkanBufferData &bufferData = g_State->m_Buffers.ResolveData(buffer);
 
     VulkanBufferStateSyncInfo oldSync = VulkanBufferStateGetSyncInfo(bufferData.state);
     VulkanBufferStateSyncInfo newSync = VulkanBufferStateGetSyncInfo(newState);
@@ -1702,8 +1727,8 @@ void Rhi::CmdTransitionBuffer(RhiCmdList cmd, RhiBuffer buffer, RhiBufferState n
 
 void Rhi::CmdUavBarrierBuffer(RhiCmdList cmd, RhiBuffer buffer)
 {
-    const VkCommandBuffer &cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
-    VulkanBufferData &bufferData = m_Buffers.ResolveData(buffer);
+    const VkCommandBuffer &cmdbuf = g_State->m_CmdLists.ResolveData(cmd).cmdbuf;
+    VulkanBufferData &bufferData = g_State->m_Buffers.ResolveData(buffer);
 
     const VkBufferMemoryBarrier2 barrier{
         .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
@@ -1729,7 +1754,7 @@ void Rhi::CmdUavBarrierBuffer(RhiCmdList cmd, RhiBuffer buffer)
 
 void Rhi::BufferMarkWritten(RhiBuffer buffer, uint32_t offset, uint32_t size)
 {
-    VulkanBufferData &bufferData = m_Buffers.ResolveData(buffer);
+    VulkanBufferData &bufferData = g_State->m_Buffers.ResolveData(buffer);
 
     if (bufferData.dirty)
     {
@@ -1746,12 +1771,12 @@ void Rhi::BufferMarkWritten(RhiBuffer buffer, uint32_t offset, uint32_t size)
 
 auto Rhi::GetMinUniformBufferOffsetAlignment() -> uint32_t
 {
-    return m_PhysDevProps.limits.minUniformBufferOffsetAlignment;
+    return g_State->m_PhysDevProps.limits.minUniformBufferOffsetAlignment;
 }
 
 auto Rhi::GetOptimalBufferCopyOffsetAlignment() -> uint32_t
 {
-    return m_PhysDevProps.limits.optimalBufferCopyOffsetAlignment;
+    return g_State->m_PhysDevProps.limits.optimalBufferCopyOffsetAlignment;
 }
 
 auto Rhi::CreateCmdList(RhiQueueType queueType) -> RhiCmdList
@@ -1765,49 +1790,50 @@ auto Rhi::CreateCmdList(RhiQueueType queueType) -> RhiCmdList
     };
 
     VkCommandBuffer commandBuffer;
-    VK_CHECK(vkAllocateCommandBuffers(m_Dev, &allocInfo, &commandBuffer));
+    VK_CHECK(vkAllocateCommandBuffers(g_State->m_Dev, &allocInfo, &commandBuffer));
 
     VulkanCmdListData cmdData{
         .cmdbuf = commandBuffer,
         .queueType = queueType,
     };
 
-    RhiCmdList cmd = m_CmdLists.Acquire(cmdData);
+    RhiCmdList cmd = g_State->m_CmdLists.Acquire(cmdData);
     return cmd;
 }
 
 void Rhi::ResetCmdList(RhiCmdList cmd)
 {
-    VulkanCmdListData &cmdData = m_CmdLists.ResolveData(cmd);
+    VulkanCmdListData &cmdData = g_State->m_CmdLists.ResolveData(cmd);
     VkCommandBuffer cmdbuf = cmdData.cmdbuf;
 
     VK_CHECK(vkResetCommandBuffer(cmdbuf, 0));
 
-    cmdData.frameConstantHead = GetFrameIndex() * (CbvOffset(m_Limits.frameConstantSize) +
-                                                   m_Limits.maxPassCount * CbvOffset(m_Limits.passConstantSize) +
-                                                   m_Limits.maxDrawCount * CbvOffset(m_Limits.drawConstantSize) +
-                                                   m_Limits.maxDrawCount * CbvOffset(m_Limits.largeDrawConstantSize));
+    cmdData.frameConstantHead =
+        GetFrameIndex() * (CbvOffset(g_State->m_Limits.frameConstantSize) +
+                           g_State->m_Limits.maxPassCount * CbvOffset(g_State->m_Limits.passConstantSize) +
+                           g_State->m_Limits.maxDrawCount * CbvOffset(g_State->m_Limits.drawConstantSize) +
+                           g_State->m_Limits.maxDrawCount * CbvOffset(g_State->m_Limits.largeDrawConstantSize));
 
-    cmdData.passConstantHead = cmdData.frameConstantHead + m_Limits.frameConstantSize;
+    cmdData.passConstantHead = cmdData.frameConstantHead + g_State->m_Limits.frameConstantSize;
 
     cmdData.drawConstantHead =
-        cmdData.passConstantHead + (m_Limits.maxPassCount * CbvOffset(m_Limits.passConstantSize));
+        cmdData.passConstantHead + (g_State->m_Limits.maxPassCount * CbvOffset(g_State->m_Limits.passConstantSize));
 
     cmdData.largeDrawConstantHead =
-        cmdData.drawConstantHead + (m_Limits.maxDrawCount * CbvOffset(m_Limits.drawConstantSize));
+        cmdData.drawConstantHead + (g_State->m_Limits.maxDrawCount * CbvOffset(g_State->m_Limits.drawConstantSize));
 }
 
-void Rhi::NameCmdList(RhiCmdList cmd, std::string_view name)
+void Rhi::NameCmdList(RhiCmdList cmd, Str name)
 {
-    const VulkanCmdListData &cmdData = m_CmdLists.ResolveData(cmd);
+    const VulkanCmdListData &cmdData = g_State->m_CmdLists.ResolveData(cmd);
     VulkanNameHandle(VK_OBJECT_TYPE_COMMAND_BUFFER, (uint64_t)cmdData.cmdbuf, name);
 }
 
 void Rhi::DestroyCmdList(RhiCmdList cmd)
 {
-    VulkanCmdListData cmdData = m_CmdLists.ReleaseData(cmd);
+    VulkanCmdListData cmdData = g_State->m_CmdLists.ReleaseData(cmd);
     VkCommandPool cmdPool = GetDeviceQueue(cmdData.queueType).cmdPool;
-    vkFreeCommandBuffers(m_Dev, cmdPool, 1, &cmdData.cmdbuf);
+    vkFreeCommandBuffers(g_State->m_Dev, cmdPool, 1, &cmdData.cmdbuf);
 }
 
 auto Rhi::CmdSetCheckpoint(RhiCmdList cmd, uint64_t data) -> uint64_t
@@ -1817,7 +1843,7 @@ auto Rhi::CmdSetCheckpoint(RhiCmdList cmd, uint64_t data) -> uint64_t
         return data;
     }
 
-    const VulkanCmdListData &cmdData = m_CmdLists.ResolveData(cmd);
+    const VulkanCmdListData &cmdData = g_State->m_CmdLists.ResolveData(cmd);
 
     static auto fn = VK_GET_INSTANCE_PROC_ADDR(vkCmdSetCheckpointNV);
     fn(cmdData.cmdbuf, reinterpret_cast<void *>(data));
@@ -1845,56 +1871,57 @@ auto Rhi::GetLastCheckpointData(RhiQueueType queueType) -> uint64_t
 
 auto Rhi::FrameBegin() -> RhiCmdList
 {
-    if (m_RecreateSwapchain)
+    if (g_State->m_RecreateSwapchain)
     {
-        vkDeviceWaitIdle(m_Dev);
+        vkDeviceWaitIdle(g_State->m_Dev);
         CreateSwapchain();
-        m_SwapchainUsable = true;
-        m_RecreateSwapchain = false;
+        g_State->m_SwapchainUsable = true;
+        g_State->m_RecreateSwapchain = false;
     }
     else
     {
-        WaitTimeline(m_GraphicsQueue.timeline, m_GraphicsQueueCmdDone[m_FrameIndex]);
+        WaitTimeline(g_State->m_GraphicsQueue.timeline, g_State->m_GraphicsQueueCmdDone[g_State->m_FrameIndex]);
     }
 
-    if (m_SwapchainUsable)
+    if (g_State->m_SwapchainUsable)
     {
         const VkResult acquireResult =
-            vkAcquireNextImageKHR(m_Dev, m_Swapchain, std::numeric_limits<uint64_t>::max(),
-                                  m_SwapchainAcquireSemaphores[m_FrameIndex], VK_NULL_HANDLE, &m_SwapchainTextureIndex);
+            vkAcquireNextImageKHR(g_State->m_Dev, g_State->m_Swapchain, Limits<uint64_t>::Max(),
+                                  g_State->m_SwapchainAcquireSemaphores[g_State->m_FrameIndex], VK_NULL_HANDLE,
+                                  &g_State->m_SwapchainTextureIndex);
 
         switch (acquireResult)
         {
         case VK_ERROR_OUT_OF_DATE_KHR: {
-            m_SwapchainUsable = false;
-            m_RecreateSwapchain = true;
+            g_State->m_SwapchainUsable = false;
+            g_State->m_RecreateSwapchain = true;
             break;
         }
 
         case VK_SUBOPTIMAL_KHR: {
-            m_SwapchainUsable = true;
-            m_RecreateSwapchain = true;
+            g_State->m_SwapchainUsable = true;
+            g_State->m_RecreateSwapchain = true;
             break;
         }
 
         default: {
             VK_CHECK(acquireResult);
-            m_RecreateSwapchain = false;
-            m_SwapchainUsable = true;
+            g_State->m_RecreateSwapchain = false;
+            g_State->m_SwapchainUsable = true;
             break;
         }
         }
     }
 
-    if (!m_SwapchainUsable)
+    if (!g_State->m_SwapchainUsable)
     {
-        vkDeviceWaitIdle(m_Dev);
+        vkDeviceWaitIdle(g_State->m_Dev);
     }
 
-    const RhiCmdList cmd = m_GraphicsQueueCmd[m_FrameIndex];
+    const RhiCmdList cmd = g_State->m_GraphicsQueueCmd[g_State->m_FrameIndex];
     ResetCmdList(cmd);
 
-    const VulkanCmdListData &cmdData = m_CmdLists.ResolveData(cmd);
+    const VulkanCmdListData &cmdData = g_State->m_CmdLists.ResolveData(cmd);
     VkCommandBuffer cmdbuf = cmdData.cmdbuf;
 
     const VkCommandBufferBeginInfo commandBufferBeginInfo{
@@ -1907,76 +1934,76 @@ auto Rhi::FrameBegin() -> RhiCmdList
 
 void Rhi::FrameEnd()
 {
-    RhiCmdList cmd = m_GraphicsQueueCmd[m_FrameIndex];
+    RhiCmdList cmd = g_State->m_GraphicsQueueCmd[g_State->m_FrameIndex];
 
-    const VkCommandBuffer &cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
+    const VkCommandBuffer &cmdbuf = g_State->m_CmdLists.ResolveData(cmd).cmdbuf;
 
     VK_CHECK(vkEndCommandBuffer(cmdbuf));
 
     WriteDescriptorTables();
 
-    const std::array<VkPipelineStageFlags, 1> waitStages = {
+    const Array<VkPipelineStageFlags, 1> waitStages = {
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
     };
 
-    const VkSemaphore acquireSemaphore = m_SwapchainAcquireSemaphores[m_FrameIndex];
-    const VkSemaphore renderFinishedSemaphore = m_RenderFinishedSemaphores[m_SwapchainTextureIndex];
+    const VkSemaphore acquireSemaphore = g_State->m_SwapchainAcquireSemaphores[g_State->m_FrameIndex];
+    const VkSemaphore renderFinishedSemaphore = g_State->m_RenderFinishedSemaphores[g_State->m_SwapchainTextureIndex];
 
-    const std::array<VkSemaphore, 2> signalSemaphores{
-        m_GraphicsQueue.timeline,
+    const Array<VkSemaphore, 2> signalSemaphores{
+        g_State->m_GraphicsQueue.timeline,
         renderFinishedSemaphore,
     };
 
-    m_GraphicsQueueCmdDone[m_FrameIndex] = m_GraphicsQueue.timelineNext++;
+    g_State->m_GraphicsQueueCmdDone[g_State->m_FrameIndex] = g_State->m_GraphicsQueue.timelineNext++;
 
     const VkTimelineSemaphoreSubmitInfo timelineSubmitInfo{
         .sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
-        .signalSemaphoreValueCount = signalSemaphores.size(),
-        .pSignalSemaphoreValues = &m_GraphicsQueueCmdDone[m_FrameIndex],
+        .signalSemaphoreValueCount = signalSemaphores.Size(),
+        .pSignalSemaphoreValues = &g_State->m_GraphicsQueueCmdDone[g_State->m_FrameIndex],
     };
 
-    if (m_SwapchainUsable)
+    if (g_State->m_SwapchainUsable)
     {
         const VkSubmitInfo submitInfo{
             .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
             .pNext = &timelineSubmitInfo,
             .waitSemaphoreCount = 1,
             .pWaitSemaphores = &acquireSemaphore,
-            .pWaitDstStageMask = waitStages.data(),
+            .pWaitDstStageMask = waitStages.Data(),
             .commandBufferCount = 1,
             .pCommandBuffers = &cmdbuf,
-            .signalSemaphoreCount = std::size(signalSemaphores),
-            .pSignalSemaphores = signalSemaphores.data(),
+            .signalSemaphoreCount = signalSemaphores.Size(),
+            .pSignalSemaphores = signalSemaphores.Data(),
         };
-        VK_CHECK(vkQueueSubmit(m_GraphicsQueue.queue, 1, &submitInfo, VK_NULL_HANDLE));
+        VK_CHECK(vkQueueSubmit(g_State->m_GraphicsQueue.queue, 1, &submitInfo, VK_NULL_HANDLE));
 
         const VkPresentInfoKHR presentInfo{
             .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
             .waitSemaphoreCount = 1,
             .pWaitSemaphores = &renderFinishedSemaphore,
             .swapchainCount = 1,
-            .pSwapchains = &m_Swapchain,
-            .pImageIndices = &m_SwapchainTextureIndex,
+            .pSwapchains = &g_State->m_Swapchain,
+            .pImageIndices = &g_State->m_SwapchainTextureIndex,
         };
 
-        const VkResult presentResult = vkQueuePresentKHR(m_GraphicsQueue.queue, &presentInfo);
+        const VkResult presentResult = vkQueuePresentKHR(g_State->m_GraphicsQueue.queue, &presentInfo);
     }
 
-    m_FrameIndex = (m_FrameIndex + 1) % m_Limits.numFramesInFlight;
+    g_State->m_FrameIndex = (g_State->m_FrameIndex + 1) % g_State->m_Limits.numFramesInFlight;
 }
 
 auto Rhi::FrameGetCmdList() -> RhiCmdList
 { // TODO: get rid of this
-    return m_GraphicsQueueCmd[m_FrameIndex];
+    return g_State->m_GraphicsQueueCmd[g_State->m_FrameIndex];
 }
 
 void Rhi::PassBegin(RhiPassDesc desc)
 {
-    RhiCmdList cmd = m_GraphicsQueueCmd[m_FrameIndex];
-    const VkCommandBuffer &cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
+    RhiCmdList cmd = g_State->m_GraphicsQueueCmd[g_State->m_FrameIndex];
+    const VkCommandBuffer &cmdbuf = g_State->m_CmdLists.ResolveData(cmd).cmdbuf;
 
-    const VulkanTextureViewData &rtvData = m_RenderTargetViews.ResolveData(desc.rtv);
-    const VulkanTextureData &renderTargetData = m_Textures.ResolveData(rtvData.texture);
+    const VulkanTextureViewData &rtvData = g_State->m_RenderTargetViews.ResolveData(desc.rtv);
+    const VulkanTextureData &renderTargetData = g_State->m_Textures.ResolveData(rtvData.texture);
 
     const VkRenderingAttachmentInfo colorAttachmentInfo{
         .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
@@ -1999,8 +2026,8 @@ void Rhi::PassBegin(RhiPassDesc desc)
 
     if (HandleIsSet(desc.dsv))
     {
-        const VulkanTextureViewData &dsvData = m_DepthStencilViews.ResolveData(desc.dsv);
-        const VulkanTextureData &depthStencilData = m_Textures.ResolveData(dsvData.texture);
+        const VulkanTextureViewData &dsvData = g_State->m_DepthStencilViews.ResolveData(desc.dsv);
+        const VulkanTextureData &depthStencilData = g_State->m_Textures.ResolveData(dsvData.texture);
 
         depthAttachmentInfo = {
             .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
@@ -2034,69 +2061,73 @@ void Rhi::PassBegin(RhiPassDesc desc)
 
 void Rhi::PassEnd()
 {
-    RhiCmdList cmd = m_GraphicsQueueCmd[m_FrameIndex];
-    VulkanCmdListData &cmdData = m_CmdLists.ResolveData(cmd);
+    RhiCmdList cmd = g_State->m_GraphicsQueueCmd[g_State->m_FrameIndex];
+    VulkanCmdListData &cmdData = g_State->m_CmdLists.ResolveData(cmd);
     VkCommandBuffer cmdbuf = cmdData.cmdbuf;
     vkCmdEndRendering(cmdbuf);
 
-    cmdData.passConstantHead += CbvOffset(m_Limits.passConstantSize);
+    cmdData.passConstantHead += CbvOffset(g_State->m_Limits.passConstantSize);
 }
 
 auto Rhi::CreateShader(const RhiShaderDesc &desc) -> RhiShader
 {
-    const RhiShader handle = m_Shaders.Acquire(VulkanShaderData{.spv = new InlineVec<uint32_t, 1 << 18>{desc.code}});
-    VulkanShaderData &shaderData = m_Shaders.ResolveData(handle);
+    Span<uint32_t> spv = g_State->rootAlloc.PushCopySpan<uint32_t>(desc.code);
+    MemCpy(spv.Data(), desc.code.Data(), desc.code.Size());
+
+    const RhiShader handle = g_State->m_Shaders.Acquire(VulkanShaderData{.spv = spv});
+    VulkanShaderData &shaderData = g_State->m_Shaders.ResolveData(handle);
 
     return handle;
 }
 
 void Rhi::DestroyShader(RhiShader shader)
 {
-    m_Shaders.ReleaseData(shader);
+    g_State->m_Shaders.ReleaseData(shader);
+
 #if 0
-    VkShaderModule shaderModule = m_Shaders.ReleaseData(shader);
-    vkDestroyShaderModule(m_Dev, shaderModule, nullptr);
+    VkShaderModule shaderModule = g_State->m_Shaders.ReleaseData(shader);
+    vkDestroyShaderModule(g_State->m_Dev, shaderModule, nullptr);
 #endif
 }
 
 void Rhi::DestroyGraphicsPipeline(RhiGraphicsPipeline pipeline)
 {
-    auto pipelineData = m_GraphicsPipelines.ReleaseData(pipeline);
-    vkDeviceWaitIdle(m_Dev);
+    auto pipelineData = g_State->m_GraphicsPipelines.ReleaseData(pipeline);
+    vkDeviceWaitIdle(g_State->m_Dev);
 
     if (pipelineData.layout)
     {
-        vkDestroyPipelineLayout(m_Dev, pipelineData.layout, nullptr);
+        vkDestroyPipelineLayout(g_State->m_Dev, pipelineData.layout, nullptr);
     }
     if (pipelineData.pipeline)
     {
-        vkDestroyPipeline(m_Dev, pipelineData.pipeline, nullptr);
+        vkDestroyPipeline(g_State->m_Dev, pipelineData.pipeline, nullptr);
     }
 }
 
 void Rhi::CmdBindGraphicsPipeline(RhiCmdList cmd, RhiGraphicsPipeline pipeline)
 {
-    VulkanCmdListData &cmdData = m_CmdLists.ResolveData(cmd);
+    VulkanCmdListData &cmdData = g_State->m_CmdLists.ResolveData(cmd);
     VkCommandBuffer cmdbuf = cmdData.cmdbuf;
 
-    const VulkanPipelineData &pipelineData = m_GraphicsPipelines.ResolveData(pipeline);
+    const VulkanPipelineData &pipelineData = g_State->m_GraphicsPipelines.ResolveData(pipeline);
 
     vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineData.pipeline);
     cmdData.boundGraphicsPipeline = pipeline;
 
-    std::array<VkDescriptorSet, 2> descriptorSets{
-        m_TexturesDescriptorTable.set,
-        m_SamplersDescriptorTable.set,
+    Array<VkDescriptorSet, 2> descriptorSets{
+        g_State->m_TexturesDescriptorTable.set,
+        g_State->m_SamplersDescriptorTable.set,
     };
 
-    vkCmdBindDescriptorSets(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineData.layout, 1, descriptorSets.size(),
-                            descriptorSets.data(), 0, nullptr);
+    vkCmdBindDescriptorSets(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineData.layout, 1, descriptorSets.Size(),
+                            descriptorSets.Data(), 0, nullptr);
 }
 
 void Rhi::CmdPushGraphicsConstants(RhiCmdList cmd, uint32_t offset, RhiShaderStage stage, ByteView data)
 {
-    const VulkanCmdListData &cmdData = m_CmdLists.ResolveData(cmd);
-    const VulkanPipelineData &pipelineData = m_GraphicsPipelines.ResolveData(cmdData.boundGraphicsPipeline);
+    const VulkanCmdListData &cmdData = g_State->m_CmdLists.ResolveData(cmd);
+    const VulkanPipelineData &pipelineData = g_State->m_GraphicsPipelines.ResolveData(cmdData.boundGraphicsPipeline);
 
     vkCmdPushConstants(cmdData.cmdbuf, pipelineData.layout, ConvertShaderStageIntoVkShaderStageFlags(stage), offset,
                        data.size(), data.data());
@@ -2108,30 +2139,30 @@ void Rhi::CmdBindVertexBuffers(RhiCmdList cmd, uint32_t firstBinding, std::span<
     NYLA_ASSERT(buffers.size() == offsets.size());
     NYLA_ASSERT(buffers.size() <= 4U);
 
-    std::array<VkBuffer, 4> vkBufs;
-    std::array<VkDeviceSize, 4> vkOffsets;
+    Array<VkBuffer, 4> vkBufs;
+    Array<VkDeviceSize, 4> vkOffsets;
     for (uint32_t i = 0; i < buffers.size(); ++i)
     {
-        vkBufs[i] = m_Buffers.ResolveData(buffers[i]).buffer;
+        vkBufs[i] = g_State->m_Buffers.ResolveData(buffers[i]).buffer;
         vkOffsets[i] = offsets[i];
     }
 
-    const VulkanCmdListData &cmdData = m_CmdLists.ResolveData(cmd);
-    vkCmdBindVertexBuffers(cmdData.cmdbuf, firstBinding, buffers.size(), vkBufs.data(), vkOffsets.data());
+    const VulkanCmdListData &cmdData = g_State->m_CmdLists.ResolveData(cmd);
+    vkCmdBindVertexBuffers(cmdData.cmdbuf, firstBinding, buffers.size(), vkBufs.Data(), vkOffsets.Data());
 }
 
 void Rhi::CmdBindIndexBuffer(RhiCmdList cmd, RhiBuffer buffer, uint64_t offset)
 {
-    const VulkanBufferData &bufferData = m_Buffers.ResolveData(buffer);
+    const VulkanBufferData &bufferData = g_State->m_Buffers.ResolveData(buffer);
 
-    const VulkanCmdListData &cmdData = m_CmdLists.ResolveData(cmd);
+    const VulkanCmdListData &cmdData = g_State->m_CmdLists.ResolveData(cmd);
     vkCmdBindIndexBuffer(cmdData.cmdbuf, bufferData.buffer, offset, VkIndexType::VK_INDEX_TYPE_UINT16);
 }
 
 void Rhi::CmdDraw(RhiCmdList cmd, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
                   uint32_t firstInstance)
 {
-    VulkanCmdListData &cmdData = m_CmdLists.ResolveData(cmd);
+    VulkanCmdListData &cmdData = g_State->m_CmdLists.ResolveData(cmd);
     CmdDrawInternal(cmdData);
     vkCmdDraw(cmdData.cmdbuf, vertexCount, instanceCount, firstVertex, firstInstance);
 }
@@ -2139,7 +2170,7 @@ void Rhi::CmdDraw(RhiCmdList cmd, uint32_t vertexCount, uint32_t instanceCount, 
 void Rhi::CmdDrawIndexed(RhiCmdList cmd, uint32_t indexCount, int32_t vertexOffset, uint32_t instanceCount,
                          uint32_t firstIndex, uint32_t firstInstance)
 {
-    VulkanCmdListData &cmdData = m_CmdLists.ResolveData(cmd);
+    VulkanCmdListData &cmdData = g_State->m_CmdLists.ResolveData(cmd);
     CmdDrawInternal(cmdData);
     vkCmdDrawIndexed(cmdData.cmdbuf, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
 }
@@ -2162,20 +2193,20 @@ auto Rhi::CreateSampler(const RhiSamplerDesc &desc) -> RhiSampler
     };
 
     VulkanSamplerData samplerData{};
-    VK_CHECK(vkCreateSampler(m_Dev, &createInfo, m_Alloc, &samplerData.sampler));
+    VK_CHECK(vkCreateSampler(g_State->m_Dev, &createInfo, g_State->vkAlloc, &samplerData.sampler));
 
-    return m_Samplers.Acquire(samplerData);
+    return g_State->m_Samplers.Acquire(samplerData);
 }
 
 void Rhi::DestroySampler(RhiSampler sampler)
 {
-    VulkanSamplerData samplerData = m_Samplers.ReleaseData(sampler);
-    vkDestroySampler(m_Dev, samplerData.sampler, m_Alloc);
+    VulkanSamplerData samplerData = g_State->m_Samplers.ReleaseData(sampler);
+    vkDestroySampler(g_State->m_Dev, samplerData.sampler, g_State->vkAlloc);
 }
 
 auto Rhi::GetBackbufferView() -> RhiRenderTargetView
 {
-    return m_SwapchainRTVs[m_SwapchainTextureIndex];
+    return g_State->m_SwapchainRTVs[g_State->m_SwapchainTextureIndex];
 }
 
 auto Rhi::CreateTexture(const RhiTextureDesc &desc) -> RhiTexture
@@ -2201,25 +2232,25 @@ auto Rhi::CreateTexture(const RhiTextureDesc &desc) -> RhiTexture
         .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
         .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
     };
-    VK_CHECK(vkCreateImage(m_Dev, &imageCreateInfo, m_Alloc, &textureData.image));
+    VK_CHECK(vkCreateImage(g_State->m_Dev, &imageCreateInfo, g_State->vkAlloc, &textureData.image));
 
     VkMemoryRequirements memoryRequirements;
-    vkGetImageMemoryRequirements(m_Dev, textureData.image, &memoryRequirements);
+    vkGetImageMemoryRequirements(g_State->m_Dev, textureData.image, &memoryRequirements);
 
     const VkMemoryAllocateInfo memoryAllocInfo{
         .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
         .allocationSize = memoryRequirements.size,
         .memoryTypeIndex = FindMemoryTypeIndex(memoryRequirements, memoryPropertyFlags),
     };
-    vkAllocateMemory(m_Dev, &memoryAllocInfo, m_Alloc, &textureData.memory);
-    vkBindImageMemory(m_Dev, textureData.image, textureData.memory, 0);
+    vkAllocateMemory(g_State->m_Dev, &memoryAllocInfo, g_State->vkAlloc, &textureData.memory);
+    vkBindImageMemory(g_State->m_Dev, textureData.image, textureData.memory, 0);
 
-    return m_Textures.Acquire(textureData);
+    return g_State->m_Textures.Acquire(textureData);
 }
 
 auto Rhi::CreateSampledTextureView(const RhiTextureViewDesc &desc) -> RhiSampledTextureView
 {
-    VulkanTextureData &textureData = m_Textures.ResolveData(desc.texture);
+    VulkanTextureData &textureData = g_State->m_Textures.ResolveData(desc.texture);
 
     VulkanTextureViewData textureViewData{
         .texture = desc.texture,
@@ -2249,15 +2280,15 @@ auto Rhi::CreateSampledTextureView(const RhiTextureViewDesc &desc) -> RhiSampled
         .subresourceRange = textureViewData.subresourceRange,
     };
 
-    VK_CHECK(vkCreateImageView(m_Dev, &imageViewCreateInfo, m_Alloc, &textureViewData.imageView));
+    VK_CHECK(vkCreateImageView(g_State->m_Dev, &imageViewCreateInfo, g_State->vkAlloc, &textureViewData.imageView));
 
-    const RhiSampledTextureView view = m_SampledTextureViews.Acquire(textureViewData);
+    const RhiSampledTextureView view = g_State->m_SampledTextureViews.Acquire(textureViewData);
     return view;
 }
 
 auto Rhi::CreateRenderTargetView(const RhiRenderTargetViewDesc &desc) -> RhiRenderTargetView
 {
-    VulkanTextureData &textureData = m_Textures.ResolveData(desc.texture);
+    VulkanTextureData &textureData = g_State->m_Textures.ResolveData(desc.texture);
 
     VulkanTextureViewData renderTargetViewData{
         .texture = desc.texture,
@@ -2287,14 +2318,15 @@ auto Rhi::CreateRenderTargetView(const RhiRenderTargetViewDesc &desc) -> RhiRend
         .subresourceRange = renderTargetViewData.subresourceRange,
     };
 
-    VK_CHECK(vkCreateImageView(m_Dev, &imageViewCreateInfo, m_Alloc, &renderTargetViewData.imageView));
-    const RhiRenderTargetView rtv = m_RenderTargetViews.Acquire(renderTargetViewData);
+    VK_CHECK(
+        vkCreateImageView(g_State->m_Dev, &imageViewCreateInfo, g_State->vkAlloc, &renderTargetViewData.imageView));
+    const RhiRenderTargetView rtv = g_State->m_RenderTargetViews.Acquire(renderTargetViewData);
     return rtv;
 }
 
 auto Rhi::CreateDepthStencilView(const RhiDepthStencilViewDesc &desc) -> RhiDepthStencilView
 {
-    VulkanTextureData &textureData = m_Textures.ResolveData(desc.texture);
+    VulkanTextureData &textureData = g_State->m_Textures.ResolveData(desc.texture);
 
     VulkanTextureViewData dsvData{
         .texture = desc.texture,
@@ -2324,29 +2356,29 @@ auto Rhi::CreateDepthStencilView(const RhiDepthStencilViewDesc &desc) -> RhiDept
         .subresourceRange = dsvData.subresourceRange,
     };
 
-    VK_CHECK(vkCreateImageView(m_Dev, &imageViewCreateInfo, m_Alloc, &dsvData.imageView));
-    const RhiDepthStencilView dsv = m_DepthStencilViews.Acquire(dsvData);
+    VK_CHECK(vkCreateImageView(g_State->m_Dev, &imageViewCreateInfo, g_State->vkAlloc, &dsvData.imageView));
+    const RhiDepthStencilView dsv = g_State->m_DepthStencilViews.Acquire(dsvData);
     return dsv;
 }
 
 auto Rhi::GetTexture(RhiSampledTextureView srv) -> RhiTexture
 {
-    return m_SampledTextureViews.ResolveData(srv).texture;
+    return g_State->m_SampledTextureViews.ResolveData(srv).texture;
 }
 
 auto Rhi::GetTexture(RhiRenderTargetView rtv) -> RhiTexture
 {
-    return m_RenderTargetViews.ResolveData(rtv).texture;
+    return g_State->m_RenderTargetViews.ResolveData(rtv).texture;
 }
 
 auto Rhi::GetTexture(RhiDepthStencilView dsv) -> RhiTexture
 {
-    return m_DepthStencilViews.ResolveData(dsv).texture;
+    return g_State->m_DepthStencilViews.ResolveData(dsv).texture;
 }
 
 auto Rhi::GetTextureInfo(RhiTexture texture) -> RhiTextureInfo
 {
-    const VulkanTextureData &textureData = m_Textures.ResolveData(texture);
+    const VulkanTextureData &textureData = g_State->m_Textures.ResolveData(texture);
     return {
         .width = textureData.extent.width,
         .height = textureData.extent.height,
@@ -2356,9 +2388,9 @@ auto Rhi::GetTextureInfo(RhiTexture texture) -> RhiTextureInfo
 
 void Rhi::CmdTransitionTexture(RhiCmdList cmd, RhiTexture texture, RhiTextureState newState)
 {
-    const VkCommandBuffer &cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
+    const VkCommandBuffer &cmdbuf = g_State->m_CmdLists.ResolveData(cmd).cmdbuf;
 
-    VulkanTextureData &textureData = m_Textures.ResolveData(texture);
+    VulkanTextureData &textureData = g_State->m_Textures.ResolveData(texture);
 
     const VulkanTextureStateSyncInfo newSyncInfo = VulkanTextureStateGetSyncInfo(newState);
     if (newSyncInfo.layout == textureData.layout)
@@ -2398,45 +2430,45 @@ void Rhi::CmdTransitionTexture(RhiCmdList cmd, RhiTexture texture, RhiTextureSta
 
 void Rhi::DestroyTexture(RhiTexture texture)
 {
-    VulkanTextureData textureData = m_Textures.ReleaseData(texture);
+    VulkanTextureData textureData = g_State->m_Textures.ReleaseData(texture);
 
     NYLA_ASSERT(textureData.image);
-    vkDestroyImage(m_Dev, textureData.image, m_Alloc);
+    vkDestroyImage(g_State->m_Dev, textureData.image, g_State->vkAlloc);
 
     NYLA_ASSERT(textureData.memory);
-    vkFreeMemory(m_Dev, textureData.memory, m_Alloc);
+    vkFreeMemory(g_State->m_Dev, textureData.memory, g_State->vkAlloc);
 }
 
 void Rhi::DestroySampledTextureView(RhiSampledTextureView textureView)
 {
-    const VulkanTextureViewData &textureViewData = m_SampledTextureViews.ReleaseData(textureView);
+    const VulkanTextureViewData &textureViewData = g_State->m_SampledTextureViews.ReleaseData(textureView);
     NYLA_ASSERT(textureViewData.imageView);
 
-    vkDestroyImageView(m_Dev, textureViewData.imageView, m_Alloc);
+    vkDestroyImageView(g_State->m_Dev, textureViewData.imageView, g_State->vkAlloc);
 }
 
 void Rhi::DestroyRenderTargetView(RhiRenderTargetView textureView)
 {
-    const VulkanTextureViewData &textureViewData = m_RenderTargetViews.ReleaseData(textureView);
+    const VulkanTextureViewData &textureViewData = g_State->m_RenderTargetViews.ReleaseData(textureView);
     NYLA_ASSERT(textureViewData.imageView);
 
-    vkDestroyImageView(m_Dev, textureViewData.imageView, m_Alloc);
+    vkDestroyImageView(g_State->m_Dev, textureViewData.imageView, g_State->vkAlloc);
 }
 
 void Rhi::DestroyDepthStencilView(RhiDepthStencilView textureView)
 {
-    const VulkanTextureViewData &textureViewData = m_DepthStencilViews.ReleaseData(textureView);
+    const VulkanTextureViewData &textureViewData = g_State->m_DepthStencilViews.ReleaseData(textureView);
     NYLA_ASSERT(textureViewData.imageView);
 
-    vkDestroyImageView(m_Dev, textureViewData.imageView, m_Alloc);
+    vkDestroyImageView(g_State->m_Dev, textureViewData.imageView, g_State->vkAlloc);
 }
 
 void Rhi::CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, uint32_t srcOffset, uint32_t size)
 {
-    const VkCommandBuffer &cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
+    const VkCommandBuffer &cmdbuf = g_State->m_CmdLists.ResolveData(cmd).cmdbuf;
 
-    VulkanTextureData &dstTextureData = m_Textures.ResolveData(dst);
-    VulkanBufferData &srcBufferData = m_Buffers.ResolveData(src);
+    VulkanTextureData &dstTextureData = g_State->m_Textures.ResolveData(dst);
+    VulkanBufferData &srcBufferData = g_State->m_Buffers.ResolveData(src);
 
     EnsureHostWritesVisible(cmdbuf, srcBufferData);
 
@@ -2458,10 +2490,10 @@ void Rhi::CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, uint32_t
 
 void Rhi::CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiTexture src)
 {
-    const VkCommandBuffer &cmdbuf = m_CmdLists.ResolveData(cmd).cmdbuf;
+    const VkCommandBuffer &cmdbuf = g_State->m_CmdLists.ResolveData(cmd).cmdbuf;
 
-    VulkanTextureData &dstTextureData = m_Textures.ResolveData(dst);
-    VulkanTextureData &srcTextureData = m_Textures.ResolveData(src);
+    VulkanTextureData &dstTextureData = g_State->m_Textures.ResolveData(dst);
+    VulkanTextureData &srcTextureData = g_State->m_Textures.ResolveData(src);
 
     const VkImageCopy region{
         .srcSubresource =
@@ -2492,7 +2524,7 @@ class SpirvShaderManager
         Output,
     };
 
-    SpirvShaderManager(std::span<uint32_t> view, RhiShaderStage stage) : m_SpvView{view}, m_Stage{stage}
+    SpirvShaderManager(Span<uint32_t> view, RhiShaderStage stage) : m_SpvView{view}, m_Stage{stage}
     {
         auto end = m_SpvView.end();
         for (auto it = m_SpvView.begin(); it != end; ++it)
@@ -2516,14 +2548,14 @@ class SpirvShaderManager
         }
     }
 
-    auto FindLocationBySemantic(std::string_view semantic, StorageClass storageClass, uint32_t *outLocation) -> bool
+    auto FindLocationBySemantic(Str semantic, StorageClass storageClass, uint32_t *outLocation) -> bool
     {
         uint32_t id;
         if (!FindIdBySemantic(semantic, storageClass, &id))
             return false;
 
         uint32_t location;
-        for (uint32_t i = 0; i < m_Locations.size(); ++i)
+        for (uint32_t i = 0; i < m_Locations.Size(); ++i)
         {
             if (m_Locations[i].id == id && CheckStorageClass(id, storageClass))
             {
@@ -2535,9 +2567,9 @@ class SpirvShaderManager
         return false;
     }
 
-    auto FindIdBySemantic(std::string_view querySemantic, StorageClass storageClass, uint32_t *outId) -> bool
+    auto FindIdBySemantic(Str querySemantic, StorageClass storageClass, uint32_t *outId) -> bool
     {
-        for (uint32_t i = 0; i < m_SemanticDataNames.size(); ++i)
+        for (uint32_t i = 0; i < m_SemanticDataNames.Size(); ++i)
         {
             const auto &semantic = m_SemanticDataNames[i];
             if (semantic == querySemantic && CheckStorageClass(m_SemanticDataIds[i], storageClass))
@@ -2549,20 +2581,20 @@ class SpirvShaderManager
         return false;
     }
 
-    auto FindSemanticById(uint32_t id, std::string_view *outSemantic) -> bool
+    auto FindSemanticById(uint32_t id, Str *outSemantic) -> bool
     {
-        for (uint32_t i = 0; i < m_SemanticDataIds.size(); ++i)
+        for (uint32_t i = 0; i < m_SemanticDataIds.Size(); ++i)
         {
             if (m_SemanticDataIds[i] == id)
             {
-                *outSemantic = m_SemanticDataNames[i].StringView();
+                *outSemantic = m_SemanticDataNames[i].GetStr();
                 return true;
             }
         }
         return false;
     }
 
-    auto RewriteLocationForSemantic(std::string_view semantic, StorageClass storageClass, uint32_t aLocation) -> bool
+    auto RewriteLocationForSemantic(Str semantic, StorageClass storageClass, uint32_t aLocation) -> bool
     {
         uint32_t oldLocation;
         if (!FindLocationBySemantic(semantic, storageClass, &oldLocation))
@@ -2604,13 +2636,13 @@ class SpirvShaderManager
         switch (storageClass)
         {
         case StorageClass::Input: {
-            for (uint32_t i = 0; i < m_InputVariables.size(); ++i)
+            for (uint32_t i = 0; i < m_InputVariables.Size(); ++i)
                 if (id == m_InputVariables[i])
                     return true;
             return false;
         }
         case StorageClass::Output: {
-            for (uint32_t i = 0; i < m_OutputVariables.size(); ++i)
+            for (uint32_t i = 0; i < m_OutputVariables.Size(); ++i)
                 if (id == m_OutputVariables[i])
                     return true;
             return false;
@@ -2621,21 +2653,21 @@ class SpirvShaderManager
         }
     }
 
-    auto CheckStorageClass(std::string_view semantic, StorageClass storageClass) -> bool
+    auto CheckStorageClass(Str semantic, StorageClass storageClass) -> bool
     {
         if (uint32_t id; FindIdBySemantic(semantic, storageClass, &id))
             return CheckStorageClass(id, storageClass);
         return false;
     }
 
-    auto GetInputIds() -> std::span<const uint32_t>
+    auto GetInputIds() -> Span<const uint32_t>
     {
-        return m_InputVariables;
+        return m_InputVariables.GetSpan().AsConst();
     }
 
-    auto GetSemantics() -> std::span<InlineString<16>>
+    auto GetSemantics() -> Span<InlineString<16>>
     {
-        return m_SemanticDataNames;
+        return m_SemanticDataNames.GetSpan();
     }
 
   private:
@@ -2662,10 +2694,10 @@ class SpirvShaderManager
     {
         SpvOperandReader operandReader = it.GetOperandReader();
 
-        std::string_view name = operandReader.String();
-        if (name == "SPV_GOOGLE_hlsl_functionality1")
+        Str name = operandReader.String();
+        if (name == AsStr("SPV_GOOGLE_hlsl_functionality1"))
             goto nop;
-        if (name == "SPV_GOOGLE_user_type")
+        if (name == AsStr("SPV_GOOGLE_user_type"))
             goto nop;
 
         return;
@@ -2683,7 +2715,7 @@ class SpirvShaderManager
         {
         case spv::Decoration::DecorationLocation: {
             const uint32_t location = operandReader.Word();
-            m_Locations.emplace_back(LocationData{
+            m_Locations.PushBack(LocationData{
                 .id = targetId,
                 .location = location,
             });
@@ -2692,7 +2724,7 @@ class SpirvShaderManager
 
         case spv::Decoration::DecorationBuiltIn: {
             const uint32_t builtin = operandReader.Word();
-            m_Builtin.emplace_back(BuiltinData{
+            m_Builtin.PushBack(BuiltinData{
                 .id = targetId,
                 .builtin = builtin,
             });
@@ -2710,12 +2742,15 @@ class SpirvShaderManager
         switch (spv::Decoration(operandReader.Word()))
         {
         case spv::Decoration::DecorationUserSemantic: {
-            m_SemanticDataIds.emplace_back(targetId);
+            m_SemanticDataIds.PushBack(targetId);
 
-            auto &name = m_SemanticDataNames.emplace_back(operandReader.String());
+            auto &name = m_SemanticDataNames.PushBack();
+            auto src = operandReader.String();
+            MemCpy(name.Data(), src.Data(), src.Size());
+
             name.AsciiToUpper();
 
-            NYLA_LOG("" NYLA_SV_FMT, NYLA_SV_ARG(name.StringView()));
+            NYLA_LOG("" NYLA_SV_FMT, NYLA_SV_ARG(name.GetStr()));
             break;
         }
         }
@@ -2733,10 +2768,10 @@ class SpirvShaderManager
         switch (static_cast<spv::StorageClass>(operandReader.Word()))
         {
         case spv::StorageClass::StorageClassInput:
-            m_InputVariables.emplace_back(resultId);
+            m_InputVariables.PushBack(resultId);
             break;
         case spv::StorageClass::StorageClassOutput:
-            m_OutputVariables.emplace_back(resultId);
+            m_OutputVariables.PushBack(resultId);
             break;
         default:
             break;
@@ -2769,11 +2804,11 @@ class SpirvShaderManager
 
 auto Rhi::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGraphicsPipeline
 {
-    auto &vertexShaderData = m_Shaders.ResolveData(desc.vs);
-    SpirvShaderManager vsMan(vertexShaderData.spv->GetSpan(), RhiShaderStage::Vertex);
+    auto &vertexShaderData = g_State->m_Shaders.ResolveData(desc.vs);
+    SpirvShaderManager vsMan(vertexShaderData.spv, RhiShaderStage::Vertex);
 
-    auto &pixelShaderData = m_Shaders.ResolveData(desc.ps);
-    SpirvShaderManager psMan(pixelShaderData.spv->GetSpan(), RhiShaderStage::Pixel);
+    auto &pixelShaderData = g_State->m_Shaders.ResolveData(desc.ps);
+    SpirvShaderManager psMan(pixelShaderData.spv, RhiShaderStage::Pixel);
 
     VulkanPipelineData pipelineData = {
         .bindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -2782,7 +2817,7 @@ auto Rhi::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGrap
     InlineVec<VkVertexInputBindingDescription, 16> vertexBindings;
     for (auto &binding : desc.vertexBindings)
     {
-        vertexBindings.emplace_back(VkVertexInputBindingDescription{
+        vertexBindings.PushBack(VkVertexInputBindingDescription{
             .binding = binding.binding,
             .stride = binding.stride,
             .inputRate = ConvertVulkanInputRate(binding.inputRate),
@@ -2793,11 +2828,11 @@ auto Rhi::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGrap
     for (auto &attribute : desc.vertexAttributes)
     {
         uint32_t location;
-        if (!vsMan.FindLocationBySemantic(attribute.semantic.StringView(), SpirvShaderManager::StorageClass::Input,
+        if (!vsMan.FindLocationBySemantic(attribute.semantic.GetStr(), SpirvShaderManager::StorageClass::Input,
                                           &location))
             NYLA_ASSERT(false);
 
-        vertexAttributes.emplace_back(VkVertexInputAttributeDescription{
+        vertexAttributes.PushBack(VkVertexInputAttributeDescription{
             .location = location,
             .binding = attribute.binding,
             .format = ConvertVertexFormatIntoVkFormat(attribute.format),
@@ -2807,11 +2842,11 @@ auto Rhi::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGrap
 
     for (uint32_t id : psMan.GetInputIds())
     {
-        std::string_view semantic;
+        Str semantic;
         if (!psMan.FindSemanticById(id, &semantic))
             NYLA_ASSERT(false);
 
-        if (semantic.starts_with("SV_"))
+        if (semantic.StartWith(AsStr("SV_")))
             continue;
 
         uint32_t location;
@@ -2830,35 +2865,35 @@ auto Rhi::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGrap
         };
 
         VkShaderModule shaderModule;
-        VK_CHECK(vkCreateShaderModule(m_Dev, &createInfo, nullptr, &shaderModule));
+        VK_CHECK(vkCreateShaderModule(g_State->m_Dev, &createInfo, nullptr, &shaderModule));
 
         return shaderModule;
     };
 
-    Erase(*vertexShaderData.spv, Spirview::kNop);
-    Erase(*pixelShaderData.spv, Spirview::kNop);
+    Erase(vertexShaderData.spv, Spirview::kNop);
+    Erase(pixelShaderData.spv, Spirview::kNop);
 
-    const std::array<VkPipelineShaderStageCreateInfo, 2> stages{
+    const Array<VkPipelineShaderStageCreateInfo, 2> stages{
         VkPipelineShaderStageCreateInfo{
             .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
             .stage = VK_SHADER_STAGE_VERTEX_BIT,
-            .module = createShaderModule(vertexShaderData.spv->GetSpan()),
+            .module = createShaderModule(vertexShaderData.spv),
             .pName = "main",
         },
         VkPipelineShaderStageCreateInfo{
             .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
             .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-            .module = createShaderModule(pixelShaderData.spv->GetSpan()),
+            .module = createShaderModule(pixelShaderData.spv),
             .pName = "main",
         },
     };
 
     const VkPipelineVertexInputStateCreateInfo vertexInputStateCreateInfo{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-        .vertexBindingDescriptionCount = vertexBindings.size(),
-        .pVertexBindingDescriptions = vertexBindings.data(),
-        .vertexAttributeDescriptionCount = vertexAttributes.size(),
-        .pVertexAttributeDescriptions = vertexAttributes.data(),
+        .vertexBindingDescriptionCount = vertexBindings.Size32(),
+        .pVertexBindingDescriptions = vertexBindings.Data(),
+        .vertexAttributeDescriptionCount = vertexAttributes.Size32(),
+        .pVertexAttributeDescriptions = vertexAttributes.Data(),
     };
 
     const VkPipelineRasterizationStateCreateInfo rasterizerCreateInfo{
@@ -2912,27 +2947,27 @@ auto Rhi::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGrap
         .blendConstants = {},
     };
 
-    const auto dynamicStates = std::to_array<VkDynamicState>({
+    const Array<VkDynamicState, 2> dynamicStates{
         VK_DYNAMIC_STATE_VIEWPORT,
         VK_DYNAMIC_STATE_SCISSOR,
-    });
+    };
 
     const VkPipelineDynamicStateCreateInfo dynamicStateCreateInfo{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-        .dynamicStateCount = dynamicStates.size(),
-        .pDynamicStates = dynamicStates.data(),
+        .dynamicStateCount = dynamicStates.Size(),
+        .pDynamicStates = dynamicStates.Data(),
     };
 
     InlineVec<VkFormat, 16> colorTargetFormats;
     for (RhiTextureFormat colorTargetFormat : desc.colorTargetFormats)
     {
-        colorTargetFormats.emplace_back(ConvertTextureFormatIntoVkFormat(colorTargetFormat, nullptr));
+        colorTargetFormats.PushBack(ConvertTextureFormatIntoVkFormat(colorTargetFormat, nullptr));
     }
 
     const VkPipelineRenderingCreateInfo pipelineRenderingCreateInfo{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-        .colorAttachmentCount = colorTargetFormats.size(),
-        .pColorAttachmentFormats = colorTargetFormats.data(),
+        .colorAttachmentCount = colorTargetFormats.Size32(),
+        .pColorAttachmentFormats = colorTargetFormats.Data(),
         .depthAttachmentFormat = ConvertTextureFormatIntoVkFormat(desc.depthFormat, nullptr),
     };
 
@@ -2951,23 +2986,23 @@ auto Rhi::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGrap
     };
 #endif
 
-    const std::array<VkDescriptorSetLayout, 3> descriptorSetLayouts = {
-        m_ConstantsDescriptorTable.layout,
-        m_TexturesDescriptorTable.layout,
-        m_SamplersDescriptorTable.layout,
+    const Array<VkDescriptorSetLayout, 3> descriptorSetLayouts = {
+        g_State->m_ConstantsDescriptorTable.layout,
+        g_State->m_TexturesDescriptorTable.layout,
+        g_State->m_SamplersDescriptorTable.layout,
     };
 
     const VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-        .setLayoutCount = descriptorSetLayouts.size(),
-        .pSetLayouts = descriptorSetLayouts.data(),
+        .setLayoutCount = descriptorSetLayouts.Size(),
+        .pSetLayouts = descriptorSetLayouts.Data(),
 #if 0
         .pushConstantRangeCount = desc.pushConstantSize > 0,
         .pPushConstantRanges = &pushConstantRange,
 #endif
     };
 
-    vkCreatePipelineLayout(m_Dev, &pipelineLayoutCreateInfo, nullptr, &pipelineData.layout);
+    vkCreatePipelineLayout(g_State->m_Dev, &pipelineLayoutCreateInfo, nullptr, &pipelineData.layout);
 
     const VkPipelineDepthStencilStateCreateInfo depthStencilState{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
@@ -2985,8 +3020,8 @@ auto Rhi::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGrap
     const VkGraphicsPipelineCreateInfo pipelineCreateInfo{
         .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
         .pNext = &pipelineRenderingCreateInfo,
-        .stageCount = stages.size(),
-        .pStages = stages.data(),
+        .stageCount = stages.Size(),
+        .pStages = stages.Data(),
         .pVertexInputState = &vertexInputStateCreateInfo,
         .pInputAssemblyState = &inputAssemblyCreateInfo,
         .pViewportState = &viewportStateCreateInfo,
@@ -3001,80 +3036,81 @@ auto Rhi::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGrap
         .basePipelineIndex = -1,
     };
 
-    VK_CHECK(vkCreateGraphicsPipelines(m_Dev, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &pipelineData.pipeline));
+    VK_CHECK(vkCreateGraphicsPipelines(g_State->m_Dev, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr,
+                                       &pipelineData.pipeline));
 
-    return m_GraphicsPipelines.Acquire(pipelineData);
+    return g_State->m_GraphicsPipelines.Acquire(pipelineData);
 }
 
-void Rhi::NameGraphicsPipeline(RhiGraphicsPipeline pipeline, std::string_view name)
+void Rhi::NameGraphicsPipeline(RhiGraphicsPipeline pipeline, Str name)
 {
-    const VulkanPipelineData &pipelineData = m_GraphicsPipelines.ResolveData(pipeline);
+    const VulkanPipelineData &pipelineData = g_State->m_GraphicsPipelines.ResolveData(pipeline);
     VulkanNameHandle(VK_OBJECT_TYPE_PIPELINE, (uint64_t)pipelineData.pipeline, name);
 }
 
 void Rhi::SetFrameConstant(RhiCmdList cmd, std::span<const std::byte> data)
 {
-    NYLA_ASSERT(data.size() <= m_Limits.frameConstantSize);
+    NYLA_ASSERT(data.size() <= g_State->m_Limits.frameConstantSize);
 
-    const VulkanCmdListData &cmdData = m_CmdLists.ResolveData(cmd);
+    const VulkanCmdListData &cmdData = g_State->m_CmdLists.ResolveData(cmd);
 
-    char *mem = MapBuffer(m_ConstantsUniformBuffer);
+    char *mem = MapBuffer(g_State->m_ConstantsUniformBuffer);
     memcpy(mem + cmdData.frameConstantHead, data.data(), data.size());
 }
 
 void Rhi::SetPassConstant(RhiCmdList cmd, std::span<const std::byte> data)
 {
-    NYLA_ASSERT(data.size() <= m_Limits.passConstantSize);
+    NYLA_ASSERT(data.size() <= g_State->m_Limits.passConstantSize);
 
-    const VulkanCmdListData &cmdData = m_CmdLists.ResolveData(cmd);
+    const VulkanCmdListData &cmdData = g_State->m_CmdLists.ResolveData(cmd);
 
-    char *mem = MapBuffer(m_ConstantsUniformBuffer);
+    char *mem = MapBuffer(g_State->m_ConstantsUniformBuffer);
     memcpy(mem + cmdData.passConstantHead, data.data(), data.size());
 }
 
 void Rhi::SetDrawConstant(RhiCmdList cmd, std::span<const std::byte> data)
 {
-    NYLA_ASSERT(data.size() <= m_Limits.drawConstantSize);
+    NYLA_ASSERT(data.size() <= g_State->m_Limits.drawConstantSize);
 
-    const VulkanCmdListData &cmdData = m_CmdLists.ResolveData(cmd);
+    const VulkanCmdListData &cmdData = g_State->m_CmdLists.ResolveData(cmd);
 
-    char *mem = MapBuffer(m_ConstantsUniformBuffer);
+    char *mem = MapBuffer(g_State->m_ConstantsUniformBuffer);
     memcpy(mem + cmdData.drawConstantHead, data.data(), data.size());
 }
 
 void Rhi::SetLargeDrawConstant(RhiCmdList cmd, std::span<const std::byte> data)
 {
-    NYLA_ASSERT(data.size() <= m_Limits.largeDrawConstantSize);
+    NYLA_ASSERT(data.size() <= g_State->m_Limits.largeDrawConstantSize);
 
-    const VulkanCmdListData &cmdData = m_CmdLists.ResolveData(cmd);
+    const VulkanCmdListData &cmdData = g_State->m_CmdLists.ResolveData(cmd);
 
-    char *mem = MapBuffer(m_ConstantsUniformBuffer);
+    char *mem = MapBuffer(g_State->m_ConstantsUniformBuffer);
     memcpy(mem + cmdData.largeDrawConstantHead, data.data(), data.size());
 
     if constexpr (false)
     {
-        const VulkanBufferData &bufferData = m_Buffers.ResolveData(m_ConstantsUniformBuffer);
+        const VulkanBufferData &bufferData = g_State->m_Buffers.ResolveData(g_State->m_ConstantsUniformBuffer);
         const VkMappedMemoryRange range{
             .sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,
             .memory = bufferData.memory,
         };
-        vkInvalidateMappedMemoryRanges(m_Dev, 1, &range);
+        vkInvalidateMappedMemoryRanges(g_State->m_Dev, 1, &range);
     }
 }
 
 void Rhi::TriggerSwapchainRecreate()
 {
-    m_RecreateSwapchain = true;
+    g_State->m_RecreateSwapchain = true;
 }
 
 auto Rhi::GetFrameIndex() -> uint32_t
 {
-    return m_FrameIndex;
+    return g_State->m_FrameIndex;
 }
 
 auto Rhi::GetNumFramesInFlight() -> uint32_t
 {
-    return m_Limits.numFramesInFlight;
+    return g_State->m_Limits.numFramesInFlight;
 }
 
 } // namespace nyla

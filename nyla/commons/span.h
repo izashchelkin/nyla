@@ -2,7 +2,9 @@
 
 #include <concepts>
 #include <cstdint>
+#include <type_traits>
 
+#include "nyla/commons/fmt.h"
 #include "nyla/commons/mem.h"
 
 namespace nyla
@@ -15,6 +17,12 @@ template <typename T> struct Span
 
     T *m_Data;
     uint64_t m_Size;
+
+    auto AsConst() -> Span<const T>
+        requires(!std::is_const<T>())
+    {
+        return {Data(), Size()};
+    }
 
     [[nodiscard]]
     auto operator[](uint64_t i) -> T &
@@ -47,15 +55,34 @@ template <typename T> struct Span
     }
 
     [[nodiscard]]
+    auto CStr() const -> const T *
+    {
+        NYLA_DASSERT(*(Data() + Size()) == '\0');
+        return m_Data;
+    }
+
+    [[nodiscard]]
     auto Size() const -> uint64_t
     {
         return m_Size;
     }
 
     [[nodiscard]]
-    auto ByteSize() const -> uint64_t
+    auto SizeBytes() const -> uint64_t
     {
         return m_Size * sizeof(T);
+    }
+
+    void Resize(uint64_t newSize)
+    {
+        m_Size = newSize;
+    }
+
+    auto SubSpan(uint64_t from) -> Span
+    {
+        const uint64_t retSize = Size() - from;
+        NYLA_DASSERT(retSize >= 0);
+        return {Data() + from, retSize};
     }
 
     [[nodiscard]]
@@ -94,6 +121,28 @@ template <typename T> struct Span
         return Data() + Size();
     }
 
+    auto Front() -> T &
+    {
+        return (*this)[0];
+    }
+
+    [[nodiscard]]
+    auto Front() const -> const T &
+    {
+        return (*this)[0];
+    }
+
+    auto Back() -> T &
+    {
+        return (*this)[m_Size - 1];
+    }
+
+    [[nodiscard]]
+    auto Back() const -> const T &
+    {
+        return (*this)[m_Size - 1];
+    }
+
     [[nodiscard]]
     auto operator==(Span rhs) const -> bool
     {
@@ -103,21 +152,21 @@ template <typename T> struct Span
         if (this->Data() == rhs.Data())
             return true;
         else
-            return MemEq((const char *)this->Data(), (const char *)rhs.Data(), rhs.ByteSize());
+            return MemEq((const char *)this->Data(), (const char *)rhs.Data(), rhs.SizeBytes());
     }
 
     [[nodiscard]]
     auto StartWith(Span prefix) const -> bool
     {
-        return MemStartsWith((const char *)this->Data(), this->ByteSize(), (const char *)prefix.Data(),
-                             prefix.ByteSize());
+        return MemStartsWith((const char *)this->Data(), this->SizeBytes(), (const char *)prefix.Data(),
+                             prefix.SizeBytes());
     }
 
     [[nodiscard]]
     auto EndsWith(Span suffix) const -> bool
     {
-        return MemEndsWith((const char *)this->Data(), this->ByteSize(), (const char *)suffix.Data(),
-                           suffix.ByteSize());
+        return MemEndsWith((const char *)this->Data(), this->SizeBytes(), (const char *)suffix.Data(),
+                           suffix.SizeBytes());
     }
 };
 
@@ -128,9 +177,7 @@ template <uint64_t N> consteval auto AsStr(const char (&str)[N]) -> Str
     return Str{str, N - 1};
 }
 
-template <typename T>
-auto AsStr(T str) -> Str
-    requires(std::same_as<T, char *> || std::same_as<T, const char *>)
+template <typename T> auto AsStr(T str) -> Str
 {
     return Str{str, CStrLen(str)};
 }

@@ -48,6 +48,32 @@ target_sources(${TARGET}
         platform_dir_watch.h
 )
 
+if(WIN32)
+    add_subdirectory(d3d12)
+endif()
+
+add_subdirectory(vulkan)
+
+find_package(Vulkan)
+
+if (Vulkan_FOUND)
+    target_sources(${TARGET}
+        PRIVATE
+            vulkan/rhi_vulkan.cc
+
+        PUBLIC
+            vulkan/rhi_vulkan.h
+
+        INTERFACE
+            rhi.h
+    )
+
+    target_link_libraries(${TARGET}
+        PUBLIC
+            Vulkan::Vulkan        
+    )
+endif()
+
 set(target_dir_watch nyla_platform_dir_watch)
 add_library(${target_dir_watch} INTERFACE)
 add_library(nyla::platform::dir_watch ALIAS ${target_dir_watch})

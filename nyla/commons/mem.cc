@@ -1,14 +1,14 @@
 #include "nyla/commons/mem.h"
-#include "nyla/commons/cstr.h"
 #include "nyla/commons/intrin.h"
-#include "nyla/commons/platform.h"
 
 #include <cstdint>
 
 namespace nyla
 {
 
-auto CStrLen(const char *str) -> uint64_t
+template <typename T>
+auto NYLA_API CStrLen(T str) -> uint64_t
+    requires(std::same_as<T, char *> || std::same_as<T, const char *>)
 {
     // NYLA_ASSERT(reinterpret_cast<uintptr_t>(str) % 16 == 0);
 

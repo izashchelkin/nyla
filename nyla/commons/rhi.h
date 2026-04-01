@@ -1,13 +1,12 @@
 #pragma once
 
 #include <cstdint>
-#include <string>
-#include <string_view>
 
 #include "nyla/commons/bitenum.h"
 #include "nyla/commons/byteview.h"
 #include "nyla/commons/handle.h"
 #include "nyla/commons/inline_string.h"
+#include "nyla/commons/region_alloc.h"
 
 namespace nyla
 {
@@ -213,6 +212,7 @@ struct RhiLimits
 
 struct RhiInitDesc
 {
+    RegionAlloc rootAlloc;
     RhiFlags flags;
     RhiLimits limits;
 };
@@ -247,7 +247,7 @@ struct RhiVertexAttributeDesc
 
 struct RhiGraphicsPipelineDesc
 {
-    std::string debugName;
+    Str debugName;
 
     RhiShader vs;
     RhiShader ps;
@@ -279,7 +279,7 @@ template <> struct EnableBitMaskOps<RhiShaderStage> : std::true_type
 struct RhiShaderDesc
 {
     RhiShaderStage stage;
-    std::span<uint32_t> code;
+    Span<uint32_t> code;
 };
 
 struct RhiTextureDesc
@@ -326,7 +326,7 @@ class Rhi
     static auto GetOptimalBufferCopyOffsetAlignment() -> uint32_t;
 
     static auto CreateBuffer(const RhiBufferDesc &) -> RhiBuffer;
-    static void NameBuffer(RhiBuffer, std::string_view name);
+    static void NameBuffer(RhiBuffer, Str name);
     static void DestroyBuffer(RhiBuffer);
 
     static auto GetBufferSize(RhiBuffer) -> uint64_t;
@@ -341,7 +341,7 @@ class Rhi
     static void CmdUavBarrierBuffer(RhiCmdList cmd, RhiBuffer buffer);
 
     static auto CreateCmdList(RhiQueueType queueType) -> RhiCmdList;
-    static void NameCmdList(RhiCmdList, std::string_view name);
+    static void NameCmdList(RhiCmdList, Str name);
     static void DestroyCmdList(RhiCmdList cmd);
     static void ResetCmdList(RhiCmdList cmd);
 
@@ -359,7 +359,7 @@ class Rhi
     static auto GetVertexFormatSize(RhiVertexFormat) -> uint32_t;
 
     static auto CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &) -> RhiGraphicsPipeline;
-    static void NameGraphicsPipeline(RhiGraphicsPipeline, std::string_view name);
+    static void NameGraphicsPipeline(RhiGraphicsPipeline, Str name);
     static void DestroyGraphicsPipeline(RhiGraphicsPipeline);
 
     static void CmdBindGraphicsPipeline(RhiCmdList, RhiGraphicsPipeline);

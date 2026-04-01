@@ -8,8 +8,8 @@ namespace nyla
 
 struct Handle
 {
-    uint32_t gen{};
-    uint32_t index{};
+    uint32_t gen;
+    uint32_t index;
 };
 
 inline auto HandleIsSet(Handle handle) -> bool

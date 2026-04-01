@@ -2,7 +2,6 @@
 
 add_subdirectory(commons)
 
-add_subdirectory(rhi)
 add_subdirectory(asset)
 add_subdirectory(engine)
 

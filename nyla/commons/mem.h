@@ -1,11 +1,13 @@
 #pragma once
 
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <type_traits>
 
 #include "nyla/commons/dllapi.h"
 #include "nyla/commons/intrin.h"
+#include "nyla/commons/restrict.h"
 
 namespace nyla
 {
@@ -35,7 +37,7 @@ inline void Write64(void *ptr, uint64_t val)
 #endif
 }
 
-inline void MemCpy(void *dest, const void *src, uint64_t size)
+inline void MemCpy(void *RESTRICT dest, const void *RESTRICT src, uint64_t size)
 {
     if (!size || dest == src)
         return;
@@ -97,7 +99,7 @@ inline void MemMove(void *dest, const void *src, uint64_t size)
 }
 
 template <typename T>
-void Swap(T &lhs, T &rhs)
+void Swap(T &RESTRICT lhs, T &RESTRICT rhs)
     requires(std::is_trivially_constructible<T>())
 {
     T tmp = lhs;
@@ -114,14 +116,24 @@ template <typename To, typename From>
     return dest;
 }
 
-template <uint64_t N> auto CStrLen(const char str[N]) -> uint64_t
+template <uint64_t N> consteval auto CStrLen(const char (&str)[N]) -> uint64_t
 {
-    return N;
+    return N - 1;
 }
-auto NYLA_API CStrLen(const char *str) -> uint64_t;
 
-auto NYLA_API MemEq(const char *p1, const char *p2, uint64_t len) -> bool;
-auto NYLA_API MemStartsWith(const char *str, uint64_t strLen, const char *prefix, uint64_t prefixLen) -> bool;
-auto NYLA_API MemEndsWith(const char *str, uint64_t strLen, const char *suffix, uint64_t suffixLen) -> bool;
+template <typename T> auto CStrLen(T str) -> uint64_t
+{
+    return CStrLen(static_cast<const char *>(str));
+}
+
+template <typename T>
+auto NYLA_API CStrLen(T str) -> uint64_t
+    requires(std::same_as<T, char *> || std::same_as<T, const char *>);
+
+auto NYLA_API MemEq(const char *RESTRICT p1, const char *RESTRICT p2, uint64_t len) -> bool;
+auto NYLA_API MemStartsWith(const char *RESTRICT str, uint64_t strLen, const char *RESTRICT prefix, uint64_t prefixLen)
+    -> bool;
+auto NYLA_API MemEndsWith(const char *RESTRICT str, uint64_t strLen, const char *RESTRICT suffix, uint64_t suffixLen)
+    -> bool;
 
 } // namespace nyla

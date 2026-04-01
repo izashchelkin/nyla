@@ -46,9 +46,15 @@ template <typename T, uint64_t N> struct alignas(RequiredAlignment<T>::value) Ar
     }
 
     [[nodiscard]]
-    auto Size() const -> uint64_t
+    constexpr auto Size() const -> uint64_t
     {
         return N;
+    }
+
+    [[nodiscard]]
+    constexpr auto Size32() const -> uint32_t
+    {
+        return static_cast<uint32_t>(Size());
     }
 
     [[nodiscard]]

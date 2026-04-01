@@ -4,25 +4,13 @@
 
 #include "nyla/commons/array.h"
 #include "nyla/commons/platform.h"
-#include "nyla/commons/str.h"
 
 namespace nyla
 {
 
-template <uint32_t N> class InlineString
+template <uint32_t N> struct InlineString
 {
   public:
-    InlineString() : m_Size{0}
-    {
-    }
-
-    InlineString(Str str) : m_Size{str.Size()}
-    {
-        NYLA_DASSERT(m_Size <= N);
-        MemCpy(m_Data.Data(), str.Data(), m_Size);
-        m_Data[m_Size + 1] = '\0';
-    }
-
     void AppendChar(char ch)
     {
         NYLA_DASSERT(m_Size < N);
@@ -41,15 +29,21 @@ template <uint32_t N> class InlineString
     }
 
     [[nodiscard]]
-    auto CString() const -> const char *
+    auto CStr() const -> const char *
     {
         return m_Data.data();
     }
 
     [[nodiscard]]
+    auto Data() -> char *
+    {
+        return m_Data.Data();
+    }
+
+    [[nodiscard]]
     auto GetStr() const -> Str
     {
-        return Str{m_Data.data(), m_Size};
+        return Str{m_Data.Data(), m_Size};
     }
 
     auto operator==(Str rhs) const -> bool

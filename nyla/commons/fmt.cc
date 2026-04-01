@@ -2,9 +2,7 @@
 #include <cstdint>
 
 #include "nyla/commons/byteparser.h"
-#include "nyla/commons/fmt.h"
 #include "nyla/commons/platform.h"
-#include "nyla/commons/str.h"
 #include "nyla/commons/word.h"
 
 namespace nyla
@@ -49,10 +47,13 @@ auto S64ToBuffer(char *buf, int64_t val) -> uint32_t
 
 } // namespace
 
-void NYLA_API FmtWrite(FileHandle handle, Str fmt, va_list args)
+void NYLA_API FileWriteFmt(FileHandle handle, const char *fmt, uint64_t fmtSize, ...)
 {
+    va_list args;
+    va_start(args, fmtSize);
+
     ByteParser parser;
-    parser.Init(fmt.Data(), fmt.Size());
+    parser.Init(fmt, fmtSize);
 
     while (parser.Left() > 0)
     {
@@ -134,6 +135,8 @@ void NYLA_API FmtWrite(FileHandle handle, Str fmt, va_list args)
     }
 
     Platform::FileWrite(handle, 1, "\n");
+
+    va_end(args);
 }
 
 } // namespace nyla

@@ -81,10 +81,10 @@ struct NYLA_API RegionAlloc
         return p;
     }
 
-    template <typename T> auto PushCopySpan(Span<const T> data) -> Span<T>
+    template <typename T> auto PushCopySpan(Span<T> data) -> Span<T>
     {
-        Span<T> p = PushArr<T>(data.m_Size());
-        MemCpy(p, data.m_Data(), data.size_bytes());
+        Span<T> p = PushArr<T>(data.Size());
+        MemCpy(p.Data(), data.Data(), data.SizeBytes());
         return p;
     }
 

@@ -10,6 +10,7 @@
 #include "nyla/commons/limits.h"
 #include "nyla/commons/mem.h"
 #include "nyla/commons/platform.h"
+#include "nyla/commons/span.h"
 
 auto CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) -> LRESULT;
 
@@ -545,7 +546,7 @@ auto Platform::FileValid(FileHandle file) -> bool
     return hFile != nullptr && hFile != INVALID_HANDLE_VALUE;
 }
 
-auto Platform::FileOpen(const Path &path, FileOpenMode mode) -> FileHandle
+auto Platform::FileOpen(const char *path, FileOpenMode mode) -> FileHandle
 {
     DWORD dwDesiredAccess = 0;
     DWORD dwCreationDisposition = 0;
@@ -567,7 +568,7 @@ auto Platform::FileOpen(const Path &path, FileOpenMode mode) -> FileHandle
         dwCreationDisposition = CREATE_ALWAYS;
     }
 
-    auto hFile = CreateFileA(path.CStr(), // lpFileName
+    auto hFile = CreateFileA(path, // lpFileName
                              dwDesiredAccess,
                              FILE_SHARE_READ, // dwShareMode
                              nullptr,         // lpSecurityAttributes

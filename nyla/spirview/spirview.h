@@ -1,10 +1,8 @@
 #pragma once
 
 #include <cstdint>
-#include <span>
-#include <string_view>
 
-#include "nyla/commons/assert.h"
+#include "nyla/commons/platform.h"
 
 namespace nyla
 {
@@ -12,22 +10,22 @@ namespace nyla
 template <class WordT> class SpvOperandReader
 {
   public:
-    explicit SpvOperandReader(std::span<WordT> data) : m_Data{data}
+    explicit SpvOperandReader(Span<WordT> data) : m_Data{data}
     {
     }
 
     [[nodiscard]]
     auto Word() -> WordT &
     {
-        WordT &ret = m_Data.front();
-        m_Data = m_Data.subspan(1);
+        WordT &ret = m_Data.Front();
+        m_Data = m_Data.SubSpan(1);
         return ret;
     }
 
     [[nodiscard]]
-    auto String() -> std::string_view
+    auto String() -> Str
     {
-        auto *strStart = reinterpret_cast<const char *>(m_Data.data());
+        auto *strStart = reinterpret_cast<const char *>(m_Data.Data());
         uint32_t strLen = 0;
         for (;;)
         {
@@ -36,7 +34,7 @@ template <class WordT> class SpvOperandReader
             {
                 if (!((word >> i) & 0xFF))
                 {
-                    std::string_view ret{strStart, strLen};
+                    Str ret{strStart, strLen};
                     return ret;
                 }
             }
@@ -44,7 +42,7 @@ template <class WordT> class SpvOperandReader
     }
 
   private:
-    std::span<WordT> m_Data;
+    Span<WordT> m_Data;
 };
 
 class Spirview
@@ -55,9 +53,9 @@ class Spirview
     static inline const uint32_t kWordCountShift = 16;
     static inline const uint32_t kNop = 1 << kWordCountShift;
 
-    explicit Spirview(std::span<uint32_t> words) : m_Words(words)
+    explicit Spirview(Span<uint32_t> words) : m_Words(words)
     {
-        NYLA_ASSERT(m_Words.size() >= 5);
+        NYLA_ASSERT(m_Words.Size() >= 5);
         NYLA_ASSERT(m_Words[0] == kMagicNumber);
 
         const uint32_t version = m_Words[1];
@@ -77,7 +75,7 @@ class Spirview
     template <class WordT> struct BasicIterator
     {
         using pointer = WordT *;
-        using span_type = std::span<WordT>;
+        using span_type = Span<WordT>;
 
         BasicIterator(pointer at, pointer end) : m_At(at), m_End(end)
         {
@@ -107,8 +105,8 @@ class Spirview
         auto GetOperandReader() const -> SpvOperandReader<WordT>
         {
             auto w = Words();
-            NYLA_ASSERT(w.size() >= 1);
-            return SpvOperandReader{w.subspan(1)};
+            NYLA_ASSERT(w.Size() >= 1);
+            return SpvOperandReader{w.SubSpan(1)};
         }
 
         auto operator++() -> BasicIterator &
@@ -161,25 +159,25 @@ class Spirview
     [[nodiscard]]
     auto begin() -> iterator
     {
-        return {m_Words.data() + 5, m_Words.data() + m_Words.size()};
+        return {m_Words.Data() + 5, m_Words.Data() + m_Words.Size()};
     }
 
     [[nodiscard]]
     auto end() -> iterator
     {
-        return {m_Words.data() + m_Words.size(), m_Words.data() + m_Words.size()};
+        return {m_Words.Data() + m_Words.Size(), m_Words.Data() + m_Words.Size()};
     }
 
     [[nodiscard]]
     auto begin() const -> const_iterator
     {
-        return {m_Words.data() + 5, m_Words.data() + m_Words.size()};
+        return {m_Words.Data() + 5, m_Words.Data() + m_Words.Size()};
     }
 
     [[nodiscard]]
     auto end() const -> const_iterator
     {
-        return {m_Words.data() + m_Words.size(), m_Words.data() + m_Words.size()};
+        return {m_Words.Data() + m_Words.Size(), m_Words.Data() + m_Words.Size()};
     }
 
     [[nodiscard]]
@@ -195,7 +193,7 @@ class Spirview
     }
 
   private:
-    std::span<uint32_t> m_Words;
+    Span<uint32_t> m_Words;
 };
 
 } // namespace nyla
