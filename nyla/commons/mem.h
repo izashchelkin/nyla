@@ -116,24 +116,31 @@ template <typename To, typename From>
     return dest;
 }
 
-template <uint64_t N> consteval auto CStrLen(const char (&str)[N]) -> uint64_t
-{
-    return N - 1;
-}
-
-template <typename T> auto CStrLen(T str) -> uint64_t
-{
-    return CStrLen(static_cast<const char *>(str));
-}
-
-template <typename T>
-auto NYLA_API CStrLen(T str) -> uint64_t
-    requires(std::same_as<T, char *> || std::same_as<T, const char *>);
-
 auto NYLA_API MemEq(const char *RESTRICT p1, const char *RESTRICT p2, uint64_t len) -> bool;
 auto NYLA_API MemStartsWith(const char *RESTRICT str, uint64_t strLen, const char *RESTRICT prefix, uint64_t prefixLen)
     -> bool;
 auto NYLA_API MemEndsWith(const char *RESTRICT str, uint64_t strLen, const char *RESTRICT suffix, uint64_t suffixLen)
     -> bool;
+
+//
+
+namespace internal_mem
+{
+
+auto NYLA_API CStrLen(const char *str) -> uint64_t;
+
+} // namespace internal_mem
+
+template <uint64_t N> consteval auto CStrLen(const char (&str)[N]) -> uint64_t
+{
+    return N - 1;
+}
+
+template <typename T>
+auto NYLA_API CStrLen(T str) -> uint64_t
+    requires(std::same_as<T, char *> || std::same_as<T, const char *>)
+{
+    return internal_mem::CStrLen(str);
+}
 
 } // namespace nyla

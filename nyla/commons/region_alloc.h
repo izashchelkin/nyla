@@ -4,6 +4,7 @@
 #include <type_traits>
 
 #include "nyla/commons/align.h"
+#include "nyla/commons/inline_vec.h"
 #include "nyla/commons/span.h"
 
 namespace nyla
@@ -104,6 +105,29 @@ struct NYLA_API RegionAlloc
 
         T *const p = reinterpret_cast<T *>(PushBytes(sizeof(T) * n, alignof(T)));
         return Span{p, n};
+    }
+
+    template <typename T, uint64_t N> auto PushVec() -> InlineVec<T, N> &
+    {
+        return *Push<InlineVec<T, N>>();
+    }
+
+    auto VoidScope(uint64_t size, auto &&fn) -> void
+    {
+        auto mark = GetAt();
+        auto alloc = PushSubAlloc(size);
+        fn(alloc);
+        Pop(mark);
+    }
+
+    auto Scope(uint64_t size, auto &&fn)
+    {
+        auto mark = GetAt();
+        auto alloc = PushSubAlloc(size);
+
+        auto &&ret = fn(alloc);
+        Pop(mark);
+        return ret;
     }
 
     auto PushSubAlloc(uint64_t size) -> RegionAlloc;

@@ -21,6 +21,9 @@ extern "C"
     void __cdecl _RTC_CheckStackVars(void *, void *)
     {
     }
+    void __chkstk()
+    {
+    }
 }
 
 #define WIN32_LEAN_AND_MEAN

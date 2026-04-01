@@ -1,4 +1,5 @@
 #include "nyla/commons/mem.h"
+#include "nyla/commons/fmt.h"
 #include "nyla/commons/intrin.h"
 
 #include <cstdint>
@@ -6,9 +7,10 @@
 namespace nyla
 {
 
-template <typename T>
-auto NYLA_API CStrLen(T str) -> uint64_t
-    requires(std::same_as<T, char *> || std::same_as<T, const char *>)
+namespace internal_mem
+{
+
+auto NYLA_API CStrLen(const char *str) -> uint64_t
 {
     // NYLA_ASSERT(reinterpret_cast<uintptr_t>(str) % 16 == 0);
 
@@ -24,6 +26,8 @@ auto NYLA_API CStrLen(T str) -> uint64_t
         }
     }
 }
+
+} // namespace internal_mem
 
 auto MemEq(const char *p1, const char *p2, uint64_t len) -> bool
 {

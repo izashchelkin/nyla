@@ -13,7 +13,6 @@
 #include "nyla/commons/limits.h"
 #include "nyla/commons/log.h"
 #include "nyla/commons/mem.h"
-#include "nyla/commons/platform.h"
 #include "nyla/commons/region_alloc.h"
 #include "nyla/commons/rhi.h"
 #include "nyla/commons/span.h"
@@ -504,6 +503,8 @@ struct DescriptorTable
 struct RhiGlobalState
 {
     RegionAlloc rootAlloc;
+    RegionAlloc transientAlloc;
+    RegionAlloc permanentAlloc;
 
     HandlePool<RhiCmdList, VulkanCmdListData, 16> m_CmdLists;
 
@@ -720,7 +721,7 @@ void CreateSwapchain()
 
     static bool logPresentModes = true;
     VkPresentModeKHR presentMode = [] -> VkPresentModeKHR {
-        InlineVec<VkPresentModeKHR, 16> presentModes;
+        auto &presentModes = g_State->transientAlloc.PushVec<VkPresentModeKHR, 16>();
         uint32_t presentModeCount = 0;
         vkGetPhysicalDeviceSurfacePresentModesKHR(g_State->m_PhysDev, g_State->m_Surface, &presentModeCount, nullptr);
 
@@ -775,7 +776,7 @@ void CreateSwapchain()
         VK_CHECK(
             vkGetPhysicalDeviceSurfaceFormatsKHR(g_State->m_PhysDev, g_State->m_Surface, &surfaceFormatCount, nullptr));
 
-        InlineVec<VkSurfaceFormatKHR, 16> surfaceFormats;
+        auto &surfaceFormats = g_State->transientAlloc.PushVec<VkSurfaceFormatKHR, 16>();
         surfaceFormats.Resize(surfaceFormatCount);
         vkGetPhysicalDeviceSurfaceFormatsKHR(g_State->m_PhysDev, g_State->m_Surface, &surfaceFormatCount,
                                              surfaceFormats.Data());
@@ -947,71 +948,73 @@ void WaitTimeline(VkSemaphore timeline, uint64_t waitValue)
 
 void WriteDescriptorTables()
 {
-    constexpr uint32_t kMaxDescriptorUpdates = 128;
+    g_State->transientAlloc.VoidScope(1_KiB, [](auto &alloc) -> void {
+        constexpr uint32_t kMaxDescriptorUpdates = 128;
 
-    InlineVec<VkWriteDescriptorSet, kMaxDescriptorUpdates> descriptorWrites;
-    InlineVec<VkDescriptorImageInfo, kMaxDescriptorUpdates> descriptorImageInfos;
-    InlineVec<VkDescriptorBufferInfo, kMaxDescriptorUpdates> descriptorBufferInfos;
+        auto &descriptorWrites = alloc.template PushVec<VkWriteDescriptorSet, kMaxDescriptorUpdates>();
+        auto &descriptorImageInfos = alloc.template PushVec<VkDescriptorImageInfo, kMaxDescriptorUpdates>();
+        auto &descriptorBufferInfos = alloc.template PushVec<VkDescriptorBufferInfo, kMaxDescriptorUpdates>();
 
-    { // TEXTURES
-        for (uint32_t i = 0; i < g_State->m_SampledTextureViews.Size(); ++i)
-        {
-            auto &slot = g_State->m_SampledTextureViews[i];
-            if (!slot.used)
-                continue;
-            if (slot.data.descriptorWritten)
-                continue;
+        { // TEXTURES
+            for (uint32_t i = 0; i < g_State->m_SampledTextureViews.Size(); ++i)
+            {
+                auto &slot = g_State->m_SampledTextureViews[i];
+                if (!slot.used)
+                    continue;
+                if (slot.data.descriptorWritten)
+                    continue;
 
-            const VulkanTextureViewData &textureViewData = slot.data;
-            const VulkanTextureData &textureData = g_State->m_Textures.ResolveData(textureViewData.texture);
+                const VulkanTextureViewData &textureViewData = slot.data;
+                const VulkanTextureData &textureData = g_State->m_Textures.ResolveData(textureViewData.texture);
 
-            VkWriteDescriptorSet &vulkanSetWrite = descriptorWrites.PushBack(VkWriteDescriptorSet{
-                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                .dstSet = g_State->m_TexturesDescriptorTable.set,
-                .dstBinding = 0,
-                .dstArrayElement = i,
-                .descriptorCount = 1,
-                .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-            });
+                VkWriteDescriptorSet &vulkanSetWrite = descriptorWrites.PushBack(VkWriteDescriptorSet{
+                    .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                    .dstSet = g_State->m_TexturesDescriptorTable.set,
+                    .dstBinding = 0,
+                    .dstArrayElement = i,
+                    .descriptorCount = 1,
+                    .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+                });
 
-            vulkanSetWrite.pImageInfo = &descriptorImageInfos.PushBack(VkDescriptorImageInfo{
-                .imageView = textureViewData.imageView,
-                .imageLayout = textureData.layout,
-            });
+                vulkanSetWrite.pImageInfo = &descriptorImageInfos.PushBack(VkDescriptorImageInfo{
+                    .imageView = textureViewData.imageView,
+                    .imageLayout = textureData.layout,
+                });
 
-            slot.data.descriptorWritten = true;
+                slot.data.descriptorWritten = true;
+            }
         }
-    }
 
-    { // SAMPLERS
-        for (uint32_t i = 0; i < g_State->m_Samplers.Size(); ++i)
-        {
-            auto &slot = g_State->m_Samplers[i];
-            if (!slot.used)
-                continue;
-            if (slot.data.descriptorWritten)
-                continue;
+        { // SAMPLERS
+            for (uint32_t i = 0; i < g_State->m_Samplers.Size(); ++i)
+            {
+                auto &slot = g_State->m_Samplers[i];
+                if (!slot.used)
+                    continue;
+                if (slot.data.descriptorWritten)
+                    continue;
 
-            const VulkanSamplerData &samplerData = slot.data;
+                const VulkanSamplerData &samplerData = slot.data;
 
-            VkWriteDescriptorSet &vulkanSetWrite = descriptorWrites.PushBack(VkWriteDescriptorSet{
-                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                .dstSet = g_State->m_SamplersDescriptorTable.set,
-                .dstBinding = 0,
-                .dstArrayElement = i,
-                .descriptorCount = 1,
-                .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
-            });
+                VkWriteDescriptorSet &vulkanSetWrite = descriptorWrites.PushBack(VkWriteDescriptorSet{
+                    .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                    .dstSet = g_State->m_SamplersDescriptorTable.set,
+                    .dstBinding = 0,
+                    .dstArrayElement = i,
+                    .descriptorCount = 1,
+                    .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
+                });
 
-            vulkanSetWrite.pImageInfo = &descriptorImageInfos.PushBack(VkDescriptorImageInfo{
-                .sampler = samplerData.sampler,
-            });
+                vulkanSetWrite.pImageInfo = &descriptorImageInfos.PushBack(VkDescriptorImageInfo{
+                    .sampler = samplerData.sampler,
+                });
 
-            slot.data.descriptorWritten = true;
+                slot.data.descriptorWritten = true;
+            }
         }
-    }
 
-    vkUpdateDescriptorSets(g_State->m_Dev, descriptorWrites.Size(), descriptorWrites.Data(), 0, nullptr);
+        vkUpdateDescriptorSets(g_State->m_Dev, descriptorWrites.Size(), descriptorWrites.Data(), 0, nullptr);
+    });
 }
 
 } // namespace
@@ -1020,8 +1023,12 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
 {
     {
         auto rootAlloc = rhiDesc.rootAlloc;
-        g_State = rootAlloc.Push(RhiGlobalState{});
+        auto permanentAlloc = rootAlloc.PushSubAlloc(16_KiB);
+        auto transientAlloc = rootAlloc.PushSubAlloc(16_KiB);
+        g_State = permanentAlloc.Push(RhiGlobalState{});
         g_State->rootAlloc = rootAlloc;
+        g_State->permanentAlloc = permanentAlloc;
+        g_State->transientAlloc = transientAlloc;
     }
 
     constexpr uint32_t kInvalidIndex = std::numeric_limits<uint32_t>::max();
@@ -1040,7 +1047,7 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
         .apiVersion = VK_API_VERSION_1_4,
     };
 
-    InlineVec<const char *, 4> enabledInstanceExtensions;
+    auto &enabledInstanceExtensions = g_State->transientAlloc.PushVec<const char *, 5>();
     enabledInstanceExtensions.PushBack(VK_KHR_SURFACE_EXTENSION_NAME);
 #if defined(__linux__)
     enabledInstanceExtensions.PushBack(VK_KHR_XCB_SURFACE_EXTENSION_NAME);
@@ -1048,14 +1055,14 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
     enabledInstanceExtensions.PushBack(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
 #endif
 
-    InlineVec<const char *, 2> instanceLayers;
+    auto &instanceLayers = g_State->transientAlloc.PushVec<const char *, 2>();
     if (kRhiValidations)
     {
         instanceLayers.PushBack("VK_LAYER_KHRONOS_validation");
     }
 
-    InlineVec<VkValidationFeatureEnableEXT, 4> validationEnabledFeatures;
-    InlineVec<VkValidationFeatureDisableEXT, 4> validationDisabledFeatures;
+    auto &validationEnabledFeatures = g_State->transientAlloc.PushVec<VkValidationFeatureEnableEXT, 4>();
+    auto &validationDisabledFeatures = g_State->transientAlloc.PushVec<VkValidationFeatureDisableEXT, 4>();
     VkValidationFeaturesEXT validationFeatures = {
         .sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT,
         .enabledValidationFeatureCount = 0,
@@ -1079,12 +1086,12 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
     uint32_t layerCount;
     vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
 
-    InlineVec<VkLayerProperties, 256> layers;
+    auto &layers = g_State->transientAlloc.PushVec<VkLayerProperties, 256>();
     layers.Resize(layerCount);
     vkEnumerateInstanceLayerProperties(&layerCount, layers.Data());
 
     {
-        InlineVec<VkExtensionProperties, 256> instanceExtensions;
+        auto &instanceExtensions = g_State->transientAlloc.PushVec<VkExtensionProperties, 256>();
         uint32_t instanceExtensionsCount;
         vkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionsCount, nullptr);
 
@@ -1107,7 +1114,7 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
         const auto &layer = layers[i];
         NYLA_LOG("    %s", layer.layerName);
 
-        InlineVec<VkExtensionProperties, 256> layerExtensions;
+        auto &layerExtensions = g_State->transientAlloc.PushVec<VkExtensionProperties, 256>();
         uint32_t layerExtensionProperties;
         vkEnumerateInstanceExtensionProperties(layer.layerName, &layerExtensionProperties, nullptr);
 
@@ -1163,11 +1170,11 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
     uint32_t numPhysDevices = 0;
     VK_CHECK(vkEnumeratePhysicalDevices(g_State->m_Instance, &numPhysDevices, nullptr));
 
-    InlineVec<VkPhysicalDevice, 16> physDevs;
+    auto &physDevs = g_State->transientAlloc.PushVec<VkPhysicalDevice, 16>();
     physDevs.Resize(numPhysDevices);
     VK_CHECK(vkEnumeratePhysicalDevices(g_State->m_Instance, &numPhysDevices, physDevs.Data()));
 
-    InlineVec<const char *, 256> deviceExtensions;
+    auto &deviceExtensions = g_State->transientAlloc.PushVec<const char *, 256>();
     deviceExtensions.PushBack(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
     deviceExtensions.PushBack(VK_EXT_PRESENT_MODE_FIFO_LATEST_READY_EXTENSION_NAME);
     deviceExtensions.PushBack(VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME);
@@ -1181,7 +1188,7 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
     {
         uint32_t extensionCount = 0;
         vkEnumerateDeviceExtensionProperties(physDev, nullptr, &extensionCount, nullptr);
-        InlineVec<VkExtensionProperties, 256> extensions;
+        auto &extensions = g_State->transientAlloc.PushVec<VkExtensionProperties, 256>();
         extensions.Resize(256);
         vkEnumerateDeviceExtensionProperties(physDev, nullptr, &extensionCount, extensions.Data());
 
@@ -1190,7 +1197,7 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
         {
             for (uint32_t i = 0; i < extensionCount; ++i)
             {
-                if (strcmp(extensions[i].extensionName, deviceExtension) == 0)
+                if (AsStr<const char *>(extensions[i].extensionName) == AsStr(deviceExtension))
                 {
                     NYLA_LOG("Found device extension: %s", deviceExtension);
                     --missingExtensions;
@@ -1213,7 +1220,7 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
 
         uint32_t queueFamilyPropCount = 0;
         vkGetPhysicalDeviceQueueFamilyProperties(physDev, &queueFamilyPropCount, nullptr);
-        InlineVec<VkQueueFamilyProperties, 256> queueFamilyProperties;
+        auto &queueFamilyProperties = g_State->transientAlloc.PushVec<VkQueueFamilyProperties, 256>();
         queueFamilyProperties.Resize(queueFamilyPropCount);
         vkGetPhysicalDeviceQueueFamilyProperties(physDev, &queueFamilyPropCount, queueFamilyProperties.Data());
 
@@ -1271,7 +1278,7 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
     NYLA_ASSERT(g_State->m_PhysDev);
 
     const float queuePriority = 1.0f;
-    InlineVec<VkDeviceQueueCreateInfo, 2> queueCreateInfos;
+    auto &queueCreateInfos = g_State->transientAlloc.PushVec<VkDeviceQueueCreateInfo, 2>();
     if (g_State->m_TransferQueue.queueFamilyIndex == kInvalidIndex)
     {
         queueCreateInfos.PushBack(VkDeviceQueueCreateInfo{
@@ -1523,7 +1530,7 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
             },
         };
 
-        InlineVec<VkWriteDescriptorSet, bufferInfos.Size()> descriptorWrites;
+        auto &descriptorWrites = g_State->transientAlloc.PushVec<VkWriteDescriptorSet, bufferInfos.Size()>();
         for (uint32_t i = 0; i < bufferInfos.Size(); ++i)
         {
             const VkDescriptorBufferInfo &bufferInfo = bufferInfos[i];
@@ -2804,172 +2811,173 @@ class SpirvShaderManager
 
 auto Rhi::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGraphicsPipeline
 {
-    auto &vertexShaderData = g_State->m_Shaders.ResolveData(desc.vs);
-    SpirvShaderManager vsMan(vertexShaderData.spv, RhiShaderStage::Vertex);
+    return g_State->transientAlloc.Scope(1_KiB, [&](auto &alloc) {
+        auto &vertexShaderData = g_State->m_Shaders.ResolveData(desc.vs);
+        SpirvShaderManager vsMan(vertexShaderData.spv, RhiShaderStage::Vertex);
 
-    auto &pixelShaderData = g_State->m_Shaders.ResolveData(desc.ps);
-    SpirvShaderManager psMan(pixelShaderData.spv, RhiShaderStage::Pixel);
+        auto &pixelShaderData = g_State->m_Shaders.ResolveData(desc.ps);
+        SpirvShaderManager psMan(pixelShaderData.spv, RhiShaderStage::Pixel);
 
-    VulkanPipelineData pipelineData = {
-        .bindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
-    };
-
-    InlineVec<VkVertexInputBindingDescription, 16> vertexBindings;
-    for (auto &binding : desc.vertexBindings)
-    {
-        vertexBindings.PushBack(VkVertexInputBindingDescription{
-            .binding = binding.binding,
-            .stride = binding.stride,
-            .inputRate = ConvertVulkanInputRate(binding.inputRate),
-        });
-    }
-
-    InlineVec<VkVertexInputAttributeDescription, 16> vertexAttributes;
-    for (auto &attribute : desc.vertexAttributes)
-    {
-        uint32_t location;
-        if (!vsMan.FindLocationBySemantic(attribute.semantic.GetStr(), SpirvShaderManager::StorageClass::Input,
-                                          &location))
-            NYLA_ASSERT(false);
-
-        vertexAttributes.PushBack(VkVertexInputAttributeDescription{
-            .location = location,
-            .binding = attribute.binding,
-            .format = ConvertVertexFormatIntoVkFormat(attribute.format),
-            .offset = attribute.offset,
-        });
-    }
-
-    for (uint32_t id : psMan.GetInputIds())
-    {
-        Str semantic;
-        if (!psMan.FindSemanticById(id, &semantic))
-            NYLA_ASSERT(false);
-
-        if (semantic.StartWith(AsStr("SV_")))
-            continue;
-
-        uint32_t location;
-        if (!vsMan.FindLocationBySemantic(semantic, SpirvShaderManager::StorageClass::Output, &location))
-            NYLA_ASSERT(false);
-
-        if (!psMan.RewriteLocationForSemantic(semantic, SpirvShaderManager::StorageClass::Input, location))
-            NYLA_ASSERT(false);
-    }
-
-    auto createShaderModule = [](std::span<const uint32_t> spv) -> VkShaderModule {
-        const VkShaderModuleCreateInfo createInfo{
-            .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-            .codeSize = spv.size_bytes(),
-            .pCode = spv.data(),
+        VulkanPipelineData pipelineData = {
+            .bindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
         };
 
-        VkShaderModule shaderModule;
-        VK_CHECK(vkCreateShaderModule(g_State->m_Dev, &createInfo, nullptr, &shaderModule));
+        auto &vertexBindings = alloc.template PushVec<VkVertexInputBindingDescription, 16>();
+        for (auto &binding : desc.vertexBindings)
+        {
+            vertexBindings.PushBack(VkVertexInputBindingDescription{
+                .binding = binding.binding,
+                .stride = binding.stride,
+                .inputRate = ConvertVulkanInputRate(binding.inputRate),
+            });
+        }
 
-        return shaderModule;
-    };
+        auto &vertexAttributes = alloc.template PushVec<VkVertexInputAttributeDescription, 16>();
+        for (auto &attribute : desc.vertexAttributes)
+        {
+            uint32_t location;
+            if (!vsMan.FindLocationBySemantic(attribute.semantic.GetStr(), SpirvShaderManager::StorageClass::Input,
+                                              &location))
+                NYLA_ASSERT(false);
 
-    Erase(vertexShaderData.spv, Spirview::kNop);
-    Erase(pixelShaderData.spv, Spirview::kNop);
+            vertexAttributes.PushBack(VkVertexInputAttributeDescription{
+                .location = location,
+                .binding = attribute.binding,
+                .format = ConvertVertexFormatIntoVkFormat(attribute.format),
+                .offset = attribute.offset,
+            });
+        }
 
-    const Array<VkPipelineShaderStageCreateInfo, 2> stages{
-        VkPipelineShaderStageCreateInfo{
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-            .stage = VK_SHADER_STAGE_VERTEX_BIT,
-            .module = createShaderModule(vertexShaderData.spv),
-            .pName = "main",
-        },
-        VkPipelineShaderStageCreateInfo{
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-            .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-            .module = createShaderModule(pixelShaderData.spv),
-            .pName = "main",
-        },
-    };
+        for (uint32_t id : psMan.GetInputIds())
+        {
+            Str semantic;
+            if (!psMan.FindSemanticById(id, &semantic))
+                NYLA_ASSERT(false);
 
-    const VkPipelineVertexInputStateCreateInfo vertexInputStateCreateInfo{
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-        .vertexBindingDescriptionCount = vertexBindings.Size32(),
-        .pVertexBindingDescriptions = vertexBindings.Data(),
-        .vertexAttributeDescriptionCount = vertexAttributes.Size32(),
-        .pVertexAttributeDescriptions = vertexAttributes.Data(),
-    };
+            if (semantic.StartWith(AsStr("SV_")))
+                continue;
 
-    const VkPipelineRasterizationStateCreateInfo rasterizerCreateInfo{
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-        .depthClampEnable = VK_FALSE,
-        .rasterizerDiscardEnable = VK_FALSE,
-        .polygonMode = VK_POLYGON_MODE_FILL,
-        .cullMode = ConvertVulkanCullMode(desc.cullMode),
-        .frontFace = ConvertVulkanFrontFace(desc.frontFace),
-        .lineWidth = 1.0f,
-    };
+            uint32_t location;
+            if (!vsMan.FindLocationBySemantic(semantic, SpirvShaderManager::StorageClass::Output, &location))
+                NYLA_ASSERT(false);
 
-    const VkPipelineInputAssemblyStateCreateInfo inputAssemblyCreateInfo{
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-        .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-    };
+            if (!psMan.RewriteLocationForSemantic(semantic, SpirvShaderManager::StorageClass::Input, location))
+                NYLA_ASSERT(false);
+        }
 
-    const VkPipelineViewportStateCreateInfo viewportStateCreateInfo{
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
-        .viewportCount = 1,
-        .scissorCount = 1,
-    };
+        auto createShaderModule = [](std::span<const uint32_t> spv) -> VkShaderModule {
+            const VkShaderModuleCreateInfo createInfo{
+                .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+                .codeSize = spv.size_bytes(),
+                .pCode = spv.data(),
+            };
 
-    const VkPipelineMultisampleStateCreateInfo multisamplingCreateInfo{
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-        .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
-        .sampleShadingEnable = VK_FALSE,
-        .minSampleShading = 1.0f,
-        .alphaToCoverageEnable = VK_FALSE,
-        .alphaToOneEnable = VK_FALSE,
-    };
+            VkShaderModule shaderModule;
+            VK_CHECK(vkCreateShaderModule(g_State->m_Dev, &createInfo, nullptr, &shaderModule));
 
-    const VkPipelineColorBlendAttachmentState colorBlendAttachment{
-        .blendEnable = VK_TRUE,
-        .srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
-        .dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
-        .colorBlendOp = VK_BLEND_OP_ADD,
-        .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
-        .dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
-        .alphaBlendOp = VK_BLEND_OP_ADD,
-        .colorWriteMask =
-            VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
-    };
+            return shaderModule;
+        };
 
-    const VkPipelineColorBlendStateCreateInfo colorBlendingCreateInfo{
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
-        .logicOpEnable = VK_FALSE,
-        .logicOp = VK_LOGIC_OP_COPY,
-        .attachmentCount = 1,
-        .pAttachments = &colorBlendAttachment,
-        .blendConstants = {},
-    };
+        Erase(vertexShaderData.spv, Spirview::kNop);
+        Erase(pixelShaderData.spv, Spirview::kNop);
 
-    const Array<VkDynamicState, 2> dynamicStates{
-        VK_DYNAMIC_STATE_VIEWPORT,
-        VK_DYNAMIC_STATE_SCISSOR,
-    };
+        const Array<VkPipelineShaderStageCreateInfo, 2> stages{
+            VkPipelineShaderStageCreateInfo{
+                .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                .stage = VK_SHADER_STAGE_VERTEX_BIT,
+                .module = createShaderModule(vertexShaderData.spv),
+                .pName = "main",
+            },
+            VkPipelineShaderStageCreateInfo{
+                .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+                .module = createShaderModule(pixelShaderData.spv),
+                .pName = "main",
+            },
+        };
 
-    const VkPipelineDynamicStateCreateInfo dynamicStateCreateInfo{
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-        .dynamicStateCount = dynamicStates.Size(),
-        .pDynamicStates = dynamicStates.Data(),
-    };
+        const VkPipelineVertexInputStateCreateInfo vertexInputStateCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+            .vertexBindingDescriptionCount = vertexBindings.Size32(),
+            .pVertexBindingDescriptions = vertexBindings.Data(),
+            .vertexAttributeDescriptionCount = vertexAttributes.Size32(),
+            .pVertexAttributeDescriptions = vertexAttributes.Data(),
+        };
 
-    InlineVec<VkFormat, 16> colorTargetFormats;
-    for (RhiTextureFormat colorTargetFormat : desc.colorTargetFormats)
-    {
-        colorTargetFormats.PushBack(ConvertTextureFormatIntoVkFormat(colorTargetFormat, nullptr));
-    }
+        const VkPipelineRasterizationStateCreateInfo rasterizerCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+            .depthClampEnable = VK_FALSE,
+            .rasterizerDiscardEnable = VK_FALSE,
+            .polygonMode = VK_POLYGON_MODE_FILL,
+            .cullMode = ConvertVulkanCullMode(desc.cullMode),
+            .frontFace = ConvertVulkanFrontFace(desc.frontFace),
+            .lineWidth = 1.0f,
+        };
 
-    const VkPipelineRenderingCreateInfo pipelineRenderingCreateInfo{
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-        .colorAttachmentCount = colorTargetFormats.Size32(),
-        .pColorAttachmentFormats = colorTargetFormats.Data(),
-        .depthAttachmentFormat = ConvertTextureFormatIntoVkFormat(desc.depthFormat, nullptr),
-    };
+        const VkPipelineInputAssemblyStateCreateInfo inputAssemblyCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+            .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+        };
+
+        const VkPipelineViewportStateCreateInfo viewportStateCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+            .viewportCount = 1,
+            .scissorCount = 1,
+        };
+
+        const VkPipelineMultisampleStateCreateInfo multisamplingCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+            .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
+            .sampleShadingEnable = VK_FALSE,
+            .minSampleShading = 1.0f,
+            .alphaToCoverageEnable = VK_FALSE,
+            .alphaToOneEnable = VK_FALSE,
+        };
+
+        const VkPipelineColorBlendAttachmentState colorBlendAttachment{
+            .blendEnable = VK_TRUE,
+            .srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
+            .dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+            .colorBlendOp = VK_BLEND_OP_ADD,
+            .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
+            .dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
+            .alphaBlendOp = VK_BLEND_OP_ADD,
+            .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT |
+                              VK_COLOR_COMPONENT_A_BIT,
+        };
+
+        const VkPipelineColorBlendStateCreateInfo colorBlendingCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+            .logicOpEnable = VK_FALSE,
+            .logicOp = VK_LOGIC_OP_COPY,
+            .attachmentCount = 1,
+            .pAttachments = &colorBlendAttachment,
+            .blendConstants = {},
+        };
+
+        const Array<VkDynamicState, 2> dynamicStates{
+            VK_DYNAMIC_STATE_VIEWPORT,
+            VK_DYNAMIC_STATE_SCISSOR,
+        };
+
+        const VkPipelineDynamicStateCreateInfo dynamicStateCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+            .dynamicStateCount = dynamicStates.Size(),
+            .pDynamicStates = dynamicStates.Data(),
+        };
+
+        auto &colorTargetFormats = alloc.template PushVec<VkFormat, 16>();
+        for (RhiTextureFormat colorTargetFormat : desc.colorTargetFormats)
+        {
+            colorTargetFormats.PushBack(ConvertTextureFormatIntoVkFormat(colorTargetFormat, nullptr));
+        }
+
+        const VkPipelineRenderingCreateInfo pipelineRenderingCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+            .colorAttachmentCount = colorTargetFormats.Size32(),
+            .pColorAttachmentFormats = colorTargetFormats.Data(),
+            .depthAttachmentFormat = ConvertTextureFormatIntoVkFormat(desc.depthFormat, nullptr),
+        };
 
 #if 0
     NYLA_ASSERT(desc.bindGroupLayoutsCount <= std::size(desc.bindGroupLayouts));
@@ -2986,60 +2994,61 @@ auto Rhi::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGrap
     };
 #endif
 
-    const Array<VkDescriptorSetLayout, 3> descriptorSetLayouts = {
-        g_State->m_ConstantsDescriptorTable.layout,
-        g_State->m_TexturesDescriptorTable.layout,
-        g_State->m_SamplersDescriptorTable.layout,
-    };
+        const Array<VkDescriptorSetLayout, 3> descriptorSetLayouts = {
+            g_State->m_ConstantsDescriptorTable.layout,
+            g_State->m_TexturesDescriptorTable.layout,
+            g_State->m_SamplersDescriptorTable.layout,
+        };
 
-    const VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-        .setLayoutCount = descriptorSetLayouts.Size(),
-        .pSetLayouts = descriptorSetLayouts.Data(),
+        const VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+            .setLayoutCount = descriptorSetLayouts.Size(),
+            .pSetLayouts = descriptorSetLayouts.Data(),
 #if 0
         .pushConstantRangeCount = desc.pushConstantSize > 0,
         .pPushConstantRanges = &pushConstantRange,
 #endif
-    };
+        };
 
-    vkCreatePipelineLayout(g_State->m_Dev, &pipelineLayoutCreateInfo, nullptr, &pipelineData.layout);
+        vkCreatePipelineLayout(g_State->m_Dev, &pipelineLayoutCreateInfo, nullptr, &pipelineData.layout);
 
-    const VkPipelineDepthStencilStateCreateInfo depthStencilState{
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-        .depthTestEnable = desc.depthTestEnabled,
-        .depthWriteEnable = desc.depthWriteEnabled,
-        .depthCompareOp = VK_COMPARE_OP_LESS,
-        .depthBoundsTestEnable = false,
-        .stencilTestEnable = false,
-        .front = {},
-        .back = {},
-        .minDepthBounds = 0.0f,
-        .maxDepthBounds = 1.0f,
-    };
+        const VkPipelineDepthStencilStateCreateInfo depthStencilState{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+            .depthTestEnable = desc.depthTestEnabled,
+            .depthWriteEnable = desc.depthWriteEnabled,
+            .depthCompareOp = VK_COMPARE_OP_LESS,
+            .depthBoundsTestEnable = false,
+            .stencilTestEnable = false,
+            .front = {},
+            .back = {},
+            .minDepthBounds = 0.0f,
+            .maxDepthBounds = 1.0f,
+        };
 
-    const VkGraphicsPipelineCreateInfo pipelineCreateInfo{
-        .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-        .pNext = &pipelineRenderingCreateInfo,
-        .stageCount = stages.Size(),
-        .pStages = stages.Data(),
-        .pVertexInputState = &vertexInputStateCreateInfo,
-        .pInputAssemblyState = &inputAssemblyCreateInfo,
-        .pViewportState = &viewportStateCreateInfo,
-        .pRasterizationState = &rasterizerCreateInfo,
-        .pMultisampleState = &multisamplingCreateInfo,
-        .pDepthStencilState = &depthStencilState,
-        .pColorBlendState = &colorBlendingCreateInfo,
-        .pDynamicState = &dynamicStateCreateInfo,
-        .layout = pipelineData.layout,
-        .subpass = 0,
-        .basePipelineHandle = VK_NULL_HANDLE,
-        .basePipelineIndex = -1,
-    };
+        const VkGraphicsPipelineCreateInfo pipelineCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+            .pNext = &pipelineRenderingCreateInfo,
+            .stageCount = stages.Size(),
+            .pStages = stages.Data(),
+            .pVertexInputState = &vertexInputStateCreateInfo,
+            .pInputAssemblyState = &inputAssemblyCreateInfo,
+            .pViewportState = &viewportStateCreateInfo,
+            .pRasterizationState = &rasterizerCreateInfo,
+            .pMultisampleState = &multisamplingCreateInfo,
+            .pDepthStencilState = &depthStencilState,
+            .pColorBlendState = &colorBlendingCreateInfo,
+            .pDynamicState = &dynamicStateCreateInfo,
+            .layout = pipelineData.layout,
+            .subpass = 0,
+            .basePipelineHandle = VK_NULL_HANDLE,
+            .basePipelineIndex = -1,
+        };
 
-    VK_CHECK(vkCreateGraphicsPipelines(g_State->m_Dev, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr,
-                                       &pipelineData.pipeline));
+        VK_CHECK(vkCreateGraphicsPipelines(g_State->m_Dev, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr,
+                                           &pipelineData.pipeline));
 
-    return g_State->m_GraphicsPipelines.Acquire(pipelineData);
+        return g_State->m_GraphicsPipelines.Acquire(pipelineData);
+    });
 }
 
 void Rhi::NameGraphicsPipeline(RhiGraphicsPipeline pipeline, Str name)
@@ -3055,7 +3064,7 @@ void Rhi::SetFrameConstant(RhiCmdList cmd, std::span<const std::byte> data)
     const VulkanCmdListData &cmdData = g_State->m_CmdLists.ResolveData(cmd);
 
     char *mem = MapBuffer(g_State->m_ConstantsUniformBuffer);
-    memcpy(mem + cmdData.frameConstantHead, data.data(), data.size());
+    MemCpy(mem + cmdData.frameConstantHead, data.data(), data.size());
 }
 
 void Rhi::SetPassConstant(RhiCmdList cmd, std::span<const std::byte> data)
@@ -3065,7 +3074,7 @@ void Rhi::SetPassConstant(RhiCmdList cmd, std::span<const std::byte> data)
     const VulkanCmdListData &cmdData = g_State->m_CmdLists.ResolveData(cmd);
 
     char *mem = MapBuffer(g_State->m_ConstantsUniformBuffer);
-    memcpy(mem + cmdData.passConstantHead, data.data(), data.size());
+    MemCpy(mem + cmdData.passConstantHead, data.data(), data.size());
 }
 
 void Rhi::SetDrawConstant(RhiCmdList cmd, std::span<const std::byte> data)
@@ -3075,7 +3084,7 @@ void Rhi::SetDrawConstant(RhiCmdList cmd, std::span<const std::byte> data)
     const VulkanCmdListData &cmdData = g_State->m_CmdLists.ResolveData(cmd);
 
     char *mem = MapBuffer(g_State->m_ConstantsUniformBuffer);
-    memcpy(mem + cmdData.drawConstantHead, data.data(), data.size());
+    MemCpy(mem + cmdData.drawConstantHead, data.data(), data.size());
 }
 
 void Rhi::SetLargeDrawConstant(RhiCmdList cmd, std::span<const std::byte> data)
@@ -3085,7 +3094,7 @@ void Rhi::SetLargeDrawConstant(RhiCmdList cmd, std::span<const std::byte> data)
     const VulkanCmdListData &cmdData = g_State->m_CmdLists.ResolveData(cmd);
 
     char *mem = MapBuffer(g_State->m_ConstantsUniformBuffer);
-    memcpy(mem + cmdData.largeDrawConstantHead, data.data(), data.size());
+    MemCpy(mem + cmdData.largeDrawConstantHead, data.data(), data.size());
 
     if constexpr (false)
     {

@@ -10,8 +10,8 @@ template <typename T> void IteratorAdvance(T &iter);
 template <typename T> [[nodiscard]] auto IteratorDistance(T lhs, T rhs) -> uint64_t;
 
 template <typename T>
-void IteratorAdvance(T iter)
-    requires(std::is_pointer_v<T>())
+void IteratorAdvance(T &iter)
+    requires(std::is_pointer_v<T>)
 {
     ++iter;
 }
@@ -19,8 +19,9 @@ void IteratorAdvance(T iter)
 template <typename T>
 [[nodiscard]]
 auto IteratorDistance(T lhs, T rhs) -> uint64_t
-    requires(std::is_pointer_v<T>())
+    requires(std::is_pointer_v<T>)
 {
+    static_assert(std::is_same<uintptr_t, uint64_t>());
     return rhs - lhs;
 }
 

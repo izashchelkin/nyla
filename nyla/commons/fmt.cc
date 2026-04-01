@@ -91,7 +91,7 @@ void NYLA_API FileWriteFmt(FileHandle handle, const char *fmt, uint64_t fmtSize,
 
             case 's': {
                 const char *s = va_arg(args, const char *);
-                Platform::FileWrite(handle, (uint32_t)CStrLen(s), s);
+                Platform::FileWrite(handle, static_cast<uint32_t>(CStrLen(s)), s);
                 break;
             }
             case 'd': {
