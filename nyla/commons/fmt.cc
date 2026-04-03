@@ -2,11 +2,8 @@
 #include <cstdarg>
 #include <cstdint>
 
-#include "nyla/commons/byteparser.h"
 #include "nyla/commons/dllapi.h"
 #include "nyla/commons/mem.h"
-#include "nyla/commons/platform.h"
-#include "nyla/commons/platform_base.h"
 #include "nyla/commons/region_alloc.h"
 #include "nyla/commons/word.h"
 
@@ -50,13 +47,13 @@ auto S64ToBuffer(char *buf, int64_t val) -> uint32_t
     return U64ToBuffer(buf, (uint64_t)val);
 }
 
-void WriteFmt(auto &&consumer, const char *fmt, uint64_t fmtSize, ...)
+void WriteFmt(auto &&consumer, Str fmt, ...)
 {
     va_list args;
-    va_start(args, fmtSize);
+    va_start(args, fmt);
 
     ByteParser parser;
-    parser.Init(fmt, fmtSize);
+    parser.Init(fmt.Data(), fmt.Size());
 
     while (parser.Left() > 0)
     {
@@ -79,7 +76,7 @@ void WriteFmt(auto &&consumer, const char *fmt, uint64_t fmtSize, ...)
                 case DWord("*s\0\0"): {
                     uint32_t len = va_arg(args, uint32_t);
                     const char *str = va_arg(args, const char *);
-                    consumer((uint32_t)len, str);
+                    consumer(str, (uint32_t)len);
                     break;
                 }
 
@@ -94,27 +91,27 @@ void WriteFmt(auto &&consumer, const char *fmt, uint64_t fmtSize, ...)
 
             case 's': {
                 const char *s = va_arg(args, const char *);
-                consumer(static_cast<uint32_t>(CStrLen(s)), s);
+                consumer(s, static_cast<uint32_t>(CStrLen(s)));
                 break;
             }
             case 'd': {
                 char buf[32];
                 uint32_t len = S64ToBuffer(buf, va_arg(args, int));
-                consumer(len, buf);
+                consumer(buf, len);
                 break;
             }
             case 'u': {
                 char buf[32];
                 uint32_t len = U64ToBuffer(buf, va_arg(args, uint32_t));
-                consumer(len, buf);
+                consumer(buf, len);
                 break;
             }
             case 'p': {
-                consumer(11, "0x[pointer]");
+                consumer("0x[pointer]", 11);
                 break;
             }
             case '%': {
-                consumer(1, "%");
+                consumer("%", 1);
                 break;
             }
 
@@ -131,32 +128,44 @@ void WriteFmt(auto &&consumer, const char *fmt, uint64_t fmtSize, ...)
             while (parser.Left() && parser.Peek() != '%')
                 parser.Advance();
 
-            consumer((uint32_t)(&parser.Peek() - start), start);
+            consumer(start, (uint32_t)(&parser.Peek() - start));
             break;
         }
         }
     }
 
-    consumer(1, "\n");
+    consumer("\n", 1);
 
     va_end(args);
 }
 
-void BufferWriteFmt(auto &&consumer, RegionAlloc &alloc, uint64_t bufferSize, const char *fmt, uint64_t fmtSize, ...)
+void BufferWriteFmt(auto &&consumer, RegionAlloc &alloc, uint64_t bufferSize, Str fmt, ...)
 {
     Span<char> buffer = alloc.PushArr<char>(bufferSize);
     uint64_t bufferUsed = 0;
 
     va_list args;
-    va_start(args, fmtSize);
+    va_start(args, fmt);
 
     WriteFmt(
-        [&](uint32_t size, const char *data) -> void {
+        [&](const char *data, uint32_t size) -> void {
             if (bufferUsed + size > bufferSize)
             {
-                consumer(buffer.Data(), bufferUsed);
-                consumer(data, size);
-                bufferUsed = 0;
+                if (bufferUsed + size > bufferSize * 3 / 2)
+                {
+                    consumer(buffer.Data(), bufferUsed);
+                    consumer(data, size);
+                    bufferUsed = 0;
+                }
+                else
+                {
+                    uint64_t remainingInBuffer = bufferSize - bufferUsed;
+                    MemCpy(buffer.Data() + bufferUsed, data, remainingInBuffer);
+                    consumer(buffer.Data(), bufferUsed);
+
+                    bufferUsed = size - remainingInBuffer;
+                    MemCpy(buffer.Data(), data + remainingInBuffer, bufferUsed);
+                }
             }
             else
             {
@@ -169,17 +178,20 @@ void BufferWriteFmt(auto &&consumer, RegionAlloc &alloc, uint64_t bufferSize, co
                 }
             }
         },
-        fmt, fmtSize, args);
+        fmt, args);
+
+    if (bufferUsed > 0)
+        consumer(buffer.Data(), bufferUsed);
 
     va_end(args);
 }
 
 } // namespace
 
-void NYLA_API StringWriteFmt(char *out, uint64_t outSize, const char *fmt, uint64_t fmtSize, ...)
+void NYLA_API StringWriteFmt(char *out, uint64_t outSize, Str fmt, ...)
 {
     va_list args;
-    va_start(args, fmtSize);
+    va_start(args, fmt);
 
     uint64_t outWritten = 0;
 
@@ -189,18 +201,18 @@ void NYLA_API StringWriteFmt(char *out, uint64_t outSize, const char *fmt, uint6
             MemCpy(out + outSize, data, size);
             outSize += size;
         },
-        fmt, fmtSize, args);
+        fmt, fmt.Size(), args);
 
     va_end(args);
 }
 
-void NYLA_API FileWriteFmt(FileHandle handle, RegionAlloc &alloc, const char *fmt, uint64_t fmtSize, ...)
+void NYLA_API FileWriteFmt(FileHandle handle, RegionAlloc &alloc, Str fmt, ...)
 {
     va_list args;
-    va_start(args, fmtSize);
+    va_start(args, fmt);
 
     BufferWriteFmt([handle](const char *data, uint32_t size) -> void { Platform::FileWrite(handle, size, data); },
-                   alloc, 1024, fmt, fmtSize, args);
+                   alloc, 1024, fmt, args);
 
     va_end(args);
 }

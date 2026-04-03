@@ -160,7 +160,7 @@ void Renderer::CmdFlush(RhiCmdList cmd)
         AssetManager::CmdBindMesh(cmd, drawCall.mesh);
         AssetManager::CmdDrawMesh(cmd, drawCall.mesh);
     }
-    m_DrawQueue.clear();
+    m_DrawQueue.Clear();
 }
 
 } // namespace nyla

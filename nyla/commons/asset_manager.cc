@@ -396,7 +396,7 @@ auto AssetManager::DeclareMesh(Str path) -> Mesh
 {
     return g_Meshes.Acquire(MeshData{
         .isStatic = false,
-        .gltfPath = Engine::GetPermanentAlloc().PushPath(path),
+        .gltfPath = CreatePath(Engine::GetPermanentAlloc(), path),
         .needsUpload = true,
     });
 }

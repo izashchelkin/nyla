@@ -2855,7 +2855,7 @@ auto Rhi::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGrap
             if (!psMan.FindSemanticById(id, &semantic))
                 NYLA_ASSERT(false);
 
-            if (semantic.StartWith(AsStr("SV_")))
+            if (semantic.StartsWith(AsStr("SV_")))
                 continue;
 
             uint32_t location;

@@ -4,8 +4,9 @@
 #include <type_traits>
 
 #include "nyla/commons/align.h"
+#include "nyla/commons/array.h"
+#include "nyla/commons/inline_string.h"
 #include "nyla/commons/inline_vec.h"
-#include "nyla/commons/span.h"
 
 namespace nyla
 {
@@ -72,6 +73,8 @@ struct NYLA_API RegionAlloc
         static_assert(std::is_trivially_destructible_v<T>);
 
         T *const p = reinterpret_cast<T *>(PushBytes(sizeof(T), alignof(T)));
+        // *p = {};
+
         return p;
     }
 
@@ -110,6 +113,11 @@ struct NYLA_API RegionAlloc
     template <typename T, uint64_t N> auto PushVec() -> InlineVec<T, N> &
     {
         return *Push<InlineVec<T, N>>();
+    }
+
+    template <uint64_t N> auto PushString() -> InlineString<N> &
+    {
+        return *Push<InlineString<N>>();
     }
 
     auto VoidScope(uint64_t size, auto &&fn) -> void
