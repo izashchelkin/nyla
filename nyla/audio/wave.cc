@@ -34,11 +34,11 @@ constexpr auto Word32(const char str[4]) -> uint32_t
 
 } // namespace
 
-auto ParseWavFile(std::span<const std::byte> bytes) -> ParseWavFileResult
+auto ParseWavFile(Span<const std::byte> bytes) -> ParseWavFileResult
 {
     ParseWavFileResult result{};
 
-    const std::byte *p = bytes.data();
+    const std::byte *p = bytes.Data();
 
     {
         WaveMasterChunk masterChunk{};
@@ -49,7 +49,7 @@ auto ParseWavFile(std::span<const std::byte> bytes) -> ParseWavFileResult
         NYLA_ASSERT(masterChunk.waveId == Word32("WAVE"));
     }
 
-    while (p != bytes.data() + bytes.size())
+    while (p != bytes.Data() + bytes.Size())
     {
         WaveChunkHeader header{};
         memcpy(&header, p, sizeof(header));

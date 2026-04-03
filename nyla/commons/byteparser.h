@@ -78,16 +78,16 @@ class ByteParser
             Advance();
     }
 
-    constexpr auto StartsWith(std::string_view str) -> bool
+    constexpr auto StartsWith(Str str) -> bool
     {
-        return std::string_view{m_At, m_Left}.starts_with(str);
+        return AsStr(m_At, m_Left).StartsWith(str);
     }
 
-    constexpr auto StartsWithAdvance(std::string_view str) -> bool
+    constexpr auto StartsWithAdvance(Str str) -> bool
     {
         if (StartsWith(str))
         {
-            Advance(str.size());
+            Advance(str.Size());
             return true;
         }
         else

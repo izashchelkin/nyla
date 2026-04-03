@@ -3,10 +3,10 @@
 #include <cstdint>
 
 #include "nyla/commons/bitenum.h"
-#include "nyla/commons/byteview.h"
 #include "nyla/commons/handle.h"
 #include "nyla/commons/inline_string.h"
 #include "nyla/commons/region_alloc.h"
+#include "nyla/commons/span.h"
 
 namespace nyla
 {
@@ -252,9 +252,9 @@ struct RhiGraphicsPipelineDesc
     RhiShader vs;
     RhiShader ps;
 
-    std::span<RhiVertexBindingDesc> vertexBindings;
-    std::span<RhiVertexAttributeDesc> vertexAttributes;
-    std::span<RhiTextureFormat> colorTargetFormats;
+    Span<RhiVertexBindingDesc> vertexBindings;
+    Span<RhiVertexAttributeDesc> vertexAttributes;
+    Span<RhiTextureFormat> colorTargetFormats;
     RhiTextureFormat depthFormat;
     bool depthWriteEnabled;
     bool depthTestEnabled;
@@ -363,8 +363,8 @@ class Rhi
     static void DestroyGraphicsPipeline(RhiGraphicsPipeline);
 
     static void CmdBindGraphicsPipeline(RhiCmdList, RhiGraphicsPipeline);
-    static void CmdBindVertexBuffers(RhiCmdList cmd, uint32_t firstBinding, std::span<const RhiBuffer> buffers,
-                                     std::span<const uint64_t> offsets);
+    static void CmdBindVertexBuffers(RhiCmdList cmd, uint32_t firstBinding, Span<const RhiBuffer> buffers,
+                                     Span<const uint64_t> offsets);
     static void CmdBindIndexBuffer(RhiCmdList cmd, RhiBuffer buffer, uint64_t offset);
     static void CmdPushGraphicsConstants(RhiCmdList cmd, uint32_t offset, RhiShaderStage stage, ByteView data);
     static void CmdDraw(RhiCmdList cmd, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
@@ -400,10 +400,10 @@ class Rhi
     static auto GetBackbufferView() -> RhiRenderTargetView;
     static void TriggerSwapchainRecreate();
 
-    static void SetFrameConstant(RhiCmdList cmd, std::span<const std::byte> data);
-    static void SetPassConstant(RhiCmdList cmd, std::span<const std::byte> data);
-    static void SetDrawConstant(RhiCmdList cmd, std::span<const std::byte> data);
-    static void SetLargeDrawConstant(RhiCmdList cmd, std::span<const std::byte> data);
+    static void SetFrameConstant(RhiCmdList cmd, ByteView data);
+    static void SetPassConstant(RhiCmdList cmd, ByteView data);
+    static void SetDrawConstant(RhiCmdList cmd, ByteView data);
+    static void SetLargeDrawConstant(RhiCmdList cmd, ByteView data);
 };
 
 } // namespace nyla

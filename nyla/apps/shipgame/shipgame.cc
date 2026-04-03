@@ -9,8 +9,8 @@
 #include "nyla/apps/shipgame/world_renderer.h"
 #include "nyla/commons/math/lerp.h"
 #include "nyla/commons/math/vec.h"
-#include "nyla/engine0/debug_text_renderer.h"
-#include "nyla/platform/abstract_input.h"
+#include "nyla/commons0/debug_text_renderer.h"
+#include "nyla/commons/abstract_input.h"
 
 namespace nyla
 {
@@ -42,13 +42,13 @@ static auto GenCircle(size_t n, float radius, float3 color) -> std::vector<Verte
 
     for (size_t i = 0; i < n; ++i)
     {
-        ret.emplace_back(Vertex{float2{}, color});
-        ret.emplace_back(Vertex{float2{r.real() * radius, r.imag() * radius}, color});
+        ret.PushBack(Vertex{float2{}, color});
+        ret.PushBack(Vertex{float2{r.real() * radius, r.imag() * radius}, color});
 
         using namespace std::complex_literals;
         r *= std::cos(theta) + std::sin(theta) * 1if;
 
-        ret.emplace_back(Vertex{float2{r.real() * radius, r.imag() * radius}, color});
+        ret.PushBack(Vertex{float2{r.real() * radius, r.imag() * radius}, color});
     }
 
     return ret;
@@ -74,9 +74,9 @@ static void RenderGameObject(GameObject &obj)
     case GameObject::Type::KShip: {
         obj.vertices.reserve(3);
 
-        obj.vertices.emplace_back(Vertex{{-0.5f, -0.36f}, obj.color});
-        obj.vertices.emplace_back(Vertex{{0.5f, 0.0f}, obj.color});
-        obj.vertices.emplace_back(Vertex{{-0.5f, 0.36f}, obj.color});
+        obj.vertices.PushBack(Vertex{{-0.5f, -0.36f}, obj.color});
+        obj.vertices.PushBack(Vertex{{0.5f, 0.0f}, obj.color});
+        obj.vertices.PushBack(Vertex{{-0.5f, 0.36f}, obj.color});
 
         break;
     }
@@ -106,7 +106,7 @@ void ShipgameInit()
         };
 
         auto *planets = new std::vector<GameObject>(3, {.type = GameObject::Type::KPlanet});
-        gameSolarSystem.children = {planets->data(), planets->size()};
+        gameSolarSystem.children = {planets->data(), planets->Size()};
 
         size_t iplanet = 0;
 
@@ -226,7 +226,7 @@ void ShipgameFrame(float dt, uint32_t fps)
 
                 const float2 v2 =
                     (float2(std::complex<float>(planet.pos - gameSolarSystem.pos) * (1.f / 1if)).Normalized() *
-                     std::max(0.f, planet.orbitRadius - r / 5.f)) +
+                     Max(0.f, planet.orbitRadius - r / 5.f)) +
                     gameSolarSystem.pos;
 
                 const float2 vv = v2 - planet.pos;
@@ -244,7 +244,7 @@ void ShipgameFrame(float dt, uint32_t fps)
 
 #if 0
 		{
-      for (size_t i = 0; i < std::size(entities); ++i) {
+      for (size_t i = 0; i < std::Size(entities); ++i) {
         Entity& entity1 = entities[i];
         if (!entity1.exists || !entity1.affected_by_gravity || !entity1.mass)
           continue;
@@ -254,7 +254,7 @@ void ShipgameFrame(float dt, uint32_t fps)
         float max_f = 0;
         float max_f_orbit_radius = 0;
 
-        for (size_t j = 0; j < std::size(entities); ++j) {
+        for (size_t j = 0; j < std::Size(entities); ++j) {
           const Entity& entity2 = entities[j];
 
           if (j == i) continue;
@@ -269,7 +269,7 @@ void ShipgameFrame(float dt, uint32_t fps)
           const Vec2f v2 = Vec2fSum(
               Vec2fMul(Vec2fNorm(Vec2fApply(Vec2fDif(entity1.pos, entity2.pos),
                                             1.f / 1if)),
-                       std::max(0.f, entity2.orbit_radius - r / 5.f)),
+                       Max(0.f, entity2.orbit_radius - r / 5.f)),
               entity2.pos);
 
           const Vec2f vv = Vec2fDif(v2, entity1.pos);
@@ -278,8 +278,8 @@ void ShipgameFrame(float dt, uint32_t fps)
             {
               Entity& line = entities[100];
               auto vertices = TriangulateLine(entity1.pos, v2, 10.f);
-              memcpy(line.data, vertices.data(),
-                     vertices.size() * sizeof(Vertex));
+              memcpy(line.data, vertices.Data(),
+                     vertices.Size() * sizeof(Vertex));
             }
 #endif
 

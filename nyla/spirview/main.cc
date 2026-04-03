@@ -1,7 +1,7 @@
 #include "nyla/commons/assert.h"
 #include "nyla/commons/log.h"
 #include "nyla/commons/memory/region_alloc.h"
-#include "nyla/platform/platform.h"
+#include "nyla/commons/platform.h"
 #include <cstdint>
 
 namespace nyla

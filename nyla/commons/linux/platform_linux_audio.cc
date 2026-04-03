@@ -1,6 +1,6 @@
 #include "nyla/commons/assert.h"
 #include "nyla/commons/log.h"
-#include "nyla/platform/platform_audio.h"
+#include "nyla/commons/platform_audio.h"
 #include <alsa/asoundlib.h>
 #include <cerrno>
 #include <cstdint>
@@ -13,7 +13,7 @@ class PlatformAudio::Impl
   public:
     void Init(const PlatformAudioInitDesc &);
     void Destroy();
-    void Write(std::span<const std::byte> data);
+    void Write(Span<const std::byte> data);
 
   private:
     uint32_t m_SampleRate{};
@@ -50,14 +50,14 @@ void PlatformAudio::Impl::Destroy()
     }
 }
 
-void PlatformAudio::Impl::Write(std::span<const std::byte> data)
+void PlatformAudio::Impl::Write(Span<const std::byte> data)
 {
     const uint32_t frameSize = m_Channels * m_BytesPerChannel;
-    NYLA_ASSERT(data.size() % frameSize == 0);
+    NYLA_ASSERT(data.Size() % frameSize == 0);
 
-    auto *p = data.data();
+    auto *p = data.Data();
 
-    uint32_t framesLeft = data.size() / frameSize;
+    uint32_t framesLeft = data.Size() / frameSize;
     while (framesLeft > 0)
     {
         snd_pcm_sframes_t res = snd_pcm_writei(m_Pcm, p, framesLeft);
@@ -94,7 +94,7 @@ void PlatformAudio::Destroy()
     }
 }
 
-void PlatformAudio::Write(std::span<const std::byte> data)
+void PlatformAudio::Write(Span<const std::byte> data)
 {
     m_Impl->Write(data);
 }

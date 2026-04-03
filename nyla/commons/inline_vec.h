@@ -144,7 +144,7 @@ template <typename T, uint64_t N> class InlineVec
         out = Back();
     }
 
-    void Resize(uint64_t newSize)
+    void ReSize(uint64_t newSize)
     {
         NYLA_ASSERT(newSize <= N);
         m_Size = newSize;

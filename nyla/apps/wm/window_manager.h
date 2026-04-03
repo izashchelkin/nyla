@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "nyla/apps/wm/layout.h"
-#include "nyla/platform/linux/platform_linux.h"
+#include "nyla/commons/linux/platform_linux.h"
 #include "xcb/xproto.h"
 
 namespace nyla

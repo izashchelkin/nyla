@@ -13,6 +13,7 @@
 #include "nyla/commons/limits.h"
 #include "nyla/commons/log.h"
 #include "nyla/commons/mem.h"
+#include "nyla/commons/minmax.h"
 #include "nyla/commons/region_alloc.h"
 #include "nyla/commons/rhi.h"
 #include "nyla/commons/span.h"
@@ -725,7 +726,7 @@ void CreateSwapchain()
         uint32_t presentModeCount = 0;
         vkGetPhysicalDeviceSurfacePresentModesKHR(g_State->m_PhysDev, g_State->m_Surface, &presentModeCount, nullptr);
 
-        presentModes.Resize(presentModeCount);
+        presentModes.ReSize(presentModeCount);
         vkGetPhysicalDeviceSurfacePresentModesKHR(g_State->m_PhysDev, g_State->m_Surface, &presentModeCount,
                                                   presentModes.Data());
 
@@ -777,7 +778,7 @@ void CreateSwapchain()
             vkGetPhysicalDeviceSurfaceFormatsKHR(g_State->m_PhysDev, g_State->m_Surface, &surfaceFormatCount, nullptr));
 
         auto &surfaceFormats = g_State->transientAlloc.PushVec<VkSurfaceFormatKHR, 16>();
-        surfaceFormats.Resize(surfaceFormatCount);
+        surfaceFormats.ReSize(surfaceFormatCount);
         vkGetPhysicalDeviceSurfaceFormatsKHR(g_State->m_PhysDev, g_State->m_Surface, &surfaceFormatCount,
                                              surfaceFormats.Data());
 
@@ -1087,7 +1088,7 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
     vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
 
     auto &layers = g_State->transientAlloc.PushVec<VkLayerProperties, 256>();
-    layers.Resize(layerCount);
+    layers.ReSize(layerCount);
     vkEnumerateInstanceLayerProperties(&layerCount, layers.Data());
 
     {
@@ -1095,7 +1096,7 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
         uint32_t instanceExtensionsCount;
         vkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionsCount, nullptr);
 
-        instanceExtensions.Resize(instanceExtensionsCount);
+        instanceExtensions.ReSize(instanceExtensionsCount);
         vkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionsCount, instanceExtensions.Data());
 
         NYLA_LOG("");
@@ -1118,7 +1119,7 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
         uint32_t layerExtensionProperties;
         vkEnumerateInstanceExtensionProperties(layer.layerName, &layerExtensionProperties, nullptr);
 
-        layerExtensions.Resize(layerExtensionProperties);
+        layerExtensions.ReSize(layerExtensionProperties);
         vkEnumerateInstanceExtensionProperties(layer.layerName, &layerExtensionProperties, layerExtensions.Data());
 
         for (uint32_t i = 0; i < layerExtensionProperties; ++i)
@@ -1171,7 +1172,7 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
     VK_CHECK(vkEnumeratePhysicalDevices(g_State->m_Instance, &numPhysDevices, nullptr));
 
     auto &physDevs = g_State->transientAlloc.PushVec<VkPhysicalDevice, 16>();
-    physDevs.Resize(numPhysDevices);
+    physDevs.ReSize(numPhysDevices);
     VK_CHECK(vkEnumeratePhysicalDevices(g_State->m_Instance, &numPhysDevices, physDevs.Data()));
 
     auto &deviceExtensions = g_State->transientAlloc.PushVec<const char *, 256>();
@@ -1189,7 +1190,7 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
         uint32_t extensionCount = 0;
         vkEnumerateDeviceExtensionProperties(physDev, nullptr, &extensionCount, nullptr);
         auto &extensions = g_State->transientAlloc.PushVec<VkExtensionProperties, 256>();
-        extensions.Resize(256);
+        extensions.ReSize(256);
         vkEnumerateDeviceExtensionProperties(physDev, nullptr, &extensionCount, extensions.Data());
 
         uint32_t missingExtensions = deviceExtensions.Size();
@@ -1221,7 +1222,7 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
         uint32_t queueFamilyPropCount = 0;
         vkGetPhysicalDeviceQueueFamilyProperties(physDev, &queueFamilyPropCount, nullptr);
         auto &queueFamilyProperties = g_State->transientAlloc.PushVec<VkQueueFamilyProperties, 256>();
-        queueFamilyProperties.Resize(queueFamilyPropCount);
+        queueFamilyProperties.ReSize(queueFamilyPropCount);
         vkGetPhysicalDeviceQueueFamilyProperties(physDev, &queueFamilyPropCount, queueFamilyProperties.Data());
 
         constexpr static uint32_t kInvalidQueueFamilyIndex = std::numeric_limits<uint32_t>::max();
@@ -1375,7 +1376,7 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
         vkGetDeviceQueue(g_State->m_Dev, g_State->m_TransferQueue.queueFamilyIndex, 0, &g_State->m_TransferQueue.queue);
     }
 
-    auto initQueue = [](DeviceQueue &queue, RhiQueueType queueType, std::span<RhiCmdList> cmd) -> void {
+    auto initQueue = [](DeviceQueue &queue, RhiQueueType queueType, Span<RhiCmdList> cmd) -> void {
         const VkCommandPoolCreateInfo commandPoolCreateInfo{
             .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
             .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
@@ -1392,8 +1393,8 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
         }
     };
     initQueue(g_State->m_GraphicsQueue, RhiQueueType::Graphics,
-              std::span{g_State->m_GraphicsQueueCmd.Data(), g_State->m_Limits.numFramesInFlight});
-    initQueue(g_State->m_TransferQueue, RhiQueueType::Transfer, std::span{&g_State->m_TransferQueueCmd, 1});
+              Span{g_State->m_GraphicsQueueCmd.Data(), g_State->m_Limits.numFramesInFlight});
+    initQueue(g_State->m_TransferQueue, RhiQueueType::Transfer, Span{&g_State->m_TransferQueueCmd, 1});
 
     const VkSemaphoreCreateInfo semaphoreCreateInfo{
         .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
@@ -1766,7 +1767,7 @@ void Rhi::BufferMarkWritten(RhiBuffer buffer, uint32_t offset, uint32_t size)
     if (bufferData.dirty)
     {
         bufferData.dirtyBegin = std::min(bufferData.dirtyBegin, offset);
-        bufferData.dirtyEnd = std::max(bufferData.dirtyBegin, offset + size);
+        bufferData.dirtyEnd = Max(bufferData.dirtyBegin, offset + size);
     }
     else
     {
@@ -2137,25 +2138,25 @@ void Rhi::CmdPushGraphicsConstants(RhiCmdList cmd, uint32_t offset, RhiShaderSta
     const VulkanPipelineData &pipelineData = g_State->m_GraphicsPipelines.ResolveData(cmdData.boundGraphicsPipeline);
 
     vkCmdPushConstants(cmdData.cmdbuf, pipelineData.layout, ConvertShaderStageIntoVkShaderStageFlags(stage), offset,
-                       data.size(), data.data());
+                       data.Size(), data.Data());
 }
 
-void Rhi::CmdBindVertexBuffers(RhiCmdList cmd, uint32_t firstBinding, std::span<const RhiBuffer> buffers,
-                               std::span<const uint64_t> offsets)
+void Rhi::CmdBindVertexBuffers(RhiCmdList cmd, uint32_t firstBinding, Span<const RhiBuffer> buffers,
+                               Span<const uint64_t> offsets)
 {
-    NYLA_ASSERT(buffers.size() == offsets.size());
-    NYLA_ASSERT(buffers.size() <= 4U);
+    NYLA_ASSERT(buffers.Size() == offsets.Size());
+    NYLA_ASSERT(buffers.Size() <= 4U);
 
     Array<VkBuffer, 4> vkBufs;
     Array<VkDeviceSize, 4> vkOffsets;
-    for (uint32_t i = 0; i < buffers.size(); ++i)
+    for (uint32_t i = 0; i < buffers.Size(); ++i)
     {
         vkBufs[i] = g_State->m_Buffers.ResolveData(buffers[i]).buffer;
         vkOffsets[i] = offsets[i];
     }
 
     const VulkanCmdListData &cmdData = g_State->m_CmdLists.ResolveData(cmd);
-    vkCmdBindVertexBuffers(cmdData.cmdbuf, firstBinding, buffers.size(), vkBufs.Data(), vkOffsets.Data());
+    vkCmdBindVertexBuffers(cmdData.cmdbuf, firstBinding, buffers.Size(), vkBufs.Data(), vkOffsets.Data());
 }
 
 void Rhi::CmdBindIndexBuffer(RhiCmdList cmd, RhiBuffer buffer, uint64_t offset)
@@ -2865,11 +2866,11 @@ auto Rhi::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGrap
                 NYLA_ASSERT(false);
         }
 
-        auto createShaderModule = [](std::span<const uint32_t> spv) -> VkShaderModule {
+        auto createShaderModule = [](Span<const uint32_t> spv) -> VkShaderModule {
             const VkShaderModuleCreateInfo createInfo{
                 .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-                .codeSize = spv.size_bytes(),
-                .pCode = spv.data(),
+                .codeSize = spv.SizeBytes(),
+                .pCode = spv.Data(),
             };
 
             VkShaderModule shaderModule;
@@ -2885,13 +2886,13 @@ auto Rhi::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGrap
             VkPipelineShaderStageCreateInfo{
                 .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
                 .stage = VK_SHADER_STAGE_VERTEX_BIT,
-                .module = createShaderModule(vertexShaderData.spv),
+                .module = createShaderModule(vertexShaderData.spv.AsConst()),
                 .pName = "main",
             },
             VkPipelineShaderStageCreateInfo{
                 .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
                 .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-                .module = createShaderModule(pixelShaderData.spv),
+                .module = createShaderModule(pixelShaderData.spv.AsConst()),
                 .pName = "main",
             },
         };
@@ -2980,7 +2981,7 @@ auto Rhi::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGrap
         };
 
 #if 0
-    NYLA_ASSERT(desc.bindGroupLayoutsCount <= std::size(desc.bindGroupLayouts));
+    NYLA_ASSERT(desc.bindGroupLayoutsCount <= std::Size(desc.bindGroupLayouts));
     pipelineData.bindGroupLayoutCount = desc.bindGroupLayoutsCount;
     pipelineData.bindGroupLayouts = desc.bindGroupLayouts;
 #endif
@@ -3057,44 +3058,44 @@ void Rhi::NameGraphicsPipeline(RhiGraphicsPipeline pipeline, Str name)
     VulkanNameHandle(VK_OBJECT_TYPE_PIPELINE, (uint64_t)pipelineData.pipeline, name);
 }
 
-void Rhi::SetFrameConstant(RhiCmdList cmd, std::span<const std::byte> data)
+void Rhi::SetFrameConstant(RhiCmdList cmd, ByteView data)
 {
-    NYLA_ASSERT(data.size() <= g_State->m_Limits.frameConstantSize);
+    NYLA_ASSERT(data.Size() <= g_State->m_Limits.frameConstantSize);
 
     const VulkanCmdListData &cmdData = g_State->m_CmdLists.ResolveData(cmd);
 
     char *mem = MapBuffer(g_State->m_ConstantsUniformBuffer);
-    MemCpy(mem + cmdData.frameConstantHead, data.data(), data.size());
+    MemCpy(mem + cmdData.frameConstantHead, data.Data(), data.Size());
 }
 
-void Rhi::SetPassConstant(RhiCmdList cmd, std::span<const std::byte> data)
+void Rhi::SetPassConstant(RhiCmdList cmd, ByteView data)
 {
-    NYLA_ASSERT(data.size() <= g_State->m_Limits.passConstantSize);
+    NYLA_ASSERT(data.Size() <= g_State->m_Limits.passConstantSize);
 
     const VulkanCmdListData &cmdData = g_State->m_CmdLists.ResolveData(cmd);
 
     char *mem = MapBuffer(g_State->m_ConstantsUniformBuffer);
-    MemCpy(mem + cmdData.passConstantHead, data.data(), data.size());
+    MemCpy(mem + cmdData.passConstantHead, data.Data(), data.Size());
 }
 
-void Rhi::SetDrawConstant(RhiCmdList cmd, std::span<const std::byte> data)
+void Rhi::SetDrawConstant(RhiCmdList cmd, ByteView data)
 {
-    NYLA_ASSERT(data.size() <= g_State->m_Limits.drawConstantSize);
+    NYLA_ASSERT(data.Size() <= g_State->m_Limits.drawConstantSize);
 
     const VulkanCmdListData &cmdData = g_State->m_CmdLists.ResolveData(cmd);
 
     char *mem = MapBuffer(g_State->m_ConstantsUniformBuffer);
-    MemCpy(mem + cmdData.drawConstantHead, data.data(), data.size());
+    MemCpy(mem + cmdData.drawConstantHead, data.Data(), data.Size());
 }
 
-void Rhi::SetLargeDrawConstant(RhiCmdList cmd, std::span<const std::byte> data)
+void Rhi::SetLargeDrawConstant(RhiCmdList cmd, ByteView data)
 {
-    NYLA_ASSERT(data.size() <= g_State->m_Limits.largeDrawConstantSize);
+    NYLA_ASSERT(data.Size() <= g_State->m_Limits.largeDrawConstantSize);
 
     const VulkanCmdListData &cmdData = g_State->m_CmdLists.ResolveData(cmd);
 
     char *mem = MapBuffer(g_State->m_ConstantsUniformBuffer);
-    MemCpy(mem + cmdData.largeDrawConstantHead, data.data(), data.size());
+    MemCpy(mem + cmdData.largeDrawConstantHead, data.Data(), data.Size());
 
     if constexpr (false)
     {

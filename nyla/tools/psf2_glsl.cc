@@ -29,9 +29,9 @@ int Main()
 
     std::vector<uint8_t> buf;
     {
-        std::array<uint8_t, 1 << 14> tmp{};
+        Array<uint8_t, 1 << 14> tmp{};
         ssize_t r;
-        while ((r = ::read(STDIN_FILENO, tmp.data(), tmp.size())) > 0)
+        while ((r = ::read(STDIN_FILENO, tmp.Data(), tmp.Size())) > 0)
             buf.insert(buf.end(), tmp.begin(), tmp.begin() + r);
         if (r < 0)
         {
@@ -39,12 +39,12 @@ int Main()
             return 1;
         }
     }
-    if (buf.size() < 32)
+    if (buf.Size() < 32)
     {
         NYLA_ASSERT(false && "File too small");
     }
 
-    const uint8_t *p = buf.data();
+    const uint8_t *p = buf.Data();
     uint32_t magic = rd32(p + 0);
     uint32_t version = rd32(p + 4);
     uint32_t header_size = rd32(p + 8);
@@ -58,7 +58,7 @@ int Main()
     {
         NYLA_ASSERT(false && "Not PSF2");
     }
-    if (header_size < 32 || buf.size() < header_size)
+    if (header_size < 32 || buf.Size() < header_size)
     {
         NYLA_ASSERT(false && "Bad/truncated header");
     }
@@ -71,14 +71,14 @@ int Main()
         NYLA_LOG("glyph_size mismatch header=%d computed=%d (continuing)", glyph_size, expect_glyph);
     }
     const uint64_t glyph_table_bytes = uint64_t(length) * glyph_size;
-    if (buf.data() + buf.size() < glyphs + glyph_table_bytes)
+    if (buf.Data() + buf.Size() < glyphs + glyph_table_bytes)
     {
         NYLA_ASSERT(false && "Truncated glyph table");
     }
 
     std::unordered_map<uint32_t, uint32_t> cp_to_glyph;
     const uint8_t *uni = glyphs + glyph_table_bytes;
-    const uint8_t *end = buf.data() + buf.size();
+    const uint8_t *end = buf.Data() + buf.Size();
     {
         const uint16_t SEP_END = 0xFFFF;
         const uint16_t SEP_SEQ = 0xFFFE;

@@ -7,7 +7,7 @@
 #include "nyla/commons/containers/map.h"
 #include "nyla/dbus/dbus.h"
 #include "nyla/debugfs/debugfs.h"
-#include "nyla/platform/linux/platform_linux.h"
+#include "nyla/commons/linux/platform_linux.h"
 #include "xcb/screensaver.h"
 
 namespace nyla
@@ -46,7 +46,7 @@ static void HandleMessage(DBusMessage *msg)
             return;
         }
 
-        std::string_view sender = dbus_message_get_sender(msg);
+        Str sender = dbus_message_get_sender(msg);
         uint32_t cookie = nextInhibitCookie++;
 
         auto [_, ok] = inhibitCookies.try_emplace(cookie, sender);
@@ -55,7 +55,7 @@ static void HandleMessage(DBusMessage *msg)
 
         DBusReplyOne(msg, DBUS_TYPE_UINT32, &cookie);
 
-        if (inhibitCookies.size() == 1)
+        if (inhibitCookies.Size() == 1)
         {
             xcb_screensaver_suspend(x11->GetConn(), true);
         }

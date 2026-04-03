@@ -6,14 +6,14 @@
 
 #include "nyla/apps/wm/window_manager.h"
 #include "nyla/commons/log.h"
-#include "nyla/platform/linux/platform_linux.h"
-#include "nyla/platform/platform.h"
+#include "nyla/commons/linux/platform_linux.h"
+#include "nyla/commons/platform.h"
 #include "xcb/xcb.h"
 
 namespace nyla
 {
 
-auto PlatformMain(std::span<const char *> argv) -> int
+auto PlatformMain(Span<const char *> argv) -> int
 {
     struct sigaction sa;
     sa.sa_handler = [](int signum) -> void { std::abort(); };
@@ -32,13 +32,13 @@ auto PlatformMain(std::span<const char *> argv) -> int
     bool isRunning = true;
     while (isRunning && !xcb_connection_has_error(LinuxX11Platform::GetConn()))
     {
-        std::array<pollfd, 1> fds{
+        Array<pollfd, 1> fds{
             pollfd{
                 .fd = xcb_get_file_descriptor(LinuxX11Platform::GetConn()),
                 .events = POLLIN,
             },
         };
-        if (poll(fds.data(), fds.size(), -1) == -1)
+        if (poll(fds.Data(), fds.Size(), -1) == -1)
         {
             NYLA_LOG("poll(): %s", strerror(errno));
             continue;

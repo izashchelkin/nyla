@@ -1,14 +1,14 @@
-#include "nyla/alloc/region_alloc.h"
+#include "nyla/commons/region_alloc.h"
 #include "nyla/apps/breakout/breakout.h"
-#include "nyla/engine/debug_text_renderer.h"
-#include "nyla/engine/engine.h"
-#include "nyla/platform/platform.h"
-#include "nyla/rhi/rhi.h"
+#include "nyla/commons/debug_text_renderer.h"
+#include "nyla/commons/engine.h"
+#include "nyla/commons/platform.h"
+#include "nyla/commons/rhi.h"
 
 namespace nyla
 {
 
-auto PlatformMain(std::span<const char *> argv) -> int
+auto PlatformMain(Span<const char *> argv) -> int
 {
     Platform::Init({
         .enabledFeatures = PlatformFeature::Gfx | PlatformFeature::KeyboardInput,

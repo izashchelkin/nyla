@@ -1,6 +1,6 @@
 #include "nyla/commons/assert.h"
 #include "nyla/commons/bitenum.h"
-#include "nyla/platform/platform_dir_watch.h"
+#include "nyla/commons/platform_dir_watch.h"
 #include <array>
 #include <cstdint>
 #include <linux/limits.h>
@@ -22,7 +22,7 @@ class PlatformDirWatch::Impl
     auto Poll(PlatformDirWatchEvent &outChange) -> bool;
 
   private:
-    alignas(inotify_event) std::array<std::byte, kBufSize> m_Buf;
+    alignas(inotify_event) Array<std::byte, kBufSize> m_Buf;
     uint32_t m_BufPos;
     uint32_t m_BufLen;
     int m_InotifyFd;
@@ -50,17 +50,17 @@ auto PlatformDirWatch::Impl::Poll(PlatformDirWatchEvent &outChange) -> bool
         NYLA_ASSERT(m_BufPos <= m_BufLen);
         if (!m_BufPos || m_BufPos == m_BufLen)
         {
-            m_BufLen = read(m_InotifyFd, m_Buf.data(), m_Buf.size());
+            m_BufLen = read(m_InotifyFd, m_Buf.Data(), m_Buf.Size());
             if (m_BufLen <= 0)
                 return false;
         }
 
-        const auto *event = reinterpret_cast<inotify_event *>(m_Buf.data() + m_BufPos);
+        const auto *event = reinterpret_cast<inotify_event *>(m_Buf.Data() + m_BufPos);
         m_BufPos += sizeof(inotify_event);
 
         if (event->mask & IN_ISDIR)
         {
-            m_BufPos += outChange.name.size();
+            m_BufPos += outChange.name.Size();
             continue;
         }
 
@@ -74,8 +74,8 @@ auto PlatformDirWatch::Impl::Poll(PlatformDirWatchEvent &outChange) -> bool
         if (event->mask & IN_MOVED_TO)
             outChange.mask |= PlatformDirWatchEventType::MovedTo;
 
-        outChange.name = (const char *)(m_Buf.data() + m_BufPos);
-        m_BufPos += outChange.name.size();
+        outChange.name = (const char *)(m_Buf.Data() + m_BufPos);
+        m_BufPos += outChange.name.Size();
 
         return true;
     }

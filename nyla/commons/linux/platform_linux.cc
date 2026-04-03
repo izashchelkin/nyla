@@ -19,8 +19,8 @@
 #include "nyla/commons/cleanup.h"
 #include "nyla/commons/log.h"
 #include "nyla/commons/string.h"
-#include "nyla/platform/linux/platform_linux.h"
-#include "nyla/platform/platform.h"
+#include "nyla/commons/linux/platform_linux.h"
+#include "nyla/commons/platform.h"
 
 #ifdef __clang__
 #pragma clang diagnostic push
@@ -56,7 +56,7 @@ xcb_get_geometry_reply_t g_WinGeom{};
 
 LinuxX11Platform::Atoms m_Atoms;
 
-std::array<xcb_keycode_t, static_cast<uint32_t>(KeyPhysical::Count)> g_KeyPhysicalCodes;
+Array<xcb_keycode_t, static_cast<uint32_t>(KeyPhysical::Count)> g_KeyPhysicalCodes;
 
 } // namespace
 
@@ -199,7 +199,7 @@ auto LinuxX11Platform::KeyPhysicalToKeyCode(KeyPhysical key) -> uint32_t
 
 auto LinuxX11Platform::KeyCodeToKeyPhysical(uint32_t keyCode, KeyPhysical *outKeyPhysical) -> bool
 {
-    for (uint32_t i = 1; i < g_KeyPhysicalCodes.size(); ++i)
+    for (uint32_t i = 1; i < g_KeyPhysicalCodes.Size(); ++i)
     {
         if (g_KeyPhysicalCodes[i] == keyCode)
         {
@@ -210,10 +210,10 @@ auto LinuxX11Platform::KeyCodeToKeyPhysical(uint32_t keyCode, KeyPhysical *outKe
     return false;
 }
 
-auto LinuxX11Platform::InternAtom(std::string_view name, bool onlyIfExists) -> xcb_atom_t
+auto LinuxX11Platform::InternAtom(Str name, bool onlyIfExists) -> xcb_atom_t
 {
     xcb_intern_atom_reply_t *reply =
-        xcb_intern_atom_reply(g_Conn, xcb_intern_atom(g_Conn, onlyIfExists, name.size(), name.data()), nullptr);
+        xcb_intern_atom_reply(g_Conn, xcb_intern_atom(g_Conn, onlyIfExists, name.Size(), name.Data()), nullptr);
     if (!reply || !reply->atom)
         NYLA_LOG("could not intern atom " NYLA_SV_FMT, NYLA_SV_ARG(name));
 
@@ -387,10 +387,10 @@ auto LinuxX11Platform::CreateWin(uint32_t width, uint32_t height, bool overrideR
 {
     const xcb_window_t window = xcb_generate_id(g_Conn);
 
-    const std::array<uint32_t, 2> values{overrideRedirect, eventMask};
+    const Array<uint32_t, 2> values{overrideRedirect, eventMask};
     xcb_create_window(g_Conn, XCB_COPY_FROM_PARENT, window, g_Screen->root, 0, 0, width, height, 0,
                       XCB_WINDOW_CLASS_INPUT_OUTPUT, g_Screen->root_visual,
-                      XCB_CW_OVERRIDE_REDIRECT | XCB_CW_EVENT_MASK, values.data());
+                      XCB_CW_OVERRIDE_REDIRECT | XCB_CW_EVENT_MASK, values.Data());
 
     xcb_map_window(g_Conn, window);
     xcb_flush(g_Conn);
@@ -689,7 +689,7 @@ auto LinuxX11Platform::ConvertKeyPhysicalIntoXkbName(KeyPhysical key) -> const c
     }
 }
 
-auto Platform::Spawn(std::span<const char *const> cmd) -> bool
+auto Platform::Spawn(Span<const char *const> cmd) -> bool
 {
     { // TODO: move this somewhere
         static bool installed = false;
@@ -716,7 +716,7 @@ auto Platform::Spawn(std::span<const char *const> cmd) -> bool
         }
     }
 
-    if (cmd.size() <= 1)
+    if (cmd.Size() <= 1)
         return false;
     if (cmd.back() != nullptr)
         return false;
@@ -744,7 +744,7 @@ auto Platform::Spawn(std::span<const char *const> cmd) -> bool
         goto failure;
     }
 
-    execvp(cmd[0], const_cast<char *const *>(cmd.data()));
+    execvp(cmd[0], const_cast<char *const *>(cmd.Data()));
 
 failure:
     _exit(127);
@@ -754,6 +754,6 @@ failure:
 
 auto main(int argc, const char *argv[]) -> int
 {
-    nyla::PlatformMain(std::span<const char *>{argv, uint64_t(argc)});
+    nyla::PlatformMain(Span<const char *>{argv, uint64_t(argc)});
     return 0;
 }

@@ -1,12 +1,12 @@
 #include <array>
 #include <cstdint>
 
-#include "nyla/formats/bdf/bdf.h"
+#include "nyla/commons/bdf/bdf.h"
 
 namespace nyla
 {
 
-auto BuildFontAtlas(BdfParser &parser, RegionAlloc &alloc) -> std::span<uint8_t>;
+auto BuildFontAtlas(BdfParser &parser, RegionAlloc &alloc) -> Span<uint8_t>;
 
 class ColorTheme
 {
@@ -15,7 +15,7 @@ class ColorTheme
 
     static uint32_t bg;
     static uint32_t fg;
-    static std::array<uint32_t, 256> palette;
+    static Array<uint32_t, 256> palette;
 };
 
 } // namespace nyla

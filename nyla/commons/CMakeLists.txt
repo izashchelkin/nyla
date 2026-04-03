@@ -10,35 +10,72 @@ target_sources(${TARGET}
         mem.cc
         path.cc
         region_alloc.cc
+        asset_manager.cc
+        debug_text_renderer.cc
+        engine.cc
+        engine0_internal.cc
+        glyph_renderer.cc
+        gpu_upload_manager.cc
+        input_manager.cc
+        render_targets.cc
+        renderer.cc
+        tween_manager.cc
 
     PUBLIC
         align.h
+        array.h
         assert.h
+        asset_manager.h
         bitenum.h
         byteliterals.h
         byteparser.h
-        byteview.h
         cast.h
         cleanup.h
+        collections.h
         color.h
+        complex.h
         cstr.h
+        debug_text_renderer.h
+        dllapi.h
+        engine.h
+        engine0_internal.h
+        entrypoint.h
         fmt.h
         future.h
+        glyph_renderer.h
+        gpu_upload_manager.h
         handle.h
         handle_pool.h
         hex.h
         inline_ring.h
         inline_string.h
         inline_vec.h
+        input_manager.h
         intrin.h
         lerp.h
+        limits.h
+        log.h
         mat.h
+        math.h
         mem.h
+        minmax.h
         mutstr.h
         path.h
+        platform.h
+        platform_audio.h
+        platform_base.h
+        platform_dir_watch.h
         region_alloc.h
+        render_targets.h
+        renderer.h
+        restrict.h
+        rhi.h
         span.h
+        staging.h
+        staging_buffer.h
         str.h
+        tuple.h
+        tween_manager.h
         vec.h
         word.h
 
@@ -121,3 +158,8 @@ elseif (UNIX AND NOT APPLE)
     #         nyla::platform::linux::audio
     # )
 endif()
+
+add_subdirectory(bdf)
+add_subdirectory(elf)
+add_subdirectory(gltf)
+add_subdirectory(json)

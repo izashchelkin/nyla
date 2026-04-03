@@ -25,17 +25,17 @@ void FuseReplyEmptyBuf(fuse_req_t req)
     fuse_reply_buf(req, nullptr, 0);
 }
 
-void FuseReplyBufSlice(fuse_req_t req, std::span<const char> buf, off_t offset, size_t size)
+void FuseReplyBufSlice(fuse_req_t req, Span<const char> buf, off_t offset, size_t size)
 {
-    if (static_cast<size_t>(offset) > buf.size())
+    if (static_cast<size_t>(offset) > buf.Size())
         FuseReplyEmptyBuf(req);
     else
     {
-        fuse_reply_buf(req, buf.data() + offset, std::min(size, buf.size() - offset));
+        fuse_reply_buf(req, buf.Data() + offset, std::min(size, buf.Size() - offset));
     }
 }
 
-static auto GetContent(DebugFsFile &file) -> std::string_view
+static auto GetContent(DebugFsFile &file) -> Str
 {
     uint64_t now = GetMonotonicTimeMicros();
     if (now - file.contentTime > 10)
@@ -57,7 +57,7 @@ static auto MakeFileEntryParam(ino_t inode, DebugFsFile &file) -> fuse_entry_par
             {
                 .st_nlink = 1,
                 .st_mode = kMode,
-                .st_size = static_cast<off_t>(GetContent(file).size()),
+                .st_size = static_cast<off_t>(GetContent(file).Size()),
             },
         .attr_timeout = 1.0,
         .entry_timeout = 1.0,
@@ -79,7 +79,7 @@ static void HandleLookup(fuse_req_t req, fuse_ino_t parentInode, const char *nam
         return;
     }
 
-    std::string_view lookupName = name;
+    Str lookupName = name;
     auto it = std::find_if(debugfs.files.begin(), debugfs.files.end(), [lookupName](const auto &ent) -> auto {
         const auto &[_, file] = ent;
         return file.name == lookupName;
@@ -101,7 +101,7 @@ static void HandleGetAttr(fuse_req_t req, fuse_ino_t inode, fuse_file_info *file
     {
         const fuse_entry_param entryParam{
             .ino = 1,
-            .attr = {.st_ino = 1, .st_nlink = 2 + debugfs.files.size(), .st_mode = S_IFDIR | 0444},
+            .attr = {.st_ino = 1, .st_nlink = 2 + debugfs.files.Size(), .st_mode = S_IFDIR | 0444},
             .attr_timeout = 1.0,
             .entry_timeout = 1.0,
         };
@@ -204,7 +204,7 @@ static void HandleReadDir(fuse_req_t req, fuse_ino_t inode, size_t size, off_t o
 
     auto append = [&](fuse_ino_t inode, const char *name) -> void {
         struct stat stat{.st_ino = inode};
-        pos += fuse_add_direntry(req, buf.data() + pos, totalSize - pos, name, &stat, buf.size());
+        pos += fuse_add_direntry(req, buf.Data() + pos, totalSize - pos, name, &stat, buf.Size());
     };
 
     append(1, ".");

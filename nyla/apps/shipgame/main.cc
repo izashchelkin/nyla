@@ -2,13 +2,13 @@
 
 #include "nyla/apps/shipgame/shipgame.h"
 #include "nyla/apps/shipgame/world_renderer.h"
-#include "nyla/engine0/debug_text_renderer.h"
-#include "nyla/engine0/engine0.h"
-#include "nyla/engine0/render_pipeline.h"
-#include "nyla/engine0/staging.h"
-#include "nyla/platform/key_physical.h"
-#include "nyla/platform/platform.h"
-#include "nyla/rhi/rhi.h"
+#include "nyla/commons0/debug_text_renderer.h"
+#include "nyla/commons0/engine0.h"
+#include "nyla/commons0/render_pipeline.h"
+#include "nyla/commons0/staging.h"
+#include "nyla/commons/key_physical.h"
+#include "nyla/commons/platform.h"
+#include "nyla/commons/rhi.h"
 
 namespace nyla
 {

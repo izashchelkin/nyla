@@ -16,7 +16,7 @@ struct DBusObjectPathHandler
 struct DBus
 {
     DBusConnection *conn;
-    Map<std::string_view, DBusObjectPathHandler *> handlers;
+    Map<Str, DBusObjectPathHandler *> handlers;
 };
 extern DBus dbus;
 

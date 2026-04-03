@@ -21,7 +21,7 @@ constexpr auto PackRGB(uint8_t r, uint8_t g, uint8_t b) -> uint32_t
 uint32_t ColorTheme::bg = PackRGB(28, 28, 28);
 uint32_t ColorTheme::fg = PackRGB(188, 188, 188);
 
-std::array<uint32_t, 256> ColorTheme::palette{
+Array<uint32_t, 256> ColorTheme::palette{
     PackRGB(28, 28, 28),    // 0: Black
     PackRGB(215, 95, 95),   // 1: Red
     PackRGB(135, 175, 135), // 2: Green
@@ -89,7 +89,7 @@ auto RGBToLAB(uint32_t color) -> float3
     float y = pivotXyz(((rgb[0] * 0.2126729f + rgb[1] * 0.7151522f + rgb[2] * 0.0721750f) * 100.0f) / 100.000f);
     float z = pivotXyz(((rgb[0] * 0.0193339f + rgb[1] * 0.1191920f + rgb[2] * 0.9503041f) * 100.0f) / 108.883f);
 
-    float l = std::max(0.f, (116.f * y) - 16.f);
+    float l = Max(0.f, (116.f * y) - 16.f);
     float a = 500.f * (x - y);
     float b = 200.f * (y - z);
 
@@ -115,7 +115,7 @@ auto LABToRGB(float3 lab) -> float3
     z = pivotXyzRev(z) * 108.883f / 100.f;
 
     auto pivotRgbRev = [](float n) -> float {
-        n = std::max(0.f, std::min(1.f, n));
+        n = Max(0.f, std::min(1.f, n));
         if (n > 0.0031308f)
             return 1.055f * std::pow(n, (1.f / 2.4f)) - 0.055f;
         else
@@ -138,7 +138,7 @@ void ColorTheme::Init()
 
     constexpr bool kHarmonious = false;
 
-    std::array<float3, 8> base8Lab{
+    Array<float3, 8> base8Lab{
         RGBToLAB(bg),         RGBToLAB(palette[1]), RGBToLAB(palette[2]), RGBToLAB(palette[3]),
         RGBToLAB(palette[4]), RGBToLAB(palette[5]), RGBToLAB(palette[6]), RGBToLAB(fg),
     };

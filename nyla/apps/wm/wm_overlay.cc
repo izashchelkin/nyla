@@ -1,6 +1,6 @@
 #include "nyla/apps/wm/wm_overlay.h"
-#include "nyla/platform/linux/platform_linux.h"
-#include "nyla/platform/platform.h"
+#include "nyla/commons/linux/platform_linux.h"
+#include "nyla/commons/platform.h"
 
 #include <chrono>
 #include <format>
@@ -12,17 +12,17 @@
 
 #include <cstdint>
 
-#include "nyla/rhi/rhi.h"
+#include "nyla/commons/rhi.h"
 #include "xcb/xcb.h"
 #include "xcb/xproto.h"
 
-#include "nyla/engine/debug_text_renderer.h"
-#include "nyla/platform/platform.h"
+#include "nyla/commons/debug_text_renderer.h"
+#include "nyla/commons/platform.h"
 
 namespace nyla
 {
 
-auto PlatformMain(std::span<const char *> argv) -> int
+auto PlatformMain(Span<const char *> argv) -> int
 {
     Platform::Init({
         .enabledFeatures = PlatformFeature::Gfx,
@@ -94,12 +94,12 @@ auto PlatformMain(std::span<const char *> argv) -> int
                     break;
                 }
 
-                std::array<pollfd, 1> fds{pollfd{
+                Array<pollfd, 1> fds{pollfd{
                     .fd = xcb_get_file_descriptor(LinuxX11Platform::GetConn()),
                     .events = POLLIN,
                 }};
 
-                int pollRes = poll(fds.data(), fds.size(), std::max(1, static_cast<int>(diff / 1000)));
+                int pollRes = poll(fds.Data(), fds.Size(), Max(1, static_cast<int>(diff / 1000)));
                 if (pollRes > 0)
                 {
                     processEvents();

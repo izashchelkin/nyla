@@ -1,6 +1,6 @@
 #include "nyla/apps/3d_ball_maze/3d_ball_maze.h"
 #include "nyla/apps/3d_ball_maze/scene.h"
-#include "nyla/engine/engine.h"
+#include "nyla/commons/engine.h"
 
 namespace nyla
 {

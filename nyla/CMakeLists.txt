@@ -3,7 +3,6 @@
 add_subdirectory(commons)
 
 add_subdirectory(asset)
-add_subdirectory(engine)
 
 add_subdirectory(audio)
 add_subdirectory(formats)

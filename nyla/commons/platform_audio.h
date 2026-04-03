@@ -18,7 +18,7 @@ class PlatformAudio
   public:
     void Init(const PlatformAudioInitDesc &);
     void Destroy();
-    void Write(std::span<const std::byte> data);
+    void Write(Span<const std::byte> data);
 
   private:
     class Impl;

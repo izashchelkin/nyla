@@ -6,7 +6,6 @@
 #include "nyla/commons/byteliterals.h"
 #include "nyla/commons/dllapi.h"
 #include "nyla/commons/fmt.h"
-#include "nyla/commons/vec.h"
 
 namespace nyla
 {
@@ -98,8 +97,8 @@ auto NYLA_API WinGetSize() -> PlatformWindowSize;
 auto NYLA_API WinPollEvent(PlatformEvent &outEvent) -> bool;
 
 auto NYLA_API UpdateGamepad(uint32_t index) -> bool;
-auto NYLA_API GetGamepadLeftStick(uint32_t index) -> float2;
-auto NYLA_API GetGamepadRightStick(uint32_t index) -> float2;
+void NYLA_API GetGamepadLeftStick(uint32_t index, float& outX, float& outY);
+void NYLA_API GetGamepadRightStick(uint32_t index, float& outX, float& outY);
 auto NYLA_API GetGamepadLeftTrigger(uint32_t index) -> float;
 auto NYLA_API GetGamepadRightTrigger(uint32_t index) -> float;
 

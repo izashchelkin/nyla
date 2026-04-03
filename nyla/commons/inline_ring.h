@@ -44,7 +44,7 @@ template <typename T, uint32_t N> class InlineRing
     }
 
     [[nodiscard]]
-    constexpr auto max_size() const -> size_type
+    constexpr auto max_Size() const -> size_type
     {
         return kCapacity;
     }
@@ -67,7 +67,7 @@ template <typename T, uint32_t N> class InlineRing
         AdvanceWrite();
     }
 
-    template <class... Args> auto emplace_back(Args &&...args) -> T &
+    template <class... Args> auto PushBack(Args &&...args) -> T &
     {
         T &ret = (m_Data[m_Write] = T(std::forward<Args>(args)...));
         AdvanceWrite();

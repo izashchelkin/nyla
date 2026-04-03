@@ -3,8 +3,8 @@
 #include "nyla/commons/math/mat.h"
 #include "nyla/commons/math/vec.h"
 #include "nyla/commons/memory/charview.h"
-#include "nyla/engine0/render_pipeline.h"
-#include "nyla/rhi/rhi.h"
+#include "nyla/commons0/render_pipeline.h"
+#include "nyla/commons/rhi.h"
 
 namespace nyla
 {
@@ -63,7 +63,7 @@ void WorldSetUp(float2 cameraPos, float zoom)
     RpStaticUniformCopy(gridPipeline, ByteViewPtr(&scene));
 }
 
-void WorldRender(float2 pos, float angleRadians, float scalar, std::span<Vertex> vertices)
+void WorldRender(float2 pos, float angleRadians, float scalar, Span<Vertex> vertices)
 {
     float4x4 model = float4x4::Translate(pos);
     model = model.Mult(float4x4::Rotate(angleRadians));
@@ -73,7 +73,7 @@ void WorldRender(float2 pos, float angleRadians, float scalar, std::span<Vertex>
 
     ByteView vertexData = ByteViewSpan(vertices);
     ByteView dynamicUniformData = ByteViewPtr(&dynamicUbo);
-    RpMesh mesh = RpVertCopy(worldPipeline, vertices.size(), vertexData);
+    RpMesh mesh = RpVertCopy(worldPipeline, vertices.Size(), vertexData);
     RpDraw(worldPipeline, mesh, dynamicUniformData);
 }
 

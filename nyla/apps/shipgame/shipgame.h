@@ -5,7 +5,7 @@
 
 #include "nyla/apps/shipgame/world_renderer.h"
 #include "nyla/commons/math/vec.h"
-#include "nyla/platform/abstract_input.h"
+#include "nyla/commons/abstract_input.h"
 
 namespace nyla
 {
@@ -36,7 +36,7 @@ struct GameObject
     float2 velocity{};
 
     std::vector<Vertex> vertices{};
-    std::span<GameObject> children{};
+    Span<GameObject> children{};
 };
 extern GameObject gameSolarSystem;
 extern GameObject gameShip;

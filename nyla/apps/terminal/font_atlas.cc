@@ -1,14 +1,14 @@
 #include <cstdint>
 
-#include "nyla/alloc/region_alloc.h"
-#include "nyla/formats/bdf/bdf.h"
+#include "nyla/commons/region_alloc.h"
+#include "nyla/commons/bdf/bdf.h"
 
 namespace nyla
 {
 
-auto BuildFontAtlas(BdfParser &parser, RegionAlloc &alloc) -> std::span<uint8_t>
+auto BuildFontAtlas(BdfParser &parser, RegionAlloc &alloc) -> Span<uint8_t>
 {
-    auto textureAtlas = alloc.Push<std::array<std::array<uint8_t, 1024>, 1024>>();
+    auto textureAtlas = alloc.Push<Array<Array<uint8_t, 1024>, 1024>>();
 
     uint32_t iglyph = 0;
     auto scratch = alloc.PushSubAlloc(1_KiB);
@@ -40,7 +40,7 @@ auto BuildFontAtlas(BdfParser &parser, RegionAlloc &alloc) -> std::span<uint8_t>
 
     auto *data = (uint8_t *)textureAtlas->data();
     constexpr size_t kSize = sizeof(*textureAtlas) / sizeof(uint8_t);
-    return std::span{data, kSize};
+    return Span{data, kSize};
 }
 
 } // namespace nyla

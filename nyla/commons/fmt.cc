@@ -1,8 +1,13 @@
+#include "nyla/commons/fmt.h"
 #include <cstdarg>
 #include <cstdint>
 
 #include "nyla/commons/byteparser.h"
+#include "nyla/commons/dllapi.h"
+#include "nyla/commons/mem.h"
 #include "nyla/commons/platform.h"
+#include "nyla/commons/platform_base.h"
+#include "nyla/commons/region_alloc.h"
 #include "nyla/commons/word.h"
 
 namespace nyla
@@ -45,9 +50,7 @@ auto S64ToBuffer(char *buf, int64_t val) -> uint32_t
     return U64ToBuffer(buf, (uint64_t)val);
 }
 
-} // namespace
-
-void NYLA_API FileWriteFmt(FileHandle handle, const char *fmt, uint64_t fmtSize, ...)
+void WriteFmt(auto &&consumer, const char *fmt, uint64_t fmtSize, ...)
 {
     va_list args;
     va_start(args, fmtSize);
@@ -76,7 +79,7 @@ void NYLA_API FileWriteFmt(FileHandle handle, const char *fmt, uint64_t fmtSize,
                 case DWord("*s\0\0"): {
                     uint32_t len = va_arg(args, uint32_t);
                     const char *str = va_arg(args, const char *);
-                    Platform::FileWrite(handle, (uint32_t)len, str);
+                    consumer((uint32_t)len, str);
                     break;
                 }
 
@@ -91,27 +94,27 @@ void NYLA_API FileWriteFmt(FileHandle handle, const char *fmt, uint64_t fmtSize,
 
             case 's': {
                 const char *s = va_arg(args, const char *);
-                Platform::FileWrite(handle, static_cast<uint32_t>(CStrLen(s)), s);
+                consumer(static_cast<uint32_t>(CStrLen(s)), s);
                 break;
             }
             case 'd': {
                 char buf[32];
                 uint32_t len = S64ToBuffer(buf, va_arg(args, int));
-                Platform::FileWrite(handle, len, buf);
+                consumer(len, buf);
                 break;
             }
             case 'u': {
                 char buf[32];
                 uint32_t len = U64ToBuffer(buf, va_arg(args, uint32_t));
-                Platform::FileWrite(handle, len, buf);
+                consumer(len, buf);
                 break;
             }
             case 'p': {
-                Platform::FileWrite(handle, 11, "0x[pointer]");
+                consumer(11, "0x[pointer]");
                 break;
             }
             case '%': {
-                Platform::FileWrite(handle, 1, "%");
+                consumer(1, "%");
                 break;
             }
 
@@ -128,13 +131,76 @@ void NYLA_API FileWriteFmt(FileHandle handle, const char *fmt, uint64_t fmtSize,
             while (parser.Left() && parser.Peek() != '%')
                 parser.Advance();
 
-            Platform::FileWrite(handle, (uint32_t)(&parser.Peek() - start), start);
+            consumer((uint32_t)(&parser.Peek() - start), start);
             break;
         }
         }
     }
 
-    Platform::FileWrite(handle, 1, "\n");
+    consumer(1, "\n");
+
+    va_end(args);
+}
+
+void BufferWriteFmt(auto &&consumer, RegionAlloc &alloc, uint64_t bufferSize, const char *fmt, uint64_t fmtSize, ...)
+{
+    Span<char> buffer = alloc.PushArr<char>(bufferSize);
+    uint64_t bufferUsed = 0;
+
+    va_list args;
+    va_start(args, fmtSize);
+
+    WriteFmt(
+        [&](uint32_t size, const char *data) -> void {
+            if (bufferUsed + size > bufferSize)
+            {
+                consumer(buffer.Data(), bufferUsed);
+                consumer(data, size);
+                bufferUsed = 0;
+            }
+            else
+            {
+                MemCpy(buffer.Data() + bufferUsed, data, size);
+
+                if (bufferUsed + size == bufferSize)
+                {
+                    consumer(buffer.Data(), bufferUsed);
+                    bufferUsed = 0;
+                }
+            }
+        },
+        fmt, fmtSize, args);
+
+    va_end(args);
+}
+
+} // namespace
+
+void NYLA_API StringWriteFmt(char *out, uint64_t outSize, const char *fmt, uint64_t fmtSize, ...)
+{
+    va_list args;
+    va_start(args, fmtSize);
+
+    uint64_t outWritten = 0;
+
+    WriteFmt(
+        [&](const char *data, uint32_t size) -> void {
+            NYLA_ASSERT(outWritten + size < outSize);
+            MemCpy(out + outSize, data, size);
+            outSize += size;
+        },
+        fmt, fmtSize, args);
+
+    va_end(args);
+}
+
+void NYLA_API FileWriteFmt(FileHandle handle, RegionAlloc &alloc, const char *fmt, uint64_t fmtSize, ...)
+{
+    va_list args;
+    va_start(args, fmtSize);
+
+    BufferWriteFmt([handle](const char *data, uint32_t size) -> void { Platform::FileWrite(handle, size, data); },
+                   alloc, 1024, fmt, fmtSize, args);
 
     va_end(args);
 }

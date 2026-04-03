@@ -19,7 +19,7 @@ template <typename T, uint32_t N> class Mat
 
     Mat(std::initializer_list<T> elems)
     {
-        NYLA_ASSERT(elems.size() == static_cast<size_t>(N * N));
+        NYLA_ASSERT(elems.Size() == static_cast<size_t>(N * N));
         auto it = elems.begin();
         for (uint32_t col = 0; col < N; ++col)
         {
@@ -30,7 +30,7 @@ template <typename T, uint32_t N> class Mat
 
     Mat(std::initializer_list<Vec<T, N>> cols)
     {
-        NYLA_ASSERT(cols.size() == static_cast<size_t>(N));
+        NYLA_ASSERT(cols.Size() == static_cast<size_t>(N));
         auto it = cols.begin();
         for (uint32_t col = 0; col < N; ++col, ++it)
         {
@@ -61,12 +61,12 @@ template <typename T, uint32_t N> class Mat
         return ret;
     }
 
-    [[nodiscard]] auto operator[](uint32_t col) -> std::array<T, N> &
+    [[nodiscard]] auto operator[](uint32_t col) -> Array<T, N> &
     {
         NYLA_ASSERT(col < N);
         return m_Data[col];
     }
-    [[nodiscard]] auto operator[](uint32_t col) const -> const std::array<T, N> &
+    [[nodiscard]] auto operator[](uint32_t col) const -> const Array<T, N> &
     {
         NYLA_ASSERT(col < N);
         return m_Data[col];
@@ -92,7 +92,7 @@ template <typename T, uint32_t N> class Mat
     auto Inversed() const -> Mat
         requires std::floating_point<T>
     {
-        std::array<std::array<T, 2ULL * N>, N> a{};
+        Array<Array<T, 2ULL * N>, N> a{};
 
         for (uint32_t row = 0; row < N; ++row)
         {
@@ -283,7 +283,7 @@ template <typename T, uint32_t N> class Mat
     }
 
   private:
-    std::array<std::array<T, N>, N> m_Data{};
+    Array<Array<T, N>, N> m_Data{};
 };
 
 using float4x4 = Mat<float, 4>;

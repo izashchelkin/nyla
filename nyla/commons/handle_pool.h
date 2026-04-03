@@ -29,13 +29,13 @@ template <typename HandleType, typename DataType, uint64_t SlotCapacity> class H
     [[nodiscard]]
     auto Data() const -> const Slot *
     {
-        return m_Slots.data();
+        return m_Slots.Data();
     }
 
     [[nodiscard]]
     auto Data() -> Slot *
     {
-        return m_Slots.data();
+        return m_Slots.Data();
     }
 
     [[nodiscard]]
@@ -53,37 +53,37 @@ template <typename HandleType, typename DataType, uint64_t SlotCapacity> class H
     [[nodiscard]]
     auto begin() -> Slot *
     {
-        return m_Slots.data();
+        return m_Slots.Data();
     }
 
     [[nodiscard]]
     auto begin() const -> const Slot *
     {
-        return m_Slots.data();
+        return m_Slots.Data();
     }
 
     [[nodiscard]]
     auto cbegin() const -> const Slot *
     {
-        return m_Slots.data();
+        return m_Slots.Data();
     }
 
     [[nodiscard]]
     auto end() -> Slot *
     {
-        return m_Slots.data() + MaxSize();
+        return m_Slots.Data() + MaxSize();
     }
 
     [[nodiscard]]
     auto end() const -> const Slot *
     {
-        return m_Slots.data() + MaxSize();
+        return m_Slots.Data() + MaxSize();
     }
 
     [[nodiscard]]
     auto cend() const -> const Slot *
     {
-        return m_Slots.data() + MaxSize();
+        return m_Slots.Data() + MaxSize();
     }
 
     auto operator[](uint32_t i) -> Slot &

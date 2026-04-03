@@ -1,17 +1,17 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "nyla/alloc/region_alloc.h"
+#include "nyla/commons/region_alloc.h"
 #include "nyla/apps/terminal/terminal.h"
-#include "nyla/engine/engine.h"
-#include "nyla/engine/glyph_renderer.h"
-#include "nyla/formats/bdf/bdf.h"
-#include "nyla/platform/platform.h"
+#include "nyla/commons/engine.h"
+#include "nyla/commons/glyph_renderer.h"
+#include "nyla/commons/bdf/bdf.h"
+#include "nyla/commons/platform.h"
 
 namespace nyla
 {
 
-auto PlatformMain(std::span<const char *> argv) -> int
+auto PlatformMain(Span<const char *> argv) -> int
 {
     ColorTheme::Init();
 
@@ -26,12 +26,12 @@ auto PlatformMain(std::span<const char *> argv) -> int
     Engine::Init({.maxFps = 144, .vsync = true, .rootAlloc = &rootAlloc});
 
     {
-        std::vector<std::byte> data = Platform::ReadFile(std::string_view{R"(D:\nyla\assets\fonts\ter-u32n.bdf)"});
+        std::vector<std::byte> data = Platform::ReadFile(Str{R"(D:\nyla\assets\fonts\ter-u32n.bdf)"});
         BdfParser bdfParser;
-        bdfParser.Init((char *)data.data(), data.size());
+        bdfParser.Init((char *)data.Data(), data.Size());
 
-        std::span<uint8_t> fontAtlas = BuildFontAtlas(bdfParser, rootAlloc);
-        GlyphRenderer::Init(fontAtlas.data(), 1024, 1024);
+        Span<uint8_t> fontAtlas = BuildFontAtlas(bdfParser, rootAlloc);
+        GlyphRenderer::Init(fontAtlas.Data(), 1024, 1024);
     }
 
     return 0;

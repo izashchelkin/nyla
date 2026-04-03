@@ -1,7 +1,7 @@
 #pragma once
 
 #include "nyla/commons/containers/inline_vec.h"
-#include "nyla/rhi/rhi.h"
+#include "nyla/commons/rhi.h"
 
 #include <d3d12.h>
 #include <dxgi1_6.h>
@@ -31,7 +31,7 @@ class Rhi::Impl
     auto GetOptimalBufferCopyOffsetAlignment() -> uint32_t;
 
     auto CreateBuffer(const RhiBufferDesc &) -> RhiBuffer;
-    void NameBuffer(RhiBuffer, std::string_view name);
+    void NameBuffer(RhiBuffer, Str name);
     void DestroyBuffer(RhiBuffer);
 
     auto GetBufferSize(RhiBuffer) -> uint32_t;
@@ -46,7 +46,7 @@ class Rhi::Impl
     void CmdUavBarrierBuffer(RhiCmdList cmd, RhiBuffer buffer);
 
     auto CreateCmdList(RhiQueueType queueType) -> RhiCmdList;
-    void NameCmdList(RhiCmdList, std::string_view name);
+    void NameCmdList(RhiCmdList, Str name);
     void DestroyCmdList(RhiCmdList cmd);
 
     auto CmdSetCheckpoint(RhiCmdList cmd, uint64_t data) -> uint64_t;
@@ -63,12 +63,12 @@ class Rhi::Impl
     auto GetVertexFormatSize(RhiVertexFormat) -> uint32_t;
 
     auto CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &) -> RhiGraphicsPipeline;
-    void NameGraphicsPipeline(RhiGraphicsPipeline, std::string_view name);
+    void NameGraphicsPipeline(RhiGraphicsPipeline, Str name);
     void DestroyGraphicsPipeline(RhiGraphicsPipeline);
 
     void CmdBindGraphicsPipeline(RhiCmdList, RhiGraphicsPipeline);
-    void CmdBindVertexBuffers(RhiCmdList cmd, uint32_t firstBinding, std::span<const RhiBuffer> buffers,
-                              std::span<const uint32_t> offsets);
+    void CmdBindVertexBuffers(RhiCmdList cmd, uint32_t firstBinding, Span<const RhiBuffer> buffers,
+                              Span<const uint32_t> offsets);
     void CmdPushGraphicsConstants(RhiCmdList cmd, uint32_t offset, RhiShaderStage stage, ByteView data);
     void CmdDraw(RhiCmdList cmd, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
                  uint32_t firstInstance);

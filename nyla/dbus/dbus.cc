@@ -90,7 +90,7 @@ void DBusProcess()
         {
             continue;
         }
-        auto it = dbus.handlers.find(std::string_view{path});
+        auto it = dbus.handlers.find(Str{path});
         if (it == dbus.handlers.end())
             continue;
         auto &[_, handler] = *it;

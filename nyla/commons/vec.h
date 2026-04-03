@@ -63,7 +63,7 @@ template <typename T, uint32_t N> class Vec
 
     [[nodiscard]] constexpr auto data() const -> const T *
     {
-        return m_Data.data();
+        return m_Data.Data();
     }
 
     [[nodiscard]]

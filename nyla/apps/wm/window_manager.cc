@@ -16,9 +16,9 @@
 #include "nyla/commons/cleanup.h"
 #include "nyla/commons/inline_vec.h"
 #include "nyla/commons/log.h"
-#include "nyla/platform/linux/platform_linux.h"
-#include "nyla/platform/linux/x11_wm_hints.h"
-#include "nyla/platform/platform.h"
+#include "nyla/commons/linux/platform_linux.h"
+#include "nyla/commons/linux/x11_wm_hints.h"
+#include "nyla/commons/platform.h"
 #include "xcb/xcb.h"
 #include "xcb/xinput.h"
 #include "xcb/xproto.h"
@@ -28,7 +28,7 @@ namespace nyla
 
 void WindowManager::Init()
 {
-    m_Stacks.resize(9);
+    m_Stacks.reSize(9);
 
     if (xcb_request_check(LinuxX11Platform::GetConn(),
                           xcb_change_window_attributes_checked(
@@ -48,7 +48,7 @@ void WindowManager::Init()
     if (!treeReply)
         return;
 
-    std::span<xcb_window_t> children = {xcb_query_tree_children(treeReply),
+    Span<xcb_window_t> children = {xcb_query_tree_children(treeReply),
                                         static_cast<size_t>(xcb_query_tree_children_length(treeReply))};
 
     for (xcb_window_t clientWindow : children)
@@ -109,7 +109,7 @@ void WindowManager::Init()
 
 auto WindowManager::GetActiveStack() -> WindowStack &
 {
-    NYLA_ASSERT((m_ActiveStackIdx & 0xFF) < m_Stacks.size());
+    NYLA_ASSERT((m_ActiveStackIdx & 0xFF) < m_Stacks.Size());
     return m_Stacks.at(m_ActiveStackIdx & 0xFF);
 }
 
@@ -154,7 +154,7 @@ void WindowManager::ManageClient(xcb_window_t clientWindow)
     FetchClientProperty(clientWindow, client, XCB_ATOM_WM_TRANSIENT_FOR);
     FetchClientProperty(clientWindow, client, LinuxX11Platform::GetAtoms().wm_protocols);
 
-    m_PendingClients.emplace_back(clientWindow);
+    m_PendingClients.PushBack(clientWindow);
 }
 
 void WindowManager::UnmanageClient(xcb_window_t clientWindow)
@@ -188,7 +188,7 @@ void WindowManager::UnmanageClient(xcb_window_t clientWindow)
 
     m_Clients.erase(it);
 
-    for (size_t istack = 0; istack < m_Stacks.size(); ++istack)
+    for (size_t istack = 0; istack < m_Stacks.Size(); ++istack)
     {
         WindowStack &stack = m_Stacks.at(istack);
 
@@ -679,7 +679,7 @@ void WindowManager::Process(bool &isRunning)
                     client.wmDeleteWindow = false;
                     client.wmTakeFocus = false;
 
-                    auto wmProtocols = std::span{
+                    auto wmProtocols = Span{
                         static_cast<xcb_atom_t *>(xcb_get_property_value(reply)),
                         xcb_get_property_value_length(reply) / sizeof(xcb_atom_t),
                     };
@@ -755,7 +755,7 @@ void WindowManager::Process(bool &isRunning)
             }
             else
             {
-                stack.windows.emplace_back(clientWindow);
+                stack.windows.PushBack(clientWindow);
 
                 if (!activated)
                 {
@@ -775,7 +775,7 @@ void WindowManager::Process(bool &isRunning)
         Color color = [this, &stack] -> nyla::Color {
             if (m_Follow)
                 return Color::KActiveFollow;
-            if (stack.zoom || stack.windows.size() < 2)
+            if (stack.zoom || stack.windows.Size() < 2)
                 return Color::KNone;
             return Color::KActive;
         }();
@@ -805,10 +805,10 @@ void WindowManager::Process(bool &isRunning)
                 hide(subwindow, m_Clients.at(subwindow));
         };
 
-        auto configureWindows = [this](Rect boundingRect, std::span<const xcb_window_t> windows, LayoutType layoutType,
+        auto configureWindows = [this](Rect boundingRect, Span<const xcb_window_t> windows, LayoutType layoutType,
                                        auto visitor) -> auto {
-            std::vector<Rect> layout = ComputeLayout(boundingRect, windows.size(), 2, layoutType);
-            NYLA_ASSERT(layout.size() == windows.size());
+            std::vector<Rect> layout = ComputeLayout(boundingRect, windows.Size(), 2, layoutType);
+            NYLA_ASSERT(layout.Size() == windows.Size());
 
             for (auto [rect, client_window] : std::ranges::views::zip(layout, windows))
             {
@@ -860,7 +860,7 @@ void WindowManager::Process(bool &isRunning)
             configureWindows(screenRect, stack.windows, stack.layoutType, configureSubwindows);
         }
 
-        for (size_t istack = 0; istack < m_Stacks.size(); ++istack)
+        for (size_t istack = 0; istack < m_Stacks.Size(); ++istack)
         {
             if (istack != (m_ActiveStackIdx & 0xFF))
             {
@@ -895,14 +895,14 @@ void WindowManager::ConfigureClientIfNeeded(xcb_connection_t *conn, xcb_window_t
     {
         anythingChanged = true;
         mask |= XCB_CONFIG_WINDOW_X;
-        values.emplace_back(newRect.X());
+        values.PushBack(newRect.X());
     }
 
     if (newRect.Y() != client.rect.Y())
     {
         anythingChanged = true;
         mask |= XCB_CONFIG_WINDOW_Y;
-        values.emplace_back(newRect.Y());
+        values.PushBack(newRect.Y());
     }
 
     if (newRect.Width() != client.rect.Width())
@@ -910,7 +910,7 @@ void WindowManager::ConfigureClientIfNeeded(xcb_connection_t *conn, xcb_window_t
         anythingChanged = true;
         sizeChanged = true;
         mask |= XCB_CONFIG_WINDOW_WIDTH;
-        values.emplace_back(newRect.Width());
+        values.PushBack(newRect.Width());
     }
 
     if (newRect.Height() != client.rect.Height())
@@ -918,7 +918,7 @@ void WindowManager::ConfigureClientIfNeeded(xcb_connection_t *conn, xcb_window_t
         anythingChanged = true;
         sizeChanged = true;
         mask |= XCB_CONFIG_WINDOW_HEIGHT;
-        values.emplace_back(newRect.Height());
+        values.PushBack(newRect.Height());
     }
 
     if (newBorderWidth != client.borderWidth)
@@ -926,12 +926,12 @@ void WindowManager::ConfigureClientIfNeeded(xcb_connection_t *conn, xcb_window_t
         anythingChanged = true;
         sizeChanged = true;
         mask |= XCB_CONFIG_WINDOW_BORDER_WIDTH;
-        values.emplace_back(newBorderWidth);
+        values.PushBack(newBorderWidth);
     }
 
     if (anythingChanged)
     {
-        xcb_configure_window(conn, clientWindow, mask, values.data());
+        xcb_configure_window(conn, clientWindow, mask, values.Data());
 
         client.wantsConfigureNotify = !sizeChanged;
         client.rect = newRect;
@@ -942,7 +942,7 @@ void WindowManager::ConfigureClientIfNeeded(xcb_connection_t *conn, xcb_window_t
 void WindowManager::MoveStack(xcb_timestamp_t time, auto computeIdx)
 {
     size_t iold = m_ActiveStackIdx & 0xFF;
-    size_t inew = computeIdx(iold + m_Stacks.size()) % m_Stacks.size();
+    size_t inew = computeIdx(iold + m_Stacks.Size()) % m_Stacks.Size();
 
     if (iold == inew)
         return;
@@ -958,7 +958,7 @@ void WindowManager::MoveStack(xcb_timestamp_t time, auto computeIdx)
         if (oldstack.activeWindow)
         {
             newstack.activeWindow = oldstack.activeWindow;
-            newstack.windows.emplace_back(oldstack.activeWindow);
+            newstack.windows.PushBack(oldstack.activeWindow);
 
             newstack.zoom = false;
             oldstack.zoom = false;
@@ -1001,7 +1001,7 @@ void WindowManager::MoveLocal(xcb_timestamp_t time, auto computeIdx, bool clearZ
     if (stack.windows.empty())
         return;
 
-    if (stack.activeWindow && stack.windows.size() < 2)
+    if (stack.activeWindow && stack.windows.Size() < 2)
     {
         return;
     }
@@ -1013,7 +1013,7 @@ void WindowManager::MoveLocal(xcb_timestamp_t time, auto computeIdx, bool clearZ
             return;
 
         size_t iold = std::distance(stack.windows.begin(), it);
-        size_t inew = computeIdx(iold + stack.windows.size()) % stack.windows.size();
+        size_t inew = computeIdx(iold + stack.windows.Size()) % stack.windows.Size();
 
         if (iold == inew)
             return;

@@ -33,12 +33,12 @@ auto TriangulateLine(const float2 &a, const float2 &b, float thickness) -> std::
         const float2 p3 = ((a - ny) + nx); // bottom-right
 
         // CCW triangles
-        out.emplace_back(Vertex{p0, red});
-        out.emplace_back(Vertex{p2, red});
-        out.emplace_back(Vertex{p1, red});
-        out.emplace_back(Vertex{p0, green});
-        out.emplace_back(Vertex{p3, green});
-        out.emplace_back(Vertex{p2, green});
+        out.PushBack(Vertex{p0, red});
+        out.PushBack(Vertex{p2, red});
+        out.PushBack(Vertex{p1, red});
+        out.PushBack(Vertex{p0, green});
+        out.PushBack(Vertex{p3, green});
+        out.PushBack(Vertex{p2, green});
         return out;
     }
 
@@ -54,13 +54,13 @@ auto TriangulateLine(const float2 &a, const float2 &b, float thickness) -> std::
 
     // Emit triangles with COUNTER-CLOCKWISE winding for Vulkan (default
     // positive-height viewport)
-    out.emplace_back(Vertex{p0, red});
-    out.emplace_back(Vertex{p2, red});
-    out.emplace_back(Vertex{p1, red});
+    out.PushBack(Vertex{p0, red});
+    out.PushBack(Vertex{p2, red});
+    out.PushBack(Vertex{p1, red});
 
-    out.emplace_back(Vertex{p0, green});
-    out.emplace_back(Vertex{p3, green});
-    out.emplace_back(Vertex{p2, green});
+    out.PushBack(Vertex{p0, green});
+    out.PushBack(Vertex{p3, green});
+    out.PushBack(Vertex{p2, green});
 
     return out;
 }

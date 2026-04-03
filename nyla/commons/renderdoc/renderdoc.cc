@@ -1,9 +1,9 @@
-#include "nyla/rhi/renderdoc/renderdoc.h"
+#include "nyla/commons/renderdoc/renderdoc.h"
 
 #if !defined(NDEBUG)
 
 #include "nyla/commons/debug/debugger.h"
-#include "nyla/rhi/renderdoc/renderdoc_app.h"
+#include "nyla/commons/renderdoc/renderdoc_app.h"
 
 namespace nyla
 {

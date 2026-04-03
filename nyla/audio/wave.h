@@ -30,7 +30,7 @@ struct WaveFmtChunk
 struct ParseWavFileResult
 {
     WaveFmtChunk *fmt;
-    std::span<const std::byte> data;
+    Span<const std::byte> data;
 
     auto GetSampleRate()
     {
@@ -43,6 +43,6 @@ struct ParseWavFileResult
     }
 };
 
-auto ParseWavFile(std::span<const std::byte> bytes) -> ParseWavFileResult;
+auto ParseWavFile(Span<const std::byte> bytes) -> ParseWavFileResult;
 
 } // namespace nyla

@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string_view>
 
-#include "nyla/platform/platform.h"
+#include "nyla/commons/platform.h"
 #include <sys/mman.h>
 #include <xcb/xcb.h>
 #include <xcb/xproto.h>
@@ -57,7 +57,7 @@ class LinuxX11Platform
     static auto GetXInputExtensionMajorOpCode() -> uint32_t;
 
     static auto GetAtoms() -> LinuxX11Platform::Atoms &;
-    static auto InternAtom(std::string_view name, bool onlyIfExists) -> xcb_atom_t;
+    static auto InternAtom(Str name, bool onlyIfExists) -> xcb_atom_t;
 
     static auto CreateWin(uint32_t width, uint32_t height, bool overrideRedirect, xcb_event_mask_t eventMask)
         -> xcb_window_t;

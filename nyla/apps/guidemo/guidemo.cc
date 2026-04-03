@@ -1,8 +1,8 @@
-#include "nyla/engine0/dbg_text_renderer.h"
-#include "nyla/engine0/engine0.h"
-#include "nyla/engine0/gui.h"
-#include "nyla/engine0/render_pipeline.h"
-#include "nyla/engine0/staging.h"
+#include "nyla/commons0/dbg_text_renderer.h"
+#include "nyla/commons0/engine0.h"
+#include "nyla/commons0/gui.h"
+#include "nyla/commons0/render_pipeline.h"
+#include "nyla/commons0/staging.h"
 
 namespace nyla
 {

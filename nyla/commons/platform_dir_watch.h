@@ -17,7 +17,7 @@ NYLA_BITENUM(PlatformDirWatchEventType);
 
 struct PlatformDirWatchEvent
 {
-    std::string_view name;
+    Str name;
     PlatformDirWatchEventType mask;
 };
 

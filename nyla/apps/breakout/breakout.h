@@ -2,9 +2,9 @@
 
 #include "nyla/commons/inline_vec.h"
 #include "nyla/commons/vec.h"
-#include "nyla/engine/asset_manager.h"
-#include "nyla/engine/input_manager.h"
-#include "nyla/rhi/rhi.h"
+#include "nyla/commons/asset_manager.h"
+#include "nyla/commons/input_manager.h"
+#include "nyla/commons/rhi.h"
 #include <cstdint>
 #include <sys/types.h>
 
@@ -27,7 +27,7 @@ struct GameState
         AssetManager::Texture playerFlash;
         AssetManager::Texture ball;
         AssetManager::Texture brickUnbreackable;
-        std::array<AssetManager::Texture, 9> bricks;
+        Array<AssetManager::Texture, 9> bricks;
 
         AssetManager::Mesh rectMesh;
     };

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "nyla/engine/asset_manager.h"
-#include "nyla/engine/render_targets.h"
-#include "nyla/rhi/rhi.h"
+#include "nyla/commons/asset_manager.h"
+#include "nyla/commons/render_targets.h"
+#include "nyla/commons/rhi.h"
 
 namespace nyla
 {

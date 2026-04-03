@@ -2,7 +2,7 @@
 #include "nyla/commons/containers/inline_vec.h"
 #include "nyla/commons/math/vec.h"
 #include "nyla/commons/os/readfile.h"
-#include "nyla/platform/platform_audio.h"
+#include "nyla/commons/platform_audio.h"
 
 #include <algorithm>
 #include <alsa/asoundlib.h>
@@ -18,7 +18,7 @@ namespace nyla
 
 struct AudioMixerCmd
 {
-    std::span<const float2> frames;
+    Span<const float2> frames;
 };
 
 class AudioMixer
@@ -34,16 +34,16 @@ class AudioMixer
 
     struct Voice
     {
-        std::span<const float2> frames;
+        Span<const float2> frames;
         uint32_t consumed;
     };
-    std::array<Voice, 8> m_Voices{};
+    Array<Voice, 8> m_Voices{};
 };
 
 void AudioMixer::Submit(const AudioMixerCmd &cmd)
 {
     std::lock_guard<std::mutex> lock(m_CmdMutex);
-    m_CmdWrite.emplace_back(cmd);
+    m_CmdWrite.PushBack(cmd);
 }
 
 void AudioMixer::RunThread()
@@ -63,7 +63,7 @@ void AudioMixer::RunThread()
         m_CmdWrite.clear();
         lock.unlock();
 
-        auto *slot = m_Voices.data();
+        auto *slot = m_Voices.Data();
         for (const auto &cmd : m_CmdRead)
         {
             NYLA_ASSERT(slot != m_Voices.end());
@@ -79,8 +79,8 @@ void AudioMixer::RunThread()
         }
 
         constexpr uint64_t kFrames = 48 * 20ul;
-        alignas(float) std::array<std::byte, kFrames * sizeof(float2)> buf{};
-        auto bufF32 = std::span{(float2 *)buf.data(), kFrames};
+        alignas(float) Array<std::byte, kFrames * sizeof(float2)> buf{};
+        auto bufF32 = Span{(float2 *)buf.Data(), kFrames};
 
         for (auto &voice : m_Voices)
         {
@@ -88,19 +88,19 @@ void AudioMixer::RunThread()
                 continue;
 
             const uint32_t start = voice.consumed;
-            const uint32_t end = std::min(voice.frames.size(), voice.consumed + buf.size());
+            const uint32_t end = std::min(voice.frames.Size(), voice.consumed + buf.Size());
 
             for (uint32_t i = start; i < end; ++i)
                 bufF32[i] += voice.frames[i];
 
-            if (end == voice.frames.size())
+            if (end == voice.frames.Size())
                 voice = {};
             else
-                voice.consumed += buf.size();
+                voice.consumed += buf.Size();
         }
 
-        auto bufS16 = std::span{(short2 *)buf.data(), kFrames};
-        for (uint32_t i = 0; i < bufF32.size(); ++i)
+        auto bufS16 = Span{(short2 *)buf.Data(), kFrames};
+        for (uint32_t i = 0; i < bufF32.Size(); ++i)
         {
             auto scaleToShort = [](float f) -> int16_t {
                 f = std::clamp(f, -1.0f, 1.0f);

@@ -41,7 +41,7 @@ template <typename T, typename Elem> void Erase(T &data, const Elem &elem)
         IteratorAdvance(it);
     }
 
-    data.Resize(data.Size() - IteratorDistance(write, end));
+    data.ReSize(data.Size() - IteratorDistance(write, end));
 }
 
 } // namespace nyla

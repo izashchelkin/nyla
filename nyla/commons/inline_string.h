@@ -3,14 +3,17 @@
 #include <cstdint>
 
 #include "nyla/commons/array.h"
+#include "nyla/commons/fmt.h"
 #include "nyla/commons/platform.h"
 
 namespace nyla
 {
 
-template <uint32_t N> struct InlineString
+template <uint64_t N> struct InlineString
 {
-  public:
+    uint64_t m_Size;
+    Array<char, N + 1> m_Data;
+
     void AppendChar(char ch)
     {
         NYLA_DASSERT(m_Size < N);
@@ -31,7 +34,7 @@ template <uint32_t N> struct InlineString
     [[nodiscard]]
     auto CStr() const -> const char *
     {
-        return m_Data.data();
+        return m_Data.Data();
     }
 
     [[nodiscard]]
@@ -62,10 +65,17 @@ template <uint32_t N> struct InlineString
                 ch = ch;
         }
     }
-
-  private:
-    uint64_t m_Size;
-    Array<char, N + 1> m_Data;
 };
+
+template <uint64_t N> auto AsInlineStr(Str str) -> InlineString<N>
+{
+    NYLA_ASSERT(str.Size() <= N);
+
+    InlineString<N> ret{
+        .m_Data = str.Data(),
+        .m_Size = str.Size(),
+    };
+    return ret;
+}
 
 } // namespace nyla

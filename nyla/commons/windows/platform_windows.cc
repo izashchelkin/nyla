@@ -74,29 +74,29 @@ auto TicksTo(uint64_t ticks, uint64_t scale) -> uint64_t
 
 } // namespace
 
-auto Platform::GetMonotonicTimeMillis() -> uint64_t
+auto NYLA_API Platform::GetMonotonicTimeMillis() -> uint64_t
 {
     return TicksTo(GetPerformanceTicks(), 1'000ULL);
 }
 
-auto Platform::GetMonotonicTimeMicros() -> uint64_t
+auto NYLA_API Platform::GetMonotonicTimeMicros() -> uint64_t
 {
     return TicksTo(GetPerformanceTicks(), 1'000'000ULL);
 }
 
-auto Platform::GetMemPageSize() -> uint64_t
+auto NYLA_API Platform::GetMemPageSize() -> uint64_t
 {
     return g_SysInfo.dwPageSize;
 }
 
-auto Platform::ReserveMemPages(uint64_t size) -> char *
+auto NYLA_API Platform::ReserveMemPages(uint64_t size) -> char *
 {
     char *ret = g_AddressSpaceAt;
     g_AddressSpaceAt += AlignedUp<uint64_t>(size, g_SysInfo.dwPageSize);
     return ret;
 }
 
-void Platform::CommitMemPages(char *page, uint64_t size)
+void NYLA_API Platform::CommitMemPages(char *page, uint64_t size)
 {
     NYLA_ASSERT(((page - g_AddressSpaceBase) % g_SysInfo.dwPageSize) == 0);
 
@@ -105,7 +105,7 @@ void Platform::CommitMemPages(char *page, uint64_t size)
     VirtualAlloc(page, size, MEM_COMMIT, PAGE_READWRITE);
 }
 
-void Platform::DecommitMemPages(char *page, uint64_t size)
+void NYLA_API Platform::DecommitMemPages(char *page, uint64_t size)
 {
     NYLA_ASSERT(((page - g_AddressSpaceBase) % g_SysInfo.dwPageSize) == 0);
 
@@ -114,7 +114,7 @@ void Platform::DecommitMemPages(char *page, uint64_t size)
     VirtualAlloc(page, size, MEM_DECOMMIT, PAGE_NOACCESS);
 }
 
-void Platform::Init(const PlatformInitDesc &desc)
+void NYLA_API Platform::Init(const PlatformInitDesc &desc)
 {
     GetNativeSystemInfo(&g_SysInfo);
 
@@ -127,7 +127,7 @@ void Platform::Init(const PlatformInitDesc &desc)
         WinOpen();
 }
 
-auto Platform::WinPollEvent(PlatformEvent &outEvent) -> bool
+auto NYLA_API Platform::WinPollEvent(PlatformEvent &outEvent) -> bool
 {
     while (g_EventsRing.empty() && !(g_Flags & (kFlagRepaint | kFlagRepaint | kFlagQuit)))
     {
@@ -184,7 +184,7 @@ auto WindowsPlatform::WinGetHandle() -> HWND
     return g_HWnd;
 }
 
-void Platform::WinOpen()
+void NYLA_API Platform::WinOpen()
 {
     if (!g_HWnd)
     {
@@ -207,7 +207,7 @@ void Platform::WinOpen()
     GetWindowRect(g_HWnd, &g_WinRect);
 }
 
-auto Platform::WinGetSize() -> PlatformWindowSize
+auto NYLA_API Platform::WinGetSize() -> PlatformWindowSize
 {
     return {
         .width = static_cast<uint32_t>(g_WinRect.right - g_WinRect.left),
@@ -239,7 +239,7 @@ auto Platform::UpdateGamepad(uint32_t index) -> bool
 namespace
 {
 
-auto GetGamepadStick(auto rawX, auto rawY, auto rawDeadzone) -> float2
+void GetGamepadStick(auto rawX, auto rawY, auto rawDeadzone, float &outX, float &outY)
 {
     const float x = (float)rawX / (float)Limits<int16_t>::Max();
     const float y = (float)rawY / (float)Limits<int16_t>::Max();
@@ -249,13 +249,16 @@ auto GetGamepadStick(auto rawX, auto rawY, auto rawDeadzone) -> float2
 
     if (magnitude < deadzone)
     {
-        return {0.0f, 0.0f};
+        outX = 0.f;
+        outY = 0.f;
     }
+    else
+    { // Renormalize so movement starts smoothly from the edge of the deadzone
+        const float scale = (magnitude - deadzone) / (1.0f - deadzone);
 
-    // Renormalize so movement starts smoothly from the edge of the deadzone
-    const float scale = (magnitude - deadzone) / (1.0f - deadzone);
-
-    return {(x / magnitude) * scale, (y / magnitude) * scale};
+        outX = (x / magnitude) * scale;
+        outY = (y / magnitude) * scale;
+    }
 }
 
 auto GetGamepadTrigger(uint8_t rawValue, uint8_t rawDeadzone) -> float
@@ -274,25 +277,25 @@ auto GetGamepadTrigger(uint8_t rawValue, uint8_t rawDeadzone) -> float
 
 } // namespace
 
-auto Platform::GetGamepadLeftStick(uint32_t index) -> float2
+void NYLA_API GetGamepadLeftStick(uint32_t index, float &outX, float &outY)
 {
     auto &gamepad = g_Gamepads[index].Gamepad;
-    return GetGamepadStick(gamepad.sThumbLX, gamepad.sThumbLY, XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE);
+    return GetGamepadStick(gamepad.sThumbLX, gamepad.sThumbLY, XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, outX, outY);
 }
 
-auto Platform::GetGamepadRightStick(uint32_t index) -> float2
+void NYLA_API GetGamepadRightStick(uint32_t index, float &outX, float &outY)
 {
     auto &gamepad = g_Gamepads[index].Gamepad;
-    return GetGamepadStick(gamepad.sThumbRX, gamepad.sThumbRY, XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE);
+    return GetGamepadStick(gamepad.sThumbRX, gamepad.sThumbRY, XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE, outX, outY);
 }
 
-auto Platform::GetGamepadLeftTrigger(uint32_t index) -> float
+auto NYLA_API Platform::GetGamepadLeftTrigger(uint32_t index) -> float
 {
     auto &gamepad = g_Gamepads[index].Gamepad;
     return GetGamepadTrigger(gamepad.bLeftTrigger, XINPUT_GAMEPAD_TRIGGER_THRESHOLD);
 }
 
-auto Platform::GetGamepadRightTrigger(uint32_t index) -> float
+auto NYLA_API Platform::GetGamepadRightTrigger(uint32_t index) -> float
 {
     auto &gamepad = g_Gamepads[index].Gamepad;
     return GetGamepadTrigger(gamepad.bRightTrigger, XINPUT_GAMEPAD_TRIGGER_THRESHOLD);
@@ -338,7 +341,7 @@ auto CALLBACK WindowsPlatform::MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, 
         if (!wasDown)
         {
             KeyPhysical key = WindowsPlatform::ScanCodeToKeyPhysical(scanCode, extended);
-            g_EventsRing.emplace_back(PlatformEvent{
+            g_EventsRing.PushBack(PlatformEvent{
                 .type = PlatformEventType::KeyDown,
                 .key = key,
             });
@@ -352,7 +355,7 @@ auto CALLBACK WindowsPlatform::MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, 
         bool extended = ((lParam >> 24) & 0x01) != 0;
 
         KeyPhysical key = WindowsPlatform::ScanCodeToKeyPhysical(scanCode, extended);
-        g_EventsRing.emplace_back(PlatformEvent{
+        g_EventsRing.PushBack(PlatformEvent{
             .type = PlatformEventType::KeyUp,
             .key = key,
         });

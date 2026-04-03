@@ -1,8 +1,8 @@
-#include "nyla/rhi/d3d12/rhi_d3d12.h"
+#include "nyla/commons/d3d12/rhi_d3d12.h"
 #include "nyla/commons/assert.h"
-#include "nyla/platform/platform.h"
-#include "nyla/platform/windows/platform_windows.h"
-#include "nyla/rhi/rhi.h"
+#include "nyla/commons/platform.h"
+#include "nyla/commons/windows/platform_windows.h"
+#include "nyla/commons/rhi.h"
 #include <d3d12.h>
 #include <dxgi1_6.h>
 #include <wrl.h>
@@ -130,9 +130,9 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
     m_CBVDescriptorSize = m_Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
     D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = m_RtvHeap->GetCPUDescriptorHandleForHeapStart();
-    for (uint32_t i = 0; i < m_FrameContext.max_size(); ++i)
+    for (uint32_t i = 0; i < m_FrameContext.max_Size(); ++i)
     {
-        FrameContext &frameContext = m_FrameContext.emplace_back(FrameContext{});
+        FrameContext &frameContext = m_FrameContext.PushBack(FrameContext{});
 
         res = m_Swapchain->GetBuffer(i, IID_PPV_ARGS(&frameContext.renderTarget));
         NYLA_ASSERT(SUCCEEDED(res));

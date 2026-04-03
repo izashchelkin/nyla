@@ -10,14 +10,14 @@
 #include "nyla/commons/color.h"
 #include "nyla/commons/handle.h"
 #include "nyla/commons/vec.h"
-#include "nyla/engine/asset_manager.h"
-#include "nyla/engine/debug_text_renderer.h"
-#include "nyla/engine/engine.h"
-#include "nyla/engine/input_manager.h"
-#include "nyla/engine/renderer.h"
-#include "nyla/engine/tween_manager.h"
-#include "nyla/platform/platform.h"
-#include "nyla/rhi/rhi.h"
+#include "nyla/commons/asset_manager.h"
+#include "nyla/commons/debug_text_renderer.h"
+#include "nyla/commons/engine.h"
+#include "nyla/commons/input_manager.h"
+#include "nyla/commons/renderer.h"
+#include "nyla/commons/tween_manager.h"
+#include "nyla/commons/platform.h"
+#include "nyla/commons/rhi.h"
 
 namespace nyla
 {
@@ -76,7 +76,7 @@ void GameInit()
         g_State.assets.ball = AssetManager::DeclareTexture(assetsBasePath + "/Ball_small-blue.png");
         g_State.assets.brickUnbreackable = AssetManager::DeclareTexture(assetsBasePath + "/Brick_unbreakable2.png");
 
-        for (uint32_t i = 0; i < g_State.assets.bricks.size(); ++i)
+        for (uint32_t i = 0; i < g_State.assets.bricks.Size(); ++i)
         {
             std::string path = std::format("{}/Brick{}_4.png", assetsBasePath, i + 1);
             g_State.assets.bricks[i] = AssetManager::DeclareTexture(path);
@@ -85,7 +85,7 @@ void GameInit()
         {
             auto &alloc = Engine::GetPermanentAlloc();
 
-            std::span<AssetManager::MeshVSInput> vertices = alloc.PushArr<AssetManager::MeshVSInput>(4);
+            Span<AssetManager::MeshVSInput> vertices = alloc.PushArr<AssetManager::MeshVSInput>(4);
 
             vertices[0] = AssetManager::MeshVSInput{
                 .pos = {-.5f, .5f, .0f},
@@ -108,7 +108,7 @@ void GameInit()
                 .uv = {1.f, 1.f},
             };
 
-            std::span<uint16_t> indices = alloc.PushArr<uint16_t>(6);
+            Span<uint16_t> indices = alloc.PushArr<uint16_t>(6);
             indices[0] = 0;
             indices[1] = 1;
             indices[2] = 2;
@@ -117,7 +117,7 @@ void GameInit()
             indices[5] = 1;
 
             g_State.assets.rectMesh =
-                AssetManager::DeclareStaticMesh({(char *)vertices.data(), vertices.size_bytes()}, indices);
+                AssetManager::DeclareStaticMesh({(char *)vertices.Data(), vertices.SizeBytes()}, indices);
         }
     }
 
@@ -136,7 +136,7 @@ void GameInit()
             float y = 20.f - i * 1.5f;
             float x = -28.f + j * 3.5f;
 
-            Brick &brick = level.bricks.emplace_back(Brick{
+            Brick &brick = level.bricks.PushBack(Brick{
                 .pos = {50.f * (j % 2 ? 1 : -1), 50.f * (j % 3 ? -1 : 1)},
                 .size = {40.f / 15.f, 1.f},
             });
@@ -252,7 +252,7 @@ void GameRender(RhiCmdList cmd, RhiRenderTargetView rtv)
 
             const float3 pos = float3{brick.pos[0], brick.pos[1], 0};
             const float3 size = float3{brick.size[0], brick.size[1], 0};
-            Renderer::Mesh(pos, size, assets.rectMesh, assets.bricks[i % assets.bricks.size()]);
+            Renderer::Mesh(pos, size, assets.rectMesh, assets.bricks[i % assets.bricks.Size()]);
         }
 
         uint64_t second = Platform::GetMonotonicTimeMillis() / 1000;
