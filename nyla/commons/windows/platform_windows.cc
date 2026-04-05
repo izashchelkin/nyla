@@ -8,9 +8,9 @@
 #include "nyla/commons/inline_ring.h"
 #include "nyla/commons/intrin.h"
 #include "nyla/commons/limits.h"
+#include "nyla/commons/math.h"
 #include "nyla/commons/mem.h"
 #include "nyla/commons/platform.h"
-#include "nyla/commons/span.h"
 
 auto CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) -> LRESULT;
 
@@ -637,8 +637,8 @@ void Platform::FileSeek(FileHandle file, int64_t at)
     distanceToMove.QuadPart = at;
 
     SetFilePointerEx(hFile,          // hFile
-                     distanceToMove, // liDistanceToMove
-                     nullptr,        // lpNewFilePointer
+                     distanceToMove, // lDistanceToMove
+                     nullptr,        // lpDistanceToMoveHigh
                      FILE_BEGIN      // dwMoveMethod
     );
 }

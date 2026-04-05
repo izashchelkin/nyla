@@ -17,7 +17,7 @@ template <typename T> struct RequiredAlignment
     static constexpr size_t value = (alignof(T) > 16) ? alignof(T) : 16;
 };
 
-inline auto Load64(const void *ptr) -> uint64_t
+inline auto Load64U(const void *ptr) -> uint64_t
 {
 #if defined(_MSC_VER)
     return *reinterpret_cast<const __unaligned uint64_t *>(ptr);
@@ -28,7 +28,7 @@ inline auto Load64(const void *ptr) -> uint64_t
 #endif
 }
 
-inline void Write64(void *ptr, uint64_t val)
+inline void Write64U(void *ptr, uint64_t val)
 {
 #if defined(_MSC_VER)
     *reinterpret_cast<__unaligned uint64_t *>(ptr) = val;
@@ -105,15 +105,6 @@ void Swap(T &RESTRICT lhs, T &RESTRICT rhs)
     T tmp = lhs;
     lhs = rhs;
     rhs = tmp;
-}
-
-template <typename To, typename From>
-[[nodiscard]] inline auto BitCast(const From &src) -> To
-    requires(sizeof(To) == sizeof(From))
-{
-    To dest;
-    __builtin_memcpy(&dest, &src, sizeof(To));
-    return dest;
 }
 
 auto NYLA_API MemEq(const char *RESTRICT p1, const char *RESTRICT p2, uint64_t len) -> bool;

@@ -1,5 +1,6 @@
 #include "nyla/commons/engine0_internal.h"
 
+#include "nyla/commons/array.h"
 #include "nyla/commons/engine.h"
 #include "nyla/commons/platform_base.h"
 #include "nyla/commons/rhi.h"
@@ -15,15 +16,17 @@ auto GetShader(const char *name, RhiShaderStage stage) -> RhiShader
         const std::string path = std::format("/home/izashchelkin/nyla/nyla/shaders/build/{}.hlsl.spv", name);
 #else
 
-        Str path = StringWriteFmt(alloc.template PushString<1024>(), AsStr(R"(D:\nyla\nyla\shaders\build\%s.hlsl.spv)"), name);
+        auto path = StringWriteFmt(alloc.template PushString<1024>(), AsStr(R"(D:\nyla\nyla\shaders\build\%s.hlsl.spv)"), name);
 #endif
         // TODO: directory watch
         // PlatformFsWatchFile(path);
 
-        Platform::FileOpen(path.CStr(), FileOpenMode::Read);
-
-        std::vector<std::byte> code = Platform::ReadFile(path);
-        const auto spirv = Span{reinterpret_cast<uint32_t *>(code.Data()), code.Size() / 4};
+#if 0
+        const Span<char> code = Platform::FileRead(alloc, path, 1 << 20);
+        const Span<uint32_t> spirv = code.Cast<uint32_t>();
+#else
+        const Span<uint32_t> spirv = Platform::FileRead(alloc, path, 1 << 20).template Cast<uint32_t>();
+#endif
 
         RhiShader shader = Rhi::CreateShader(RhiShaderDesc{
             .stage = stage,

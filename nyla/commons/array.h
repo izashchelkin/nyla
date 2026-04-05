@@ -137,6 +137,12 @@ template <typename T> struct Span
         return {Data() + from, size};
     }
 
+    template <typename K> auto Cast() const -> Span<K>
+    {
+        NYLA_ASSERT(!(sizeof(T) % sizeof(K)));
+        return Span<K>{(K *)Data(), Size() * sizeof(T) / sizeof(K)};
+    }
+
     [[nodiscard]]
     auto begin() -> T *
     {
@@ -529,8 +535,8 @@ class ByteParser
 
 template <uint64_t N> struct InlineString
 {
-    uint64_t m_Size;
     Array<char, N + 1> m_Data;
+    uint64_t m_Size;
 
     void AppendChar(char ch)
     {
@@ -593,7 +599,7 @@ template <uint64_t N> struct InlineString
 
 template <uint64_t N> auto AsInlineStr(Str str) -> InlineString<N>
 {
-    NYLA_ASSERT(str.Size() <= N);
+    NYLA_ASSERT(str.Size() <= N + 1);
 
     InlineString<N> ret{
         .m_Data = str.Data(),

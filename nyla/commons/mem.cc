@@ -1,5 +1,5 @@
 #include "nyla/commons/mem.h"
-#include "nyla/commons/fmt.h"
+#include "nyla/commons/array.h"
 #include "nyla/commons/intrin.h"
 
 #include <cstdint>
@@ -35,9 +35,9 @@ auto MemEq(const char *p1, const char *p2, uint64_t len) -> bool
     {
         if (len >= 8)
         {
-            if (Load64(p1) != Load64(p2))
+            if (Load64U(p1) != Load64U(p2))
                 return false;
-            return Load64(p1 + len - 8) == Load64(p2 + len - 8);
+            return Load64U(p1 + len - 8) == Load64U(p2 + len - 8);
         }
         for (uint64_t i = 0; i < len; ++i)
         {

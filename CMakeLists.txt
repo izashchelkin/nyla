@@ -47,6 +47,7 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
         "-fno-stack-protector"
         "-fno-exceptions"
         "-fno-rtti"
+        "-fno-strict-aliasing"
     )
     
     add_link_options(

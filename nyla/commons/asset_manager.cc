@@ -1,14 +1,12 @@
 #include <cstdint>
 
 #include "nyla/commons/align.h"
-#include "nyla/commons/assert.h"
 #include "nyla/commons/asset_manager.h"
 #include "nyla/commons/engine.h"
 #include "nyla/commons/gltf/gltf.h"
 #include "nyla/commons/gpu_upload_manager.h"
 #include "nyla/commons/handle.h"
 #include "nyla/commons/handle_pool.h"
-#include "nyla/commons/inline_string.h"
 #include "nyla/commons/log.h"
 #include "nyla/commons/path.h"
 #include "nyla/commons/platform.h"
@@ -26,14 +24,14 @@ namespace
 struct TextureData
 {
     bool isStatic;
-    std::string path;
+    Str path;
     bool needsUpload;
 
     RhiTexture texture;
     RhiSampledTextureView textureView;
-    uint32_t width = 0;
-    uint32_t height = 0;
-    uint32_t channels = 0;
+    uint32_t width;
+    uint32_t height;
+    uint32_t channels;
 };
 HandlePool<AssetManager::Texture, TextureData, 128> g_Textures;
 
@@ -144,69 +142,67 @@ void AssetManager::Flush()
 
 void AssetManager::Upload(RhiCmdList cmd)
 {
-    for (uint32_t i = 0; i < g_Meshes.Size(); ++i)
-    {
-        auto &slot = *(g_Meshes.begin() + i);
-        if (!slot.used)
-            continue;
-
-        MeshData &meshData = slot.data;
-        if (!meshData.needsUpload)
-            continue;
-
-        if (meshData.isStatic)
+    Engine::GetPerFrameAlloc().VoidScope(1 << 23, [&](auto &alloc) {
+        for (uint32_t i = 0; i < g_Meshes.Size(); ++i)
         {
-            meshData.indexCount = meshData.indices.Size();
-            NYLA_ASSERT(meshData.indexCount % 3 == 0);
+            auto &slot = *(g_Meshes.begin() + i);
+            if (!slot.used)
+                continue;
 
-            char *uploadMemory =
-                GpuUploadManager::CmdCopyStaticIndices(cmd, meshData.indices.SizeBytes(), meshData.indexBufferOffset);
-            memcpy(uploadMemory, meshData.indices.Data(), meshData.indices.SizeBytes());
+            MeshData &meshData = slot.data;
+            if (!meshData.needsUpload)
+                continue;
 
-            uploadMemory = GpuUploadManager::CmdCopyStaticVertices(cmd, meshData.vertexData.SizeBytes(),
-                                                                   meshData.vertexBufferOffset);
-            memcpy(uploadMemory, meshData.vertexData.Data(), meshData.vertexData.SizeBytes());
-        }
-        else
-        {
-            auto &transientAlloc = Engine::GetPerFrameAlloc();
-            RegionAlloc scratchAlloc = transientAlloc.PushSubAlloc(16_KiB);
-
-            NYLA_ASSERT(meshData.gltfPath.EndsWith(AsStr(".gltf")));
-            std::vector<std::byte> gltfData = Platform::ReadFile(meshData.gltfPath.StrView());
-            std::vector<std::byte> binData =
-                Platform::ReadFile(meshData.gltfPath.Clone(scratchAlloc).SetExtension(".bin").StrView());
-
+            if (meshData.isStatic)
             {
-                GltfParser parser;
-                parser.Init(&scratchAlloc, Span{(char *)gltfData.Data(), gltfData.Size()},
-                            Span{(char *)binData.Data(), binData.Size()});
-                NYLA_ASSERT(parser.Parse());
+                meshData.indexCount = meshData.indices.Size();
+                NYLA_ASSERT(meshData.indexCount % 3 == 0);
 
-                NYLA_ASSERT(parser.GetImages().Size() == 1);
+                char *uploadMemory = GpuUploadManager::CmdCopyStaticIndices(cmd, meshData.indices.SizeBytes(),
+                                                                            meshData.indexBufferOffset);
+                memcpy(uploadMemory, meshData.indices.Data(), meshData.indices.SizeBytes());
+
+                uploadMemory = GpuUploadManager::CmdCopyStaticVertices(cmd, meshData.vertexData.SizeBytes(),
+                                                                       meshData.vertexBufferOffset);
+                memcpy(uploadMemory, meshData.vertexData.Data(), meshData.vertexData.SizeBytes());
+            }
+            else
+            {
+                NYLA_ASSERT(meshData.gltfPath.EndsWith(AsStr(".gltf")));
+                Span gltfData = Platform::FileRead(meshData.gltfPath.GetStr());
+                Span binData = Platform::FileRead(
+                    alloc, ClonePath(alloc, meshData.gltfPath).SetExtension(".bin").GetStr(), 1 << 20);
 
                 {
-                    GltfImage image = parser.GetImages().front();
-                    Path path = meshData.gltfPath.Clone(scratchAlloc).PopBack().Append(image.uri);
-                    meshData.texture = DeclareTexture(path.StrView());
-                }
+                    GltfParser parser;
+                    parser.Init(&alloc, Span{(char *)gltfData.Data(), gltfData.Size()},
+                                Span{(char *)binData.Data(), binData.Size()});
+                    NYLA_ASSERT(parser.Parse());
 
-                for (const GltfMesh &mesh : parser.GetMeshes())
+                    NYLA_ASSERT(parser.GetImages().Size() == 1);
 
-                    for (const GltfMeshPrimitive &primitive : mesh.primitives)
                     {
+                        GltfImage image = parser.GetImages().Front();
+                        Path path = alloc.ClonePath(alloc, meshData.gltfPath).PopBack().Append(image.uri);
+                        meshData.texture = DeclareTexture(path.GetStr());
+                    }
+
+                    for (const GltfMesh &mesh : parser.GetMeshes())
+
+                        for (const GltfMeshPrimitive &primitive : mesh.primitives)
                         {
-                            GltfAccessor indices = parser.GetAccessor(primitive.indices);
-                            NYLA_ASSERT(indices.type == GltfAccessorType::SCALAR);
-                            NYLA_ASSERT(indices.componentType == GltfAccessorComponentType::UNSIGNED_SHORT);
+                            {
+                                GltfAccessor indices = parser.GetAccessor(primitive.indices);
+                                NYLA_ASSERT(indices.type == GltfAccessorType::SCALAR);
+                                NYLA_ASSERT(indices.componentType == GltfAccessorComponentType::UNSIGNED_SHORT);
 
-                            GltfBufferView bufferView = parser.GetBufferView(indices.bufferView);
+                                GltfBufferView bufferView = parser.GetBufferView(indices.bufferView);
 
-                            uint32_t bufferSize = indices.count * GetGltfAccessorSize(indices);
-                            char *const uploadMemory =
-                                GpuUploadManager::CmdCopyStaticIndices(cmd, bufferSize, meshData.indexBufferOffset);
+                                uint32_t bufferSize = indices.count * GetGltfAccessorSize(indices);
+                                char *const uploadMemory =
+                                    GpuUploadManager::CmdCopyStaticIndices(cmd, bufferSize, meshData.indexBufferOffset);
 
-                            Span<char> indicesData = parser.GetAccessorData(indices);
+                                Span<char> indicesData = parser.GetAccessorData(indices);
 
 #if 0
                             { // conversion
@@ -219,61 +215,61 @@ void AssetManager::Upload(RhiCmdList cmd)
                             }
 #endif
 
-                            memcpy(uploadMemory, indicesData.Data(), indicesData.SizeBytes());
+                                memcpy(uploadMemory, indicesData.Data(), indicesData.SizeBytes());
 
-                            NYLA_ASSERT((indicesData.SizeBytes() % sizeof(uint16_t)) == 0);
-                            meshData.indexCount = indicesData.SizeBytes() / sizeof(uint16_t);
-                            NYLA_ASSERT(meshData.indexCount % 3 == 0);
-                        }
+                                NYLA_ASSERT((indicesData.SizeBytes() % sizeof(uint16_t)) == 0);
+                                meshData.indexCount = indicesData.SizeBytes() / sizeof(uint16_t);
+                                NYLA_ASSERT(meshData.indexCount % 3 == 0);
+                            }
 
-                        {
-                            auto &attrs = primitive.attributes;
-
-                            uint32_t stride = 0;
-
-                            auto alignStride = [&](GltfAccessor accessor) -> void {
-                                const uint32_t componentSize = GetGltfAccessorComponentSize(accessor.componentType);
-                                AlignUp(stride, componentSize);
-                            };
-                            auto countStride = [&](GltfAccessor accessor) -> uint32_t {
-                                alignStride(accessor);
-                                const uint32_t offset = stride;
-                                stride += GetGltfAccessorSize(accessor);
-                                return offset;
-                            };
-
-                            GltfAccessor pos;
-                            NYLA_ASSERT(parser.FindAttributeAccessor(attrs, "POSITION", pos));
-                            NYLA_ASSERT(pos.type == GltfAccessorType::VEC3);
-                            NYLA_ASSERT(pos.componentType == GltfAccessorComponentType::FLOAT);
-                            const uint32_t posOffset = countStride(pos);
-
-                            GltfAccessor norm;
-                            NYLA_ASSERT(parser.FindAttributeAccessor(attrs, "NORMAL", norm));
-                            NYLA_ASSERT(norm.type == GltfAccessorType::VEC3);
-                            NYLA_ASSERT(norm.componentType == GltfAccessorComponentType::FLOAT);
-                            NYLA_ASSERT(norm.count == pos.count);
-                            const uint32_t normOffset = countStride(norm);
-
-                            GltfAccessor texCoord;
-                            NYLA_ASSERT(parser.FindAttributeAccessor(attrs, "TEXCOORD_0", texCoord));
-                            NYLA_ASSERT(texCoord.type == GltfAccessorType::VEC2);
-                            NYLA_ASSERT(texCoord.componentType == GltfAccessorComponentType::FLOAT);
-                            NYLA_ASSERT(texCoord.count == pos.count);
-                            const uint32_t texCoordOffset = countStride(texCoord);
-
-                            alignStride(pos);
-                            const uint32_t bufferSize = stride * pos.count;
-
-                            const auto posBufferView = parser.GetAccessorData(pos);
-                            const auto normBufferView = parser.GetAccessorData(norm);
-                            const auto texCoordBufferView = parser.GetAccessorData(texCoord);
-
-                            char *const uploadMemory =
-                                GpuUploadManager::CmdCopyStaticVertices(cmd, bufferSize, meshData.vertexBufferOffset);
-
-                            for (uint32_t i = 0; i < pos.count; ++i)
                             {
+                                auto &attrs = primitive.attributes;
+
+                                uint32_t stride = 0;
+
+                                auto alignStride = [&](GltfAccessor accessor) -> void {
+                                    const uint32_t componentSize = GetGltfAccessorComponentSize(accessor.componentType);
+                                    AlignUp(stride, componentSize);
+                                };
+                                auto countStride = [&](GltfAccessor accessor) -> uint32_t {
+                                    alignStride(accessor);
+                                    const uint32_t offset = stride;
+                                    stride += GetGltfAccessorSize(accessor);
+                                    return offset;
+                                };
+
+                                GltfAccessor pos;
+                                NYLA_ASSERT(parser.FindAttributeAccessor(attrs, AsStr("POSITION"), pos));
+                                NYLA_ASSERT(pos.type == GltfAccessorType::VEC3);
+                                NYLA_ASSERT(pos.componentType == GltfAccessorComponentType::FLOAT);
+                                const uint32_t posOffset = countStride(pos);
+
+                                GltfAccessor norm;
+                                NYLA_ASSERT(parser.FindAttributeAccessor(attrs, AsStr("NORMAL"), norm));
+                                NYLA_ASSERT(norm.type == GltfAccessorType::VEC3);
+                                NYLA_ASSERT(norm.componentType == GltfAccessorComponentType::FLOAT);
+                                NYLA_ASSERT(norm.count == pos.count);
+                                const uint32_t normOffset = countStride(norm);
+
+                                GltfAccessor texCoord;
+                                NYLA_ASSERT(parser.FindAttributeAccessor(attrs, AsStr("TEXCOORD_0"), texCoord));
+                                NYLA_ASSERT(texCoord.type == GltfAccessorType::VEC2);
+                                NYLA_ASSERT(texCoord.componentType == GltfAccessorComponentType::FLOAT);
+                                NYLA_ASSERT(texCoord.count == pos.count);
+                                const uint32_t texCoordOffset = countStride(texCoord);
+
+                                alignStride(pos);
+                                const uint32_t bufferSize = stride * pos.count;
+
+                                const auto posBufferView = parser.GetAccessorData(pos);
+                                const auto normBufferView = parser.GetAccessorData(norm);
+                                const auto texCoordBufferView = parser.GetAccessorData(texCoord);
+
+                                char *const uploadMemory = GpuUploadManager::CmdCopyStaticVertices(
+                                    cmd, bufferSize, meshData.vertexBufferOffset);
+
+                                for (uint32_t i = 0; i < pos.count; ++i)
+                                {
 
 #if 0
                                 { // conversion
@@ -287,86 +283,93 @@ void AssetManager::Upload(RhiCmdList cmd)
                                 }
 #endif
 
-                                auto copyAttribute = [uploadMemory, i, stride](GltfAccessor accessor, uint32_t offset,
-                                                                               char *byteBufferViewData) -> void {
-                                    void *const dst = uploadMemory + static_cast<uint64_t>(i * stride + offset);
-                                    const void *const src =
-                                        byteBufferViewData + static_cast<uint64_t>(i * GetGltfAccessorSize(accessor));
-                                    memcpy(dst, src, GetGltfAccessorSize(accessor));
-                                };
+                                    auto copyAttribute = [uploadMemory, i, stride](GltfAccessor accessor,
+                                                                                   uint32_t offset,
+                                                                                   char *byteBufferViewData) -> void {
+                                        void *const dst = uploadMemory + static_cast<uint64_t>(i * stride + offset);
+                                        const void *const src =
+                                            byteBufferViewData +
+                                            static_cast<uint64_t>(i * GetGltfAccessorSize(accessor));
+                                        memcpy(dst, src, GetGltfAccessorSize(accessor));
+                                    };
 
-                                copyAttribute(pos, posOffset, posBufferView.Data());
-                                copyAttribute(norm, normOffset, normBufferView.Data());
-                                copyAttribute(texCoord, texCoordOffset, texCoordBufferView.Data());
+                                    copyAttribute(pos, posOffset, posBufferView.Data());
+                                    copyAttribute(norm, normOffset, normBufferView.Data());
+                                    copyAttribute(texCoord, texCoordOffset, texCoordBufferView.Data());
+                                }
                             }
                         }
-                    }
+                }
             }
-            transientAlloc.Pop(scratchAlloc.GetBase());
+
+            meshData.needsUpload = false;
+            alloc.Reset();
         }
 
-        meshData.needsUpload = false;
-    }
-
-    for (uint32_t i = 0; i < g_Textures.Size(); ++i)
-    {
-        auto &slot = *(g_Textures.begin() + i);
-        if (!slot.used)
-            continue;
-
-        TextureData &textureAssetData = slot.data;
-        if (!textureAssetData.needsUpload)
-            continue;
-
-        // stbi_set_flip_vertically_on_load(true);
-        void *data = stbi_load(textureAssetData.path.c_str(), (int *)&textureAssetData.width,
-                               (int *)&textureAssetData.height, (int *)&textureAssetData.channels, STBI_rgb_alpha);
-
-        if (textureAssetData.channels != 4) // alpha missing?
-            textureAssetData.channels = 4;
-
-        if (!data)
+        for (uint32_t i = 0; i < g_Textures.Size(); ++i)
         {
-            NYLA_LOG("stbi_load failed for '%s': %s", textureAssetData.path.Data(), stbi_failure_reason());
-            NYLA_ASSERT(false);
+            auto &slot = *(g_Textures.begin() + i);
+            if (!slot.used)
+                continue;
+
+            TextureData &textureAssetData = slot.data;
+            if (!textureAssetData.needsUpload)
+                continue;
+
+            // stbi_set_flip_vertically_on_load(true);
+
+            void *data = nullptr;
+#if 0
+                stbi_load(textureAssetData.path.c_str(), (int *)&textureAssetData.width,
+                                   (int *)&textureAssetData.height, (int *)&textureAssetData.channels, STBI_rgb_alpha);
+#endif
+
+            if (textureAssetData.channels != 4) // alpha missing?
+                textureAssetData.channels = 4;
+
+            if (!data)
+            {
+                // NYLA_LOG("stbi_load failed for '%s': %s", textureAssetData.path.Data(), stbi_failure_reason());
+                NYLA_ASSERT(false);
+            }
+
+            const RhiTexture texture = Rhi::CreateTexture(RhiTextureDesc{
+                .width = textureAssetData.width,
+                .height = textureAssetData.height,
+                .memoryUsage = RhiMemoryUsage::GpuOnly,
+                .usage = RhiTextureUsage::TransferDst | RhiTextureUsage::ShaderSampled,
+                .format = RhiTextureFormat::R8G8B8A8_sRGB,
+            });
+            textureAssetData.texture = texture;
+
+            const RhiSampledTextureView textureView = Rhi::CreateSampledTextureView(RhiTextureViewDesc{
+                .texture = texture,
+            });
+            textureAssetData.textureView = textureView;
+
+            Rhi::CmdTransitionTexture(cmd, texture, RhiTextureState::TransferDst);
+
+            const uint32_t size = textureAssetData.width * textureAssetData.height * textureAssetData.channels;
+
+            char *uploadMemory = GpuUploadManager::CmdCopyTexture(cmd, texture, size);
+            memcpy(uploadMemory, data, size);
+
+            free(data);
+
+            // TODO: this barrier does not need to be here
+            Rhi::CmdTransitionTexture(cmd, texture, RhiTextureState::ShaderRead);
+
+            NYLA_LOG("Uploading '%s'", (const char *)textureAssetData.path.Data());
+
+            textureAssetData.needsUpload = false;
         }
-
-        const RhiTexture texture = Rhi::CreateTexture(RhiTextureDesc{
-            .width = textureAssetData.width,
-            .height = textureAssetData.height,
-            .memoryUsage = RhiMemoryUsage::GpuOnly,
-            .usage = RhiTextureUsage::TransferDst | RhiTextureUsage::ShaderSampled,
-            .format = RhiTextureFormat::R8G8B8A8_sRGB,
-        });
-        textureAssetData.texture = texture;
-
-        const RhiSampledTextureView textureView = Rhi::CreateSampledTextureView(RhiTextureViewDesc{
-            .texture = texture,
-        });
-        textureAssetData.textureView = textureView;
-
-        Rhi::CmdTransitionTexture(cmd, texture, RhiTextureState::TransferDst);
-
-        const uint32_t size = textureAssetData.width * textureAssetData.height * textureAssetData.channels;
-
-        char *uploadMemory = GpuUploadManager::CmdCopyTexture(cmd, texture, size);
-        memcpy(uploadMemory, data, size);
-
-        free(data);
-
-        // TODO: this barrier does not need to be here
-        Rhi::CmdTransitionTexture(cmd, texture, RhiTextureState::ShaderRead);
-
-        NYLA_LOG("Uploading '%s'", (const char *)textureAssetData.path.Data());
-
-        textureAssetData.needsUpload = false;
-    }
+    });
 }
 
 auto AssetManager::DeclareTexture(Str path) -> Texture
 {
     return g_Textures.Acquire(TextureData{
-        .path = std::string{path},
+        .path = path,
         .needsUpload = true,
     });
 }
