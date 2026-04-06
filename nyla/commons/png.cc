@@ -4,8 +4,6 @@
 #include "nyla/commons/png.h"
 #include "nyla/commons/word.h"
 
-#define STBI__PNG_TYPE(a, b, c, d)                                                                                     \
-    (((unsigned)(a) << 24) + ((unsigned)(b) << 16) + ((unsigned)(c) << 8) + (unsigned)(d))
 #define STBI_MAX_DIMENSIONS (1 << 24)
 
 namespace nyla::ByteParser::PNGParser
@@ -39,53 +37,52 @@ INLINE PNGChunk ReadChunkHeader(Instance &self)
 
 } // namespace
 
-auto PNGParser::Parse(Instance &self, ScanType scan) -> bool
+auto PNGParser::Parse(Instance &self, Scan scan) -> bool
 {
     uint8_t palette[1024], pal_img_n = 0;
     uint8_t has_trans = 0, tc[3] = {0};
     uint16_t tc16[3];
     uint32_t ioff = 0, idata_limit = 0, i, pal_len = 0;
     int first = 1, k, interlace = 0, color = 0, is_iphone = 0;
-    stbi__context *s = z->s;
 
-    z->expanded = NULL;
-    z->idata = NULL;
-    z->out = NULL;
+    self.expanded = NULL;
+    self.idata = NULL;
+    self.out = NULL;
 
     if (!MemStartsWith(self.m_At, self.m_Left, PNGSig, sizeof(PNGSig)))
         return Error(self, "Invalid PNG signature");
 
-    if (!stbi__check_png_header(s))
-        return 0;
-
-    if (scan == STBI__SCAN_type)
-        return 1;
+    if (scan == Scan::Type)
+        return true;
 
     for (;;)
     {
-        stbi__pngchunk c = stbi__get_chunk_header(s);
+        auto c = ReadChunkHeader(self);
         switch (c.type)
         {
-        case STBI__PNG_TYPE('C', 'g', 'B', 'I'):
+
+        case DWordBE("CgBI"): {
             is_iphone = 1;
-            Advance(c.length);
+            Advance(self, c.length);
             break;
-        case STBI__PNG_TYPE('I', 'H', 'D', 'R'): {
+        }
+
+        case DWordBE("IHDR"): {
             int comp, filter;
             if (!first)
-                return Error("multiple IHDR", "Corrupt PNG");
+                return Error(self, "multiple IHDR", "Corrupt PNG");
             first = 0;
             if (c.length != 13)
-                return Error("bad IHDR len", "Corrupt PNG");
-            s->img_x = Pop32BE();
-            s->img_y = Pop32BE();
-            if (s->img_y > STBI_MAX_DIMENSIONS)
-                return Error("too large", "Very large image (corrupt?)");
-            if (s->img_x > STBI_MAX_DIMENSIONS)
-                return Error("too large", "Very large image (corrupt?)");
+                return Error(self, "bad IHDR len", "Corrupt PNG");
+            self.img_x = Read32BE(self);
+            self.img_y = Read32BE(self);
+            if (self.img_y > STBI_MAX_DIMENSIONS)
+                return Error(self, "too large", "Very large image (corrupt?)");
+            if (self.img_x > STBI_MAX_DIMENSIONS)
+                return Error(self, "too large", "Very large image (corrupt?)");
 
-            m_Depth = Pop();
-            switch (m_Depth)
+            self.m_Depth = Read(self);
+            switch (self.m_Depth)
             {
             case 1:
             case 2:
@@ -95,129 +92,129 @@ auto PNGParser::Parse(Instance &self, ScanType scan) -> bool
                 break;
 
             default:
-                return Error("1/2/4/8/16-bit only", "PNG not supported: 1/2/4/8/16-bit only");
+                return Error(self, "1/2/4/8/16-bit only", "PNG not supported: 1/2/4/8/16-bit only");
             }
 
-            color = Pop();
+            color = Read(self);
             if (color > 6)
-                return Error("bad ctype", "Corrupt PNG");
-            if (color == 3 && m_Depth == 16)
-                return Error("bad ctype", "Corrupt PNG");
+                return Error(self, "bad ctype", "Corrupt PNG");
+            if (color == 3 && self.m_Depth == 16)
+                return Error(self, "bad ctype", "Corrupt PNG");
             if (color == 3)
                 pal_img_n = 3;
             else if (color & 1)
-                return Error("bad ctype", "Corrupt PNG");
-            comp = Pop();
+                return Error(self, "bad ctype", "Corrupt PNG");
+            comp = Read(self);
             if (comp)
-                return Error("bad comp method", "Corrupt PNG");
-            filter = Pop();
+                return Error(self, "bad comp method", "Corrupt PNG");
+            filter = Read(self);
             if (filter)
-                return Error("bad filter method", "Corrupt PNG");
-            interlace = Pop();
+                return Error(self, "bad filter method", "Corrupt PNG");
+            interlace = Read(self);
             if (interlace > 1)
-                return Error("bad interlace method", "Corrupt PNG");
-            if (!s->img_x || !s->img_y)
-                return Error("0-pixel image", "Corrupt PNG");
+                return Error(self, "bad interlace method", "Corrupt PNG");
+            if (!self.img_x || !self.img_y)
+                return Error(self, "0-pixel image", "Corrupt PNG");
             if (!pal_img_n)
             {
-                s->img_n = (color & 2 ? 3 : 1) + (color & 4 ? 1 : 0);
-                if ((1 << 30) / s->img_x / s->img_n < s->img_y)
-                    return Error("too large", "Image too large to decode");
+                self.img_n = (color & 2 ? 3 : 1) + (color & 4 ? 1 : 0);
+                if ((1 << 30) / self.img_x / self.img_n < self.img_y)
+                    return Error(self, "too large", "Image too large to decode");
             }
             else
             {
                 // if paletted, then pal_n is our final components, and
                 // img_n is # components to decompress/filter.
-                s->img_n = 1;
-                if ((1 << 30) / s->img_x / 4 < s->img_y)
-                    return Error("too large", "Corrupt PNG");
+                self.img_n = 1;
+                if ((1 << 30) / self.img_x / 4 < self.img_y)
+                    return Error(self, "too large", "Corrupt PNG");
             }
             // even with SCAN_header, have to scan to see if we have a tRNS
             break;
         }
 
-        case STBI__PNG_TYPE('P', 'L', 'T', 'E'): {
+        case DWordBE("PLTE"): {
             if (first)
-                return Error("first not IHDR", "Corrupt PNG");
+                return Error(self, "first not IHDR", "Corrupt PNG");
             if (c.length > 256 * 3)
-                return Error("invalid PLTE", "Corrupt PNG");
+                return Error(self, "invalid PLTE", "Corrupt PNG");
             pal_len = c.length / 3;
             if (pal_len * 3 != c.length)
-                return Error("invalid PLTE", "Corrupt PNG");
+                return Error(self, "invalid PLTE", "Corrupt PNG");
             for (i = 0; i < pal_len; ++i)
             {
-                palette[i * 4 + 0] = Pop();
-                palette[i * 4 + 1] = Pop();
-                palette[i * 4 + 2] = Pop();
+                palette[i * 4 + 0] = Read(self);
+                palette[i * 4 + 1] = Read(self);
+                palette[i * 4 + 2] = Read(self);
                 palette[i * 4 + 3] = 255;
             }
             break;
         }
 
-        case STBI__PNG_TYPE('t', 'R', 'N', 'S'): {
+        case DWordBE("tRNS"): {
             if (first)
-                return Error("first not IHDR", "Corrupt PNG");
-            if (z->idata)
-                return Error("tRNS after IDAT", "Corrupt PNG");
+                return Error(self, "first not IHDR", "Corrupt PNG");
+            if (self.idata)
+                return Error(self, "tRNS after IDAT", "Corrupt PNG");
             if (pal_img_n)
             {
-                if (scan == STBI__SCAN_header)
+                if (scan == Scan::Header)
                 {
-                    s->img_n = 4;
-                    return 1;
+                    self.img_n = 4;
+                    return true;
                 }
                 if (pal_len == 0)
-                    return Error("tRNS before PLTE", "Corrupt PNG");
+                    return Error(self, "tRNS before PLTE", "Corrupt PNG");
                 if (c.length > pal_len)
-                    return Error("bad tRNS len", "Corrupt PNG");
+                    return Error(self, "bad tRNS len", "Corrupt PNG");
                 pal_img_n = 4;
                 for (i = 0; i < c.length; ++i)
-                    palette[i * 4 + 3] = Pop();
+                    palette[i * 4 + 3] = Read(self);
             }
             else
             {
-                if (!(s->img_n & 1))
-                    return Error("tRNS with alpha", "Corrupt PNG");
-                if (c.length != (uint32_t)s->img_n * 2)
-                    return Error("bad tRNS len", "Corrupt PNG");
+                if (!(self.img_n & 1))
+                    return Error(self, "tRNS with alpha", "Corrupt PNG");
+                if (c.length != (uint32_t)self.img_n * 2)
+                    return Error(self, "bad tRNS len", "Corrupt PNG");
                 has_trans = 1;
                 // non-paletted with tRNS = constant alpha. if header-scanning, we can stop now.
-                if (scan == STBI__SCAN_header)
+                if (scan == Scan::Header)
                 {
-                    ++s->img_n;
-                    return 1;
+                    ++self.img_n;
+                    return true;
                 }
-                if (m_Depth == 16)
+                if (self.m_Depth == 16)
                 {
-                    for (k = 0; k < s->img_n && k < 3; ++k) // extra loop test to suppress false GCC warning
-                        tc16[k] = Pop16BE();                // copy the values as-is
+                    for (k = 0; k < self.img_n && k < 3; ++k) // extra loop test to suppress false GCC warning
+                        tc16[k] = Read16BE(self);             // copy the values as-is
                 }
                 else
                 {
-                    for (k = 0; k < s->img_n && k < 3; ++k)
+                    for (k = 0; k < self.img_n && k < 3; ++k)
                     {
-                        tc[k] = (unsigned char)(Pop16BE() & 255) *
-                                stbi__depth_scale_table[m_Depth]; // non 8-bit images will be larger
+                        tc[k] = (unsigned char)(Read16BE(self) & 255) *
+                                DepthScaleTable[self.m_Depth]; // non 8-bit images will be larger
                     }
                 }
             }
             break;
         }
 
-        case STBI__PNG_TYPE('I', 'D', 'A', 'T'): {
+        case DWordBE("IDAT"): {
             if (first)
-                return Error("first not IHDR", "Corrupt PNG");
+                return Error(self, "first not IHDR", "Corrupt PNG");
             if (pal_img_n && !pal_len)
-                return Error("no PLTE", "Corrupt PNG");
-            if (scan == STBI__SCAN_header)
+                return Error(self, "no PLTE", "Corrupt PNG");
+            if (scan == Scan::Header)
             {
                 // header scan definitely stops at first IDAT
                 if (pal_img_n)
-                    s->img_n = pal_img_n;
-                return 1;
+                    self.img_n = pal_img_n;
+                return true;
             }
             if (c.length > (1u << 30))
-                return Error("IDAT size limit", "IDAT section larger than 2^30 bytes");
+                return Error(self, "IDAT size limit", "IDAT section larger than 2^30 bytes");
             if ((int)(ioff + c.length) < (int)ioff)
                 return 0;
             if (ioff + c.length > idata_limit)
@@ -231,8 +228,8 @@ auto PNGParser::Parse(Instance &self, ScanType scan) -> bool
                 // STBI_NOTUSED(idata_limit_old);
                 p = (unsigned char *)STBI_REALLOC_SIZED(z->idata, idata_limit_old, idata_limit);
                 if (p == NULL)
-                    return Error("outofmem", "Out of memory");
-                z->idata = p;
+                    return Error(self, "outofmem", "Out of memory");
+                self.idata = p;
             }
             if (!stbi__getn(s, z->idata + ioff, c.length))
                 return Error("outofdata", "Corrupt PNG");
@@ -245,7 +242,7 @@ auto PNGParser::Parse(Instance &self, ScanType scan) -> bool
             if (first)
                 return Error("first not IHDR", "Corrupt PNG");
             if (scan != STBI__SCAN_load)
-                return 1;
+                return true;
             if (z->idata == NULL)
                 return Error("no IDAT", "Corrupt PNG");
             // initial guess for decoded data size to avoid unnecessary reallocs
@@ -297,7 +294,7 @@ auto PNGParser::Parse(Instance &self, ScanType scan) -> bool
             z->expanded = NULL;
             // end of PNG chunk, read and skip CRC
             Pop32BE(s);
-            return 1;
+            return true;
         }
 
         default:
@@ -323,56 +320,5 @@ auto PNGParser::Parse(Instance &self, ScanType scan) -> bool
         Pop32BE(s);
     }
 }
-
-namespace
-{
-
-int stbi__err(const char *str)
-{
-    // stbi__g_failure_reason = str;
-    return 0;
-}
-
-int stbi__err(const char *str, const char *str1)
-{
-    // stbi__g_failure_reason = str;
-    return 0;
-}
-
-stbi_inline static uint8_t stbi__get8(stbi__context *s)
-{
-    if (s->img_buffer < s->img_buffer_end)
-        return *s->img_buffer++;
-    else
-        return 0;
-}
-
-static int stbi__get16be(stbi__context *s)
-{
-    int z = stbi__get8(s);
-    return (z << 8) + stbi__get8(s);
-}
-
-static uint32_t Pop32BE(stbi__context *s)
-{
-    uint32_t z = stbi__get16be(s);
-    return (z << 16) + stbi__get16be(s);
-}
-
-int stbi__check_png_header(stbi__context *s)
-{
-    static const uint8_t png_sig[8] = {137, 80, 78, 71, 13, 10, 26, 10};
-    int i;
-    for (i = 0; i < 8; ++i)
-        if (stbi__get8(s) != png_sig[i])
-            return stbi__err("bad png sig", "Not a PNG");
-    return 1;
-}
-
-int stbi__parse_png_file(stbi__png *z, int scan, int req_comp)
-{
-}
-
-} // namespace
 
 } // namespace nyla::ByteParser::PNGParser
