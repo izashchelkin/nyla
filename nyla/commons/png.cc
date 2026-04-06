@@ -1,36 +1,45 @@
-#include "nyla/commons/png.h"
 #include <cstdint>
+
+#include "nyla/commons/mem.h"
+#include "nyla/commons/png.h"
+#include "nyla/commons/word.h"
 
 #define STBI__PNG_TYPE(a, b, c, d)                                                                                     \
     (((unsigned)(a) << 24) + ((unsigned)(b) << 16) + ((unsigned)(c) << 8) + (unsigned)(d))
 #define STBI_MAX_DIMENSIONS (1 << 24)
 
-#ifndef _MSC_VER
-#ifdef __cplusplus
-#define stbi_inline inline
-#else
-#define stbi_inline
-#endif
-#else
-#define stbi_inline __forceinline
-#endif
-
-namespace nyla
+namespace nyla::ByteParser::PNGParser
 {
 
-static const unsigned char stbi__depth_scale_table[9] = {0, 0xff, 0x55, 0, 0x11, 0, 0, 0, 0x01};
-
-int stbi__check_png_header(stbi__context *s)
+namespace
 {
-    static const uint8_t png_sig[8] = {137, 80, 78, 71, 13, 10, 26, 10};
-    int i;
-    for (i = 0; i < 8; ++i)
-        if (stbi__get8(s) != png_sig[i])
-            return stbi__err("bad png sig", "Not a PNG");
-    return 1;
+
+const uint8_t DepthScaleTable[9] = {0, 0xff, 0x55, 0, 0x11, 0, 0, 0, 0x01};
+const uint8_t PNGSig[8]{137, 80, 78, 71, 13, 10, 26, 10};
+
+auto Error(Instance &self, const char *err) -> bool
+{
+    NYLA_LOG("%s", err);
+    return false;
 }
 
-auto PNGParser::Parse() -> bool
+auto Error(Instance &self, const char *err, const char *detail) -> bool
+{
+    NYLA_LOG(NYLA_SV_FMT " " NYLA_SV_FMT, err, detail);
+    return false;
+}
+
+INLINE PNGChunk ReadChunkHeader(Instance &self)
+{
+    PNGChunk c;
+    c.length = Read32BE(self);
+    c.type = Read32BE(self);
+    return c;
+}
+
+} // namespace
+
+auto PNGParser::Parse(Instance &self, ScanType scan) -> bool
 {
     uint8_t palette[1024], pal_img_n = 0;
     uint8_t has_trans = 0, tc[3] = {0};
@@ -42,6 +51,9 @@ auto PNGParser::Parse() -> bool
     z->expanded = NULL;
     z->idata = NULL;
     z->out = NULL;
+
+    if (!MemStartsWith(self.m_At, self.m_Left, PNGSig, sizeof(PNGSig)))
+        return Error(self, "Invalid PNG signature");
 
     if (!stbi__check_png_header(s))
         return 0;
@@ -363,4 +375,4 @@ int stbi__parse_png_file(stbi__png *z, int scan, int req_comp)
 
 } // namespace
 
-} // namespace nyla
+} // namespace nyla::ByteParser::PNGParser

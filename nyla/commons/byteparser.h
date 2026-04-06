@@ -35,196 +35,157 @@ INLINE uint64_t ByteSwap64(uint64_t val)
 #endif
 }
 
-inline auto IsNumber(uint8_t ch) -> bool
+INLINE auto IsNumber(uint8_t ch) -> bool
 {
     return ch >= '0' && ch <= '9';
 }
 
-inline auto IsAlpha(uint8_t ch) -> bool
+INLINE auto IsAlpha(uint8_t ch) -> bool
 {
     return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch < 'Z');
 }
 
-inline auto IsWhitespace(uint8_t ch) -> bool
+INLINE auto IsWhitespace(uint8_t ch) -> bool
 {
     return ch == ' ' || ch == '\n' || ch == '\t';
 }
 
-struct ByteParser
+namespace ByteParser
+{
+struct Instance
 {
     const uint8_t *m_At;
     uint64_t m_Left;
-
-    void Init(const uint8_t *base, uint64_t size)
-    {
-        m_At = base;
-        m_Left = size;
-    }
-
-    auto Left() -> uint64_t
-    {
-        return m_Left;
-    }
-
-    [[nodiscard]]
-    auto Peek() const -> const uint8_t &
-    {
-        return *m_At;
-    }
-
-    void Advance()
-    {
-        Advance(1);
-    }
-
-    void Advance(uint64_t i)
-    {
-        m_At += i;
-        m_Left -= i;
-        NYLA_DASSERT(m_Left >= 0);
-    }
-
-    auto Pop() -> uint8_t
-    {
-        const uint8_t ret = Peek();
-        Advance();
-        return ret;
-    }
-
-    template <typename T> auto Pop() -> T
-    {
-        const T ret = LoadU<T>(m_At);
-        Advance(sizeof(ret));
-        return ret;
-    }
-
-    auto Pop16() -> uint16_t
-    {
-        return Pop<uint16_t>();
-    }
-
-    auto Pop16BE() -> uint16_t
-    {
-        return ByteSwap16(Pop16());
-    }
-
-    auto Pop32() -> uint32_t
-    {
-        return Pop<uint32_t>();
-    }
-
-    auto Pop32BE() -> uint32_t
-    {
-        return ByteSwap32(Pop32());
-    }
-
-    auto Pop64() -> uint64_t
-    {
-        return Pop<uint64_t>();
-    }
-
-    auto Pop64BE() -> uint64_t
-    {
-        return ByteSwap64(Pop64());
-    }
-
-    //
-
-    void SkipUntil(uint8_t ch)
-    {
-        while (Peek() != ch)
-            Advance();
-    }
-
-    void NextLine()
-    {
-        while (Pop() != '\n')
-            ;
-    }
-
-    void SkipWhitespace()
-    {
-        while (IsWhitespace(Peek()))
-            Advance();
-    }
-
-    auto StartsWith(Str str) -> bool
-    {
-        return AsStr((const char *)m_At, m_Left).StartsWith(str);
-    }
-
-    auto StartsWithAdvance(Str str) -> bool
-    {
-        if (StartsWith(str))
-        {
-            Advance(str.Size());
-            return true;
-        }
-        else
-        {
-            return false;
-        }
-    }
-
-    auto ParseLong() -> int64_t
-    {
-        double d;
-        int64_t l;
-        const ParseNumberResult res = ParseDecimal(d, l);
-        NYLA_ASSERT(res == ParseNumberResult::Long);
-        return l;
-    }
-
-    enum ParseNumberResult
-    {
-        Double,
-        Long,
-    };
-
-    auto ParseDecimal(double &outDouble, int64_t &outLong) -> ParseNumberResult
-    {
-        int32_t sign = 1;
-        if (Peek() == '-')
-        {
-            sign = -1;
-            Advance();
-        }
-
-        uint64_t integer = 0;
-        uint64_t fraction = 0;
-        uint64_t fractionCount = 0;
-
-        while (m_Left > 0 && IsNumber(Peek()))
-        {
-            integer *= 10;
-            integer += Pop() - '0';
-        }
-
-        if (Peek() == '.')
-        {
-            Advance();
-            while (m_Left > 0 && IsNumber(Peek()))
-            {
-                ++fractionCount;
-                fraction *= 10;
-                fraction += Pop() - '0';
-            }
-
-            auto f = static_cast<double>(fraction);
-            for (uint32_t i = 0; i < fractionCount; ++i)
-                f /= 10.0;
-
-            f += static_cast<double>(integer);
-
-            outDouble = static_cast<double>(sign * f);
-            return ParseNumberResult::Double;
-        }
-        else
-        {
-            outLong = static_cast<int64_t>(sign * integer);
-            return ParseNumberResult::Long;
-        }
-    }
 };
+
+INLINE void Init(Instance &self, const uint8_t *base, uint64_t size)
+{
+    self.m_At = base;
+    self.m_Left = size;
+}
+
+INLINE auto Left(const Instance &self) -> uint64_t
+{
+    return self.m_Left;
+}
+
+[[nodiscard]]
+INLINE auto Peek(const Instance &self) -> const uint8_t &
+{
+    return *self.m_At;
+}
+
+INLINE void Advance(Instance &self, uint64_t i)
+{
+    self.m_At += i;
+    self.m_Left -= i;
+    NYLA_DASSERT(self.m_Left >= 0);
+}
+
+INLINE void Advance(Instance &self)
+{
+    Advance(self, 1);
+}
+
+INLINE auto Read(Instance &self) -> uint8_t
+{
+    const uint8_t ret = Peek(self);
+    Advance(self);
+    return ret;
+}
+
+template <typename T> auto Read(Instance &self) -> T
+{
+    const T ret = LoadU<T>(self.m_At);
+    Advance(self, sizeof(ret));
+    return ret;
+}
+
+INLINE auto Read16(Instance &self) -> uint16_t
+{
+    return Read<uint16_t>(self);
+}
+
+INLINE auto Read16BE(Instance &self) -> uint16_t
+{
+    return ByteSwap16(Read16(self));
+}
+
+INLINE auto Read32(Instance &self) -> uint32_t
+{
+    return Read<uint32_t>(self);
+}
+
+INLINE auto Read32BE(Instance &self) -> uint32_t
+{
+    return ByteSwap32(Read32(self));
+}
+
+INLINE auto Read64(Instance &self) -> uint64_t
+{
+    return Read<uint64_t>(self);
+}
+
+INLINE auto Read64BE(Instance &self) -> uint64_t
+{
+    return ByteSwap64(Read64(self));
+}
+
+//
+
+INLINE void SkipUntil(Instance &self, uint8_t ch)
+{
+    while (Peek(self) != ch)
+        Advance(self);
+}
+
+INLINE void NextLine(Instance &self)
+{
+    while (Read(self) != '\n')
+        ;
+}
+
+INLINE void SkipWhitespace(Instance &self)
+{
+    while (IsWhitespace(Peek(self)))
+        Advance(self);
+}
+
+INLINE auto StartsWith(Instance &self, Str str) -> bool
+{
+    return AsStr((const char *)self.m_At, self.m_Left).StartsWith(str);
+}
+
+INLINE auto StartsWithAdvance(Instance &self, Str str) -> bool
+{
+    if (StartsWith(self, str))
+    {
+        Advance(self, str.Size());
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
+
+enum ParseNumberResult
+{
+    Double,
+    Long,
+};
+
+auto ParseDecimal(Instance &self, double &outDouble, int64_t &outLong) -> ParseNumberResult;
+
+INLINE auto ParseLong(Instance &self) -> int64_t
+{
+    double d;
+    int64_t l;
+    const ParseNumberResult res = ParseDecimal(self, d, l);
+    NYLA_ASSERT(res == ParseNumberResult::Long);
+    return l;
+}
+
+}; // namespace ByteParser
 
 } // namespace nyla

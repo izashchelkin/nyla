@@ -109,7 +109,7 @@ inline void MemMove(void *dest, const void *src, uint64_t size)
 }
 
 template <typename T>
-void Swap(T &RESTRICT lhs, T &RESTRICT rhs)
+void Swap(T &lhs, T &rhs)
     requires(std::is_trivially_constructible<T>())
 {
     T tmp = lhs;
@@ -117,11 +117,12 @@ void Swap(T &RESTRICT lhs, T &RESTRICT rhs)
     rhs = tmp;
 }
 
-auto NYLA_API MemEq(const char *RESTRICT p1, const char *RESTRICT p2, uint64_t len) -> bool;
-auto NYLA_API MemStartsWith(const char *RESTRICT str, uint64_t strLen, const char *RESTRICT prefix, uint64_t prefixLen)
-    -> bool;
-auto NYLA_API MemEndsWith(const char *RESTRICT str, uint64_t strLen, const char *RESTRICT suffix, uint64_t suffixLen)
-    -> bool;
+[[nodiscard]]
+auto NYLA_API MemEq(const void *p1, const void *p2, uint64_t len) -> bool;
+[[nodiscard]]
+auto NYLA_API MemStartsWith(const void *str, uint64_t strLen, const void *prefix, uint64_t prefixLen) -> bool;
+[[nodiscard]]
+auto NYLA_API MemEndsWith(const void *str, uint64_t strLen, const void *suffix, uint64_t suffixLen) -> bool;
 
 //
 

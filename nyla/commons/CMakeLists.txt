@@ -21,6 +21,7 @@ target_sources(${TARGET}
         renderer.cc
         tween_manager.cc
         png.cc
+        byteparser.cc
 
     PUBLIC
         align.h
