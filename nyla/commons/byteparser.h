@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "nyla/commons/fmt.h"
+#include "nyla/commons/mem.h"
 #include "nyla/commons/span.h"
 
 namespace nyla
@@ -99,6 +100,19 @@ template <typename T> auto Read(Instance &self) -> T
     const T ret = LoadU<T>(self.m_At);
     Advance(self, sizeof(ret));
     return ret;
+}
+
+INLINE auto ReadN(Instance &self, void *out, uint64_t count) -> bool
+{
+    if (self.m_Left >= count)
+    {
+        MemCpy(out, self.m_At, count);
+        return true;
+    }
+    else
+    {
+        return false;
+    }
 }
 
 INLINE auto Read16(Instance &self) -> uint16_t

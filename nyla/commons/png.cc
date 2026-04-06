@@ -37,7 +37,7 @@ INLINE PNGChunk ReadChunkHeader(Instance &self)
 
 } // namespace
 
-auto PNGParser::Parse(Instance &self, Scan scan) -> bool
+auto PNGParser::Parse(Instance &self, RegionAlloc &alloc, Scan scan) -> bool
 {
     uint8_t palette[1024], pal_img_n = 0;
     uint8_t has_trans = 0, tc[3] = {0};
@@ -231,20 +231,20 @@ auto PNGParser::Parse(Instance &self, Scan scan) -> bool
                     return Error(self, "outofmem", "Out of memory");
                 self.idata = p;
             }
-            if (!stbi__getn(s, z->idata + ioff, c.length))
-                return Error("outofdata", "Corrupt PNG");
+            if (!ReadN(self, self.idata + ioff, c.length))
+                return Error(self, "outofdata", "Corrupt PNG");
             ioff += c.length;
             break;
         }
 
-        case STBI__PNG_TYPE('I', 'E', 'N', 'D'): {
+        case DWordBE("IEND"): {
             uint32_t raw_len, bpl;
             if (first)
-                return Error("first not IHDR", "Corrupt PNG");
-            if (scan != STBI__SCAN_load)
+                return Error(self, "first not IHDR", "Corrupt PNG");
+            if (scan != Scan::Load)
                 return true;
-            if (z->idata == NULL)
-                return Error("no IDAT", "Corrupt PNG");
+            if (self.idata == NULL)
+                return Error(self, "no IDAT", "Corrupt PNG");
             // initial guess for decoded data size to avoid unnecessary reallocs
             bpl = (s->img_x * z->depth + 7) / 8; // bytes per line, per component
             raw_len = bpl * s->img_y * s->img_n /* pixels */ + s->img_y /* filter mode per row */;

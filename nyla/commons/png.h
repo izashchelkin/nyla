@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "nyla/commons/byteparser.h"
+#include "nyla/commons/region_alloc.h"
 
 namespace nyla::ByteParser::PNGParser
 {
@@ -43,6 +44,6 @@ INLINE void Init(Instance &self, const uint8_t *base, uint64_t size)
     ByteParser::Init(self, base, size);
 }
 
-static auto Parse(Instance &self, Scan scan) -> bool;
+auto Parse(Instance &self, RegionAlloc &alloc, Scan scan) -> bool;
 
 } // namespace nyla::ByteParser::PNGParser
