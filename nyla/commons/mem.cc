@@ -1,5 +1,5 @@
 #include "nyla/commons/mem.h"
-#include "nyla/commons/array.h"
+#include "nyla/commons/fmt.h"
 #include "nyla/commons/intrin.h"
 
 #include <cstdint>

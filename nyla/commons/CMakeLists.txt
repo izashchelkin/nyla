@@ -20,6 +20,7 @@ target_sources(${TARGET}
         render_targets.cc
         renderer.cc
         tween_manager.cc
+        png.cc
 
     PUBLIC
         align.h
@@ -78,6 +79,7 @@ target_sources(${TARGET}
         tween_manager.h
         vec.h
         word.h
+        png.h
 
     INTERFACE
         platform.h

@@ -4,8 +4,7 @@
 
 #include "nyla/commons/bitenum.h"
 #include "nyla/commons/byteliterals.h"
-#include "nyla/commons/dllapi.h"
-#include "nyla/commons/fmt.h"
+#include "nyla/commons/macros.h"
 
 namespace nyla
 {

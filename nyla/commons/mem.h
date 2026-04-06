@@ -5,9 +5,8 @@
 #include <cstdint>
 #include <type_traits>
 
-#include "nyla/commons/dllapi.h"
 #include "nyla/commons/intrin.h"
-#include "nyla/commons/restrict.h"
+#include "nyla/commons/macros.h"
 
 namespace nyla
 {
@@ -17,23 +16,34 @@ template <typename T> struct RequiredAlignment
     static constexpr size_t value = (alignof(T) > 16) ? alignof(T) : 16;
 };
 
-inline auto Load64U(const void *ptr) -> uint64_t
+template <typename T>
+auto LoadU(const void *ptr) -> T
+    requires(std::is_trivially_constructible_v<T> and std::is_trivially_copyable_v<T>)
 {
+
 #if defined(_MSC_VER)
-    return *reinterpret_cast<const __unaligned uint64_t *>(ptr);
+    return *(const __unaligned T *)(ptr);
 #else
-    uint64_t val;
-    __builtin_memcpy(&val, ptr, 8);
+    T val;
+    __builtin_memcpy(&val, ptr, sizeof(T));
     return val;
 #endif
+};
+
+inline auto Load64U(const void *ptr) -> uint64_t
+{
+    return LoadU<uint64_t>(ptr);
 }
 
-inline void Write64U(void *ptr, uint64_t val)
+template <typename T>
+void WriteU(void *ptr, const T &val)
+    requires(std::is_trivially_constructible_v<T>() and std::is_trivially_copyable_v<T>)
 {
+
 #if defined(_MSC_VER)
-    *reinterpret_cast<__unaligned uint64_t *>(ptr) = val;
+    *(__unaligned T *)(ptr) = val;
 #else
-    __builtin_memcpy(ptr, &val, 8);
+    __builtin_memcpy(ptr, &val, sizeof(T));
 #endif
 }
 
