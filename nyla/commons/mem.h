@@ -5,7 +5,6 @@
 #include <cstdint>
 #include <type_traits>
 
-#include "nyla/commons/intrin.h"
 #include "nyla/commons/macros.h"
 
 namespace nyla
@@ -16,38 +15,7 @@ template <typename T> struct RequiredAlignment
     static constexpr size_t value = (alignof(T) > 16) ? alignof(T) : 16;
 };
 
-template <typename T>
-auto LoadU(const void *ptr) -> T
-    requires(std::is_trivially_constructible_v<T> and std::is_trivially_copyable_v<T>)
-{
-
-#if defined(_MSC_VER)
-    return *(const __unaligned T *)(ptr);
-#else
-    T val;
-    __builtin_memcpy(&val, ptr, sizeof(T));
-    return val;
-#endif
-};
-
-inline auto Load64U(const void *ptr) -> uint64_t
-{
-    return LoadU<uint64_t>(ptr);
-}
-
-template <typename T>
-void WriteU(void *ptr, const T &val)
-    requires(std::is_trivially_constructible_v<T>() and std::is_trivially_copyable_v<T>)
-{
-
-#if defined(_MSC_VER)
-    *(__unaligned T *)(ptr) = val;
-#else
-    __builtin_memcpy(ptr, &val, sizeof(T));
-#endif
-}
-
-inline void MemCpy(void *RESTRICT dest, const void *RESTRICT src, uint64_t size)
+INLINE void MemCpy(void *RESTRICT dest, const void *RESTRICT src, uint64_t size)
 {
     if (!size || dest == src)
         return;
@@ -59,7 +27,7 @@ inline void MemCpy(void *RESTRICT dest, const void *RESTRICT src, uint64_t size)
 #endif
 }
 
-inline void MemSet(void *dest, uint8_t value, uint64_t size)
+INLINE void MemSet(void *dest, uint8_t value, uint64_t size)
 {
     if (!size)
         return;
@@ -71,17 +39,17 @@ inline void MemSet(void *dest, uint8_t value, uint64_t size)
 #endif
 }
 
-inline void MemZero(void *dest, uint64_t size)
+INLINE void MemZero(void *dest, uint64_t size)
 {
     MemSet(dest, 0, size);
 }
 
-template <typename T> void MemZero(T *dest)
+template <typename T> INLINE void MemZero(T *dest)
 {
     MemSet(dest, 0, sizeof(T));
 }
 
-inline void MemMove(void *dest, const void *src, uint64_t size)
+INLINE void MemMove(void *dest, const void *src, uint64_t size)
 {
     if (!size || dest == src)
         return;
@@ -109,7 +77,7 @@ inline void MemMove(void *dest, const void *src, uint64_t size)
 }
 
 template <typename T>
-void Swap(T &lhs, T &rhs)
+INLINE void Swap(T &lhs, T &rhs)
     requires(std::is_trivially_constructible<T>())
 {
     T tmp = lhs;
@@ -139,7 +107,7 @@ template <uint64_t N> consteval auto CStrLen(const char (&str)[N]) -> uint64_t
 }
 
 template <typename T>
-auto NYLA_API CStrLen(T str) -> uint64_t
+auto INLINE CStrLen(T str) -> uint64_t
     requires(std::same_as<T, char *> || std::same_as<T, const char *>)
 {
     return internal_mem::CStrLen(str);

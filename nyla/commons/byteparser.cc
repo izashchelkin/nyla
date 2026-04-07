@@ -8,7 +8,7 @@ namespace nyla
 namespace ByteParser
 {
 
-auto ParseDecimal(Instance &self, double &outDouble, int64_t &outLong) -> ParseNumberResult
+auto ParseDecimal(byte_parser &self, double &outDouble, int64_t &outLong) -> ParseNumberResult
 {
     int32_t sign = 1;
     if (Peek(self) == '-')
@@ -21,7 +21,7 @@ auto ParseDecimal(Instance &self, double &outDouble, int64_t &outLong) -> ParseN
     uint64_t fraction = 0;
     uint64_t fractionCount = 0;
 
-    while (self.m_Left > 0 && IsNumber(Peek(self)))
+    while (self.size > 0 && IsNumber(Peek(self)))
     {
         integer *= 10;
         integer += Read(self) - '0';
@@ -30,7 +30,7 @@ auto ParseDecimal(Instance &self, double &outDouble, int64_t &outLong) -> ParseN
     if (Peek(self) == '.')
     {
         Advance(self);
-        while (self.m_Left > 0 && IsNumber(Peek(self)))
+        while (self.size > 0 && IsNumber(Peek(self)))
         {
             ++fractionCount;
             fraction *= 10;

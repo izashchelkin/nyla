@@ -24,6 +24,7 @@ target_sources(${TARGET}
         byteparser.cc
 
     PUBLIC
+        concepts.h
         align.h
         array.h
         assert.h

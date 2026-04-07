@@ -4,7 +4,6 @@
 #include <type_traits>
 
 #include "nyla/commons/align.h"
-#include "nyla/commons/inline_string.h"
 #include "nyla/commons/inline_vec.h"
 
 namespace nyla

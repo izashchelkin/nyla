@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "nyla/commons/fmt.h"
+#include "nyla/commons/intrin.h"
 #include "nyla/commons/mem.h"
 #include "nyla/commons/span.h"
 
@@ -51,62 +52,65 @@ INLINE auto IsWhitespace(uint8_t ch) -> bool
     return ch == ' ' || ch == '\n' || ch == '\t';
 }
 
-namespace ByteParser
+struct byte_parser
 {
-struct Instance
-{
-    const uint8_t *m_At;
-    uint64_t m_Left;
+    const uint8_t *begin;
+    const uint8_t *end;
+    const uint8_t *at;
 };
 
-INLINE void Init(Instance &self, const uint8_t *base, uint64_t size)
+namespace ByteParser
 {
-    self.m_At = base;
-    self.m_Left = size;
+
+INLINE void Init(byte_parser &self, const uint8_t *base, uint64_t size)
+{
+    self.begin = base;
+    self.at = base;
+    self.end = base + size;
 }
 
-INLINE auto Left(const Instance &self) -> uint64_t
+INLINE auto BytesLeft(const byte_parser &self) -> uint64_t
 {
-    return self.m_Left;
+    return self.end - self.at;
 }
 
 [[nodiscard]]
-INLINE auto Peek(const Instance &self) -> const uint8_t &
+INLINE auto Peek(const byte_parser &self) -> const uint8_t &
 {
-    return *self.m_At;
+    return *self.at;
 }
 
-INLINE void Advance(Instance &self, uint64_t i)
+INLINE void Advance(byte_parser &self, uint64_t i)
 {
-    self.m_At += i;
-    self.m_Left -= i;
-    NYLA_DASSERT(self.m_Left >= 0);
+    self.at += i;
+    NYLA_DASSERT(self.at < self.end);
 }
 
-INLINE void Advance(Instance &self)
+INLINE void Advance(byte_parser &self)
 {
     Advance(self, 1);
 }
 
-INLINE auto Read(Instance &self) -> uint8_t
+INLINE auto Read(byte_parser &self) -> uint8_t
 {
     const uint8_t ret = Peek(self);
     Advance(self);
     return ret;
 }
 
-template <typename T> auto Read(Instance &self) -> T
+template <typename T> auto Read(byte_parser &self) -> T
 {
-    const T ret = LoadU<T>(self.m_At);
+    const T ret = LoadU<T>(self.at);
     Advance(self, sizeof(ret));
     return ret;
 }
 
-INLINE auto ReadN(Instance &self, void *out, uint64_t count) -> bool
+INLINE auto ReadN(byte_parser &self, void *out, uint64_t count) -> bool
 {
-    if (self.m_Left >= count)
+    if (BytesLeft(self) >= count)
     {
-        MemCpy(out, self.m_At, count);
+        MemCpy(out, self.at, count);
+        Advance(self, count);
         return true;
     }
     else
@@ -115,62 +119,62 @@ INLINE auto ReadN(Instance &self, void *out, uint64_t count) -> bool
     }
 }
 
-INLINE auto Read16(Instance &self) -> uint16_t
+INLINE auto Read16(byte_parser &self) -> uint16_t
 {
     return Read<uint16_t>(self);
 }
 
-INLINE auto Read16BE(Instance &self) -> uint16_t
+INLINE auto Read16BE(byte_parser &self) -> uint16_t
 {
     return ByteSwap16(Read16(self));
 }
 
-INLINE auto Read32(Instance &self) -> uint32_t
+INLINE auto Read32(byte_parser &self) -> uint32_t
 {
     return Read<uint32_t>(self);
 }
 
-INLINE auto Read32BE(Instance &self) -> uint32_t
+INLINE auto Read32BE(byte_parser &self) -> uint32_t
 {
     return ByteSwap32(Read32(self));
 }
 
-INLINE auto Read64(Instance &self) -> uint64_t
+INLINE auto Read64(byte_parser &self) -> uint64_t
 {
     return Read<uint64_t>(self);
 }
 
-INLINE auto Read64BE(Instance &self) -> uint64_t
+INLINE auto Read64BE(byte_parser &self) -> uint64_t
 {
     return ByteSwap64(Read64(self));
 }
 
 //
 
-INLINE void SkipUntil(Instance &self, uint8_t ch)
+INLINE void SkipUntil(byte_parser &self, uint8_t ch)
 {
     while (Peek(self) != ch)
         Advance(self);
 }
 
-INLINE void NextLine(Instance &self)
+INLINE void NextLine(byte_parser &self)
 {
     while (Read(self) != '\n')
         ;
 }
 
-INLINE void SkipWhitespace(Instance &self)
+INLINE void SkipWhitespace(byte_parser &self)
 {
     while (IsWhitespace(Peek(self)))
         Advance(self);
 }
 
-INLINE auto StartsWith(Instance &self, Str str) -> bool
+INLINE auto StartsWith(byte_parser &self, Str str) -> bool
 {
-    return AsStr((const char *)self.m_At, self.m_Left).StartsWith(str);
+    return AsStr(self.at, BytesLeft(self)).StartsWith(str);
 }
 
-INLINE auto StartsWithAdvance(Instance &self, Str str) -> bool
+INLINE auto StartsWithAdvance(byte_parser &self, Str str) -> bool
 {
     if (StartsWith(self, str))
     {
@@ -189,9 +193,9 @@ enum ParseNumberResult
     Long,
 };
 
-auto ParseDecimal(Instance &self, double &outDouble, int64_t &outLong) -> ParseNumberResult;
+auto ParseDecimal(byte_parser &self, double &outDouble, int64_t &outLong) -> ParseNumberResult;
 
-INLINE auto ParseLong(Instance &self) -> int64_t
+INLINE auto ParseLong(byte_parser &self) -> int64_t
 {
     double d;
     int64_t l;

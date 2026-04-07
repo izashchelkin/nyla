@@ -1,115 +1,96 @@
 #pragma once
 
 #include <cstdint>
-#include <type_traits>
 
+#include "nyla/commons/concepts.h"
 #include "nyla/commons/mem.h"
 #include "nyla/commons/span.h"
 
 namespace nyla
 {
 
-template <typename T, uint64_t N> struct alignas(RequiredAlignment<T>::value) Array
+template <Plain T, uint64_t Size> struct alignas(RequiredAlignment<T>::value) array
 {
-    static_assert(std::is_trivially_constructible<T>());
-    static_assert(std::is_trivially_destructible<T>());
-
-    T data[N];
-
-    auto GetSpan() -> Span<T>
-    {
-        return {Data(), Size()};
-    }
-
-    auto GetSpan() const -> Span<const T>
-    {
-        return {Data(), Size()};
-    }
+    T data[Size];
 
     [[nodiscard]]
     auto operator[](uint64_t i) -> T &
     {
+        NYLA_DASSERT(i < Size);
         return data[i];
     }
 
     [[nodiscard]]
     auto operator[](uint64_t i) const -> const T &
     {
+        NYLA_DASSERT(i < Size);
         return data[i];
-    }
-
-    [[nodiscard]]
-    auto Empty() const -> bool
-    {
-        return Size() == 0;
-    }
-
-    [[nodiscard]]
-    auto Data() -> T *
-    {
-        return data;
-    }
-
-    [[nodiscard]]
-    auto Data() const -> const T *
-    {
-        return data;
-    }
-
-    [[nodiscard]]
-    constexpr auto Size() const -> uint64_t
-    {
-        return N;
-    }
-
-    [[nodiscard]]
-    constexpr auto Size32() const -> uint32_t
-    {
-        return static_cast<uint32_t>(Size());
-    }
-
-    [[nodiscard]]
-    auto MaxSize() const -> uint64_t
-    {
-        return N;
     }
 
     [[nodiscard]]
     auto begin() -> T *
     {
-        return Data();
+        return data;
     }
 
     [[nodiscard]]
     auto begin() const -> const T *
     {
-        return Data();
+        return data;
     }
 
     [[nodiscard]]
     auto cbegin() const -> const T *
     {
-        return Data();
+        return data;
     }
 
     [[nodiscard]]
     auto end() -> T *
     {
-        return Data() + Size();
+        return data + Size;
     }
 
     [[nodiscard]]
     auto end() const -> const T *
     {
-        return Data() + Size();
+        return data + Size;
     }
 
     [[nodiscard]]
     auto cend() const -> const T *
     {
-        return Data() + Size();
+        return data + Size;
+    }
+
+    operator span<T>()
+    {
+        return span<T>{data, Size};
+    }
+
+    operator span<const T>() const
+    {
+        return span<const T>{data, Size};
     }
 };
 
+namespace Array
+{
+
+template <typename T, uint64_t Size>
+[[nodiscard]]
+INLINE auto Front(const array<T, Size> &self) -> T &
+{
+    return self[0];
+}
+
+template <typename T, uint64_t Size>
+[[nodiscard]]
+INLINE auto Back(const array<T, Size> &self) -> T &
+{
+    return self[Size - 1];
+}
+
+} // namespace Array
 
 } // namespace nyla

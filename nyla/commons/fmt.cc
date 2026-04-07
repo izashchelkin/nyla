@@ -2,7 +2,7 @@
 #include <cstdarg>
 #include <cstdint>
 
-#include "nyla/commons/dllapi.h"
+#include "nyla/commons/macros.h"
 #include "nyla/commons/mem.h"
 #include "nyla/commons/region_alloc.h"
 #include "nyla/commons/word.h"
@@ -188,7 +188,7 @@ void BufferWriteFmt(auto &&consumer, RegionAlloc &alloc, uint64_t bufferSize, St
 
 } // namespace
 
-void NYLA_API StringWriteFmt(char *out, uint64_t outSize, Str fmt, ...)
+void NYLA_API StringWriteFmt(char *out, uint64_t outSize, byteview fmt, ...)
 {
     va_list args;
     va_start(args, fmt);

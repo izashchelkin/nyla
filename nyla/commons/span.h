@@ -1,209 +1,179 @@
 #pragma once
 
 #include <cstdint>
-#include <type_traits>
+
+#include "nyla/commons/concepts.h"
+#include "nyla/commons/fmt.h"
+#include "nyla/commons/mem.h"
 
 namespace nyla
 {
 
-template <typename T> struct Span
+template <Plain T> struct span
 {
-    static_assert(std::is_trivially_constructible<T>());
-    static_assert(std::is_trivially_destructible<T>());
-
-    T *m_Data;
-    uint64_t m_Size;
-
-    auto AsConst() -> Span<const T>
-        requires(!std::is_const<T>())
-    {
-        return {Data(), Size()};
-    }
+    T *data;
+    uint64_t size;
 
     [[nodiscard]]
     auto operator[](uint64_t i) -> T &
     {
-        return m_Data[i];
+        NYLA_DASSERT(i < size);
+        return data[i];
     }
 
     [[nodiscard]]
     auto operator[](uint64_t i) const -> const T &
     {
-        return m_Data[i];
-    }
-
-    [[nodiscard]]
-    auto Empty() const -> bool
-    {
-        return m_Size == 0;
-    }
-
-    [[nodiscard]]
-    auto Data() -> T *
-    {
-        return m_Data;
-    }
-
-    [[nodiscard]]
-    auto Data() const -> const T *
-    {
-        return m_Data;
-    }
-
-    [[nodiscard]]
-    auto CStr() const -> const T *
-    {
-        NYLA_DASSERT(*(Data() + Size()) == '\0');
-        return m_Data;
-    }
-
-    [[nodiscard]]
-    auto Size() const -> uint64_t
-    {
-        return m_Size;
-    }
-
-    [[nodiscard]]
-    auto SizeBytes() const -> uint64_t
-    {
-        return m_Size * sizeof(T);
-    }
-
-    void ReSize(uint64_t newSize)
-    {
-        m_Size = newSize;
-    }
-
-    auto SubSpan(uint64_t from) -> Span
-    {
-        const uint64_t retSize = Size() - from;
-        NYLA_DASSERT(retSize >= 0);
-        return {Data() + from, retSize};
-    }
-
-    auto SubSpan(uint64_t from, uint64_t size) -> Span
-    {
-        NYLA_DASSERT(Size() - from >= size);
-        return {Data() + from, size};
-    }
-
-    template <typename K> auto Cast() const -> Span<K>
-    {
-        NYLA_ASSERT(!(sizeof(T) % sizeof(K)));
-        return Span<K>{(K *)Data(), Size() * sizeof(T) / sizeof(K)};
+        NYLA_DASSERT(i < size);
+        return data[i];
     }
 
     [[nodiscard]]
     auto begin() -> T *
     {
-        return Data();
+        return data;
     }
 
     [[nodiscard]]
     auto begin() const -> const T *
     {
-        return Data();
+        return data;
     }
 
     [[nodiscard]]
     auto cbegin() const -> const T *
     {
-        return Data();
+        return data;
     }
 
     [[nodiscard]]
     auto end() -> T *
     {
-        return Data() + Size();
+        return data + size;
     }
 
     [[nodiscard]]
     auto end() const -> const T *
     {
-        return Data() + Size();
+        return data + size;
     }
 
     [[nodiscard]]
     auto cend() const -> const T *
     {
-        return Data() + Size();
-    }
-
-    auto Front() -> T &
-    {
-        return (*this)[0];
-    }
-
-    [[nodiscard]]
-    auto Front() const -> const T &
-    {
-        return (*this)[0];
-    }
-
-    auto Back() -> T &
-    {
-        return (*this)[m_Size - 1];
-    }
-
-    [[nodiscard]]
-    auto Back() const -> const T &
-    {
-        return (*this)[m_Size - 1];
-    }
-
-    [[nodiscard]]
-    auto operator==(Span rhs) const -> bool
-    {
-        if (this->Size() != rhs.Size())
-            return false;
-
-        if (this->Data() == rhs.Data())
-            return true;
-        else
-            return MemEq((const char *)this->Data(), (const char *)rhs.Data(), rhs.SizeBytes());
-    }
-
-    [[nodiscard]]
-    auto StartsWith(Span prefix) const -> bool
-    {
-        return MemStartsWith((const char *)this->Data(), this->SizeBytes(), (const char *)prefix.Data(),
-                             prefix.SizeBytes());
-    }
-
-    [[nodiscard]]
-    auto EndsWith(Span suffix) const -> bool
-    {
-        return MemEndsWith((const char *)this->Data(), this->SizeBytes(), (const char *)suffix.Data(),
-                           suffix.SizeBytes());
+        return data + size;
     }
 };
 
-using Str = Span<const char>;
-using ByteView = Span<const char>;
+using byteview = span<const uint8_t>;
 
-template <uint64_t N> consteval auto AsStr(const char (&str)[N]) -> Str
+namespace Span
 {
-    return Str{str, N - 1};
+
+template <typename T>
+[[nodiscard]]
+INLINE auto AsConst(span<T> self) -> span<const T>
+{
+    return {self.data, self.size};
 }
 
-template <typename T> auto AsStr(T str) -> Str
+template <typename T>
+[[nodiscard]]
+INLINE auto Empty(span<T> self) -> bool
 {
-    return Str{str, CStrLen(str)};
+    return self.size == 0;
 }
 
-template <typename T> constexpr auto AsStr(T str, uint64_t size) -> Str
+template <typename T>
+[[nodiscard]]
+INLINE auto CStr(span<T> self) -> const char *
+    requires(sizeof(T) == 1)
 {
-    return Str{str, size};
+    NYLA_ASSERT(*(self.data + self.size) == 0);
+    return (const char *)self.data;
 }
 
-template <typename T> auto ByteViewSpan(Span<T> in) -> ByteView
+template <typename T>
+[[nodiscard]]
+INLINE auto SizeBytes(span<T> self) -> uint64_t
 {
-    return Span{(const char *)in.Data(), in.SizeBytes()};
+    return self.size * sizeof(T);
 }
 
-template <typename T> constexpr auto ByteViewPtr(const T *in) -> ByteView
+template <typename T> INLINE void Resize(span<T> self, uint64_t newSize)
 {
-    return Span{(const char *)in, sizeof(T)};
+    self.size = newSize;
+}
+
+template <typename T>
+[[nodiscard]]
+INLINE auto SubSpan(span<T> self, uint64_t from) -> span<T>
+{
+    const uint64_t retSize = self.size - from;
+    NYLA_DASSERT(retSize >= 0);
+    return {self.data + from, retSize};
+}
+
+template <typename T>
+[[nodiscard]]
+INLINE auto SubSpan(span<T> self, uint64_t from, uint64_t size) -> span<T>
+{
+    NYLA_DASSERT(self.size - from >= size);
+    return {self.data + from, size};
+}
+
+template <typename T, typename K>
+[[nodiscard]]
+INLINE auto Cast(span<T> self) -> span<K>
+{
+    return span<K>{(K *)self.data, self.size * sizeof(T) / sizeof(K)};
+}
+
+template <typename T>
+[[nodiscard]]
+INLINE auto Front(span<T> self) -> T &
+{
+    return self[0];
+}
+
+template <typename T>
+[[nodiscard]]
+INLINE auto Back(span<T> self) -> T &
+{
+    return self[self.size - 1];
+}
+
+template <typename T>
+[[nodiscard]]
+INLINE auto Eq(span<T> self, span<T> another) -> bool
+{
+    if (self.size == another.size)
+        return MemEq(self.data, another.data, SizeBytes(self));
+    else
+        return false;
+}
+
+template <typename T>
+[[nodiscard]]
+INLINE auto StartsWith(span<T> self, span<T> prefix) -> bool
+{
+    return MemStartsWith(self.data, Span::SizeBytes(self), prefix.data, Span::SizeBytes(prefix));
+}
+
+template <typename T>
+[[nodiscard]]
+INLINE auto EndsWith(span<T> self, span<T> suffix) -> bool
+{
+    return MemEndsWith(self.data, Span::SizeBytes(self), suffix.data, Span::SizeBytes(suffix));
+}
+
+} // namespace Span
+
+template <uint64_t N>
+[[nodiscard]]
+INLINE auto LiteralAsView(const char (&str)[N]) -> byteview
+{
+    return byteview{(uint8_t *)str, N - 1};
 }
 
 } // namespace nyla

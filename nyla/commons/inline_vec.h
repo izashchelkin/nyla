@@ -1,179 +1,219 @@
 #pragma once
 
+#include <cstdarg>
 #include <cstdint>
 
 #include "nyla/commons/array.h"
+#include "nyla/commons/fmt.h"
+#include "nyla/commons/mem.h"
 #include "nyla/commons/span.h"
 
 namespace nyla
 {
 
-template <typename T, uint64_t N> class InlineVec
+void NYLA_API StringWriteFmt(char *out, uint64_t outSize, byteview fmt, ...);
+
+template <Plain T, uint64_t Capacity> struct inline_vec
 {
-  public:
-    [[nodiscard]] auto Data() -> T *
+    array<T, sizeof(T) * Capacity> data;
+    uint64_t size;
+
+    [[nodiscard]]
+    auto operator[](uint64_t i) -> T &
     {
-        return m_Data.Data();
+        NYLA_DASSERT(i < size);
+        return data[i];
     }
 
-    [[nodiscard]] auto Data() const -> const T *
+    [[nodiscard]]
+    auto operator[](uint64_t i) const -> const T &
     {
-        return m_Data.Data();
+        NYLA_DASSERT(i < size);
+        return data[i];
     }
 
-    auto GetSpan() -> Span<T>
+    [[nodiscard]]
+    auto begin() -> T *
     {
-        return {Data(), Size()};
+        return data;
     }
 
-    auto GetSpan() const -> Span<const T>
+    [[nodiscard]]
+    auto begin() const -> const T *
     {
-        return {Data(), Size()};
+        return data;
     }
 
-    [[nodiscard]] auto Size() const -> uint64_t
+    [[nodiscard]]
+    auto cbegin() const -> const T *
     {
-        return m_Size;
+        return data;
     }
 
-    [[nodiscard]] auto Size32() const -> uint32_t
+    [[nodiscard]]
+    auto end() -> T *
     {
-        return m_Size;
+        return data + Capacity;
     }
 
-    [[nodiscard]] auto Empty() const -> bool
+    [[nodiscard]]
+    auto end() const -> const T *
     {
-        return m_Size == 0;
+        return data + Capacity;
     }
 
-    [[nodiscard]] constexpr auto MaxSize() const -> uint64_t
+    [[nodiscard]]
+    auto cend() const -> const T *
     {
-        return N;
+        return data + Capacity;
     }
 
-    [[nodiscard]] auto operator[](uint64_t i) -> T &
+    operator span<T>()
     {
-        NYLA_ASSERT(i < m_Size);
-        return Data()[i];
+        return span<T>{data, size};
     }
 
-    [[nodiscard]] auto operator[](uint64_t i) const -> const T &
+    operator span<const T>() const
     {
-        NYLA_ASSERT(i < m_Size);
-        return Data()[i];
+        return span<const T>{data, size};
     }
-
-    [[nodiscard]] auto begin() -> T *
-    {
-        return Data();
-    }
-
-    [[nodiscard]] auto begin() const -> const T *
-    {
-        return Data();
-    }
-
-    [[nodiscard]] auto cbegin() const -> const T *
-    {
-        return Data();
-    }
-
-    [[nodiscard]] auto end() -> T *
-    {
-        return Data() + m_Size;
-    }
-
-    [[nodiscard]] auto end() const -> const T *
-    {
-        return Data() + m_Size;
-    }
-
-    [[nodiscard]] auto cend() const -> const T *
-    {
-        return Data() + m_Size;
-    }
-
-    auto Front() -> T &
-    {
-        return (*this)[0];
-    }
-
-    auto Front() const -> const T &
-    {
-        return (*this)[0];
-    }
-
-    auto Back() -> T &
-    {
-        return (*this)[m_Size - 1];
-    }
-
-    auto Back() const -> const T &
-    {
-        return (*this)[m_Size - 1];
-    }
-
-    void Clear() noexcept
-    {
-        m_Size = 0;
-    }
-
-    template <class... Args> auto PushBack() -> T &
-    {
-        NYLA_ASSERT(m_Size < N);
-        T *p = Data() + m_Size++;
-        return *p;
-    }
-
-    template <class... Args> auto PushBack(const T &value) -> T &
-    {
-        NYLA_ASSERT(m_Size < N);
-        T *p = Data() + m_Size++;
-        *p = value;
-        return *p;
-    }
-
-    void PopBack()
-    {
-        NYLA_ASSERT(m_Size);
-        --m_Size;
-    }
-
-    void TakeBack(T &out)
-    {
-        out = Back();
-    }
-
-    void ReSize(uint64_t newSize)
-    {
-        NYLA_ASSERT(newSize <= N);
-        m_Size = newSize;
-    }
-
-    auto Erase(const T *pos) -> T *
-    {
-        NYLA_ASSERT(pos >= begin() && pos < end());
-        return Erase(pos, pos + 1);
-    }
-
-    auto Erase(T *first, T *last) -> T *
-    {
-        if (first == last)
-            return first;
-
-        uint64_t numRemoved = last - first;
-        uint64_t numToMove = end() - last;
-
-        if (numToMove > 0)
-            MemMove(first, last, numToMove * sizeof(T));
-
-        m_Size -= numRemoved;
-        return first;
-    }
-
-  private:
-    uint64_t m_Size;
-    Array<T, sizeof(T) * N> m_Data;
 };
+
+template <uint64_t Capacity> using inline_string = inline_vec<uint8_t, Capacity>;
+
+namespace InlineVec
+{
+
+template <typename T, uint64_t Capacity>
+[[nodiscard]]
+INLINE auto Front(const inline_vec<T, Capacity> &self) -> T &
+{
+    NYLA_DASSERT(self.size);
+    return self[0];
+}
+
+template <typename T, uint64_t Capacity>
+[[nodiscard]]
+INLINE auto Back(const inline_vec<T, Capacity> &self) -> T &
+{
+    NYLA_DASSERT(self.size);
+    return self[self.size - 1];
+}
+
+template <typename T, uint64_t Capacity> INLINE void Resize(inline_vec<T, Capacity> &self, uint64_t newSize)
+{
+    NYLA_DASSERT(newSize <= Capacity);
+    self.size = newSize;
+}
+
+template <typename T, uint64_t Capacity> INLINE void Clear(inline_vec<T, Capacity> &self)
+{
+    self.size = 0;
+}
+
+template <typename T, uint64_t Capacity> INLINE auto Append(inline_vec<T, Capacity> &self) -> T &
+{
+    NYLA_DASSERT(self.size < Capacity);
+    T *p = self.data + self.size++;
+    return *p;
+}
+
+template <typename T, uint64_t Capacity> INLINE auto Append(inline_vec<T, Capacity> &self, const T &data) -> T &
+{
+    T &ret = Append(self);
+    ret = data;
+    return ret;
+}
+
+template <typename T, uint64_t Capacity> INLINE auto Append(inline_vec<T, Capacity> &self, span<const T> data) -> T &
+{
+    NYLA_DASSERT(self.size + data.size < Capacity);
+    T &ret = Back(self);
+    MemCpy(&ret, data.data, Span::SizeBytes(data));
+    self.size += data.size;
+    return ret;
+}
+
+template <typename T, uint64_t Capacity> INLINE auto PopBack(inline_vec<T, Capacity> &self) -> T
+{
+    T ret = Back(self);
+    --self.size;
+    return ret;
+}
+
+template <typename T, uint64_t Capacity> INLINE auto Erase(inline_vec<T, Capacity> &self, const T *pos) -> T *
+{
+    NYLA_DASSERT(pos >= self.begin() && pos < self.end());
+    return Erase(pos, pos + 1);
+}
+
+template <typename T, uint64_t Capacity> INLINE auto Erase(inline_vec<T, Capacity> &self, T *first, T *last) -> T *
+{
+    if (first == last)
+        return first;
+
+    uint64_t numRemoved = last - first;
+    uint64_t numToMove = self.end() - last;
+
+    if (numToMove > 0)
+        MemMove(first, last, numToMove * sizeof(T));
+
+    self.size -= numRemoved;
+    return first;
+}
+
+}; // namespace InlineVec
+
+namespace InlineString
+{
+
+template <uint64_t Capacity> INLINE void AppendSuffix(inline_string<Capacity> &self, byteview suffix)
+{
+    InlineVec::Append(self, suffix);
+    if (self.size < Capacity)
+        NYLA_DASSERT((self.data + self.size) == '\0');
+}
+
+template <uint64_t Capacity> INLINE void RemoveSuffix(inline_string<Capacity> &self, uint64_t suffixLen)
+{
+    NYLA_DASSERT(suffixLen <= self.size);
+    self.size -= suffixLen;
+    self.data + self.size = '\0';
+}
+
+template <uint64_t Capacity> [[nodiscard]] INLINE bool TryRemoveSuffix(inline_string<Capacity> &self, byteview suffix)
+{
+    if (MemEndsWith(self.data, self.size, suffix.data, suffix.size))
+    {
+        RemoveSuffix(self, suffix.size);
+        return true;
+    }
+    else
+        return false;
+}
+
+template <uint64_t Capacity> void AsciiToUpper(inline_string<Capacity> &self)
+{
+    for (uint32_t i = 0; i < self.size; ++i)
+    {
+        char &ch = self[i];
+        if (ch >= 'a' && ch <= 'z')
+            ch = ch - ('a' - 'A');
+        else
+            ch = ch;
+    }
+}
+
+template <uint64_t Capacity>
+[[nodiscard]] INLINE auto WriteFmt(inline_string<Capacity> &out, byteview fmt, ...) -> byteview
+{
+    va_list args;
+    va_start(args, fmt);
+    StringWriteFmt(out.data + out.size, Capacity - out.size, fmt, args);
+    va_end(args);
+    return out;
+}
+
+}; // namespace InlineString
 
 } // namespace nyla

@@ -20,9 +20,7 @@ auto NYLA_API CStrLen(const char *str) -> uint64_t
         int cmp = _mm_movemask_epi8(_mm_cmpeq_epi8(_mm_loadu_si128((const __m128i *)ptr), zero));
         if (cmp)
         {
-            unsigned long index;
-            NYLA_DASSERT(_BitScanForward(&index, cmp));
-            return (ptr - str) + index;
+            return (ptr - str) + BitScanForward32(cmp);
         }
     }
 }
