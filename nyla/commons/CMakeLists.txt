@@ -24,7 +24,6 @@ target_sources(${TARGET}
         byteparser.cc
 
     PUBLIC
-        concepts.h
         align.h
         array.h
         assert.h
@@ -37,60 +36,62 @@ target_sources(${TARGET}
         collections.h
         color.h
         complex.h
+        concepts.h
         cstr.h
         debug_text_renderer.h
-        dllapi.h
-        engine.h
         engine0_internal.h
+        engine.h
         entrypoint.h
         fmt.h
+        fmt_string.h
         future.h
+        glyph_renderer.cc
         glyph_renderer.h
         gpu_upload_manager.h
         handle.h
         handle_pool.h
         hex.h
         inline_ring.h
-        inline_string.h
         inline_vec.h
         input_manager.h
         intrin.h
         lerp.h
         limits.h
         log.h
+        macros.h
         mat.h
         math.h
         mem.h
         minmax.h
         mutstr.h
+        path.cc
         path.h
-        platform.h
         platform_audio.h
         platform_base.h
         platform_dir_watch.h
+        platform.h
+        png.h
         region_alloc.h
-        render_targets.h
         renderer.h
-        restrict.h
+        render_targets.h
         rhi.h
         span.h
-        staging.h
         staging_buffer.h
+        staging.h
         str.h
         tuple.h
         tween_manager.h
         vec.h
         word.h
-        png.h
 
-    INTERFACE
-        platform.h
-        platform_audio.h
-        platform_dir_watch.h
-)
+        INTERFACE
+            platform.h
+            platform_audio.h
+            platform_dir_watch.h
+    )
 
-if(WIN32)
-    add_subdirectory(d3d12)
+    if(WIN32)
+        add_subdirectory(d3d12)
 endif()
 
 add_subdirectory(vulkan)

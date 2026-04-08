@@ -171,7 +171,7 @@ INLINE auto EndsWith(span<T> self, span<T> suffix) -> bool
 
 template <uint64_t N>
 [[nodiscard]]
-INLINE auto LiteralAsView(const char (&str)[N]) -> byteview
+INLINE auto StringLiteralAsView(const char (&str)[N]) -> byteview
 {
     return byteview{(uint8_t *)str, N - 1};
 }

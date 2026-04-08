@@ -1,142 +1,120 @@
 #pragma once
 
 #include <cstdint>
-#include <type_traits>
 
 #include "nyla/commons/align.h"
+#include "nyla/commons/fmt.h"
 #include "nyla/commons/inline_vec.h"
+#include "nyla/commons/macros.h"
+#include "nyla/commons/mem.h"
+#include "nyla/commons/platform_base.h"
 
 namespace nyla
 {
 
-struct NYLA_API RegionAlloc
+struct region_alloc
 {
-    static constexpr inline uint64_t kMinAlign = 16;
-
-    bool m_OwnsPages;
-    char *m_Base;
-    uint64_t m_Size;
-    uint64_t m_MaxSize;
-    uint64_t m_Used;
-
-    void Init(void *base, uint64_t maxSize, bool ownsPages);
-
-    auto PushBytes(uint64_t size, uint64_t align) -> char *;
-
-    void Pop(void *p);
-
-    void Reset()
-    {
-        m_Used = 0;
-    }
-
-    [[nodiscard]]
-    auto GetBase() -> char *
-    {
-        return m_Base;
-    }
-
-    [[nodiscard]]
-    auto GetBase() const -> const char *
-    {
-        return m_Base;
-    }
-
-    [[nodiscard]]
-    auto GetBytesUsed() const -> uint32_t
-    {
-        return m_Used;
-    }
-
-    [[nodiscard]]
-    auto GetAt() -> char *
-    {
-        return m_Base + m_Used;
-    }
-
-    [[nodiscard]]
-    auto GetAt() const -> const char *
-    {
-        return m_Base + m_Used;
-    }
-
-    [[nodiscard]]
-    auto GetMaxSize() -> uint32_t
-    {
-        return m_MaxSize;
-    }
-
-    template <typename T> auto Push() -> T *
-    {
-        static_assert(std::is_trivially_destructible_v<T>);
-
-        T *const p = reinterpret_cast<T *>(PushBytes(sizeof(T), alignof(T)));
-        // *p = {};
-
-        return p;
-    }
-
-    template <typename T> auto Push(const T &initializer) -> T *
-    {
-        T *const p = Push<T>();
-        *p = initializer;
-        return p;
-    }
-
-    template <typename T> auto PushCopySpan(Span<T> data) -> Span<T>
-    {
-        Span<T> p = PushArr<T>(data.Size());
-        MemCpy(p.Data(), data.Data(), data.SizeBytes());
-        return p;
-    }
-
-    auto PushCopyStr(Str data) -> Span<char>
-    {
-        Span<char> p = PushArr<char>(data.Size());
-        MemCpy(p.Data(), data.Data(), data.Size());
-        return p;
-    }
-
-    template <typename T> auto PushArr(uint64_t n) -> Span<T>
-    {
-        uint64_t s = sizeof(T) * n;
-
-        static_assert(std::is_trivially_destructible_v<T>);
-        static_assert(AlignedUp(sizeof(T), alignof(T)) == sizeof(T));
-
-        T *const p = reinterpret_cast<T *>(PushBytes(sizeof(T) * n, alignof(T)));
-        return Span{p, n};
-    }
-
-    template <typename T, uint64_t N> auto PushVec() -> InlineVec<T, N> &
-    {
-        return *Push<InlineVec<T, N>>();
-    }
-
-    template <uint64_t N> auto PushString() -> InlineString<N> &
-    {
-        return *Push<InlineString<N>>();
-    }
-
-    auto VoidScope(uint64_t size, auto &&fn) -> void
-    {
-        auto mark = GetAt();
-        auto alloc = PushSubAlloc(size);
-        fn(alloc);
-        Pop(mark);
-    }
-
-    auto Scope(uint64_t size, auto &&fn)
-    {
-        auto mark = GetAt();
-        auto alloc = PushSubAlloc(size);
-
-        auto &&ret = fn(alloc);
-        Pop(mark);
-        return ret;
-    }
-
-    auto PushSubAlloc(uint64_t size) -> RegionAlloc;
+    uint8_t *at;
+    uint8_t *begin;
+    uint8_t *reservedEnd;
+    uint8_t *commitedEnd;
 };
+
+namespace RegionAlloc
+{
+
+void NYLA_API CommitPages(region_alloc &self);
+
+[[nodiscard]]
+INLINE auto PushBytes(region_alloc &self, uint64_t size, uint64_t align) -> uint8_t *
+{
+    self.at = AlignedUp(self.at, Max(align, kMinAlign));
+    uint8_t *const ret = self.at;
+    self.at += size;
+
+    NYLA_ASSERT(self.at <= self.reservedEnd);
+    if (self.at > self.commitedEnd)
+        CommitPages(self);
+
+    MemZero(ret, size);
+    return ret;
+}
+
+INLINE void Reset(region_alloc &self)
+{
+    self.at = self.begin;
+}
+
+INLINE void Reset(region_alloc &self, void *p)
+{
+    NYLA_DASSERT(p != nullptr);
+    NYLA_DASSERT(p >= self.begin);
+    NYLA_DASSERT(p < self.commitedEnd);
+
+    self.at = (uint8_t *)p;
+}
+
+template <Plain T>
+[[nodiscard]]
+INLINE auto Push(region_alloc &self) -> T &
+{
+    uint8_t *mem = PushBytes(self, sizeof(T), required_align_v<T>);
+    return *((T *)mem);
+}
+
+template <Plain T>
+[[nodiscard]]
+INLINE auto PushN(region_alloc &self, uint64_t n) -> span<T>
+{
+    uint8_t *mem = PushBytes(self, sizeof(T) * n, required_align_v<T>);
+    return span<T>{(T *)mem, n};
+}
+
+template <typename T, uint64_t Capacity>
+[[nodiscard]]
+INLINE auto PushVec(region_alloc &self) -> inline_vec<T, Capacity> &
+{
+    return *Push<inline_vec<T, Capacity>>(self);
+}
+
+template <uint64_t Capacity>
+[[nodiscard]]
+INLINE auto PushString(region_alloc &self) -> inline_string<Capacity> &
+{
+    return *Push<inline_string<Capacity>>(self);
+}
+
+[[nodiscard]]
+INLINE auto PushSubAlloc(region_alloc &self, uint64_t size) -> region_alloc
+{
+    NYLA_ASSERT(size > 0);
+    uint8_t *mem = PushBytes(self, size, Platform::GetMemPageSize());
+    return region_alloc{
+        .at = mem,
+        .begin = mem,
+        .reservedEnd = mem + size,
+        .commitedEnd = mem + size,
+    };
+}
+
+INLINE auto VoidScope(region_alloc &self, uint64_t size, auto &&fn) -> void
+{
+    auto mark = self.at;
+    auto alloc = PushSubAlloc(self, size);
+    fn(alloc);
+    Reset(self, mark);
+}
+
+[[nodiscard]]
+INLINE auto Scope(region_alloc &self, uint64_t size, auto &&fn)
+{
+    auto mark = self.at;
+    auto alloc = PushSubAlloc(self, size);
+    auto &&ret = fn(alloc);
+    Reset(self, mark);
+    return ret;
+}
+
+} // namespace RegionAlloc
 
 } // namespace nyla

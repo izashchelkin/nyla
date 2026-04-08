@@ -6,14 +6,10 @@
 #include <type_traits>
 
 #include "nyla/commons/macros.h"
+#include "nyla/commons/minmax.h"
 
 namespace nyla
 {
-
-template <typename T> struct RequiredAlignment
-{
-    static constexpr size_t value = (alignof(T) > 16) ? alignof(T) : 16;
-};
 
 INLINE void MemCpy(void *RESTRICT dest, const void *RESTRICT src, uint64_t size)
 {

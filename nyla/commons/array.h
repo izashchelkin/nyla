@@ -2,14 +2,14 @@
 
 #include <cstdint>
 
+#include "nyla/commons/align.h"
 #include "nyla/commons/concepts.h"
-#include "nyla/commons/mem.h"
 #include "nyla/commons/span.h"
 
 namespace nyla
 {
 
-template <Plain T, uint64_t Size> struct alignas(RequiredAlignment<T>::value) array
+template <Plain T, uint64_t Size> struct alignas(required_align_v<T>) array
 {
     T data[Size];
 
