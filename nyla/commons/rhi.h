@@ -5,7 +5,6 @@
 #include "nyla/commons/bitenum.h"
 #include "nyla/commons/handle.h"
 #include "nyla/commons/inline_string.h"
-#include "nyla/commons/region_alloc.h"
 #include "nyla/commons/span.h"
 
 namespace nyla
@@ -212,7 +211,6 @@ struct RhiLimits
 
 struct RhiInitDesc
 {
-    RegionAlloc rootAlloc;
     RhiFlags flags;
     RhiLimits limits;
 };
@@ -240,21 +238,21 @@ struct RhiVertexBindingDesc
 struct RhiVertexAttributeDesc
 {
     uint32_t binding;
-    InlineString<16> semantic;
+    inline_string<16> semantic;
     RhiVertexFormat format;
     uint32_t offset;
 };
 
 struct RhiGraphicsPipelineDesc
 {
-    Str debugName;
+    byteview debugName;
 
     RhiShader vs;
     RhiShader ps;
 
-    Span<RhiVertexBindingDesc> vertexBindings;
-    Span<RhiVertexAttributeDesc> vertexAttributes;
-    Span<RhiTextureFormat> colorTargetFormats;
+    span<RhiVertexBindingDesc> vertexBindings;
+    span<RhiVertexAttributeDesc> vertexAttributes;
+    span<RhiTextureFormat> colorTargetFormats;
     RhiTextureFormat depthFormat;
     bool depthWriteEnabled;
     bool depthTestEnabled;
@@ -279,7 +277,7 @@ template <> struct EnableBitMaskOps<RhiShaderStage> : std::true_type
 struct RhiShaderDesc
 {
     RhiShaderStage stage;
-    Span<uint32_t> code;
+    span<uint32_t> code;
 };
 
 struct RhiTextureDesc
@@ -326,7 +324,7 @@ class Rhi
     static auto GetOptimalBufferCopyOffsetAlignment() -> uint32_t;
 
     static auto CreateBuffer(const RhiBufferDesc &) -> RhiBuffer;
-    static void NameBuffer(RhiBuffer, Str name);
+    static void NameBuffer(RhiBuffer, byteview name);
     static void DestroyBuffer(RhiBuffer);
 
     static auto GetBufferSize(RhiBuffer) -> uint64_t;
@@ -341,7 +339,7 @@ class Rhi
     static void CmdUavBarrierBuffer(RhiCmdList cmd, RhiBuffer buffer);
 
     static auto CreateCmdList(RhiQueueType queueType) -> RhiCmdList;
-    static void NameCmdList(RhiCmdList, Str name);
+    static void NameCmdList(RhiCmdList, byteview name);
     static void DestroyCmdList(RhiCmdList cmd);
     static void ResetCmdList(RhiCmdList cmd);
 
@@ -359,14 +357,14 @@ class Rhi
     static auto GetVertexFormatSize(RhiVertexFormat) -> uint32_t;
 
     static auto CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &) -> RhiGraphicsPipeline;
-    static void NameGraphicsPipeline(RhiGraphicsPipeline, Str name);
+    static void NameGraphicsPipeline(RhiGraphicsPipeline, byteview name);
     static void DestroyGraphicsPipeline(RhiGraphicsPipeline);
 
     static void CmdBindGraphicsPipeline(RhiCmdList, RhiGraphicsPipeline);
-    static void CmdBindVertexBuffers(RhiCmdList cmd, uint32_t firstBinding, Span<const RhiBuffer> buffers,
-                                     Span<const uint64_t> offsets);
+    static void CmdBindVertexBuffers(RhiCmdList cmd, uint32_t firstBinding, span<const RhiBuffer> buffers,
+                                     span<const uint64_t> offsets);
     static void CmdBindIndexBuffer(RhiCmdList cmd, RhiBuffer buffer, uint64_t offset);
-    static void CmdPushGraphicsConstants(RhiCmdList cmd, uint32_t offset, RhiShaderStage stage, ByteView data);
+    static void CmdPushGraphicsConstants(RhiCmdList cmd, uint32_t offset, RhiShaderStage stage, byteview data);
     static void CmdDraw(RhiCmdList cmd, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
                         uint32_t firstInstance);
     static void CmdDrawIndexed(RhiCmdList cmd, uint32_t indexCount, int32_t vertexOffset, uint32_t instanceCount,
@@ -400,10 +398,10 @@ class Rhi
     static auto GetBackbufferView() -> RhiRenderTargetView;
     static void TriggerSwapchainRecreate();
 
-    static void SetFrameConstant(RhiCmdList cmd, ByteView data);
-    static void SetPassConstant(RhiCmdList cmd, ByteView data);
-    static void SetDrawConstant(RhiCmdList cmd, ByteView data);
-    static void SetLargeDrawConstant(RhiCmdList cmd, ByteView data);
+    static void SetFrameConstant(RhiCmdList cmd, byteview data);
+    static void SetPassConstant(RhiCmdList cmd, byteview data);
+    static void SetDrawConstant(RhiCmdList cmd, byteview data);
+    static void SetLargeDrawConstant(RhiCmdList cmd, byteview data);
 };
 
 } // namespace nyla

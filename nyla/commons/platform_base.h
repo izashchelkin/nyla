@@ -88,6 +88,8 @@ auto NYLA_API GetMonotonicTimeMillis() -> uint64_t;
 auto NYLA_API GetMonotonicTimeMicros() -> uint64_t;
 auto NYLA_API GetMonotonicTimeNanos() -> uint64_t;
 
+auto NYLA_API Sleep(uint64_t millis);
+
 auto NYLA_API Spawn(const char *const cmd, uint64_t count) -> bool;
 
 void NYLA_API Init(const PlatformInitDesc &desc);

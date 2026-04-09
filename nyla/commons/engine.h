@@ -1,8 +1,9 @@
 #pragma once
 
+#include <cstdint>
+
 #include "nyla/commons/region_alloc.h"
 #include "nyla/commons/rhi.h"
-#include <cstdint>
 
 namespace nyla
 {
@@ -11,8 +12,6 @@ struct EngineInitDesc
 {
     uint32_t maxFps;
     bool vsync;
-
-    RegionAlloc *rootAlloc;
 };
 
 struct EngineFrameBeginResult
@@ -22,20 +21,17 @@ struct EngineFrameBeginResult
     uint32_t fps;
 };
 
-class Engine
+namespace Engine
 {
-  public:
-    static void Init(const EngineInitDesc &);
-    static auto ShouldExit() -> bool;
 
-    static auto FrameBegin() -> EngineFrameBeginResult;
-    static auto FrameEnd() -> void;
+void NYLA_API Init(const EngineInitDesc &);
+auto NYLA_API ShouldExit() -> bool;
 
-    static auto GetPermanentAlloc() -> RegionAlloc &;
+auto NYLA_API FrameBegin() -> EngineFrameBeginResult;
+auto NYLA_API FrameEnd() -> void;
 
-    static auto GetPerFrameAlloc() -> RegionAlloc &;
+auto NYLA_API GetPerFrameAlloc() -> region_alloc &;
 
-  private:
-};
+} // namespace Engine
 
 } // namespace nyla

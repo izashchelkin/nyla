@@ -1,8 +1,5 @@
-#include <chrono>
-#include <cmath>
 #include <concepts>
 #include <cstdint>
-#include <thread>
 
 #include "nyla/commons/asset_manager.h"
 #include "nyla/commons/bitenum.h"
@@ -10,7 +7,10 @@
 #include "nyla/commons/engine.h"
 #include "nyla/commons/gpu_upload_manager.h"
 #include "nyla/commons/input_manager.h"
+#include "nyla/commons/intrin.h"
+#include "nyla/commons/macros.h"
 #include "nyla/commons/platform.h"
+#include "nyla/commons/platform_base.h"
 #include "nyla/commons/region_alloc.h"
 #include "nyla/commons/renderer.h"
 #include "nyla/commons/rhi.h"
@@ -23,51 +23,36 @@ namespace nyla
 namespace
 {
 
-RegionAlloc *m_RootAlloc;
-RegionAlloc m_PermanentAlloc;
-RegionAlloc m_PerFrameAlloc;
+struct engine
+{
+    region_alloc perFrameAlloc;
 
-GpuUploadManager m_GpuUploadManager;
-AssetManager m_AssetManager;
-TweenManager m_TweenManager;
-InputManager m_InputManager;
-
-Renderer m_Renderer;
-DebugTextRenderer m_DebugTextRenderer;
-
-uint64_t m_TargetFrameDurationUs;
-
-uint64_t m_LastFrameStart;
-uint32_t m_DtUsAccum;
-uint32_t m_FramesCounted;
-uint32_t m_Fps;
-bool m_ShouldExit;
+    uint64_t targetFrameDurationUs;
+    uint64_t lastFrameStartUs;
+    uint32_t dtUsAccum;
+    uint32_t framesCounted;
+    uint32_t fps;
+    bool shouldExit;
+};
+engine *g_Engine;
 
 } // namespace
 
-auto Engine::GetPermanentAlloc() -> RegionAlloc &
+namespace Engine
 {
-    return m_PermanentAlloc;
-}
 
-auto Engine::GetPerFrameAlloc() -> RegionAlloc &
+void NYLA_API Init(const EngineInitDesc &desc)
 {
-    return m_PerFrameAlloc;
-}
+    g_Engine = &RegionAlloc::Alloc<engine>(RegionAlloc::g_BootstrapAlloc);
+    g_Engine->perFrameAlloc = RegionAlloc::Create(64_MiB, 0);
 
-void Engine::Init(const EngineInitDesc &desc)
-{
-    m_LastFrameStart = Platform::GetMonotonicTimeMicros();
-
-    m_RootAlloc = desc.rootAlloc;
-    m_PermanentAlloc = m_RootAlloc->PushSubAlloc(16_MiB);
-    m_PerFrameAlloc = m_RootAlloc->PushSubAlloc(16_MiB);
+    g_Engine->lastFrameStartUs = Platform::GetMonotonicTimeMicros();
 
     uint32_t maxFps = 144;
     if (desc.maxFps > 0)
         maxFps = desc.maxFps;
 
-    m_TargetFrameDurationUs = static_cast<uint64_t>(1'000'000.0 / maxFps);
+    g_Engine->targetFrameDurationUs = static_cast<uint64_t>(1'000'000.0 / maxFps);
 
     RhiFlags flags = None<RhiFlags>();
     if (desc.vsync)
@@ -77,39 +62,33 @@ void Engine::Init(const EngineInitDesc &desc)
         .flags = flags,
     });
 
-    m_GpuUploadManager.Init();
-    m_AssetManager.Init();
-
-    m_Renderer.Init();
-    m_DebugTextRenderer.Init();
+    GpuUploadManager::Init();
+    AssetManager::Init();
+    Renderer::Init();
+    DebugTextRenderer::Init();
 }
 
-auto Engine::ShouldExit() -> bool
-{
-    return m_ShouldExit;
-}
-
-auto Engine::FrameBegin() -> EngineFrameBeginResult
+auto NYLA_API FrameBegin() -> EngineFrameBeginResult
 {
     RhiCmdList cmd = Rhi::FrameBegin();
 
     const uint64_t frameStart = Platform::GetMonotonicTimeMicros();
 
-    const uint64_t dtUs = frameStart - m_LastFrameStart;
-    m_DtUsAccum += dtUs;
-    ++m_FramesCounted;
+    const uint64_t dtUs = frameStart - g_Engine->lastFrameStartUs;
+    g_Engine->dtUsAccum += dtUs;
+    ++g_Engine->framesCounted;
 
     const float dt = static_cast<float>(dtUs) * 1e-6f;
-    m_LastFrameStart = frameStart;
+    g_Engine->lastFrameStartUs = frameStart;
 
-    if (m_DtUsAccum >= 500'000ull)
+    if (g_Engine->dtUsAccum >= 500'000ull)
     {
-        const double seconds = static_cast<double>(m_DtUsAccum) / 1'000'000.0;
-        const double fpsF64 = m_FramesCounted / seconds;
+        const double seconds = static_cast<double>(g_Engine->dtUsAccum) / 1'000'000.0;
+        const double fpsF64 = g_Engine->framesCounted / seconds;
 
-        m_Fps = std::lround(fpsF64);
-        m_DtUsAccum = 0;
-        m_FramesCounted = 0;
+        g_Engine->fps = LRound(fpsF64);
+        g_Engine->dtUsAccum = 0;
+        g_Engine->framesCounted = 0;
     }
 
     for (;;)
@@ -166,22 +145,28 @@ auto Engine::FrameBegin() -> EngineFrameBeginResult
     };
 }
 
-auto Engine::FrameEnd() -> void
+} // namespace Engine
+
+auto NYLA_API FrameEnd() -> void
 {
     Rhi::FrameEnd();
 
-    uint64_t frameEnd = Platform::GetMonotonicTimeMicros();
-    uint64_t frameDurationUs = frameEnd - m_LastFrameStart;
+    uint64_t frameEndUs = Platform::GetMonotonicTimeMicros();
+    uint64_t frameDurationUs = frameEndUs - g_Engine->lastFrameStartUs;
 
-    if (m_TargetFrameDurationUs > frameDurationUs)
-    {
-        using namespace std::chrono_literals;
-        std::this_thread::sleep_for((m_TargetFrameDurationUs - frameDurationUs) * 1us);
-    }
+    uint64_t sleepForMillis = (g_Engine->targetFrameDurationUs - frameDurationUs) / 1000;
+    if (sleepForMillis)
+        Platform::Sleep(sleepForMillis);
 }
 
-//
+auto NYLA_API GetPerFrameAlloc() -> region_alloc &
+{
+    return g_Engine->perFrameAlloc;
+}
 
-Engine g_Engine{};
+auto NYLA_API ShouldExit() -> bool
+{
+    return g_Engine->shouldExit;
+}
 
 } // namespace nyla

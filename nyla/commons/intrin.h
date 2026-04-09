@@ -77,4 +77,13 @@ INLINE uint32_t BitScanForward64(uint64_t n)
 #endif
 }
 
+INLINE int64_t LRound(double x)
+{
+#if defined(_MSC_VER)
+    return _mm_cvtsd_si64(_mm_set_sd(x + (x >= 0 ? 0.5 : -0.5)));
+#else
+    return __builtin_lround(x);
+#endif
+}
+
 } // namespace nyla

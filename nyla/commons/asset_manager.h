@@ -1,13 +1,10 @@
 #pragma once
 
+#include <cstdint>
+
 #include "nyla/commons/handle.h"
-#include "nyla/commons/handle_pool.h"
-#include "nyla/commons/inline_path.h"
-#include "nyla/commons/region_alloc.h"
 #include "nyla/commons/rhi.h"
 #include "nyla/commons/vec.h"
-#include <cstdint>
-#include <string>
 
 namespace nyla
 {
@@ -25,9 +22,9 @@ class AssetManager
         float2 uv;
     };
 
-    static auto GetMeshVertexAttributes() -> Span<RhiVertexAttributeDesc>;
-    static auto GetMeshVertexBindings() -> Span<RhiVertexBindingDesc>;
-    static auto GetMeshPipelineColorTargetFormats() -> Span<RhiTextureFormat>;
+    static auto GetMeshVertexAttributes() -> span<RhiVertexAttributeDesc>;
+    static auto GetMeshVertexBindings() -> span<RhiVertexBindingDesc>;
+    static auto GetMeshPipelineColorTargetFormats() -> span<RhiTextureFormat>;
 
     struct Texture : Handle
     {
@@ -54,12 +51,12 @@ class AssetManager
 
     static void Flush();
 
-    static auto DeclareTexture(Str path) -> Texture;
+    static auto DeclareTexture(byteview path) -> Texture;
     static auto GetRhiSampledTextureView(Texture, RhiSampledTextureView &) -> bool;
     static auto GetRhiSampledTextureView(Mesh, RhiSampledTextureView &) -> bool;
 
-    static auto DeclareMesh(Str path) -> Mesh;
-    static auto DeclareStaticMesh(Span<const char> vertexData, Span<const uint16_t> indices) -> Mesh;
+    static auto DeclareMesh(byteview path) -> Mesh;
+    static auto DeclareStaticMesh(span<const char> vertexData, span<const uint16_t> indices) -> Mesh;
 
     static void CmdBindMesh(RhiCmdList cmd, Mesh mesh);
     static void CmdDrawMesh(RhiCmdList cmd, AssetManager::Mesh mesh);
