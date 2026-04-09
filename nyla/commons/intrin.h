@@ -51,27 +51,27 @@ INLINE void WriteU(void *ptr, const T &val)
 #endif
 }
 
-INLINE int BitScanForward32(uint32_t n)
+INLINE uint32_t BitScanForward32(uint32_t n)
 {
     NYLA_DASSERT(n != 0);
 
 #if defined(_MSC_VER)
     unsigned long index;
     _BitScanForward(&index, (unsigned long)n);
-    return (int)index;
+    return (uint32_t)index;
 #else
     return __builtin_ctz((unsigned int)n);
 #endif
 }
 
-INLINE int BitScanForward64(uint64_t n)
+INLINE uint32_t BitScanForward64(uint64_t n)
 {
     NYLA_DASSERT(n != 0);
 
 #if defined(_MSC_VER)
     unsigned long index;
     _BitScanForward64(&index, (unsigned __int64)n);
-    return (int)index;
+    return (uint32_t)index;
 #else
     return __builtin_ctzll((unsigned long long)n);
 #endif

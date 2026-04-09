@@ -37,7 +37,7 @@ void NYLA_API FileWriteFmt(FileHandle handle, const char *fmt, uint64_t fmtSize,
 #define NYLA_ASSERT(cond)                                                                                              \
     do                                                                                                                 \
     {                                                                                                                  \
-        if (!(cond))                                                                                                   \
+        if (!(cond)) [[unlikely]]                                                                                      \
         {                                                                                                              \
             NYLA_LOG("%s:%d: assertion failed: %s", __FILE__, __LINE__, #cond);                                        \
             NYLA_DEBUGBREAK();                                                                                         \

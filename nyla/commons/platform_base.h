@@ -81,7 +81,7 @@ constexpr inline uint64_t kPageAllocMinSize = 64_KiB;
 
 auto NYLA_API GetMemPageSize() -> uint64_t;
 auto NYLA_API ReserveMemPages(uint64_t size) -> char *;
-void NYLA_API CommitMemPages(char *page, uint64_t size);
+void NYLA_API CommitMemPages(void *page, uint64_t size);
 void NYLA_API DecommitMemPages(char *page, uint64_t size);
 
 auto NYLA_API GetMonotonicTimeMillis() -> uint64_t;

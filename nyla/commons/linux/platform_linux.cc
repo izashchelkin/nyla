@@ -118,7 +118,7 @@ auto Platform::ReserveMemPages(uint64_t size) -> char *
     return ret;
 }
 
-void Platform::CommitMemPages(char *page, uint64_t size)
+void Platform::CommitMemPages(void *page, uint64_t size)
 {
     NYLA_ASSERT(((page - g_AddressSpaceBase) % g_PageSize) == 0);
 

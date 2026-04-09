@@ -9,7 +9,7 @@ namespace nyla
 {
 
 constexpr inline uint64_t kMinAlign = 16;
-template <typename T> uint64_t required_align_v = Max(alignof(T), kMinAlign);
+template <typename T> constexpr inline uint64_t required_align_v = Max(alignof(T), kMinAlign);
 
 INLINE constexpr auto AlignedUp(uint64_t n, uint64_t align) -> uint64_t
 {

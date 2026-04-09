@@ -77,6 +77,13 @@ template <Plain T, uint64_t Size> struct alignas(required_align_v<T>) array
 namespace Array
 {
 
+template <typename T, uint64_t ArraySize>
+[[nodiscard]]
+INLINE auto Size(const array<T, ArraySize> &self) -> uint64_t
+{
+    return ArraySize;
+}
+
 template <typename T, uint64_t Size>
 [[nodiscard]]
 INLINE auto Front(const array<T, Size> &self) -> T &
