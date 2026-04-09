@@ -5,8 +5,8 @@
 #include <unistd.h>
 
 #include "nyla/apps/wm/window_manager.h"
-#include "nyla/commons/log.h"
 #include "nyla/commons/linux/platform_linux.h"
+#include "nyla/commons/log.h"
 #include "nyla/commons/platform.h"
 #include "xcb/xcb.h"
 

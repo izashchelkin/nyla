@@ -1,10 +1,10 @@
 #pragma once
 
-#include "nyla/commons/inline_vec.h"
-#include "nyla/commons/vec.h"
 #include "nyla/commons/asset_manager.h"
+#include "nyla/commons/inline_vec.h"
 #include "nyla/commons/input_manager.h"
 #include "nyla/commons/rhi.h"
+#include "nyla/commons/vec.h"
 #include <cstdint>
 #include <sys/types.h>
 

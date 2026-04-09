@@ -1,11 +1,11 @@
-#include "nyla/commons/dllapi.h"
+#include "nyla/commons/macros.h"
 
 namespace nyla
 {
 
 auto PlatformMain() -> int;
 
-}
+} // namespace nyla
 
 #ifdef WIN32
 

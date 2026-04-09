@@ -1,11 +1,13 @@
 #include <cstdint>
 
 #include "nyla/asset/asset.h"
+#include "nyla/commons/bootstrap.h"
 #include "nyla/commons/entrypoint.h"
 #include "nyla/commons/fmt.h"
-#include "nyla/commons/path.h"
+#include "nyla/commons/inline_string.h"
 #include "nyla/commons/platform.h"
 #include "nyla/commons/region_alloc.h"
+#include "nyla/commons/span.h"
 
 namespace nyla
 {
@@ -13,15 +15,14 @@ namespace nyla
 auto PlatformMain() -> int
 {
     Platform::Init({});
+    Bootstrap();
 
-    RegionAlloc rootAlloc;
-    rootAlloc.Init(nullptr, 64_GiB, true);
+    region_alloc arena = RegionAlloc::Create(1_MiB, 0);
 
-    auto args = rootAlloc.PushArr<Str>(256);
+    span<byteview> args = RegionAlloc::AllocArray<byteview>(RegionAlloc::g_BootstrapAlloc, 256);
+    Platform::ParseStdArgs(args.data, args.size);
 
-    Platform::ParseStdArgs(args.Data(), args.Size());
-
-    if (args.Size() < 2)
+    if (args.size < 2)
     {
         NYLA_LOG("usage: %s [output] {[input] [processor config]}", args[0]);
         return 1;
@@ -29,36 +30,35 @@ auto PlatformMain() -> int
 
     for (auto arg : args)
     {
-        if (!arg.Empty())
+        if (arg.size > 0)
             NYLA_LOG("" NYLA_SV_FMT, NYLA_SV_ARG(arg));
     }
 
     NYLA_LOG("Writing into " NYLA_SV_FMT, NYLA_SV_ARG(args[1]));
 
-    auto scratch = rootAlloc.PushSubAlloc(1 << 20);
     const FileHandle outputFile =
-        Platform::FileOpen(CreatePath(scratch, args[1]).CStr(), FileOpenMode::Append | FileOpenMode::Write);
+        Platform::FileOpen(RegionAlloc::SafeCStr<64>(arena, args[1]), FileOpenMode::Append | FileOpenMode::Write);
     NYLA_ASSERT(Platform::FileValid(outputFile));
 
-    scratch.Reset();
+    RegionAlloc::Reset(arena);
+    auto &cmdLineBuffer = RegionAlloc::AllocString<1_KiB>(arena);
 
-    for (uint32_t i = 1; i < args.Size(); ++i)
+    for (uint32_t i = 1; i < args.size; ++i)
     {
-        Str arg = args[i];
-        scratch.PushCopyStr(AsStr(" \""));
-        scratch.PushCopyStr(arg);
-        scratch.PushCopyStr(AsStr("\""));
+        InlineString::AppendSuffix(cmdLineBuffer, StringLiteralAsView(" \""));
+        InlineString::AppendSuffix(cmdLineBuffer, args[i]);
+        InlineString::AppendSuffix(cmdLineBuffer, StringLiteralAsView("\""));
     }
 
-    Platform::FileWrite(outputFile, AssetPackerHeader{.count = scratch.GetBytesUsed()});
-    Platform::FileWriteSpan(outputFile, Span{scratch.GetBase(), scratch.GetBytesUsed()});
+    Platform::FileWrite(outputFile, AssetPackerHeader{.count = (uint32_t)cmdLineBuffer.size});
+    Platform::FileWriteSpan(outputFile, (byteview)cmdLineBuffer);
 
-    rootAlloc.Pop(scratch.GetBase());
+    RegionAlloc::Reset(arena);
 
-    for (uint32_t i = 2; i < args.Size();)
+    for (uint32_t i = 2; i < args.size;)
     {
-        Str dataPath = args[i++];
-        Str processorConfig = args[i++];
+        byteview dataPath = args[i++];
+        byteview processorConfig = args[i++];
 
         // NYLA_LOG("Packing " NYLA_SV_FMT " using config " NYLA_SV_FMT, NYLA_SV_ARG(dataPath),
         //          NYLA_SV_ARG(processorConfig));

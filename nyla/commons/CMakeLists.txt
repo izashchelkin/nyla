@@ -8,7 +8,6 @@ target_sources(${TARGET}
     PRIVATE
         fmt.cc
         mem.cc
-        path.cc
         region_alloc.cc
         asset_manager.cc
         debug_text_renderer.cc
@@ -22,6 +21,7 @@ target_sources(${TARGET}
         tween_manager.cc
         png.cc
         byteparser.cc
+        bootstrap.cc
 
     PUBLIC
         align.h
@@ -33,6 +33,7 @@ target_sources(${TARGET}
         byteparser.h
         cast.h
         cleanup.h
+        bootstrap.h
         collections.h
         color.h
         complex.h
@@ -45,7 +46,6 @@ target_sources(${TARGET}
         fmt.h
         fmt_string.h
         future.h
-        glyph_renderer.cc
         glyph_renderer.h
         gpu_upload_manager.h
         handle.h
@@ -64,8 +64,7 @@ target_sources(${TARGET}
         mem.h
         minmax.h
         mutstr.h
-        path.cc
-        path.h
+        inline_path.h
         platform_audio.h
         platform_base.h
         platform_dir_watch.h
@@ -84,10 +83,10 @@ target_sources(${TARGET}
         vec.h
         word.h
 
-        INTERFACE
-            platform.h
-            platform_audio.h
-            platform_dir_watch.h
+    INTERFACE
+        platform.h
+        platform_audio.h
+        platform_dir_watch.h
     )
 
     if(WIN32)

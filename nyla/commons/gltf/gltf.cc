@@ -1,9 +1,9 @@
 #include "nyla/commons/gltf/gltf.h"
 #include "nyla/commons/align.h"
 #include "nyla/commons/assert.h"
-#include "nyla/commons/word.h"
 #include "nyla/commons/json/json.h"
 #include "nyla/commons/json/json_value.h"
+#include "nyla/commons/word.h"
 #include <cstdint>
 
 namespace nyla

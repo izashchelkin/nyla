@@ -8,6 +8,7 @@
 #include "nyla/commons/inline_vec.h"
 #include "nyla/commons/macros.h"
 #include "nyla/commons/mem.h"
+#include "nyla/commons/mempage_pool.h"
 #include "nyla/commons/platform_base.h"
 
 namespace nyla
@@ -23,6 +24,35 @@ struct region_alloc
 
 namespace RegionAlloc
 {
+
+extern region_alloc g_BootstrapAlloc;
+
+[[nodiscard]]
+INLINE auto Create(uint64_t maxSize, uint64_t precommitSize) -> region_alloc
+{
+    NYLA_ASSERT(maxSize <= MemPagePool::kChunkSize);
+    NYLA_ASSERT(precommitSize <= maxSize);
+
+    region_alloc ret{};
+    ret.begin = MemPagePool::AcquireChunk().data;
+    ret.end = ret.begin + maxSize;
+    ret.at = ret.begin;
+    ret.commitedEnd = ret.at + precommitSize;
+
+    if (precommitSize > 0)
+        Platform::CommitMemPages(ret.begin, precommitSize);
+
+    return ret;
+}
+
+INLINE void Destroy(region_alloc &self)
+{
+    if (self.commitedEnd > self.begin)
+        Platform::DecommitMemPages(self.begin, self.commitedEnd - self.begin);
+
+    MemPagePool::ReleaseChunk(self.begin);
+    MemZero(&self);
+}
 
 INLINE void Reset(region_alloc &self)
 {
@@ -60,7 +90,7 @@ INLINE auto Alloc(region_alloc &self, uint64_t size, uint64_t align) -> uint8_t 
     return ret;
 }
 
-template <Plain T>
+template <typename T>
 [[nodiscard]]
 INLINE auto Alloc(region_alloc &self) -> T &
 {
@@ -68,7 +98,7 @@ INLINE auto Alloc(region_alloc &self) -> T &
     return *((T *)mem);
 }
 
-template <Plain T>
+template <typename T>
 [[nodiscard]]
 INLINE auto AllocArray(region_alloc &self, uint64_t n) -> span<T>
 {
@@ -90,8 +120,26 @@ INLINE auto AllocString(region_alloc &self) -> inline_string<Capacity> &
     return *Alloc<inline_string<Capacity>>(self);
 }
 
+template <uint64_t Capacity>
 [[nodiscard]]
-INLINE auto PushSubAlloc(region_alloc &self, uint64_t size) -> region_alloc
+INLINE auto AllocString(region_alloc &self, byteview str) -> inline_string<Capacity> &
+{
+    auto &ret = AllocString<Capacity>(self);
+    InlineString::AppendSuffix(str);
+    return ret;
+}
+
+template <uint64_t Capacity>
+[[nodiscard]]
+INLINE auto SafeCStr(region_alloc &self, byteview str) -> const char *
+{
+    auto &ret = AllocString<Capacity>(self);
+    InlineString::AppendSuffix(str);
+    return Span::CStr((byteview)ret);
+}
+
+[[nodiscard]]
+INLINE auto SubAlloc(region_alloc &self, uint64_t size) -> region_alloc
 {
     NYLA_ASSERT(size > 0);
     uint8_t *mem = Alloc(self, size, Platform::GetMemPageSize());

@@ -1,5 +1,5 @@
-#include <cstdint>
 #include <cstdarg>
+#include <cstdint>
 
 #include "nyla/commons/macros.h"
 #include "nyla/commons/span.h"

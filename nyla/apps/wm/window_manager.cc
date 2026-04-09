@@ -15,9 +15,9 @@
 #include "nyla/commons/assert.h"
 #include "nyla/commons/cleanup.h"
 #include "nyla/commons/inline_vec.h"
-#include "nyla/commons/log.h"
 #include "nyla/commons/linux/platform_linux.h"
 #include "nyla/commons/linux/x11_wm_hints.h"
+#include "nyla/commons/log.h"
 #include "nyla/commons/platform.h"
 #include "xcb/xcb.h"
 #include "xcb/xinput.h"
@@ -49,7 +49,7 @@ void WindowManager::Init()
         return;
 
     Span<xcb_window_t> children = {xcb_query_tree_children(treeReply),
-                                        static_cast<size_t>(xcb_query_tree_children_length(treeReply))};
+                                   static_cast<size_t>(xcb_query_tree_children_length(treeReply))};
 
     for (xcb_window_t clientWindow : children)
     {

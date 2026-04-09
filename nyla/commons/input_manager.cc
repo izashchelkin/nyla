@@ -1,10 +1,10 @@
-#include <limits>
 #include <cstdint>
+#include <limits>
 
 #include "nyla/commons/array.h"
-#include "nyla/commons/minmax.h"
 #include "nyla/commons/inline_vec.h"
 #include "nyla/commons/input_manager.h"
+#include "nyla/commons/minmax.h"
 
 namespace nyla
 {

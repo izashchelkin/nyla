@@ -4,8 +4,8 @@
 #include <vector>
 
 #include "nyla/apps/shipgame/world_renderer.h"
-#include "nyla/commons/math/vec.h"
 #include "nyla/commons/abstract_input.h"
+#include "nyla/commons/math/vec.h"
 
 namespace nyla
 {

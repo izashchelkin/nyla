@@ -1,12 +1,10 @@
 #pragma once
 
 #include <concepts>
-#include <cstddef>
 #include <cstdint>
 #include <type_traits>
 
 #include "nyla/commons/macros.h"
-#include "nyla/commons/minmax.h"
 
 namespace nyla
 {
@@ -104,7 +102,8 @@ template <uint64_t N> consteval auto CStrLen(const char (&str)[N]) -> uint64_t
 
 template <typename T>
 auto INLINE CStrLen(T str) -> uint64_t
-    requires(std::same_as<T, char *> || std::same_as<T, const char *>)
+    requires(std::same_as<T, char *> || std::same_as<T, const char *> || std::same_as<T, uint8_t *> ||
+             std::same_as<T, const uint8_t *>)
 {
     return internal_mem::CStrLen(str);
 }

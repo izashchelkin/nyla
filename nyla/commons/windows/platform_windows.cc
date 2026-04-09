@@ -4,13 +4,15 @@
 
 #include "nyla/commons/align.h"
 #include "nyla/commons/byteliterals.h"
-#include "nyla/commons/dllapi.h"
 #include "nyla/commons/inline_ring.h"
 #include "nyla/commons/intrin.h"
 #include "nyla/commons/limits.h"
+#include "nyla/commons/macros.h"
 #include "nyla/commons/math.h"
 #include "nyla/commons/mem.h"
 #include "nyla/commons/platform.h"
+#include "nyla/commons/region_alloc.h"
+#include "nyla/commons/span.h"
 
 auto CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) -> LRESULT;
 
@@ -20,8 +22,8 @@ namespace nyla
 namespace
 {
 
-char *g_AddressSpaceBase;
-char *g_AddressSpaceAt;
+uint8_t *g_AddressSpaceBase;
+uint8_t *g_AddressSpaceAt;
 uint64_t g_AddressSpaceSize;
 
 SYSTEM_INFO g_SysInfo{};
@@ -89,7 +91,7 @@ auto NYLA_API Platform::GetMemPageSize() -> uint64_t
     return g_SysInfo.dwPageSize;
 }
 
-auto NYLA_API Platform::ReserveMemPages(uint64_t size) -> char *
+auto NYLA_API Platform::ReserveMemPages(uint64_t size) -> void *
 {
     char *ret = g_AddressSpaceAt;
     g_AddressSpaceAt += AlignedUp<uint64_t>(size, g_SysInfo.dwPageSize);
@@ -98,18 +100,14 @@ auto NYLA_API Platform::ReserveMemPages(uint64_t size) -> char *
 
 void NYLA_API Platform::CommitMemPages(char *page, uint64_t size)
 {
-    NYLA_ASSERT(((page - g_AddressSpaceBase) % g_SysInfo.dwPageSize) == 0);
-
-    AlignUp<uint64_t>(size, g_SysInfo.dwPageSize);
+    // NYLA_ASSERT(((page - g_AddressSpaceBase) % g_SysInfo.dwPageSize) == 0);
 
     VirtualAlloc(page, size, MEM_COMMIT, PAGE_READWRITE);
 }
 
 void NYLA_API Platform::DecommitMemPages(char *page, uint64_t size)
 {
-    NYLA_ASSERT(((page - g_AddressSpaceBase) % g_SysInfo.dwPageSize) == 0);
-
-    AlignUp<uint64_t>(size, g_SysInfo.dwPageSize);
+    // NYLA_ASSERT(((page - g_AddressSpaceBase) % g_SysInfo.dwPageSize) == 0);
 
     VirtualAlloc(page, size, MEM_DECOMMIT, PAGE_NOACCESS);
 }
@@ -118,10 +116,9 @@ void NYLA_API Platform::Init(const PlatformInitDesc &desc)
 {
     GetNativeSystemInfo(&g_SysInfo);
 
-    g_AddressSpaceSize = AlignedUp<uint64_t>(256_GiB, g_SysInfo.dwAllocationGranularity);
-
-    g_AddressSpaceBase = (char *)VirtualAlloc(nullptr, g_AddressSpaceSize, MEM_RESERVE, PAGE_NOACCESS);
-    g_AddressSpaceAt = g_AddressSpaceBase;
+    g_AddressSpaceBase = (uint8_t *)VirtualAlloc(nullptr, g_AddressSpaceSize, MEM_RESERVE, PAGE_NOACCESS);
+    RegionAlloc::InitRootAlloc(g_AddressSpaceBase);
+    MemPagePool::Init();
 
     if (desc.open)
         WinOpen();
@@ -601,7 +598,7 @@ void Platform::FileClose(FileHandle file)
     CloseHandle(hFile);
 }
 
-auto Platform::FileRead(FileHandle file, uint32_t size, char *out) -> uint32_t
+auto Platform::FileRead(FileHandle file, uint32_t size, uint8_t *out) -> uint32_t
 {
     auto hFile = reinterpret_cast<HANDLE>(file);
     DWORD bytesRead = 0;
@@ -676,16 +673,18 @@ auto Platform::GetStderr() -> FileHandle
     return GetStdHandle(STD_ERROR_HANDLE);
 }
 
-void Platform::ParseStdArgs(Str *args, uint32_t maxArgs)
+void Platform::ParseStdArgs(byteview *args, uint32_t maxArgs)
 {
-    auto cmdLine = AsStr(GetCommandLineA());
-    const char *cursor = cmdLine.Data();
+    uint8_t *cmdLine = (uint8_t *)GetCommandLineA();
+    uint64_t cmdLineLen = CStrLen(cmdLine);
+
+    const uint8_t *cursor = cmdLine;
     bool inQuotes = false;
     uint32_t argCount = 0;
 
-    const char *argStart = nullptr;
+    const uint8_t *argStart = nullptr;
 
-    for (uint32_t i = 0; i < cmdLine.Size() && argCount < maxArgs; ++i)
+    for (uint64_t i = 0; i < cmdLineLen && argCount < maxArgs; ++i)
     {
         char ch = cmdLine[i];
 
@@ -697,7 +696,7 @@ void Platform::ParseStdArgs(Str *args, uint32_t maxArgs)
             else
             {
                 // Closing quote: Save the string between argStart and here
-                args[argCount++] = Str{argStart, (uint32_t)(&cmdLine[i] - argStart)};
+                args[argCount++] = byteview{argStart, (uint32_t)(&cmdLine[i] - argStart)};
                 argStart = nullptr;
             }
         }
@@ -707,7 +706,7 @@ void Platform::ParseStdArgs(Str *args, uint32_t maxArgs)
             {
                 if (argStart) // We were in a word, and just hit a space
                 {
-                    args[argCount++] = Str{argStart, (uint32_t)(&cmdLine[i] - argStart)};
+                    args[argCount++] = byteview{argStart, (uint32_t)(&cmdLine[i] - argStart)};
                     argStart = nullptr;
                 }
             }
@@ -721,7 +720,7 @@ void Platform::ParseStdArgs(Str *args, uint32_t maxArgs)
     // Capture the trailing argument if there was no trailing space/quote
     if (argStart && argCount < maxArgs)
     {
-        args[argCount++] = Str{argStart, (uint32_t)((cmdLine.Data() + cmdLine.Size()) - argStart)};
+        args[argCount++] = byteview{argStart, (uint32_t)((cmdLine + cmdLineLen) - argStart)};
     }
 
     NYLA_ASSERT(!inQuotes);

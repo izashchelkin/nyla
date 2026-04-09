@@ -1,8 +1,8 @@
 #include "nyla/commons/d3d12/rhi_d3d12.h"
 #include "nyla/commons/assert.h"
 #include "nyla/commons/platform.h"
-#include "nyla/commons/windows/platform_windows.h"
 #include "nyla/commons/rhi.h"
+#include "nyla/commons/windows/platform_windows.h"
 #include <d3d12.h>
 #include <dxgi1_6.h>
 #include <wrl.h>

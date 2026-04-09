@@ -7,10 +7,10 @@
 #include <numbers>
 
 #include "nyla/apps/shipgame/world_renderer.h"
+#include "nyla/commons/abstract_input.h"
 #include "nyla/commons/math/lerp.h"
 #include "nyla/commons/math/vec.h"
 #include "nyla/commons0/debug_text_renderer.h"
-#include "nyla/commons/abstract_input.h"
 
 namespace nyla
 {

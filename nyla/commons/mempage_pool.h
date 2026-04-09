@@ -1,3 +1,4 @@
+#include "nyla/commons/platform_base.h"
 #pragma oncn
 
 #include <cstdint>
@@ -15,20 +16,22 @@ namespace nyla
 namespace MemPagePool
 {
 
+constexpr inline uint64_t kPoolSize = 256_GiB;
 constexpr inline uint64_t kChunkSize = 256_MiB;
-constexpr inline uint64_t kNumChunks = 256_GiB / kChunkSize;
+constexpr inline uint64_t kNumChunks = kPoolSize / kChunkSize;
 
 } // namespace MemPagePool
 
 struct mempage_pool
 {
-    array<uint64_t, MemPagePool::kNumChunks / sizeof(uint64_t)> bitset;
     uint8_t *begin;
+    array<uint64_t, MemPagePool::kNumChunks / sizeof(uint64_t)> bitset;
 };
-extern mempage_pool *g_MemPagePool;
 
 namespace MemPagePool
 {
+
+extern mempage_pool *g_MemPagePool;
 
 INLINE auto AcquireChunk() -> span<uint8_t>
 {
@@ -56,10 +59,21 @@ INLINE void ReleaseChunk(void *p)
 {
     uint64_t ichunk = ((uint8_t *)p - g_MemPagePool->begin) / kChunkSize;
     uint64_t &qword = g_MemPagePool->bitset[ichunk / sizeof(uint64_t)];
-    uint64_t mask = ((uint64_t)1) << (ichunk % sizeof(uint64_t));
 
+    uint64_t mask = ((uint64_t)1) << (ichunk % sizeof(uint64_t));
     NYLA_DASSERT(qword & mask);
+
     qword &= ~(mask);
+}
+
+INLINE auto Init(void *addressSpace)
+{
+    g_MemPagePool = (mempage_pool *)addressSpace;
+    Platform::CommitMemPages(addressSpace, sizeof(*g_MemPagePool));
+
+    AcquireChunk();
+
+    Platform::GetMemPageSize();
 }
 
 } // namespace MemPagePool

@@ -1,8 +1,8 @@
 #include "nyla/apps/asteroids/asteroids.h"
-#include "nyla/commons/signal/signal.h"
-#include "nyla/commons0/frame_arena.h"
 #include "nyla/commons/platform.h"
 #include "nyla/commons/rhi.h"
+#include "nyla/commons/signal/signal.h"
+#include "nyla/commons0/frame_arena.h"
 
 namespace nyla
 {

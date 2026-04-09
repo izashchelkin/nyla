@@ -1,7 +1,7 @@
 #include "nyla/commons/elf/elf.h"
-#include "nyla/commons/region_alloc.h"
 #include "nyla/commons/assert.h"
 #include "nyla/commons/platform.h"
+#include "nyla/commons/region_alloc.h"
 
 namespace nyla
 {

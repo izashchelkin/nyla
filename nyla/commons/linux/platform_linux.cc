@@ -17,10 +17,10 @@
 #include "nyla/commons/assert.h"
 #include "nyla/commons/byteliterals.h"
 #include "nyla/commons/cleanup.h"
-#include "nyla/commons/log.h"
-#include "nyla/commons/string.h"
 #include "nyla/commons/linux/platform_linux.h"
+#include "nyla/commons/log.h"
 #include "nyla/commons/platform.h"
+#include "nyla/commons/string.h"
 
 #ifdef __clang__
 #pragma clang diagnostic push

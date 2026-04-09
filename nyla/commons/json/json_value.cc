@@ -1,7 +1,7 @@
 #include "nyla/commons/json/json_value.h"
 #include "nyla/commons/assert.h"
-#include "nyla/commons/log.h"
 #include "nyla/commons/json/json.h"
+#include "nyla/commons/log.h"
 #include <cinttypes>
 #include <cstdint>
 #include <string_view>

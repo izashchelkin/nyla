@@ -5,9 +5,9 @@
 #include <unordered_map>
 
 #include "nyla/commons/containers/map.h"
+#include "nyla/commons/linux/platform_linux.h"
 #include "nyla/dbus/dbus.h"
 #include "nyla/debugfs/debugfs.h"
-#include "nyla/commons/linux/platform_linux.h"
 #include "xcb/screensaver.h"
 
 namespace nyla

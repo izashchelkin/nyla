@@ -4,18 +4,18 @@
 #include <cstdint>
 #include <thread>
 
-#include "nyla/commons/region_alloc.h"
-#include "nyla/commons/bitenum.h"
 #include "nyla/commons/asset_manager.h"
+#include "nyla/commons/bitenum.h"
 #include "nyla/commons/debug_text_renderer.h"
 #include "nyla/commons/engine.h"
 #include "nyla/commons/gpu_upload_manager.h"
 #include "nyla/commons/input_manager.h"
+#include "nyla/commons/platform.h"
+#include "nyla/commons/region_alloc.h"
 #include "nyla/commons/renderer.h"
+#include "nyla/commons/rhi.h"
 #include "nyla/commons/staging_buffer.h"
 #include "nyla/commons/tween_manager.h"
-#include "nyla/commons/platform.h"
-#include "nyla/commons/rhi.h"
 
 namespace nyla
 {

@@ -10,9 +10,7 @@
 namespace nyla
 {
 
-void NYLA_API StringWriteFmt(char *out, uint64_t outSize, byteview fmt, ...);
-
-template <Plain T, uint64_t Capacity> struct inline_vec
+template <is_plain T, uint64_t Capacity> struct inline_vec
 {
     array<T, sizeof(T) * Capacity> data;
     uint64_t size;

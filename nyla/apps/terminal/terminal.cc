@@ -1,12 +1,12 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "nyla/commons/region_alloc.h"
 #include "nyla/apps/terminal/terminal.h"
+#include "nyla/commons/bdf/bdf.h"
 #include "nyla/commons/engine.h"
 #include "nyla/commons/glyph_renderer.h"
-#include "nyla/commons/bdf/bdf.h"
 #include "nyla/commons/platform.h"
+#include "nyla/commons/region_alloc.h"
 
 namespace nyla
 {

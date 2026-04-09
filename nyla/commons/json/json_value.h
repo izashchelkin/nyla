@@ -92,28 +92,28 @@ class JsonValue
     }
 
 #define DECL(name, out)                                                                                                \
-    auto Try##name(Span<Str>, out &) -> bool;                                                        \
-    auto name(Span<Str> path) -> out                                                                 \
+    auto Try##name(Span<Str>, out &) -> bool;                                                                          \
+    auto name(Span<Str> path) -> out                                                                                   \
     {                                                                                                                  \
         out ret;                                                                                                       \
         NYLA_ASSERT(Try##name(path, ret));                                                                             \
         return ret;                                                                                                    \
     }                                                                                                                  \
-    auto Try##name(Str path, out &ret) -> bool                                                            \
+    auto Try##name(Str path, out &ret) -> bool                                                                         \
     {                                                                                                                  \
-        return Try##name(Span{&path, 1}, ret);                                                                    \
+        return Try##name(Span{&path, 1}, ret);                                                                         \
     }                                                                                                                  \
-    auto name(Str path) -> out                                                                            \
+    auto name(Str path) -> out                                                                                         \
     {                                                                                                                  \
-        return name(Span{&path, 1});                                                                              \
+        return name(Span{&path, 1});                                                                                   \
     }                                                                                                                  \
     auto Try##name(out &ret) -> bool                                                                                   \
     {                                                                                                                  \
-        return Try##name(Span<Str>{}, ret);                                                          \
+        return Try##name(Span<Str>{}, ret);                                                                            \
     }                                                                                                                  \
     auto name() -> out                                                                                                 \
     {                                                                                                                  \
-        return name(Span<Str>{});                                                                    \
+        return name(Span<Str>{});                                                                                      \
     }
 
     DECL(Any, JsonValue *);

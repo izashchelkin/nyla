@@ -1,7 +1,7 @@
 #include <cstdint>
 
-#include "nyla/commons/region_alloc.h"
 #include "nyla/commons/bdf/bdf.h"
+#include "nyla/commons/region_alloc.h"
 
 namespace nyla
 {

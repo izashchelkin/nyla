@@ -1,11 +1,11 @@
 #pragma once
 
-#include "nyla/commons/region_alloc.h"
 #include "nyla/commons/handle.h"
 #include "nyla/commons/handle_pool.h"
-#include "nyla/commons/path.h"
-#include "nyla/commons/vec.h"
+#include "nyla/commons/inline_path.h"
+#include "nyla/commons/region_alloc.h"
 #include "nyla/commons/rhi.h"
+#include "nyla/commons/vec.h"
 #include <cstdint>
 #include <string>
 

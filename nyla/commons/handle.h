@@ -12,6 +12,9 @@ struct Handle
     uint32_t index;
 };
 
+template <typename T>
+concept is_handle = std::derived_from<T, Handle> && (sizeof(T) == sizeof(Handle));
+
 inline auto HandleIsSet(Handle handle) -> bool
 {
     return handle.gen;

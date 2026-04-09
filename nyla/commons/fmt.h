@@ -14,7 +14,7 @@ void NYLA_API FileWriteFmt(FileHandle handle, const char *fmt, uint64_t fmtSize,
 #define NYLA_LOG(fmt, ...) ::nyla::FileWriteFmt(Platform::GetStderr(), fmt, CStrLen(fmt), ##__VA_ARGS__)
 
 #define NYLA_SV_FMT "%.*s"
-#define NYLA_SV_ARG(sv) (uint32_t)((sv).Size()), (sv).Data()
+#define NYLA_SV_ARG(sv) (uint32_t)((sv).size), (sv).data
 
 #if defined(_MSC_VER)
 #define NYLA_DEBUGBREAK() __debugbreak()

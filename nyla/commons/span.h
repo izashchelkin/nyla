@@ -9,7 +9,7 @@
 namespace nyla
 {
 
-template <Plain T> struct span
+template <is_plain T> struct span
 {
     T *data;
     uint64_t size;
@@ -75,13 +75,6 @@ template <typename T>
 INLINE auto AsConst(span<T> self) -> span<const T>
 {
     return {self.data, self.size};
-}
-
-template <typename T>
-[[nodiscard]]
-INLINE auto Empty(span<T> self) -> bool
-{
-    return self.size == 0;
 }
 
 template <typename T>

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "nyla/commons/region_alloc.h"
 #include "nyla/commons/inline_vec.h"
 #include "nyla/commons/json/json.h"
+#include "nyla/commons/region_alloc.h"
 #include <cstdint>
 
 namespace nyla
@@ -156,8 +156,8 @@ class GltfParser
 
     auto Parse() -> bool;
 
-    auto FindAttributeAccessor(Span<GltfMeshPrimitiveAttribute> attributes, Str attributeName,
-                               GltfAccessor &out) -> bool;
+    auto FindAttributeAccessor(Span<GltfMeshPrimitiveAttribute> attributes, Str attributeName, GltfAccessor &out)
+        -> bool;
 
     auto GetBufferViews() -> Span<GltfBufferView>
     {

@@ -82,7 +82,7 @@ constexpr inline uint64_t kPageAllocMinSize = 64_KiB;
 auto NYLA_API GetMemPageSize() -> uint64_t;
 auto NYLA_API ReserveMemPages(uint64_t size) -> char *;
 void NYLA_API CommitMemPages(void *page, uint64_t size);
-void NYLA_API DecommitMemPages(char *page, uint64_t size);
+void NYLA_API DecommitMemPages(void *page, uint64_t size);
 
 auto NYLA_API GetMonotonicTimeMillis() -> uint64_t;
 auto NYLA_API GetMonotonicTimeMicros() -> uint64_t;
@@ -96,8 +96,8 @@ auto NYLA_API WinGetSize() -> PlatformWindowSize;
 auto NYLA_API WinPollEvent(PlatformEvent &outEvent) -> bool;
 
 auto NYLA_API UpdateGamepad(uint32_t index) -> bool;
-void NYLA_API GetGamepadLeftStick(uint32_t index, float& outX, float& outY);
-void NYLA_API GetGamepadRightStick(uint32_t index, float& outX, float& outY);
+void NYLA_API GetGamepadLeftStick(uint32_t index, float &outX, float &outY);
+void NYLA_API GetGamepadRightStick(uint32_t index, float &outX, float &outY);
 auto NYLA_API GetGamepadLeftTrigger(uint32_t index) -> float;
 auto NYLA_API GetGamepadRightTrigger(uint32_t index) -> float;
 
@@ -108,7 +108,7 @@ auto NYLA_API GetStderr() -> FileHandle;
 auto NYLA_API FileValid(FileHandle file) -> bool;
 auto NYLA_API FileOpen(const char *path, FileOpenMode mode) -> FileHandle;
 void NYLA_API FileClose(FileHandle file);
-auto NYLA_API FileRead(FileHandle file, uint32_t size, char *out) -> uint32_t;
+auto NYLA_API FileRead(FileHandle file, uint32_t size, uint8_t *out) -> uint32_t;
 auto NYLA_API FileWrite(FileHandle file, uint32_t size, const char *in) -> uint32_t;
 void NYLA_API FileSeek(FileHandle file, int64_t at);
 auto NYLA_API FileTell(FileHandle file) -> uint64_t;
