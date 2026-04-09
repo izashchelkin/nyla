@@ -28,6 +28,81 @@ template <is_plain T, uint64_t Size> struct alignas(required_align_v<T>) array
     }
 
     [[nodiscard]]
+    constexpr auto operator-() const
+    {
+        array ret;
+        for (uint32_t i = 0; i < Size; ++i)
+            ret[i] = -ret[i];
+        return ret;
+    }
+
+    [[nodiscard]]
+    constexpr auto operator==(const array &rhs) const -> bool
+    {
+        for (uint32_t i = 0; i < Size; ++i)
+        {
+            if (this[i] != rhs[i])
+                return false;
+        }
+        return true;
+    }
+
+    constexpr auto operator+=(const array &rhs) -> array &
+    {
+        for (uint32_t i = 0; i < Size; ++i)
+            this[i] += rhs[i];
+        return *this;
+    }
+
+    [[nodiscard]]
+    constexpr auto operator+(const array &rhs) const -> array
+    {
+        array lhs = *this;
+        return (lhs += rhs);
+    }
+    constexpr auto operator-=(const array &rhs) -> array &
+    {
+        for (uint32_t i = 0; i < Size; ++i)
+            this[i] -= rhs[i];
+        return *this;
+    }
+
+    [[nodiscard]]
+    constexpr auto operator-(const array &rhs) const -> array
+    {
+        array lhs = *this;
+        return (lhs -= rhs);
+    }
+
+    constexpr auto operator*=(auto scalar) -> array &
+    {
+        for (uint32_t i = 0; i < Size; ++i)
+            this[i] *= static_cast<T>(scalar);
+        return *this;
+    }
+
+    [[nodiscard]]
+    constexpr auto operator*(auto scalar) const -> array
+    {
+        array lhs = *this;
+        return (lhs *= scalar);
+    }
+
+    constexpr auto operator/=(auto scalar) -> array &
+    {
+        for (uint32_t i = 0; i < Size; ++i)
+            this[i] /= static_cast<T>(scalar);
+        return *this;
+    }
+
+    [[nodiscard]]
+    constexpr auto operator/(auto scalar) const -> array
+    {
+        array lhs = *this;
+        return (lhs /= scalar);
+    }
+
+    [[nodiscard]]
     auto begin() -> T *
     {
         return data;
