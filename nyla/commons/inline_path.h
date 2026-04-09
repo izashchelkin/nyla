@@ -1,21 +1,26 @@
 #pragma once
 
-#include "nyla/commons/dllapi.h"
+#include "nyla/commons/inline_string.h"
+#include "nyla/commons/macros.h"
 #include "nyla/commons/region_alloc.h"
 #include "nyla/commons/span.h"
+#include <cstdint>
 
 namespace nyla
 {
 
+template <uint64_t Capacity> using inline_path = inline_string<Capacity>;
+
+constexpr inline uint8_t kPathSep = '/';
+
+namespace InlinePath
+{
+
+} // namespace InlinePath
+
 struct NYLA_API Path
 {
     RegionAlloc m_Alloc;
-
-    [[nodiscard]]
-    static constexpr auto IsSeparator(char ch) -> bool
-    {
-        return ch == '/' || ch == '\\';
-    }
 
     auto Init(RegionAlloc alloc) -> Path &;
 
