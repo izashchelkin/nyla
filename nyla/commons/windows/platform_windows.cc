@@ -726,8 +726,7 @@ void Platform::ParseStdArgs(byteview *args, uint32_t maxArgs)
     NYLA_ASSERT(!inQuotes);
 }
 
-auto NYLA_API EntryPointWin32(int (*fnMain)(), HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
-                              int nCmdShow) -> int
+auto NYLA_API EntryPointWin32(int (*fnMain)()) -> int
 {
 #ifndef NDEBUG
     NYLA_ASSERT(AllocConsole());
