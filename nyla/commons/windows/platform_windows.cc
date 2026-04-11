@@ -597,7 +597,7 @@ auto Platform::FileRead(FileHandle file, uint32_t size, uint8_t *out) -> uint32_
     return bytesRead;
 }
 
-auto Platform::FileWrite(FileHandle file, uint32_t size, const char *in) -> uint32_t
+auto Platform::FileWrite(FileHandle file, uint32_t size, const uint8_t *in) -> uint32_t
 {
     auto hFile = reinterpret_cast<HANDLE>(file);
     DWORD bytesWritten = 0;

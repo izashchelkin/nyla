@@ -1,10 +1,11 @@
 #include "nyla/commons/fmt.h"
+
 #include <cstdarg>
 #include <cstdint>
 
+#include "nyla/commons/byteparser.h"
 #include "nyla/commons/macros.h"
 #include "nyla/commons/mem.h"
-#include "nyla/commons/region_alloc.h"
 #include "nyla/commons/word.h"
 
 namespace nyla
@@ -13,7 +14,7 @@ namespace nyla
 namespace
 {
 
-auto U64ToBuffer(char *buf, uint64_t val) -> uint32_t
+auto U64ToBuffer(uint8_t *buf, uint64_t val) -> uint32_t
 {
     if (val == 0)
     {
@@ -21,11 +22,11 @@ auto U64ToBuffer(char *buf, uint64_t val) -> uint32_t
         return 1;
     }
 
-    char temp[20]; // Max digits for u64
+    uint8_t temp[20]; // Max digits for u64
     uint32_t i = 0;
     while (val > 0)
     {
-        temp[i++] = (char)('0' + (val % 10));
+        temp[i++] = (uint8_t)('0' + (val % 10));
         val /= 10;
     }
 
@@ -37,7 +38,7 @@ auto U64ToBuffer(char *buf, uint64_t val) -> uint32_t
     return len;
 }
 
-auto S64ToBuffer(char *buf, int64_t val) -> uint32_t
+auto S64ToBuffer(uint8_t *buf, int64_t val) -> uint32_t
 {
     if (val < 0)
     {
@@ -47,35 +48,35 @@ auto S64ToBuffer(char *buf, int64_t val) -> uint32_t
     return U64ToBuffer(buf, (uint64_t)val);
 }
 
-void WriteFmt(auto &&consumer, Str fmt, ...)
+void WriteFmt(auto &&consumer, byteview fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
 
-    ByteParser parser;
-    parser.Init(fmt.Data(), fmt.Size());
+    byte_parser parser;
+    ByteParser::Init(parser, fmt.data, fmt.size);
 
-    while (parser.Left() > 0)
+    while (ByteParser::HasNext(parser))
     {
-        char ch = parser.Pop();
+        uint8_t ch = ByteParser::Read(parser);
 
         switch (ch)
         {
         case '%': {
-            char ch1 = parser.Left() ? parser.Pop() : '\0';
+            uint8_t ch1 = ByteParser::ReadOrDefault(parser, '\0');
 
             switch (ch1)
             {
 
             case '.': {
-                char ch2 = parser.Left() ? parser.Pop() : '\0';
-                char ch3 = parser.Left() ? parser.Pop() : '\0';
+                uint8_t ch2 = ByteParser::ReadOrDefault(parser, '\0');
+                uint8_t ch3 = ByteParser::ReadOrDefault(parser, '\0');
 
                 switch ((uint32_t)(ch2 | (ch3 << 8)))
                 {
                 case DWord("*s\0\0"): {
-                    uint32_t len = va_arg(args, uint32_t);
-                    const char *str = va_arg(args, const char *);
+                    uint64_t len = va_arg(args, uint64_t);
+                    const uint8_t *str = va_arg(args, const uint8_t *);
                     consumer(str, (uint32_t)len);
                     break;
                 }
@@ -90,28 +91,28 @@ void WriteFmt(auto &&consumer, Str fmt, ...)
             }
 
             case 's': {
-                const char *s = va_arg(args, const char *);
+                const uint8_t *s = va_arg(args, const uint8_t *);
                 consumer(s, static_cast<uint32_t>(CStrLen(s)));
                 break;
             }
             case 'd': {
-                char buf[32];
+                uint8_t buf[32];
                 uint32_t len = S64ToBuffer(buf, va_arg(args, int));
                 consumer(buf, len);
                 break;
             }
             case 'u': {
-                char buf[32];
+                uint8_t buf[32];
                 uint32_t len = U64ToBuffer(buf, va_arg(args, uint32_t));
                 consumer(buf, len);
                 break;
             }
             case 'p': {
-                consumer("0x[pointer]", 11);
+                consumer((uint8_t *)"0x[pointer]", 11);
                 break;
             }
             case '%': {
-                consumer("%", 1);
+                consumer((uint8_t *)"%", 1);
                 break;
             }
 
@@ -124,56 +125,55 @@ void WriteFmt(auto &&consumer, Str fmt, ...)
         }
 
         default: {
-            const char *start = &parser.Peek() - 1;
-            while (parser.Left() && parser.Peek() != '%')
-                parser.Advance();
+            const uint8_t *start = &ByteParser::Peek(parser) - 1;
+            while (ByteParser::HasNext(parser) && ByteParser::Peek(parser) != '%')
+                ByteParser::Advance(parser);
 
-            consumer(start, (uint32_t)(&parser.Peek() - start));
+            consumer(start, (&ByteParser::Peek(parser) - start));
             break;
         }
         }
     }
 
-    consumer("\n", 1);
+    consumer((uint8_t *)"\n", 1);
 
     va_end(args);
 }
 
-void BufferWriteFmt(auto &&consumer, RegionAlloc &alloc, uint64_t bufferSize, Str fmt, ...)
+void BufferWriteFmt(auto &&consumer, byteview buffer, byteview fmt, ...)
 {
-    Span<char> buffer = alloc.PushArr<char>(bufferSize);
     uint64_t bufferUsed = 0;
 
     va_list args;
     va_start(args, fmt);
 
     WriteFmt(
-        [&](const char *data, uint32_t size) -> void {
-            if (bufferUsed + size > bufferSize)
+        [&](const uint8_t *data, uint32_t size) -> void {
+            if (bufferUsed + size > buffer.size)
             {
-                if (bufferUsed + size > bufferSize * 3 / 2)
+                if (bufferUsed + size > buffer.size * 3 / 2)
                 {
-                    consumer(buffer.Data(), bufferUsed);
+                    consumer(buffer.data, bufferUsed);
                     consumer(data, size);
                     bufferUsed = 0;
                 }
                 else
                 {
-                    uint64_t remainingInBuffer = bufferSize - bufferUsed;
-                    MemCpy(buffer.Data() + bufferUsed, data, remainingInBuffer);
-                    consumer(buffer.Data(), bufferUsed);
+                    uint64_t remainingInBuffer = buffer.size - bufferUsed;
+                    MemCpy(buffer.data + bufferUsed, data, remainingInBuffer);
+                    consumer(buffer.data, bufferUsed);
 
                     bufferUsed = size - remainingInBuffer;
-                    MemCpy(buffer.Data(), data + remainingInBuffer, bufferUsed);
+                    MemCpy(buffer.data, data + remainingInBuffer, bufferUsed);
                 }
             }
             else
             {
-                MemCpy(buffer.Data() + bufferUsed, data, size);
+                MemCpy(buffer.data + bufferUsed, data, size);
 
-                if (bufferUsed + size == bufferSize)
+                if (bufferUsed + size == buffer.size)
                 {
-                    consumer(buffer.Data(), bufferUsed);
+                    consumer(buffer.data, bufferUsed);
                     bufferUsed = 0;
                 }
             }
@@ -181,14 +181,14 @@ void BufferWriteFmt(auto &&consumer, RegionAlloc &alloc, uint64_t bufferSize, St
         fmt, args);
 
     if (bufferUsed > 0)
-        consumer(buffer.Data(), bufferUsed);
+        consumer(buffer.data, bufferUsed);
 
     va_end(args);
 }
 
 } // namespace
 
-void NYLA_API StringWriteFmt(char *out, uint64_t outSize, byteview fmt, ...)
+void NYLA_API StringWriteFmt(uint8_t *out, uint64_t outSize, byteview fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
@@ -196,23 +196,24 @@ void NYLA_API StringWriteFmt(char *out, uint64_t outSize, byteview fmt, ...)
     uint64_t outWritten = 0;
 
     WriteFmt(
-        [&](const char *data, uint32_t size) -> void {
+        [&](const uint8_t *data, uint64_t size) -> void {
             NYLA_ASSERT(outWritten + size < outSize);
             MemCpy(out + outSize, data, size);
             outSize += size;
         },
-        fmt, fmt.Size(), args);
+        fmt, args);
 
     va_end(args);
 }
 
-void NYLA_API FileWriteFmt(FileHandle handle, RegionAlloc &alloc, Str fmt, ...)
+void NYLA_API FileWriteFmt(FileHandle handle, byteview buffer, byteview fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
 
-    BufferWriteFmt([handle](const char *data, uint32_t size) -> void { Platform::FileWrite(handle, size, data); },
-                   alloc, 1024, fmt, args);
+    BufferWriteFmt(
+        [handle](const uint8_t *data, uint64_t size) -> void { Platform::FileWrite(handle, (uint32_t)size, data); },
+        buffer, fmt, args);
 
     va_end(args);
 }

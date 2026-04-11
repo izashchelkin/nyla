@@ -1,8 +1,7 @@
+#include <cinttypes>
 #include <cstdint>
 
-#include "nyla/commons/assert.h"
 #include "nyla/commons/fmt.h"
-#include "nyla/commons/json/json.h"
 #include "nyla/commons/json/json_value.h"
 
 namespace nyla
@@ -68,8 +67,7 @@ auto TryString(json_value &self, span<byteview> path, byteview &out) -> bool
     if (tmp->tag != json_tag::String)
         return false;
 
-    const auto &valStr = tmp->val.valStr;
-    out = byteview{(uint8_t *)valStr.str, valStr.len};
+    out = tmp->val.valStr;
     return true;
 }
 
@@ -134,57 +132,55 @@ auto GetNext(json_value &self) -> json_value *
     }
 }
 
-} // namespace JsonValue
-
-void LogJsonValue(JsonValue *val, uint32_t indent)
+void Log(json_value &self, uint32_t indent)
 {
-    switch (val->GetTag())
+    switch (self.tag)
     {
-    case JsonTag::Null: {
+    case json_tag::Null: {
         NYLA_LOG("%*snull", indent, " ");
         return;
     }
-    case JsonTag::Bool: {
-        NYLA_LOG("%*s%d", indent, " ", val->Bool());
+    case json_tag::Bool: {
+        NYLA_LOG("%*s%d", indent, " ", JsonValue::Bool(self));
         return;
     }
-    case JsonTag::Integer: {
-        NYLA_LOG("%*s%" PRIu64, indent, " ", val->QWord());
+    case json_tag::Integer: {
+        NYLA_LOG("%*s%" PRIu64, indent, " ", JsonValue::QWord(self));
         return;
     }
-    case JsonTag::Double: {
-        NYLA_LOG("%*s%f", indent, " ", val->Double());
+    case json_tag::Double: {
+        NYLA_LOG("%*s%f", indent, " ", JsonValue::Double(self));
         return;
     }
-    case JsonTag::String: {
-        NYLA_LOG("%*s\"" NYLA_SV_FMT "\"", indent, " ", NYLA_SV_ARG(val->String()));
+    case json_tag::String: {
+        NYLA_LOG("%*s\"" NYLA_SV_FMT "\"", indent, " ", NYLA_SV_ARG(JsonValue::String(self)));
         return;
     }
-    case JsonTag::ArrayBegin: {
+    case json_tag::ArrayBegin: {
         NYLA_LOG("%*s[", indent, " ");
 
-        auto end = val->end();
-        for (auto it = val->begin(); it != end; ++it)
-            LogJsonValue(*it, indent + 2);
+        auto end = self.end();
+        for (auto it = self.begin(); it != end; ++it)
+            Log(*it, indent + 2);
 
         // Fallthrough
     }
-    case JsonTag::ArrayEnd: {
+    case json_tag::ArrayEnd: {
         NYLA_LOG("%*s]", indent, " ");
         return;
     }
-    case JsonTag::ObjectBegin: {
+    case json_tag::ObjectBegin: {
         NYLA_LOG("%*s{", indent, " ");
 
-        auto end = val->end();
-        for (auto it = val->begin(); it != end; ++it)
+        auto end = self.end();
+        for (auto it = self.begin(); it != end; ++it)
         {
-            LogJsonValue(*it, indent + 2);
+            Log(*it, indent + 2);
         }
 
         // Fallthrough
     }
-    case JsonTag::ObjectEnd: {
+    case json_tag::ObjectEnd: {
         NYLA_LOG("%*s}", indent, " ");
         return;
     }
@@ -193,5 +189,7 @@ void LogJsonValue(JsonValue *val, uint32_t indent)
     }
     }
 }
+
+} // namespace JsonValue
 
 } // namespace nyla

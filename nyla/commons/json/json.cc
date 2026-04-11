@@ -1,69 +1,65 @@
-#include "nyla/commons/json/json.h"
-#include "nyla/commons/assert.h"
-#include "nyla/commons/json/json_value.h"
-#include "nyla/commons/region_alloc.h"
 #include <cstdint>
+
+#include "nyla/commons/byteparser.h"
+#include "nyla/commons/fmt.h"
+#include "nyla/commons/json/json.h"
+#include "nyla/commons/json/json_value.h"
 
 namespace nyla
 {
 
+namespace JsonParser
+{
+
 namespace
 {
-} // namespace
 
-auto JsonParser::ParseNext() -> JsonValue *
+auto PushOut(json_parser &self, const json_value &value) -> json_value *
 {
-    SkipWhitespace();
+    NYLA_ASSERT(self.outSize > 0);
 
-    char ch = Peek();
-    if (IsNumber(ch) || ch == '-')
-        return ParseNumber();
-    if (IsAlpha(ch))
-        return ParseLiteral();
+    json_value *ret = self.out;
+    *ret = value;
 
-    Advance();
-    if (ch == '"')
-        return ParseString();
-    if (ch == '[')
-        return ParseArray();
-    if (ch == '{')
-        return ParseObject();
+    ++self.out;
+    --self.outSize;
 
-    NYLA_ASSERT(false);
+    return ret;
 }
 
-auto JsonParser::ParseLiteral() -> JsonValue *
+auto ParseLiteral(json_parser &self) -> json_value *
 {
-    switch (Pop())
+    switch (ByteParser::Read(self))
     {
     case 'n': {
-        NYLA_ASSERT(Pop() == 'u');
-        NYLA_ASSERT(Pop() == 'l');
-        NYLA_ASSERT(Pop() == 'l');
-        return m_Alloc->Push(JsonValue{});
+        NYLA_ASSERT(ByteParser::Read(self) == 'u');
+        NYLA_ASSERT(ByteParser::Read(self) == 'l');
+        NYLA_ASSERT(ByteParser::Read(self) == 'l');
+
+        return PushOut(self, json_value{});
     }
 
     case 't': {
-        NYLA_ASSERT(Pop() == 'r');
-        NYLA_ASSERT(Pop() == 'u');
-        NYLA_ASSERT(Pop() == 'e');
+        NYLA_ASSERT(ByteParser::Read(self) == 'r');
+        NYLA_ASSERT(ByteParser::Read(self) == 'u');
+        NYLA_ASSERT(ByteParser::Read(self) == 'e');
 
-        JsonValue val;
-        val.SetValue(true);
+        json_value val;
+        JsonValue::SetValue(val, true);
 
-        return m_Alloc->Push(val);
+        return PushOut(self, val);
     }
 
     case 'f': {
-        NYLA_ASSERT(Pop() == 'a');
-        NYLA_ASSERT(Pop() == 'l');
-        NYLA_ASSERT(Pop() == 's');
-        NYLA_ASSERT(Pop() == 'e');
+        NYLA_ASSERT(ByteParser::Read(self) == 'a');
+        NYLA_ASSERT(ByteParser::Read(self) == 'l');
+        NYLA_ASSERT(ByteParser::Read(self) == 's');
+        NYLA_ASSERT(ByteParser::Read(self) == 'e');
 
-        JsonValue val;
-        val.SetValue(false);
+        json_value val;
+        JsonValue::SetValue(val, false);
 
-        return m_Alloc->Push(val);
+        return PushOut(self, val);
     }
 
     default: {
@@ -73,36 +69,36 @@ auto JsonParser::ParseLiteral() -> JsonValue *
     }
 }
 
-auto JsonParser::ParseNumber() -> JsonValue *
+auto ParseNumber(json_parser &self) -> json_value *
 {
     double doubleVal;
     int64_t longVal;
 
-    JsonValue val;
-    switch (ParseDecimal(doubleVal, longVal))
+    json_value val;
+    switch (ByteParser::ParseDecimal(self, doubleVal, longVal))
     {
     case ByteParser::ParseNumberResult::Double: {
-        val.SetValue(doubleVal);
+        JsonValue::SetValue(val, doubleVal);
         break;
     }
     case ByteParser::ParseNumberResult::Long: {
-        val.SetValue(longVal);
+        JsonValue::SetValue(val, longVal);
         break;
     }
     }
 
-    return m_Alloc->Push(val);
+    return PushOut(self, val);
 }
 
-auto JsonParser::ParseString() -> JsonValue *
+auto ParseString(json_parser &self) -> json_value *
 {
-    const char *base = m_At;
-    uint32_t count = 0;
+    const uint8_t *base = self.at;
+    uint64_t count = 0;
 
     char prevch = 0;
-    while (m_Left > 0)
+    while (ByteParser::HasNext(self))
     {
-        const char ch = Pop();
+        const char ch = ByteParser::Read(self);
         if (ch == '"' /*  && prevch != '\\' */)
             break;
 
@@ -111,84 +107,108 @@ auto JsonParser::ParseString() -> JsonValue *
         ++count;
     }
 
-    Str s{base, count};
+    json_value val;
+    JsonValue::SetValue(val, byteview{base, count});
 
-    JsonValue val;
-    val.SetValue(base, count);
-
-    return m_Alloc->Push(val);
+    return PushOut(self, val);
 }
 
-auto JsonParser::ParseArray() -> JsonValue *
+auto ParseArray(json_parser &self) -> json_value *
 {
-    JsonValue *begin = m_Alloc->Push(JsonValue());
+    json_value *begin = PushOut(self, json_value());
     int32_t count = 0;
 
     for (;;)
     {
-        if (Peek() == ']')
+        if (ByteParser::Peek(self) == ']')
         {
-            Advance();
+            ByteParser::Advance(self);
             break;
         }
 
         ++count;
 
-        JsonValue *elem = ParseNext();
+        json_value *elem = ParseNext(self);
 
-        SkipWhitespace();
-        const char ch = Pop();
+        ByteParser::SkipWhitespace(self);
+        const char ch = ByteParser::Read(self);
         if (ch == ']')
             break;
 
         NYLA_ASSERT(ch == ',');
     }
 
-    JsonValue *end = m_Alloc->Push(JsonValue());
+    json_value *end = PushOut(self, json_value());
 
-    begin->SetValue(JsonTag::ArrayBegin, count, end);
-    end->SetValue(JsonTag::ArrayEnd);
+    JsonValue::SetValue(*begin, json_tag::ArrayBegin, count, end);
+    JsonValue::SetValue(*end, json_tag::ArrayEnd);
 
     return begin;
 }
 
-auto JsonParser::ParseObject() -> JsonValue *
+auto ParseObject(json_parser &self) -> json_value *
 {
-    auto *begin = m_Alloc->Push<JsonValue>();
+    auto *begin = PushOut(self, json_value{});
     uint32_t count = 0;
 
     for (;;)
     {
-        if (Peek() == '}')
+        if (ByteParser::Peek(self) == '}')
         {
-            Advance();
+            ByteParser::Advance(self);
             break;
         }
 
         ++count;
 
-        JsonValue *key = ParseNext();
-        NYLA_ASSERT(key->GetTag() == JsonTag::String);
+        json_value *key = ParseNext(self);
+        NYLA_ASSERT(key->tag == json_tag::String);
 
-        SkipWhitespace();
-        NYLA_ASSERT(Pop() == ':');
+        ByteParser::SkipWhitespace(self);
+        NYLA_ASSERT(ByteParser::Read(self) == ':');
 
-        JsonValue *val = ParseNext();
+        json_value *val = ParseNext(self);
 
-        SkipWhitespace();
-        const char ch = Pop();
+        ByteParser::SkipWhitespace(self);
+        const char ch = ByteParser::Read(self);
         if (ch == '}')
             break;
 
         NYLA_ASSERT(ch == ',');
     }
 
-    auto *end = m_Alloc->Push<JsonValue>();
+    json_value *end = PushOut(self, json_value());
 
-    begin->SetValue(JsonTag::ObjectBegin, count, end);
-    end->SetValue(JsonTag::ObjectEnd);
+    JsonValue::SetValue(*begin, json_tag::ObjectBegin, count, end);
+    JsonValue::SetValue(*end, json_tag::ObjectEnd);
 
     return begin;
 }
+
+} // namespace
+
+auto ParseNext(json_parser &self) -> json_value *
+{
+    ByteParser::SkipWhitespace(self);
+
+    char ch = ByteParser::Peek(self);
+    if (IsNumber(ch) || ch == '-')
+        return ParseNumber(self);
+    if (IsAlpha(ch))
+        return ParseLiteral(self);
+
+    ByteParser::Advance(self);
+    if (ch == '"')
+        return ParseString(self);
+    if (ch == '[')
+        return ParseArray(self);
+    if (ch == '{')
+        return ParseObject(self);
+
+    NYLA_ASSERT(false);
+    return nullptr;
+}
+
+} // namespace JsonParser
 
 } // namespace nyla

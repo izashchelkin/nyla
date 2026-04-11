@@ -3,32 +3,22 @@
 #include <cstdint>
 
 #include "nyla/commons/byteparser.h"
-#include "nyla/commons/region_alloc.h"
+#include "nyla/commons/json/json_value.h"
 
 namespace nyla
 {
 
-class JsonValue;
-
-class JsonParser : public ByteParser
+struct json_parser : byte_parser
 {
-  public:
-    void Init(RegionAlloc *alloc, const char *base, uint64_t size)
-    {
-        m_Alloc = alloc;
-        ByteParser::Init(base, size);
-    }
-
-    auto ParseNext() -> JsonValue *;
-
-  private:
-    auto ParseNumber() -> JsonValue *;
-    auto ParseLiteral() -> JsonValue *;
-    auto ParseString() -> JsonValue *;
-    auto ParseArray() -> JsonValue *;
-    auto ParseObject() -> JsonValue *;
-
-    RegionAlloc *m_Alloc;
+    json_value *out;
+    uint64_t outSize;
 };
+
+namespace JsonParser
+{
+
+auto ParseNext(json_parser &self) -> json_value *;
+
+}
 
 } // namespace nyla

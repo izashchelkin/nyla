@@ -104,7 +104,7 @@ auto NYLA_API FileValid(FileHandle file) -> bool;
 auto NYLA_API FileOpen(const char *path, FileOpenMode mode) -> FileHandle;
 void NYLA_API FileClose(FileHandle file);
 auto NYLA_API FileRead(FileHandle file, uint32_t size, uint8_t *out) -> uint32_t;
-auto NYLA_API FileWrite(FileHandle file, uint32_t size, const char *in) -> uint32_t;
+auto NYLA_API FileWrite(FileHandle file, uint32_t size, const uint8_t *in) -> uint32_t;
 void NYLA_API FileSeek(FileHandle file, int64_t at);
 auto NYLA_API FileTell(FileHandle file) -> uint64_t;
 

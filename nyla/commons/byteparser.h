@@ -74,6 +74,11 @@ INLINE auto BytesLeft(const byte_parser &self) -> uint64_t
     return self.end - self.at;
 }
 
+INLINE auto HasNext(const byte_parser &self) -> uint64_t
+{
+    return self.end > self.at;
+}
+
 [[nodiscard]]
 INLINE auto Peek(const byte_parser &self) -> const uint8_t &
 {
@@ -98,7 +103,15 @@ INLINE auto Read(byte_parser &self) -> uint8_t
     return ret;
 }
 
-template <typename T> auto Read(byte_parser &self) -> T
+INLINE auto ReadOrDefault(byte_parser &self, uint8_t defaultValue) -> uint8_t
+{
+    if (HasNext(self))
+        return Read(self);
+    else
+        return defaultValue;
+}
+
+template <typename T> INLINE auto Read(byte_parser &self) -> T
 {
     const T ret = LoadU<T>(self.at);
     Advance(self, sizeof(ret));

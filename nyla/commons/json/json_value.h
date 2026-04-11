@@ -66,12 +66,7 @@ struct json_value
         bool valBool;
         int64_t valInt;
         double valDouble;
-
-        struct
-        {
-            const char *str;
-            uint32_t len;
-        } valStr;
+        byteview valStr;
 
         struct
         {
@@ -131,10 +126,10 @@ INLINE void SetValue(json_value &self, double val)
     self.val = {.valDouble = val};
 }
 
-INLINE void SetValue(json_value &self, const char *str, uint32_t len)
+INLINE void SetValue(json_value &self, byteview str)
 {
     self.tag = json_tag::String;
-    self.val = {.valStr = {.str = str, .len = len}};
+    self.val = {.valStr = str};
 }
 
 INLINE void SetValue(json_value &self, json_tag tag, uint32_t count, json_value *end)
