@@ -72,7 +72,6 @@ target_sources(${TARGET}
         math.h
         mem.h
         minmax.h
-        mutstr.h
         platform.h
         platform_audio.h
         platform_base.h
