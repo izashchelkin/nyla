@@ -1,8 +1,9 @@
 #pragma once
 
+#include <cstdint>
+
 #include "nyla/commons/byteparser.h"
 #include "nyla/commons/region_alloc.h"
-#include <cstdint>
 
 namespace nyla
 {

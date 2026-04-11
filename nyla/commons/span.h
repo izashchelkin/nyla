@@ -72,6 +72,13 @@ namespace Span
 
 template <typename T>
 [[nodiscard]]
+INLINE auto IsEmpty(span<T> self) -> bool
+{
+    return self.size == 0;
+}
+
+template <typename T>
+[[nodiscard]]
 INLINE auto AsConst(span<T> self) -> span<const T>
 {
     return {self.data, self.size};

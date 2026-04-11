@@ -169,16 +169,16 @@ INLINE void SkipWhitespace(byte_parser &self)
         Advance(self);
 }
 
-INLINE auto StartsWith(byte_parser &self, Str str) -> bool
+INLINE auto StartsWith(byte_parser &self, byteview prefix) -> bool
 {
-    return AsStr(self.at, BytesLeft(self)).StartsWith(str);
+    return MemStartsWith(self.at, BytesLeft(self), prefix.data, prefix.size);
 }
 
-INLINE auto StartsWithAdvance(byte_parser &self, Str str) -> bool
+INLINE auto StartsWithAdvance(byte_parser &self, byteview prefix) -> bool
 {
-    if (StartsWith(self, str))
+    if (StartsWith(self, prefix))
     {
-        Advance(self, str.Size());
+        Advance(self, prefix.size);
         return true;
     }
     else

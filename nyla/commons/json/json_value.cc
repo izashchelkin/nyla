@@ -1,147 +1,140 @@
-#include "nyla/commons/json/json_value.h"
-#include "nyla/commons/assert.h"
-#include "nyla/commons/json/json.h"
-#include "nyla/commons/log.h"
-#include <cinttypes>
 #include <cstdint>
-#include <string_view>
+
+#include "nyla/commons/assert.h"
+#include "nyla/commons/fmt.h"
+#include "nyla/commons/json/json.h"
+#include "nyla/commons/json/json_value.h"
 
 namespace nyla
 {
 
-auto JsonValue::Skip() -> JsonValue *
+namespace JsonValue
 {
-    switch (m_Tag)
-    {
-    case JsonTag::ArrayBegin:
-    case JsonTag::ObjectBegin:
-        return m_Val.valHeader.end + 1;
 
-    default:
-        return this + 1;
-    }
-}
-
-auto JsonValue::TryAny(Span<Str> path, JsonValue *&out) -> bool
+auto TryAny(json_value &self, span<byteview> path, json_value *&out) -> bool
 {
-    if (path.empty())
+    if (Span::IsEmpty(path))
     {
-        out = this;
+        out = &self;
         return true;
     }
 
-    if (m_Tag != JsonTag::ObjectBegin)
+    if (self.tag != json_tag::ObjectBegin)
         return false;
 
-    auto end = this->end();
-    for (auto it = begin(); it != end;)
+    for (auto it = self.begin(), end = self.end(); it != end;)
     {
-        auto key = it->String();
+        byteview key = JsonValue::String(*it);
         ++it;
-        auto val = it->Any();
+        auto val = JsonValue::Any(*it);
         ++it;
 
-        if (key == path.front())
-            return val->TryAny(path.subspan(1), out);
+        if (Span::Eq(key, Span::Front(path)))
+            return JsonValue::TryAny(*val, Span::SubSpan(path, 1), out);
     }
 
     return false;
 }
 
-auto JsonValue::TryObject(Span<Str> path, JsonValue *&out) -> bool
+auto TryObject(json_value &self, span<byteview> path, json_value *&out) -> bool
 {
-    JsonValue *tmp;
-    if (!TryAny(path, tmp))
+    json_value *tmp;
+    if (!TryAny(self, path, tmp))
         return false;
-    if (tmp->m_Tag != JsonTag::ObjectBegin)
+    if (tmp->tag != json_tag::ObjectBegin)
         return false;
 
     out = tmp;
     return true;
 }
 
-auto JsonValue::TryArray(Span<Str> path, JsonValue *&out) -> bool
+auto TryArray(json_value &self, span<byteview> path, json_value *&out) -> bool
 {
-    JsonValue *tmp;
-    if (!TryAny(path, tmp))
+    json_value *tmp;
+    if (!TryAny(self, path, tmp))
         return false;
-    if (tmp->m_Tag != JsonTag::ArrayBegin)
+    if (tmp->tag != json_tag::ArrayBegin)
         return false;
 
     out = tmp;
     return true;
 }
 
-auto JsonValue::TryString(Span<Str> path, Str &out) -> bool
+auto TryString(json_value &self, span<byteview> path, byteview &out) -> bool
 {
-    JsonValue *tmp;
-    if (!TryAny(path, tmp))
+    json_value *tmp;
+    if (!TryAny(self, path, tmp))
         return false;
-    if (tmp->m_Tag != JsonTag::String)
+    if (tmp->tag != json_tag::String)
         return false;
 
-    const auto &valStr = tmp->m_Val.valStr;
-    out = Str{valStr.str, valStr.len};
+    const auto &valStr = tmp->val.valStr;
+    out = byteview{(uint8_t *)valStr.str, valStr.len};
     return true;
 }
 
-auto JsonValue::TryQWord(Span<Str> path, uint64_t &out) -> bool
+auto TryQWord(json_value &self, span<byteview> path, uint64_t &out) -> bool
 {
-    JsonValue *tmp;
-    if (!TryAny(path, tmp))
+    json_value *tmp;
+    if (!TryAny(self, path, tmp))
         return false;
-    if (tmp->m_Tag != JsonTag::Integer)
+    if (tmp->tag != json_tag::Integer)
         return false;
 
-    out = tmp->m_Val.valInt;
+    out = tmp->val.valInt;
     return true;
 }
 
-auto JsonValue::TryDWord(Span<Str> path, uint32_t &out) -> bool
+auto TryDWord(json_value &self, span<byteview> path, uint32_t &out) -> bool
 {
-    JsonValue *tmp;
-    if (!TryAny(path, tmp))
+    json_value *tmp;
+    if (!TryAny(self, path, tmp))
         return false;
-    if (tmp->m_Tag != JsonTag::Integer)
+    if (tmp->tag != json_tag::Integer)
         return false;
 
-    out = tmp->m_Val.valInt;
+    out = tmp->val.valInt;
     return true;
 }
 
-auto JsonValue::TryDouble(Span<Str> path, double &out) -> bool
+auto TryDouble(json_value &self, span<byteview> path, double &out) -> bool
 {
-    JsonValue *tmp;
-    if (!TryAny(path, tmp))
+    json_value *tmp;
+    if (!TryAny(self, path, tmp))
         return false;
-    if (tmp->m_Tag != JsonTag::Double)
+    if (tmp->tag != json_tag::Double)
         return false;
 
-    out = tmp->m_Val.valDouble;
+    out = tmp->val.valDouble;
     return true;
 }
 
-auto JsonValue::TryBool(Span<Str> path, bool &out) -> bool
+auto TryBool(json_value &self, span<byteview> path, bool &out) -> bool
 {
-    JsonValue *tmp;
-    if (!TryAny(path, tmp))
+    json_value *tmp;
+    if (!TryAny(self, path, tmp))
         return false;
-    if (tmp->m_Tag != JsonTag::Bool)
+    if (tmp->tag != json_tag::Bool)
         return false;
 
-    out = tmp->m_Val.valBool;
+    out = tmp->val.valBool;
     return true;
 }
 
-//
-
-auto JsonValueIter::operator++() -> JsonValueIter &
+auto GetNext(json_value &self) -> json_value *
 {
-    m_At = m_At->Skip();
-    return *this;
+    switch (self.tag)
+    {
+    case json_tag::ArrayBegin:
+    case json_tag::ObjectBegin:
+        return self.val.valHeader.end + 1;
+
+    default:
+        return &self + 1;
+    }
 }
 
-//
+} // namespace JsonValue
 
 void LogJsonValue(JsonValue *val, uint32_t indent)
 {

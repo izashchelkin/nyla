@@ -30,7 +30,8 @@ extern "C"
 
     void NORETURN WINAPI _start()
     {
-        nyla::LibMain(nyla::PlatformMain);
-        __halt();
+        nyla::LibMain(nyla::UserMain);
+        TRAP();
+        UNREACHABLE();
     }
 }

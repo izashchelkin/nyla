@@ -42,7 +42,7 @@ target_sources(${TARGET}
         debug_text_renderer.h
         engine0_internal.h
         engine.h
-        entrypoint.h
+        entrypoint.cc
         fmt.h
         fmt_string.h
         future.h
@@ -51,7 +51,7 @@ target_sources(${TARGET}
         handle.h
         handle_pool.h
         hex.h
-        inline_ring.h
+        inline_queue.h
         inline_vec.h
         input_manager.h
         intrin.h

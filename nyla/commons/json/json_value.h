@@ -1,42 +1,51 @@
 #pragma once
 
-#include "nyla/commons/assert.h"
 #include <cstdint>
-#include <span>
-#include <string_view>
+
+#include "nyla/commons/fmt.h"
+#include "nyla/commons/span.h"
 
 namespace nyla
 {
 
-struct JsonValue;
+struct json_value;
 
-class JsonValueIter
+namespace JsonValue
 {
-  public:
-    explicit JsonValueIter(JsonValue *at) : m_At{at}
+
+auto GetNext(json_value &self) -> json_value *;
+
+void Log(json_value *val, uint32_t indent = 0);
+
+} // namespace JsonValue
+
+struct json_value_iterator
+{
+    json_value *p;
+
+    auto operator*() const -> json_value &
     {
+        return *p;
     }
 
-    auto operator*() const -> JsonValue *
+    auto operator->() const -> json_value &
     {
-        return m_At;
-    }
-    auto operator->() const -> JsonValue *
-    {
-        return m_At;
-    }
-    auto operator==(const JsonValueIter &other) const -> bool
-    {
-        return m_At == other.m_At;
+        return *p;
     }
 
-    auto operator++() -> JsonValueIter &;
+    auto operator==(const json_value_iterator &other) const -> bool
+    {
+        return p == other.p;
+    }
 
-  private:
-    JsonValue *m_At;
+    auto operator++() -> json_value_iterator &
+    {
+        p = JsonValue::GetNext(*p);
+        return *this;
+    }
 };
 
-enum class JsonTag
+enum class json_tag
 {
     Invalid = 0,
     Null,
@@ -50,131 +59,9 @@ enum class JsonTag
     ObjectEnd,
 };
 
-class JsonValue
+struct json_value
 {
-  public:
-    void SetValue(JsonTag tag)
-    {
-        m_Tag = tag;
-    }
-
-    void SetValue(bool val)
-    {
-        m_Tag = JsonTag::Bool;
-        m_Val = {.valBool = val};
-    }
-
-    void SetValue(int64_t val)
-    {
-        m_Tag = JsonTag::Integer;
-        m_Val = {.valInt = val};
-    }
-
-    void SetValue(double val)
-    {
-        m_Tag = JsonTag::Double;
-        m_Val = {.valDouble = val};
-    }
-
-    void SetValue(const char *str, uint32_t len)
-    {
-        m_Tag = JsonTag::String;
-        m_Val = {.valStr = {.str = str, .len = len}};
-    }
-
-    void SetValue(JsonTag tag, uint32_t count, JsonValue *end)
-    {
-        m_Tag = tag;
-        m_Val.valHeader = {
-            .end = end,
-            .count = count,
-        };
-    }
-
-#define DECL(name, out)                                                                                                \
-    auto Try##name(Span<Str>, out &) -> bool;                                                                          \
-    auto name(Span<Str> path) -> out                                                                                   \
-    {                                                                                                                  \
-        out ret;                                                                                                       \
-        NYLA_ASSERT(Try##name(path, ret));                                                                             \
-        return ret;                                                                                                    \
-    }                                                                                                                  \
-    auto Try##name(Str path, out &ret) -> bool                                                                         \
-    {                                                                                                                  \
-        return Try##name(Span{&path, 1}, ret);                                                                         \
-    }                                                                                                                  \
-    auto name(Str path) -> out                                                                                         \
-    {                                                                                                                  \
-        return name(Span{&path, 1});                                                                                   \
-    }                                                                                                                  \
-    auto Try##name(out &ret) -> bool                                                                                   \
-    {                                                                                                                  \
-        return Try##name(Span<Str>{}, ret);                                                                            \
-    }                                                                                                                  \
-    auto name() -> out                                                                                                 \
-    {                                                                                                                  \
-        return name(Span<Str>{});                                                                                      \
-    }
-
-    DECL(Any, JsonValue *);
-    DECL(Object, JsonValue *);
-    DECL(Array, JsonValue *);
-    DECL(String, Str);
-    DECL(DWord, uint32_t);
-    DECL(QWord, uint64_t);
-    DECL(Double, double);
-    DECL(Bool, bool);
-
-#undef DECL
-
-    auto Skip() -> JsonValue *;
-
-    //
-
-    auto GetTag()
-    {
-        return m_Tag;
-    }
-
-    auto GetCount()
-    {
-        NYLA_ASSERT(m_Tag == JsonTag::ArrayBegin || m_Tag == JsonTag::ObjectBegin);
-        return m_Val.valHeader.count;
-    }
-
-    auto GetFront() -> JsonValue *
-    {
-        NYLA_ASSERT(m_Tag == JsonTag::ArrayBegin || m_Tag == JsonTag::ObjectBegin);
-        return this + 1;
-    }
-
-#if 0
-    auto operator[](uint32_t i) -> JsonValue *
-    {
-        NYLA_ASSERT(m_Tag == JsonTag::ArrayBegin || m_Tag == JsonTag::ObjectBegin);
-
-        JsonValue *ret = this;
-        while (i-- > 0)
-            ret = ret->Skip();
-
-        return ret;
-    }
-#endif
-
-    auto begin() -> JsonValueIter
-    {
-        NYLA_ASSERT(m_Tag == JsonTag::ArrayBegin || m_Tag == JsonTag::ObjectBegin);
-        return JsonValueIter{this + 1};
-    }
-
-    auto end() -> JsonValueIter
-    {
-        NYLA_ASSERT(m_Tag == JsonTag::ArrayBegin || m_Tag == JsonTag::ObjectBegin);
-        return JsonValueIter{m_Val.valHeader.end};
-    }
-
-  private:
-    JsonTag m_Tag;
+    json_tag tag;
     union {
         bool valBool;
         int64_t valInt;
@@ -188,12 +75,113 @@ class JsonValue
 
         struct
         {
-            JsonValue *end;
+            json_value *end;
             uint32_t count;
         } valHeader;
-    } m_Val;
+    } val;
+
+    auto begin() -> json_value_iterator
+    {
+        NYLA_ASSERT(tag == json_tag::ArrayBegin || tag == json_tag::ObjectBegin);
+        return json_value_iterator{this + 1};
+    }
+
+    auto end() -> json_value_iterator
+    {
+        NYLA_ASSERT(tag == json_tag::ArrayBegin || tag == json_tag::ObjectBegin);
+        return json_value_iterator{val.valHeader.end};
+    }
 };
 
-void LogJsonValue(JsonValue *val, uint32_t indent = 0);
+namespace JsonValue
+{
+
+INLINE auto GetCount(const json_value &self)
+{
+    NYLA_ASSERT(self.tag == json_tag::ArrayBegin || self.tag == json_tag::ObjectBegin);
+    return self.val.valHeader.count;
+}
+
+INLINE auto GetFront(json_value &self) -> json_value *
+{
+    NYLA_ASSERT(self.tag == json_tag::ArrayBegin || self.tag == json_tag::ObjectBegin);
+    return &self + 1;
+}
+
+INLINE void SetValue(json_value &self, json_tag tag)
+{
+    self.tag = tag;
+}
+
+INLINE void SetValue(json_value &self, bool val)
+{
+    self.tag = json_tag::Bool;
+    self.val = {.valBool = val};
+}
+
+INLINE void SetValue(json_value &self, int64_t val)
+{
+    self.tag = json_tag::Integer;
+    self.val = {.valInt = val};
+}
+
+INLINE void SetValue(json_value &self, double val)
+{
+    self.tag = json_tag::Double;
+    self.val = {.valDouble = val};
+}
+
+INLINE void SetValue(json_value &self, const char *str, uint32_t len)
+{
+    self.tag = json_tag::String;
+    self.val = {.valStr = {.str = str, .len = len}};
+}
+
+INLINE void SetValue(json_value &self, json_tag tag, uint32_t count, json_value *end)
+{
+    self.tag = tag;
+    self.val.valHeader = {
+        .end = end,
+        .count = count,
+    };
+}
+
+#define X(name, out)                                                                                                   \
+    auto Try##name(json_value &self, span<byteview>, out &) -> bool;                                                   \
+    INLINE auto name(json_value &self, span<byteview> path) -> out                                                     \
+    {                                                                                                                  \
+        out ret;                                                                                                       \
+        NYLA_ASSERT(Try##name(self, path, ret));                                                                       \
+        return ret;                                                                                                    \
+    }                                                                                                                  \
+    INLINE auto Try##name(json_value &self, byteview path, out &ret) -> bool                                           \
+    {                                                                                                                  \
+        return Try##name(self, span{&path, 1}, ret);                                                                   \
+    }                                                                                                                  \
+    INLINE auto name(json_value &self, byteview path) -> out                                                           \
+    {                                                                                                                  \
+        return name(self, span{&path, 1});                                                                             \
+    }                                                                                                                  \
+    INLINE auto Try##name(json_value &self, out &ret) -> bool                                                          \
+    {                                                                                                                  \
+        return Try##name(self, span<byteview>{}, ret);                                                                 \
+    }                                                                                                                  \
+    INLINE auto name(json_value &self) -> out                                                                          \
+    {                                                                                                                  \
+        return name(self, span<byteview>{});                                                                           \
+    }
+
+X(Any, json_value *);
+X(Object, json_value *);
+X(Array, json_value *);
+X(String, byteview);
+X(DWord, uint32_t);
+X(QWord, uint64_t);
+X(Double, double);
+X(Bool, bool);
+
+#undef X
+
+} // namespace JsonValue
 
 } // namespace nyla

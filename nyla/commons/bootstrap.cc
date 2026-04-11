@@ -10,7 +10,7 @@ namespace nyla
 
 void Bootstrap()
 {
-    uint8_t *dressSpaceBase = (uint8_t * latform::ReserveMemPages(MemPagePool::kPoolSize);
+    uint8_t *addressSpaceBase = (uint8_t *)Platform::ReserveMemPages(MemPagePool::kPoolSize);
     Platform::CommitMemPages(addressSpaceBase, Platform::GetMemPageSize());
 
     RegionAlloc::g_BootstrapAlloc.begin = (uint8_t *)addressSpaceBase;

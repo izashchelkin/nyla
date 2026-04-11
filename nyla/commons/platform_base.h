@@ -58,12 +58,6 @@ struct PlatformEvent
     };
 };
 
-struct PlatformInitDesc
-{
-    PlatformFeature enabledFeatures;
-    bool open;
-};
-
 enum class FileOpenMode
 {
     Read = 1 << 0,
@@ -80,7 +74,7 @@ namespace Platform
 constexpr inline uint64_t kPageAllocMinSize = 64_KiB;
 
 auto NYLA_API GetMemPageSize() -> uint64_t;
-auto NYLA_API ReserveMemPages(uint64_t size) -> char *;
+auto NYLA_API ReserveMemPages(uint64_t size) -> void *;
 void NYLA_API CommitMemPages(void *page, uint64_t size);
 void NYLA_API DecommitMemPages(void *page, uint64_t size);
 
@@ -92,7 +86,6 @@ auto NYLA_API Sleep(uint64_t millis);
 
 auto NYLA_API Spawn(const char *const cmd, uint64_t count) -> bool;
 
-void NYLA_API Init(const PlatformInitDesc &desc);
 void NYLA_API WinOpen();
 auto NYLA_API WinGetSize() -> PlatformWindowSize;
 auto NYLA_API WinPollEvent(PlatformEvent &outEvent) -> bool;

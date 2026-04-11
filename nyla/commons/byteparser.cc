@@ -21,7 +21,7 @@ auto ParseDecimal(byte_parser &self, double &outDouble, int64_t &outLong) -> Par
     uint64_t fraction = 0;
     uint64_t fractionCount = 0;
 
-    while (self.size > 0 && IsNumber(Peek(self)))
+    while (BytesLeft(self) > 0 && IsNumber(Peek(self)))
     {
         integer *= 10;
         integer += Read(self) - '0';
@@ -30,7 +30,7 @@ auto ParseDecimal(byte_parser &self, double &outDouble, int64_t &outLong) -> Par
     if (Peek(self) == '.')
     {
         Advance(self);
-        while (self.size > 0 && IsNumber(Peek(self)))
+        while (BytesLeft(self) > 0 && IsNumber(Peek(self)))
         {
             ++fractionCount;
             fraction *= 10;

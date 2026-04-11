@@ -1,8 +1,9 @@
+#include "nyla/commons/entrypoint.cc"
+
 #include <cstdint>
 
 #include "nyla/asset/asset.h"
 #include "nyla/commons/bootstrap.h"
-#include "nyla/commons/entrypoint.h"
 #include "nyla/commons/fmt.h"
 #include "nyla/commons/inline_string.h"
 #include "nyla/commons/platform.h"
@@ -12,7 +13,7 @@
 namespace nyla
 {
 
-auto PlatformMain() -> int
+auto UserMain() -> int
 {
     Platform::Init({});
     Bootstrap();
@@ -29,42 +30,42 @@ auto PlatformMain() -> int
     }
 
     for (auto arg : args)
-    {
+
         if (arg.size > 0)
             NYLA_LOG("" NYLA_SV_FMT, NYLA_SV_ARG(arg));
-    }
+}
 
-    NYLA_LOG("Writing into " NYLA_SV_FMT, NYLA_SV_ARG(args[1]));
+NYLA_LOG("Writing into " NYLA_SV_FMT, NYLA_SV_ARG(args[1]));
 
-    const FileHandle outputFile =
-        Platform::FileOpen(RegionAlloc::SafeCStr<64>(arena, args[1]), FileOpenMode::Append | FileOpenMode::Write);
-    NYLA_ASSERT(Platform::FileValid(outputFile));
+const FileHandle outputFile =
+    Platform::FileOpen(RegionAlloc::SafeCStr<64>(arena, args[1]), FileOpenMode::Append | FileOpenMode::Write);
+NYLA_ASSERT(Platform::FileValid(outputFile));
 
-    RegionAlloc::Reset(arena);
-    auto &cmdLineBuffer = RegionAlloc::AllocString<1_KiB>(arena);
+RegionAlloc::Reset(arena);
+auto &cmdLineBuffer = RegionAlloc::AllocString<1_KiB>(arena);
 
-    for (uint32_t i = 1; i < args.size; ++i)
-    {
-        InlineString::AppendSuffix(cmdLineBuffer, StringLiteralAsView(" \""));
-        InlineString::AppendSuffix(cmdLineBuffer, args[i]);
-        InlineString::AppendSuffix(cmdLineBuffer, StringLiteralAsView("\""));
-    }
+for (uint32_t i = 1; i < args.size; ++i)
+{
+    InlineString::AppendSuffix(cmdLineBuffer, StringLiteralAsView(" \""));
+    InlineString::AppendSuffix(cmdLineBuffer, args[i]);
+    InlineString::AppendSuffix(cmdLineBuffer, StringLiteralAsView("\""));
+}
 
-    Platform::FileWrite(outputFile, AssetPackerHeader{.count = (uint32_t)cmdLineBuffer.size});
-    Platform::FileWriteSpan(outputFile, (byteview)cmdLineBuffer);
+Platform::FileWrite(outputFile, AssetPackerHeader{.count = (uint32_t)cmdLineBuffer.size});
+Platform::FileWriteSpan(outputFile, (byteview)cmdLineBuffer);
 
-    RegionAlloc::Reset(arena);
+RegionAlloc::Reset(arena);
 
-    for (uint32_t i = 2; i < args.size;)
-    {
-        byteview dataPath = args[i++];
-        byteview processorConfig = args[i++];
+for (uint32_t i = 2; i < args.size;)
+{
+    byteview dataPath = args[i++];
+    byteview processorConfig = args[i++];
 
-        // NYLA_LOG("Packing " NYLA_SV_FMT " using config " NYLA_SV_FMT, NYLA_SV_ARG(dataPath),
-        //          NYLA_SV_ARG(processorConfig));
-    }
+    // NYLA_LOG("Packing " NYLA_SV_FMT " using config " NYLA_SV_FMT, NYLA_SV_ARG(dataPath),
+    //          NYLA_SV_ARG(processorConfig));
+}
 
-    return 0;
+return 0;
 }
 
 } // namespace nyla

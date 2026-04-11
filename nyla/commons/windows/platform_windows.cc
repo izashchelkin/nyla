@@ -2,16 +2,14 @@
 
 #include <cstdint>
 
-#include "nyla/commons/align.h"
-#include "nyla/commons/byteliterals.h"
-#include "nyla/commons/inline_ring.h"
+#include "nyla/commons/bootstrap.h"
+#include "nyla/commons/inline_queue.h"
 #include "nyla/commons/intrin.h"
 #include "nyla/commons/limits.h"
 #include "nyla/commons/macros.h"
 #include "nyla/commons/math.h"
 #include "nyla/commons/mem.h"
 #include "nyla/commons/platform.h"
-#include "nyla/commons/region_alloc.h"
 #include "nyla/commons/span.h"
 
 auto CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) -> LRESULT;
@@ -22,23 +20,19 @@ namespace nyla
 namespace
 {
 
-uint8_t *g_AddressSpaceBase;
-uint8_t *g_AddressSpaceAt;
-uint64_t g_AddressSpaceSize;
-
 SYSTEM_INFO g_SysInfo{};
 HINSTANCE g_HInstance{};
 HWND g_HWnd{};
 RECT g_WinRect{};
 
-Array<XINPUT_STATE, 1> g_Gamepads{};
+array<XINPUT_STATE, 1> g_Gamepads{};
 
 static inline constexpr uint32_t kFlagQuit = 1 << 0;
 static inline constexpr uint32_t kFlagWinResize = 1 << 1;
 static inline constexpr uint32_t kFlagRepaint = 1 << 2;
 uint32_t g_Flags{};
 
-InlineRing<PlatformEvent, 32> g_EventsRing{};
+inline_queue<PlatformEvent, 32> g_EventsQueue{};
 
 } // namespace
 
@@ -93,41 +87,32 @@ auto NYLA_API Platform::GetMemPageSize() -> uint64_t
 
 auto NYLA_API Platform::ReserveMemPages(uint64_t size) -> void *
 {
-    char *ret = g_AddressSpaceAt;
-    g_AddressSpaceAt += AlignedUp<uint64_t>(size, g_SysInfo.dwPageSize);
-    return ret;
+    return VirtualAlloc(nullptr, size, MEM_RESERVE, PAGE_NOACCESS);
 }
 
-void NYLA_API Platform::CommitMemPages(char *page, uint64_t size)
+void NYLA_API Platform::CommitMemPages(void *page, uint64_t size)
 {
-    // NYLA_ASSERT(((page - g_AddressSpaceBase) % g_SysInfo.dwPageSize) == 0);
-
     VirtualAlloc(page, size, MEM_COMMIT, PAGE_READWRITE);
 }
 
-void NYLA_API Platform::DecommitMemPages(char *page, uint64_t size)
+void NYLA_API Platform::DecommitMemPages(void *page, uint64_t size)
 {
-    // NYLA_ASSERT(((page - g_AddressSpaceBase) % g_SysInfo.dwPageSize) == 0);
-
     VirtualAlloc(page, size, MEM_DECOMMIT, PAGE_NOACCESS);
-}
-
-void NYLA_API Platform::Init(const PlatformInitDesc &desc)
-{
-    GetNativeSystemInfo(&g_SysInfo);
-
-    g_AddressSpaceBase = (uint8_t *)VirtualAlloc(nullptr, g_AddressSpaceSize, MEM_RESERVE, PAGE_NOACCESS);
-    RegionAlloc::InitRootAlloc(g_AddressSpaceBase);
-    MemPagePool::Init();
-
-    if (desc.open)
-        WinOpen();
 }
 
 auto NYLA_API Platform::WinPollEvent(PlatformEvent &outEvent) -> bool
 {
-    while (g_EventsRing.empty() && !(g_Flags & (kFlagRepaint | kFlagRepaint | kFlagQuit)))
+    for (;;)
     {
+        if (InlineQueue::IsEmpty(g_EventsQueue))
+            break;
+        if (g_Flags & kFlagRepaint)
+            return true;
+        if (g_Flags & kFlagWinResize)
+            return true;
+        if (g_Flags & kFlagQuit)
+            return true;
+
         MSG msg{};
         if (!PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
             break;
@@ -166,9 +151,9 @@ auto NYLA_API Platform::WinPollEvent(PlatformEvent &outEvent) -> bool
         return true;
     }
 
-    if (!g_EventsRing.empty())
+    if (!InlineQueue::IsEmpty(g_EventsQueue))
     {
-        outEvent = g_EventsRing.pop_front();
+        outEvent = InlineQueue::Read(g_EventsQueue);
         return true;
     }
 
@@ -338,10 +323,10 @@ auto CALLBACK WindowsPlatform::MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, 
         if (!wasDown)
         {
             KeyPhysical key = WindowsPlatform::ScanCodeToKeyPhysical(scanCode, extended);
-            g_EventsRing.PushBack(PlatformEvent{
-                .type = PlatformEventType::KeyDown,
-                .key = key,
-            });
+            InlineQueue::Write(g_EventsQueue, PlatformEvent{
+                                                  .type = PlatformEventType::KeyDown,
+                                                  .key = key,
+                                              });
         }
         return 0;
     }
@@ -352,10 +337,10 @@ auto CALLBACK WindowsPlatform::MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, 
         bool extended = ((lParam >> 24) & 0x01) != 0;
 
         KeyPhysical key = WindowsPlatform::ScanCodeToKeyPhysical(scanCode, extended);
-        g_EventsRing.PushBack(PlatformEvent{
-            .type = PlatformEventType::KeyUp,
-            .key = key,
-        });
+        InlineQueue::Write(g_EventsQueue, PlatformEvent{
+                                              .type = PlatformEventType::KeyUp,
+                                              .key = key,
+                                          });
         return 0;
     }
 
@@ -726,8 +711,10 @@ void Platform::ParseStdArgs(byteview *args, uint32_t maxArgs)
     NYLA_ASSERT(!inQuotes);
 }
 
-auto NYLA_API EntryPointWin32(int (*fnMain)()) -> int
+auto NYLA_API LibMain(int (*userMain)()) -> int
 {
+    GetNativeSystemInfo(&g_SysInfo);
+
 #ifndef NDEBUG
     NYLA_ASSERT(AllocConsole());
 
@@ -741,7 +728,9 @@ auto NYLA_API EntryPointWin32(int (*fnMain)()) -> int
     SetStdHandle(STD_ERROR_HANDLE, hConOut);
 #endif
 
-    const int retCode = fnMain();
+    Bootstrap();
+
+    const int retCode = userMain();
 
 #ifndef NDEBUG
     for (;;)
