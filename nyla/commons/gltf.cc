@@ -1,10 +1,13 @@
-#include "nyla/commons/gltf/gltf.h"
+#include "nyla/commons/gltf.h"
+
+#include <cstdint>
+
 #include "nyla/commons/align.h"
 #include "nyla/commons/assert.h"
-#include "nyla/commons/json/json.h"
-#include "nyla/commons/json/json_value.h"
+#include "nyla/commons/json_parser.h"
+#include "nyla/commons/json_value.h"
+#include "nyla/commons/region_alloc.h"
 #include "nyla/commons/word.h"
-#include <cstdint>
 
 namespace nyla
 {
@@ -40,12 +43,15 @@ auto GlbChunkParser::Parse(Span<char> &jsonChunk, Span<char> &binChunk) -> bool
 }
 #endif
 
-auto GltfParser::FindAttributeAccessor(Span<GltfMeshPrimitiveAttribute> attributes, Str attributeName,
-                                       GltfAccessor &out) -> bool
+namespace GltfParser
+{
+
+auto FindAttributeAccessor(gltf_parser &self, span<gltf_mesh_primitive_attribute> attributes, byteview attributeName,
+                           gltf_accessor &out) -> bool
 {
     for (auto attribute : attributes)
     {
-        if (attribute.name == attributeName)
+        if (Span::Eq(attribute.name, attributeName))
         {
             out = GetAccessor(attribute.accessor);
             return true;
@@ -54,14 +60,15 @@ auto GltfParser::FindAttributeAccessor(Span<GltfMeshPrimitiveAttribute> attribut
     return false;
 }
 
-auto GltfParser::Parse() -> bool
+auto Parse(gltf_parser &self, region_alloc &alloc) -> bool
 {
-    JsonParser jsonParser;
-    jsonParser.Init(m_Alloc, m_JsonChunk.Data(), m_JsonChunk.SizeBytes());
-    JsonValue *jsonChunk = jsonParser.ParseNext();
+    json_parser jsonParser;
+    JsonParser::Init(jsonParser, self.jsonChunk, RegionAlloc::AllocArray<json_value>(alloc, 1024));
+
+    json_value &jsonChunk = *JsonParser::ParseNext(jsonParser);
 
     {
-        JsonValue *images = jsonChunk->Array("images");
+        json_value *images = JsonValue::Array(jsonChunk, "images"_s);
         for (auto it = images->begin(), end = images->end(); it != end; ++it)
         {
             auto &image = m_Images.PushBack(GltfImage{});
@@ -72,7 +79,7 @@ auto GltfParser::Parse() -> bool
     }
 
     {
-        JsonValue *buffers = jsonChunk->Array("buffers");
+        json_value *buffers = JsonValue::Array(jsonChunk, "buffers"_s);
         for (auto it = buffers->begin(), end = buffers->end(); it != end; ++it)
         {
             auto &buffer = m_Buffers.PushBack(GltfBuffer{});
@@ -81,7 +88,7 @@ auto GltfParser::Parse() -> bool
     }
 
     {
-        JsonValue *bufferViews = jsonChunk->Array("bufferViews");
+        json_value *bufferViews = JsonValue::Array(jsonChunk, "bufferViews"_s);
         for (auto it = bufferViews->begin(), end = bufferViews->end(); it != end; ++it)
         {
             auto &bufferView = m_BufferViews.PushBack(GltfBufferView{});
@@ -95,7 +102,7 @@ auto GltfParser::Parse() -> bool
     }
 
     {
-        JsonValue *accessors = jsonChunk->Array("accessors");
+        json_value *accessors = JsonValue::Array(jsonChunk, "accessors"_s);
         for (auto it = accessors->begin(), end = accessors->end(); it != end; ++it)
         {
             auto &accessor = m_Accessors.PushBack(GltfAccessor{});
@@ -122,26 +129,26 @@ auto GltfParser::Parse() -> bool
 
             Str accessorType = it->String("type");
             if (accessorType == "SCALAR")
-                accessor.type = GltfAccessorType::SCALAR;
+                accessor.type = gltf_accessor_type::SCALAR;
             else if (accessorType == "VEC2")
-                accessor.type = GltfAccessorType::VEC2;
+                accessor.type = gltf_accessor_type::VEC2;
             else if (accessorType == "VEC3")
-                accessor.type = GltfAccessorType::VEC3;
+                accessor.type = gltf_accessor_type::VEC3;
             else if (accessorType == "VEC4")
-                accessor.type = GltfAccessorType::VEC4;
+                accessor.type = gltf_accessor_type::VEC4;
             else if (accessorType == "MAT2")
-                accessor.type = GltfAccessorType::MAT2;
+                accessor.type = gltf_accessor_type::MAT2;
             else if (accessorType == "MAT3")
-                accessor.type = GltfAccessorType::MAT3;
+                accessor.type = gltf_accessor_type::MAT3;
             else if (accessorType == "MAT4")
-                accessor.type = GltfAccessorType::MAT4;
+                accessor.type = gltf_accessor_type::MAT4;
             else
                 NYLA_ASSERT(false);
         }
     }
 
     {
-        JsonValue *meshes = jsonChunk->Array("meshes");
+        json_value *meshes = jsonChunk->Array("meshes");
         for (auto it = meshes->begin(), end = meshes->end(); it != end; ++it)
         {
             auto &mesh = m_Meshes.PushBack(GltfMesh{});
@@ -156,7 +163,7 @@ auto GltfParser::Parse() -> bool
             JsonValue *primitiveJson = primitivesJson->GetFront();
             for (uint32_t i = 0; i < primitivesCount; ++i, primitiveJson = primitiveJson->Skip())
             {
-                auto &primitive = mesh.primitives[i] = GltfMeshPrimitive{};
+                auto &primitive = mesh.primitives[i] = gltf_mesh_primitive{};
 
                 primitive.indices = primitiveJson->DWord("indices");
                 primitive.material = primitiveJson->DWord("material");
@@ -169,7 +176,7 @@ auto GltfParser::Parse() -> bool
                 JsonValue *attributeJson = attributesJson->GetFront();
                 for (uint32_t j = 0; j < attributesCount; ++j)
                 {
-                    auto &attribute = primitive.attributes[j] = GltfMeshPrimitiveAttribute{};
+                    auto &attribute = primitive.attributes[j] = gltf_mesh_primitive_attribute{};
 
                     attribute.name = attributeJson->String();
 
@@ -184,5 +191,7 @@ auto GltfParser::Parse() -> bool
 
     return true;
 }
+
+} // namespace GltfParser
 
 } // namespace nyla

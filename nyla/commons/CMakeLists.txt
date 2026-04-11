@@ -6,55 +6,64 @@ target_compile_definitions(${TARGET} PRIVATE NYLA_DLL_EXPORT)
 
 target_sources(${TARGET}
     PRIVATE
-        fmt.cc
-        mem.cc
-        region_alloc.cc
         asset_manager.cc
+        bdf.cc
+        bootstrap.cc
+        byteparser.cc
         debug_text_renderer.cc
         engine.cc
         engine0_internal.cc
+        fmt.cc
+        gltf.cc
         glyph_renderer.cc
         gpu_upload_manager.cc
         input_manager.cc
+        json_parser.cc
+        json_value.cc
+        mem.cc
+        png.cc
+        region_alloc.cc
         render_targets.cc
         renderer.cc
         tween_manager.cc
-        png.cc
-        byteparser.cc
-        bootstrap.cc
 
     PUBLIC
         align.h
         array.h
         assert.h
         asset_manager.h
+        bdf.h
         bitenum.h
+        bootstrap.h
         byteliterals.h
         byteparser.h
         cast.h
         cleanup.h
-        bootstrap.h
         collections.h
         color.h
         complex.h
         concepts.h
         cstr.h
         debug_text_renderer.h
-        engine0_internal.h
         engine.h
+        engine0_internal.h
         entrypoint.cc
         fmt.h
         fmt_string.h
         future.h
+        gltf.h
         glyph_renderer.h
         gpu_upload_manager.h
         handle.h
         handle_pool.h
         hex.h
+        inline_path.h
         inline_queue.h
         inline_vec.h
         input_manager.h
         intrin.h
+        json_parser.h
+        json_value.h
         lerp.h
         limits.h
         log.h
@@ -64,19 +73,18 @@ target_sources(${TARGET}
         mem.h
         minmax.h
         mutstr.h
-        inline_path.h
+        platform.h
         platform_audio.h
         platform_base.h
         platform_dir_watch.h
-        platform.h
         png.h
         region_alloc.h
-        renderer.h
         render_targets.h
+        renderer.h
         rhi.h
         span.h
-        staging_buffer.h
         staging.h
+        staging_buffer.h
         str.h
         tuple.h
         tween_manager.h
@@ -163,7 +171,4 @@ elseif (UNIX AND NOT APPLE)
     # )
 endif()
 
-add_subdirectory(bdf)
 add_subdirectory(elf)
-add_subdirectory(gltf)
-add_subdirectory(json)
