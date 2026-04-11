@@ -2,12 +2,9 @@
 
 #include <cstdint>
 
-#include "nyla/commons/align.h"
-#include "nyla/commons/assert.h"
 #include "nyla/commons/json_parser.h"
 #include "nyla/commons/json_value.h"
 #include "nyla/commons/region_alloc.h"
-#include "nyla/commons/word.h"
 
 namespace nyla
 {
@@ -53,7 +50,7 @@ auto FindAttributeAccessor(gltf_parser &self, span<gltf_mesh_primitive_attribute
     {
         if (Span::Eq(attribute.name, attributeName))
         {
-            out = GetAccessor(attribute.accessor);
+            out = self.accessors[attribute.accessor];
             return true;
         }
     }
@@ -69,78 +66,90 @@ auto Parse(gltf_parser &self, region_alloc &alloc) -> bool
 
     {
         json_value *images = JsonValue::Array(jsonChunk, "images"_s);
-        for (auto it = images->begin(), end = images->end(); it != end; ++it)
+        self.images = RegionAlloc::AllocArray<gltf_image>(alloc, JsonValue::GetCount(*images));
+
+        uint64_t i = 0;
+        for (auto it = images->begin(), end = images->end(); it != end; ++it, ++i)
         {
-            auto &image = m_Images.PushBack(GltfImage{});
-            image.uri = it->String("uri");
-            image.mimeType = it->String("mimeType");
-            image.name = it->String("name");
+            gltf_image &image = self.images[i];
+            image.uri = JsonValue::String(*it, "uri"_s);
+            image.mimeType = JsonValue::String(*it, "mimeType"_s);
+            image.name = JsonValue::String(*it, "name"_s);
         }
     }
 
     {
         json_value *buffers = JsonValue::Array(jsonChunk, "buffers"_s);
-        for (auto it = buffers->begin(), end = buffers->end(); it != end; ++it)
+        self.buffers = RegionAlloc::AllocArray<gltf_buffer>(alloc, JsonValue::GetCount(*buffers));
+
+        uint64_t i = 0;
+        for (auto it = buffers->begin(), end = buffers->end(); it != end; ++it, ++i)
         {
-            auto &buffer = m_Buffers.PushBack(GltfBuffer{});
-            buffer.byteLength = it->DWord("byteLength");
+            auto &buffer = self.buffers[i];
+            buffer.byteLength = JsonValue::DWord(*it, "byteLength"_s);
         }
     }
 
     {
         json_value *bufferViews = JsonValue::Array(jsonChunk, "bufferViews"_s);
-        for (auto it = bufferViews->begin(), end = bufferViews->end(); it != end; ++it)
-        {
-            auto &bufferView = m_BufferViews.PushBack(GltfBufferView{});
-            bufferView.buffer = it->DWord("buffer");
+        self.bufferViews = RegionAlloc::AllocArray<gltf_buffer_view>(alloc, JsonValue::GetCount(*bufferViews));
 
-            if (!it->TryDWord("byteOffset", bufferView.byteOffset))
+        uint64_t i = 0;
+        for (auto it = bufferViews->begin(), end = bufferViews->end(); it != end; ++it, ++i)
+        {
+            auto &bufferView = self.bufferViews[i];
+            bufferView.buffer = JsonValue::DWord(*it, "buffer"_s);
+
+            if (!JsonValue::TryDWord(*it, "byteOffset"_s, bufferView.byteOffset))
                 bufferView.byteOffset = 0;
 
-            bufferView.byteLength = it->DWord("byteLength");
+            bufferView.byteLength = JsonValue::DWord(*it, "byteLength"_s);
         }
     }
 
     {
         json_value *accessors = JsonValue::Array(jsonChunk, "accessors"_s);
-        for (auto it = accessors->begin(), end = accessors->end(); it != end; ++it)
-        {
-            auto &accessor = m_Accessors.PushBack(GltfAccessor{});
-            accessor.bufferView = it->DWord("bufferView");
-            accessor.count = it->DWord("count");
+        self.accessors = RegionAlloc::AllocArray<gltf_accessor>(alloc, JsonValue::GetCount(*accessors));
 
-            if (!it->TryDWord("byteOffset", accessor.byteOffset))
+        uint64_t i = 0;
+        for (auto it = accessors->begin(), end = accessors->end(); it != end; ++it, ++i)
+        {
+            auto &accessor = self.accessors[i];
+            accessor.bufferView = JsonValue::DWord(*it, "bufferView"_s);
+            accessor.count = JsonValue::DWord(*it, "count"_s);
+
+            if (!JsonValue::TryDWord(*it, "byteOffset"_s, accessor.byteOffset))
                 accessor.byteOffset = 0;
 
-            accessor.componentType = GltfAccessorComponentType(it->DWord("componentType"));
+            accessor.componentType = (gltf_accessor_component_type)JsonValue::DWord(*it, "componentType"_s);
             switch (accessor.componentType)
             {
-            case GltfAccessorComponentType::BYTE:
-            case GltfAccessorComponentType::UNSIGNED_BYTE:
-            case GltfAccessorComponentType::SHORT:
-            case GltfAccessorComponentType::UNSIGNED_SHORT:
-            case GltfAccessorComponentType::UNSIGNED_INT:
-            case GltfAccessorComponentType::FLOAT:
+            case nyla::gltf_accessor_component_type::BYTE:
+            case nyla::gltf_accessor_component_type::UNSIGNED_BYTE:
+            case nyla::gltf_accessor_component_type::SHORT:
+            case nyla::gltf_accessor_component_type::UNSIGNED_SHORT:
+            case nyla::gltf_accessor_component_type::UNSIGNED_INT:
+            case nyla::gltf_accessor_component_type::FLOAT:
                 break;
 
             default:
                 NYLA_ASSERT(false);
             };
 
-            Str accessorType = it->String("type");
-            if (accessorType == "SCALAR")
+            byteview accessorType = JsonValue::String(*it, "type"_s);
+            if (Span::Eq(accessorType, "SCALAR"_s))
                 accessor.type = gltf_accessor_type::SCALAR;
-            else if (accessorType == "VEC2")
+            else if (Span::Eq(accessorType, "VEC2"_s))
                 accessor.type = gltf_accessor_type::VEC2;
-            else if (accessorType == "VEC3")
+            else if (Span::Eq(accessorType, "VEC3"_s))
                 accessor.type = gltf_accessor_type::VEC3;
-            else if (accessorType == "VEC4")
+            else if (Span::Eq(accessorType, "VEC4"_s))
                 accessor.type = gltf_accessor_type::VEC4;
-            else if (accessorType == "MAT2")
+            else if (Span::Eq(accessorType, "MAT2"_s))
                 accessor.type = gltf_accessor_type::MAT2;
-            else if (accessorType == "MAT3")
+            else if (Span::Eq(accessorType, "MAT3"_s))
                 accessor.type = gltf_accessor_type::MAT3;
-            else if (accessorType == "MAT4")
+            else if (Span::Eq(accessorType, "MAT4"_s))
                 accessor.type = gltf_accessor_type::MAT4;
             else
                 NYLA_ASSERT(false);
@@ -148,42 +157,44 @@ auto Parse(gltf_parser &self, region_alloc &alloc) -> bool
     }
 
     {
-        json_value *meshes = jsonChunk->Array("meshes");
-        for (auto it = meshes->begin(), end = meshes->end(); it != end; ++it)
-        {
-            auto &mesh = m_Meshes.PushBack(GltfMesh{});
+        json_value *meshes = JsonValue::Array(jsonChunk, "meshes"_s);
+        self.meshes = RegionAlloc::AllocArray<gltf_mesh>(alloc, JsonValue::GetCount(*meshes));
 
-            if (!it->TryString("name", mesh.name))
+        uint64_t i = 0;
+        for (auto it = meshes->begin(), end = meshes->end(); it != end; ++it, ++i)
+        {
+            auto &mesh = self.meshes[i];
+
+            if (!JsonValue::TryString(*it, "name"_s, mesh.name))
                 mesh.name = {};
 
-            JsonValue *primitivesJson = it->Array("primitives");
-            uint32_t primitivesCount = primitivesJson->GetCount();
-            mesh.primitives = m_Alloc->PushArr<GltfMeshPrimitive>(primitivesCount);
+            json_value *primitivesJson = JsonValue::Array(*it, "primitives"_s);
+            uint32_t primitivesCount = JsonValue::GetCount(*primitivesJson);
+            mesh.primitives = RegionAlloc::AllocArray<gltf_mesh_primitive>(alloc, primitivesCount);
 
-            JsonValue *primitiveJson = primitivesJson->GetFront();
-            for (uint32_t i = 0; i < primitivesCount; ++i, primitiveJson = primitiveJson->Skip())
+            json_value *primitiveJson = JsonValue::GetFront(*primitivesJson);
+            for (uint32_t i = 0; i < primitivesCount; ++i, primitiveJson = JsonValue::GetNext(*primitiveJson))
             {
                 auto &primitive = mesh.primitives[i] = gltf_mesh_primitive{};
 
-                primitive.indices = primitiveJson->DWord("indices");
-                primitive.material = primitiveJson->DWord("material");
+                primitive.indices = JsonValue::DWord(*primitiveJson, "indices"_s);
+                primitive.material = JsonValue::DWord(*primitiveJson, "material"_s);
 
-                JsonValue *attributesJson = primitiveJson->Object("attributes");
-                uint32_t attributesCount = attributesJson->GetCount();
+                json_value *attributesJson = JsonValue::Object(*primitiveJson, "attributes"_s);
+                uint32_t attributesCount = JsonValue::GetCount(*attributesJson);
 
-                primitive.attributes = m_Alloc->PushArr<GltfMeshPrimitiveAttribute>(attributesCount);
+                primitive.attributes = RegionAlloc::AllocArray<gltf_mesh_primitive_attribute>(alloc, attributesCount);
 
-                JsonValue *attributeJson = attributesJson->GetFront();
+                json_value *attributeJson = JsonValue::GetFront(*attributesJson);
                 for (uint32_t j = 0; j < attributesCount; ++j)
                 {
                     auto &attribute = primitive.attributes[j] = gltf_mesh_primitive_attribute{};
 
-                    attribute.name = attributeJson->String();
+                    attribute.name = JsonValue::String(*attributeJson);
+                    attributeJson = JsonValue::GetNext(*attributeJson);
 
-                    attributeJson = attributeJson->Skip();
-
-                    attribute.accessor = attributeJson->DWord();
-                    attributeJson = attributeJson->Skip();
+                    attribute.accessor = JsonValue::DWord(*attributeJson);
+                    attributeJson = JsonValue::GetNext(*attributeJson);
                 }
             }
         }

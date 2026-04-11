@@ -10,13 +10,11 @@ namespace nyla
 
 struct gltf_buffer
 {
-    gltf_buffer *next;
     uint32_t byteLength;
 };
 
 struct gltf_image
 {
-    gltf_image *next;
     byteview uri;
     byteview mimeType;
     byteview name;
@@ -24,7 +22,6 @@ struct gltf_image
 
 struct gltf_buffer_view
 {
-    gltf_buffer_view *next;
     uint32_t buffer;
     uint32_t byteOffset;
     uint32_t byteLength;
@@ -40,7 +37,7 @@ enum class gltf_accessor_component_type
     FLOAT = 5126,
 };
 
-inline auto GetGltfAccessorComponentSize(gltf_accessor_component_type componentType) -> uint32_t
+INLINE auto GetGltfAccessorComponentSize(gltf_accessor_component_type componentType) -> uint32_t
 {
     switch (componentType)
     {
@@ -96,7 +93,6 @@ inline auto GetGltfAccessorComponentCount(gltf_accessor_type accessorType) -> ui
 
 struct gltf_accessor
 {
-    gltf_accessor *next;
     uint32_t bufferView;
     uint32_t byteOffset;
     gltf_accessor_component_type componentType;
@@ -156,11 +152,11 @@ struct gltf_parser
     uint8_t *out;
     uint64_t outSize;
 
-    gltf_buffer_view *bufferViews;
-    gltf_buffer *buffers;
-    gltf_accessor *accessors;
-    gltf_image *images;
-    gltf_mesh *meshes;
+    span<gltf_buffer_view> bufferViews;
+    span<gltf_buffer> buffers;
+    span<gltf_accessor> accessors;
+    span<gltf_image> images;
+    span<gltf_mesh> meshes;
 };
 
 namespace GltfParser
