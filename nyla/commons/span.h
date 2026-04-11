@@ -169,11 +169,18 @@ INLINE auto EndsWith(span<T> self, span<T> suffix) -> bool
 
 } // namespace Span
 
+#if 0
 template <uint64_t N>
 [[nodiscard]]
 INLINE auto StringLiteralAsView(const char (&str)[N]) -> byteview
 {
     return byteview{(uint8_t *)str, N - 1};
+}
+#endif
+
+constexpr byteview operator""_s(const char *str, uint64_t len)
+{
+    return byteview{(uint8_t *)str, len};
 }
 
 } // namespace nyla

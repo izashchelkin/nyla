@@ -140,7 +140,7 @@ void WriteFmt(auto &&consumer, byteview fmt, ...)
     va_end(args);
 }
 
-void BufferWriteFmt(auto &&consumer, byteview buffer, byteview fmt, ...)
+void BufferWriteFmt(auto &&consumer, span<uint8_t> buffer, byteview fmt, ...)
 {
     uint64_t bufferUsed = 0;
 
@@ -206,7 +206,7 @@ void NYLA_API StringWriteFmt(uint8_t *out, uint64_t outSize, byteview fmt, ...)
     va_end(args);
 }
 
-void NYLA_API FileWriteFmt(FileHandle handle, byteview buffer, byteview fmt, ...)
+void NYLA_API FileWriteFmt(FileHandle handle, span<uint8_t> buffer, byteview fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
