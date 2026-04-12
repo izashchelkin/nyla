@@ -1,10 +1,17 @@
 #include "nyla/commons/spv_shader.h"
+#include "nyla/commons/byteliterals.h"
+#include "nyla/commons/fmt.h"
+#include "nyla/commons/span.h"
 #include "nyla/commons/spv_reader.h"
+#include <cstdint>
 
 namespace nyla
 {
 
 namespace SpvShader
+{
+
+namespace
 {
 
 enum class spv_decoration
@@ -1208,119 +1215,6 @@ enum class spv_op_process_result
     MakeNop,
 };
 
-#if 0
-void Init(spv_shader &self, span<uint32_t> data, RhiShaderStage expectedStage)
-{
-    SpvReader::ReadHeader(data);
-    while (data.size)
-    {
-        span<uint32_t> opWithOperands = SpvReader::ReadOpWithOperands(data);
-        switch (SpirvReader::ParseOp(Span::Front(opWithOperands)))
-        {
-
-#define X(name)                                                                                                        \
-    case spv::name: {                                                                                                  \
-        name(it);                                                                                                      \
-        break;                                                                                                         \
-    }
-            X(OpEntryPoint)
-            X(OpExtension)
-            X(OpDecorate)
-            X(OpDecorateString)
-            X(OpVariable)
-        }
-    }
-}
-#endif
-
-#if 0
-auto FindLocationBySemantic(Str semantic, StorageClass storageClass, uint32_t *outLocation) -> bool
-{
-    uint32_t id;
-    if (!FindIdBySemantic(semantic, storageClass, &id))
-        return false;
-
-    uint32_t location;
-    for (uint32_t i = 0; i < m_Locations.Size(); ++i)
-    {
-        if (m_Locations[i].id == id && CheckStorageClass(id, storageClass))
-        {
-            *outLocation = m_Locations[i].location;
-            return true;
-        }
-    }
-
-    return false;
-}
-
-auto FindIdBySemantic(Str querySemantic, StorageClass storageClass, uint32_t *outId) -> bool
-{
-    for (uint32_t i = 0; i < m_SemanticDataNames.Size(); ++i)
-    {
-        const auto &semantic = m_SemanticDataNames[i];
-        if (semantic == querySemantic && CheckStorageClass(m_SemanticDataIds[i], storageClass))
-        {
-            *outId = m_SemanticDataIds[i];
-            return true;
-        }
-    }
-    return false;
-}
-
-auto FindSemanticById(uint32_t id, Str *outSemantic) -> bool
-{
-    for (uint32_t i = 0; i < m_SemanticDataIds.Size(); ++i)
-    {
-        if (m_SemanticDataIds[i] == id)
-        {
-            *outSemantic = m_SemanticDataNames[i].GetStr();
-            return true;
-        }
-    }
-    return false;
-}
-
-auto RewriteLocationForSemantic(Str semantic, StorageClass storageClass, uint32_t aLocation) -> bool
-{
-    uint32_t oldLocation;
-    if (!FindLocationBySemantic(semantic, storageClass, &oldLocation))
-        return false;
-
-    if (oldLocation == aLocation)
-        return true;
-
-    auto end = m_SpvView.end();
-    for (auto it = m_SpvView.begin(); it != end; ++it)
-    {
-        auto op = spv::Op(it.Op());
-
-        if (op != spv::OpDecorate)
-            continue;
-
-        SpvOperandReader operandReader = it.GetOperandReader();
-
-        uint32_t id = operandReader.Word();
-
-        if (spv::Decoration(operandReader.Word()) != spv::DecorationLocation)
-            continue;
-        if (!CheckStorageClass(id, storageClass))
-            continue;
-
-        uint32_t &location = operandReader.Word();
-        if (location == oldLocation)
-        {
-            location = aLocation;
-            return true;
-        }
-    }
-
-    return false;
-}
-#endif
-
-namespace
-{
-
 auto HandleOpEntryPoint(spv_shader &self, span<uint32_t> operands) -> spv_op_process_result
 {
     auto executionModel = (spv_execution_model)SpvReader::ReadWord(operands);
@@ -1432,6 +1326,139 @@ auto HandleOpVariable(spv_shader &self, span<uint32_t> operands) -> spv_op_proce
 }
 
 } // namespace
+
+void ProcessShader(spv_shader &self, span<uint32_t> data, RhiShaderStage stage)
+{
+    SpvReader::ReadHeader(data);
+    while (data.size)
+    {
+        span<uint32_t> opWithOperands = SpvReader::ReadOpWithOperands(data);
+        uint32_t op = SpvReader::ParseOp(Span::Front(opWithOperands));
+        span<uint32_t> operands = Span::SubSpan(opWithOperands, 1);
+
+        spv_op_process_result result = spv_op_process_result::Ok;
+        switch ((spv_op)op)
+        {
+
+#define X(name)                                                                                                        \
+    case spv_op::name: {                                                                                               \
+        spv_op_process_result result = HandleOp##name(self, operands);                                                 \
+        break;                                                                                                         \
+    }
+            X(EntryPoint)
+            X(Extension)
+            X(Decorate)
+            X(DecorateString)
+            X(Variable)
+
+#undef X
+
+        default: {
+            break;
+        }
+        }
+
+        switch (result)
+        {
+        case spv_op_process_result::Ok: {
+            break;
+        }
+        case spv_op_process_result::InvalidState: {
+            NYLA_ASSERT(false);
+            break;
+        }
+        case spv_op_process_result::MakeNop: {
+            SpvReader::MakeNop(opWithOperands);
+            break;
+        }
+        }
+    }
+}
+
+#if 0
+auto FindLocationBySemantic(Str semantic, StorageClass storageClass, uint32_t *outLocation) -> bool
+{
+    uint32_t id;
+    if (!FindIdBySemantic(semantic, storageClass, &id))
+        return false;
+
+    uint32_t location;
+    for (uint32_t i = 0; i < m_Locations.Size(); ++i)
+    {
+        if (m_Locations[i].id == id && CheckStorageClass(id, storageClass))
+        {
+            *outLocation = m_Locations[i].location;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+auto FindIdBySemantic(Str querySemantic, StorageClass storageClass, uint32_t *outId) -> bool
+{
+    for (uint32_t i = 0; i < m_SemanticDataNames.Size(); ++i)
+    {
+        const auto &semantic = m_SemanticDataNames[i];
+        if (semantic == querySemantic && CheckStorageClass(m_SemanticDataIds[i], storageClass))
+        {
+            *outId = m_SemanticDataIds[i];
+            return true;
+        }
+    }
+    return false;
+}
+
+auto FindSemanticById(uint32_t id, Str *outSemantic) -> bool
+{
+    for (uint32_t i = 0; i < m_SemanticDataIds.Size(); ++i)
+    {
+        if (m_SemanticDataIds[i] == id)
+        {
+            *outSemantic = m_SemanticDataNames[i].GetStr();
+            return true;
+        }
+    }
+    return false;
+}
+
+auto RewriteLocationForSemantic(Str semantic, StorageClass storageClass, uint32_t aLocation) -> bool
+{
+    uint32_t oldLocation;
+    if (!FindLocationBySemantic(semantic, storageClass, &oldLocation))
+        return false;
+
+    if (oldLocation == aLocation)
+        return true;
+
+    auto end = m_SpvView.end();
+    for (auto it = m_SpvView.begin(); it != end; ++it)
+    {
+        auto op = spv::Op(it.Op());
+
+        if (op != spv::OpDecorate)
+            continue;
+
+        SpvOperandReader operandReader = it.GetOperandReader();
+
+        uint32_t id = operandReader.Word();
+
+        if (spv::Decoration(operandReader.Word()) != spv::DecorationLocation)
+            continue;
+        if (!CheckStorageClass(id, storageClass))
+            continue;
+
+        uint32_t &location = operandReader.Word();
+        if (location == oldLocation)
+        {
+            location = aLocation;
+            return true;
+        }
+    }
+
+    return false;
+}
+#endif
 
 } // namespace SpvShader
 

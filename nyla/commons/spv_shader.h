@@ -9,8 +9,6 @@ namespace nyla
 
 struct spv_shader
 {
-    span<uint32_t> data;
-
     RhiShaderStage stage;
 
     inline_vec<uint32_t, 8> inputVariables;
@@ -43,7 +41,7 @@ enum class spv_shader_storage_class
 namespace SpvShader
 {
 
-void Init(spv_shader &self, span<uint32_t> &data, RhiShaderStage expectedStage);
+void ProcessShader(spv_shader &self, span<uint32_t> data, RhiShaderStage stage);
 
 auto FindLocationBySemantic(spv_shader &self, byteview semantic, spv_shader_storage_class storageClass,
                             uint32_t *outLocation) -> bool;
