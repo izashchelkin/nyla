@@ -63,6 +63,11 @@ template <is_plain T> struct span
     {
         return data + size;
     }
+
+    operator span<const T>() const
+    {
+        return span<const T>{data, size};
+    }
 };
 
 using byteview = span<const uint8_t>;
@@ -75,13 +80,6 @@ template <typename T>
 INLINE auto IsEmpty(span<T> self) -> bool
 {
     return self.size == 0;
-}
-
-template <typename T>
-[[nodiscard]]
-INLINE auto AsConst(span<T> self) -> span<const T>
-{
-    return {self.data, self.size};
 }
 
 template <typename T>

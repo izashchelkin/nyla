@@ -357,7 +357,7 @@ class Rhi
 
     static auto GetVertexFormatSize(RhiVertexFormat) -> uint32_t;
 
-    static auto CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &) -> RhiGraphicsPipeline;
+    static auto CreateGraphicsPipeline(region_alloc &scratch, const RhiGraphicsPipelineDesc &) -> RhiGraphicsPipeline;
     static void NameGraphicsPipeline(RhiGraphicsPipeline, byteview name);
     static void DestroyGraphicsPipeline(RhiGraphicsPipeline);
 

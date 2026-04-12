@@ -106,6 +106,15 @@ INLINE auto AllocArray(region_alloc &self, uint64_t n) -> span<T>
     return span<T>{(T *)mem, n};
 }
 
+template <typename T>
+[[nodiscard]]
+INLINE auto AllocArray(region_alloc &self, span<T> data) -> span<T>
+{
+    span<T> mem = AllocArray(self, data.size);
+    MemCpy(mem.data, data.data, data.size);
+    return span<T>{mem.data, data.size};
+}
+
 template <typename T, uint64_t Capacity>
 [[nodiscard]]
 INLINE auto AllocVec(region_alloc &self) -> inline_vec<T, Capacity> &
@@ -149,23 +158,6 @@ INLINE auto SubAlloc(region_alloc &self, uint64_t size) -> region_alloc
         .end = mem + size,
         .commitedEnd = mem + size,
     };
-}
-
-INLINE auto VoidScope(region_alloc &self, uint64_t size, auto &&fn) -> void
-{
-    auto mark = self.at;
-    auto alloc = PushSubAlloc(self, size);
-    fn(alloc);
-    Reset(self, mark);
-}
-
-[[nodiscard]]
-INLINE auto Scope(region_alloc &self, uint64_t size, auto &&fn)
-{
-    auto mark = self.at;
-    auto alloc = PushSubAlloc(self, size);
-    auto &&ret = fn(alloc);
-    Reset(self, mark);
 }
 
 } // namespace RegionAlloc

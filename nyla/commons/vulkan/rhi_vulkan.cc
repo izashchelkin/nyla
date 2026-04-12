@@ -16,6 +16,7 @@
 #include "nyla/commons/region_alloc.h"
 #include "nyla/commons/rhi.h"
 #include "nyla/commons/span.h"
+#include "nyla/commons/spv_shader.h"
 
 #define spv_enable_utility_code
 
@@ -2101,11 +2102,14 @@ void Rhi::PassEnd()
 
 auto Rhi::CreateShader(const RhiShaderDesc &desc) -> RhiShader
 {
-    span<uint32_t> spv = g_State->rootAlloc.PushCopySpan<uint32_t>(desc.code);
-    MemCpy(spv.Data(), desc.code.Data(), desc.code.Size());
+    // TODO: correct lifetime
+    auto alloc = RegionAlloc::Create(16_MiB, 0);
 
-    const RhiShader handle = g_State->m_Shaders.Acquire(VulkanShaderData{.spv = spv});
-    VulkanShaderData &shaderData = g_State->m_Shaders.ResolveData(handle);
+    span<uint32_t> spv = RegionAlloc::AllocArray<uint32_t>(alloc, desc.code);
+    MemCpy(spv.data, desc.code.data, desc.code.size);
+
+    const RhiShader handle = HandlePool::Acquire(g_State->m_Shaders, VulkanShaderData{.spv = spv});
+    VulkanShaderData &shaderData = HandlePool::ResolveData(g_State->m_Shaders, handle);
 
     return handle;
 }
@@ -2544,175 +2548,179 @@ void Rhi::CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiTexture src)
                    &region);
 }
 
-auto Rhi::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGraphicsPipeline
+auto Rhi::CreateGraphicsPipeline(region_alloc &scratch, const RhiGraphicsPipelineDesc &desc) -> RhiGraphicsPipeline
 {
-    return g_State->transientAlloc.Scope(1_KiB, [&](auto &alloc) {
-        auto &vertexShaderData = g_State->m_Shaders.ResolveData(desc.vs);
-        SpirvShaderManager vsMan(vertexShaderData.spv, RhiShaderStage::Vertex);
+    SCRATCH_REMEMBER;
 
-        auto &pixelShaderData = g_State->m_Shaders.ResolveData(desc.ps);
-        SpirvShaderManager psMan(pixelShaderData.spv, RhiShaderStage::Pixel);
+    auto &vertexShaderData = HandlePool::ResolveData(g_State->m_Shaders, desc.vs);
+    auto &pixelShaderData = HandlePool::ResolveData(g_State->m_Shaders, desc.ps);
 
-        VulkanPipelineData pipelineData = {
-            .bindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
+    spv_shader vsMan;
+    SpvShader::ProcessShader(vsMan, vertexShaderData.spv, RhiShaderStage::Vertex);
+
+    spv_shader psMan;
+    SpvShader::ProcessShader(psMan, pixelShaderData.spv, RhiShaderStage::Pixel);
+
+    VulkanPipelineData pipelineData = {
+        .bindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
+    };
+
+    auto &vertexBindings = RegionAlloc::AllocVec<VkVertexInputBindingDescription, 16>(scratch);
+    for (auto &binding : desc.vertexBindings)
+    {
+        InlineVec::Append(vertexBindings, VkVertexInputBindingDescription{
+                                              .binding = binding.binding,
+                                              .stride = binding.stride,
+                                              .inputRate = ConvertVulkanInputRate(binding.inputRate),
+                                          });
+    }
+
+    auto &vertexAttributes = RegionAlloc::AllocVec<VkVertexInputAttributeDescription, 16>(scratch);
+    for (auto &attribute : desc.vertexAttributes)
+    {
+        uint32_t location;
+        if (!SpvShader::FindLocationBySemantic(vsMan, attribute.semantic, spv_shader_storage_class::Input, &location))
+            NYLA_ASSERT(false);
+
+        InlineVec::Append(vertexAttributes, VkVertexInputAttributeDescription{
+                                                .location = location,
+                                                .binding = attribute.binding,
+                                                .format = ConvertVertexFormatIntoVkFormat(attribute.format),
+                                                .offset = attribute.offset,
+                                            });
+    }
+
+    for (uint32_t id : SpvShader::GetInputIds(psMan))
+    {
+        byteview semantic;
+        if (!SpvShader::FindSemanticById(psMan, id, &semantic))
+            NYLA_ASSERT(false);
+
+        if (Span::StartsWith(semantic, "SV_"_s))
+            continue;
+
+        uint32_t location;
+        if (!SpvShader::FindLocationBySemantic(vsMan, semantic, spv_shader_storage_class::Output, &location))
+            NYLA_ASSERT(false);
+
+        if (!SpvShader::RewriteLocationForSemantic(psMan, pixelShaderData.spv, semantic,
+                                                   spv_shader_storage_class::Input, location))
+            NYLA_ASSERT(false);
+    }
+
+    auto createShaderModule = [](span<const uint32_t> spv) -> VkShaderModule {
+        const VkShaderModuleCreateInfo createInfo{
+            .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+            .codeSize = Span::SizeBytes(spv),
+            .pCode = spv.data,
         };
 
-        auto &vertexBindings = alloc.template PushVec<VkVertexInputBindingDescription, 16>();
-        for (auto &binding : desc.vertexBindings)
-        {
-            vertexBindings.PushBack(VkVertexInputBindingDescription{
-                .binding = binding.binding,
-                .stride = binding.stride,
-                .inputRate = ConvertVulkanInputRate(binding.inputRate),
-            });
-        }
+        VkShaderModule shaderModule;
+        VK_CHECK(vkCreateShaderModule(g_State->m_Dev, &createInfo, nullptr, &shaderModule));
 
-        auto &vertexAttributes = alloc.template PushVec<VkVertexInputAttributeDescription, 16>();
-        for (auto &attribute : desc.vertexAttributes)
-        {
-            uint32_t location;
-            if (!vsMan.FindLocationBySemantic(attribute.semantic.GetStr(), SpirvShaderManager::StorageClass::Input,
-                                              &location))
-                NYLA_ASSERT(false);
+        return shaderModule;
+    };
 
-            vertexAttributes.PushBack(VkVertexInputAttributeDescription{
-                .location = location,
-                .binding = attribute.binding,
-                .format = ConvertVertexFormatIntoVkFormat(attribute.format),
-                .offset = attribute.offset,
-            });
-        }
+    Erase(vertexShaderData.spv, 0);
+    Erase(pixelShaderData.spv, 0);
 
-        for (uint32_t id : psMan.GetInputIds())
-        {
-            Str semantic;
-            if (!psMan.FindSemanticById(id, &semantic))
-                NYLA_ASSERT(false);
+    const array<VkPipelineShaderStageCreateInfo, 2> stages{
+        VkPipelineShaderStageCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+            .stage = VK_SHADER_STAGE_VERTEX_BIT,
+            .module = createShaderModule(vertexShaderData.spv),
+            .pName = "main",
+        },
+        VkPipelineShaderStageCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+            .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+            .module = createShaderModule(pixelShaderData.spv),
+            .pName = "main",
+        },
+    };
 
-            if (semantic.StartsWith(AsStr("SV_")))
-                continue;
+    const VkPipelineVertexInputStateCreateInfo vertexInputStateCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+        .vertexBindingDescriptionCount = (uint32_t)vertexBindings.size,
+        .pVertexBindingDescriptions = InlineVec::DataPtr(vertexBindings),
+        .vertexAttributeDescriptionCount = (uint32_t)vertexAttributes.size,
+        .pVertexAttributeDescriptions = InlineVec::DataPtr(vertexAttributes),
+    };
 
-            uint32_t location;
-            if (!vsMan.FindLocationBySemantic(semantic, SpirvShaderManager::StorageClass::Output, &location))
-                NYLA_ASSERT(false);
+    const VkPipelineRasterizationStateCreateInfo rasterizerCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+        .depthClampEnable = VK_FALSE,
+        .rasterizerDiscardEnable = VK_FALSE,
+        .polygonMode = VK_POLYGON_MODE_FILL,
+        .cullMode = ConvertVulkanCullMode(desc.cullMode),
+        .frontFace = ConvertVulkanFrontFace(desc.frontFace),
+        .lineWidth = 1.0f,
+    };
 
-            if (!psMan.RewriteLocationForSemantic(semantic, SpirvShaderManager::StorageClass::Input, location))
-                NYLA_ASSERT(false);
-        }
+    const VkPipelineInputAssemblyStateCreateInfo inputAssemblyCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+        .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+    };
 
-        auto createShaderModule = [](Span<const uint32_t> spv) -> VkShaderModule {
-            const VkShaderModuleCreateInfo createInfo{
-                .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-                .codeSize = spv.SizeBytes(),
-                .pCode = spv.Data(),
-            };
+    const VkPipelineViewportStateCreateInfo viewportStateCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+        .viewportCount = 1,
+        .scissorCount = 1,
+    };
 
-            VkShaderModule shaderModule;
-            VK_CHECK(vkCreateShaderModule(g_State->m_Dev, &createInfo, nullptr, &shaderModule));
+    const VkPipelineMultisampleStateCreateInfo multisamplingCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+        .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
+        .sampleShadingEnable = VK_FALSE,
+        .minSampleShading = 1.0f,
+        .alphaToCoverageEnable = VK_FALSE,
+        .alphaToOneEnable = VK_FALSE,
+    };
 
-            return shaderModule;
-        };
+    const VkPipelineColorBlendAttachmentState colorBlendAttachment{
+        .blendEnable = VK_TRUE,
+        .srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
+        .dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+        .colorBlendOp = VK_BLEND_OP_ADD,
+        .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
+        .dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
+        .alphaBlendOp = VK_BLEND_OP_ADD,
+        .colorWriteMask =
+            VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
+    };
 
-        Erase(vertexShaderData.spv, Spirview::kNop);
-        Erase(pixelShaderData.spv, Spirview::kNop);
+    const VkPipelineColorBlendStateCreateInfo colorBlendingCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+        .logicOpEnable = VK_FALSE,
+        .logicOp = VK_LOGIC_OP_COPY,
+        .attachmentCount = 1,
+        .pAttachments = &colorBlendAttachment,
+        .blendConstants = {},
+    };
 
-        const Array<VkPipelineShaderStageCreateInfo, 2> stages{
-            VkPipelineShaderStageCreateInfo{
-                .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-                .stage = VK_SHADER_STAGE_VERTEX_BIT,
-                .module = createShaderModule(vertexShaderData.spv.AsConst()),
-                .pName = "main",
-            },
-            VkPipelineShaderStageCreateInfo{
-                .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-                .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-                .module = createShaderModule(pixelShaderData.spv.AsConst()),
-                .pName = "main",
-            },
-        };
+    const array<VkDynamicState, 2> dynamicStates{
+        VK_DYNAMIC_STATE_VIEWPORT,
+        VK_DYNAMIC_STATE_SCISSOR,
+    };
 
-        const VkPipelineVertexInputStateCreateInfo vertexInputStateCreateInfo{
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-            .vertexBindingDescriptionCount = vertexBindings.Size32(),
-            .pVertexBindingDescriptions = vertexBindings.Data(),
-            .vertexAttributeDescriptionCount = vertexAttributes.Size32(),
-            .pVertexAttributeDescriptions = vertexAttributes.Data(),
-        };
+    const VkPipelineDynamicStateCreateInfo dynamicStateCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+        .dynamicStateCount = Array::Size(dynamicStates),
+        .pDynamicStates = dynamicStates.data,
+    };
 
-        const VkPipelineRasterizationStateCreateInfo rasterizerCreateInfo{
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-            .depthClampEnable = VK_FALSE,
-            .rasterizerDiscardEnable = VK_FALSE,
-            .polygonMode = VK_POLYGON_MODE_FILL,
-            .cullMode = ConvertVulkanCullMode(desc.cullMode),
-            .frontFace = ConvertVulkanFrontFace(desc.frontFace),
-            .lineWidth = 1.0f,
-        };
+    auto &colorTargetFormats = RegionAlloc::AllocVec<VkFormat, 16>(scratch);
+    for (RhiTextureFormat colorTargetFormat : desc.colorTargetFormats)
+    {
+        InlineVec::Append(colorTargetFormats, ConvertTextureFormatIntoVkFormat(colorTargetFormat, nullptr));
+    }
 
-        const VkPipelineInputAssemblyStateCreateInfo inputAssemblyCreateInfo{
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-            .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-        };
-
-        const VkPipelineViewportStateCreateInfo viewportStateCreateInfo{
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
-            .viewportCount = 1,
-            .scissorCount = 1,
-        };
-
-        const VkPipelineMultisampleStateCreateInfo multisamplingCreateInfo{
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-            .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
-            .sampleShadingEnable = VK_FALSE,
-            .minSampleShading = 1.0f,
-            .alphaToCoverageEnable = VK_FALSE,
-            .alphaToOneEnable = VK_FALSE,
-        };
-
-        const VkPipelineColorBlendAttachmentState colorBlendAttachment{
-            .blendEnable = VK_TRUE,
-            .srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
-            .dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
-            .colorBlendOp = VK_BLEND_OP_ADD,
-            .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
-            .dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
-            .alphaBlendOp = VK_BLEND_OP_ADD,
-            .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT |
-                              VK_COLOR_COMPONENT_A_BIT,
-        };
-
-        const VkPipelineColorBlendStateCreateInfo colorBlendingCreateInfo{
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
-            .logicOpEnable = VK_FALSE,
-            .logicOp = VK_LOGIC_OP_COPY,
-            .attachmentCount = 1,
-            .pAttachments = &colorBlendAttachment,
-            .blendConstants = {},
-        };
-
-        const Array<VkDynamicState, 2> dynamicStates{
-            VK_DYNAMIC_STATE_VIEWPORT,
-            VK_DYNAMIC_STATE_SCISSOR,
-        };
-
-        const VkPipelineDynamicStateCreateInfo dynamicStateCreateInfo{
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-            .dynamicStateCount = dynamicStates.Size(),
-            .pDynamicStates = dynamicStates.Data(),
-        };
-
-        auto &colorTargetFormats = alloc.template PushVec<VkFormat, 16>();
-        for (RhiTextureFormat colorTargetFormat : desc.colorTargetFormats)
-        {
-            colorTargetFormats.PushBack(ConvertTextureFormatIntoVkFormat(colorTargetFormat, nullptr));
-        }
-
-        const VkPipelineRenderingCreateInfo pipelineRenderingCreateInfo{
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-            .colorAttachmentCount = colorTargetFormats.Size32(),
-            .pColorAttachmentFormats = colorTargetFormats.Data(),
-            .depthAttachmentFormat = ConvertTextureFormatIntoVkFormat(desc.depthFormat, nullptr),
-        };
+    const VkPipelineRenderingCreateInfo pipelineRenderingCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+        .colorAttachmentCount = (uint32_t)colorTargetFormats.size,
+        .pColorAttachmentFormats = InlineVec::DataPtr(colorTargetFormats),
+        .depthAttachmentFormat = ConvertTextureFormatIntoVkFormat(desc.depthFormat, nullptr),
+    };
 
 #if 0
     NYLA_ASSERT(desc.bindGroupLayoutsCount <= std::Size(desc.bindGroupLayouts));
@@ -2729,111 +2737,112 @@ auto Rhi::CreateGraphicsPipeline(const RhiGraphicsPipelineDesc &desc) -> RhiGrap
     };
 #endif
 
-        const Array<VkDescriptorSetLayout, 3> descriptorSetLayouts = {
-            g_State->m_ConstantsDescriptorTable.layout,
-            g_State->m_TexturesDescriptorTable.layout,
-            g_State->m_SamplersDescriptorTable.layout,
-        };
+    const array<VkDescriptorSetLayout, 3> descriptorSetLayouts = {
+        g_State->m_ConstantsDescriptorTable.layout,
+        g_State->m_TexturesDescriptorTable.layout,
+        g_State->m_SamplersDescriptorTable.layout,
+    };
 
-        const VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-            .setLayoutCount = descriptorSetLayouts.Size(),
-            .pSetLayouts = descriptorSetLayouts.Data(),
+    const VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+        .setLayoutCount = Array::Size(descriptorSetLayouts),
+        .pSetLayouts = descriptorSetLayouts.data,
 #if 0
         .pushConstantRangeCount = desc.pushConstantSize > 0,
         .pPushConstantRanges = &pushConstantRange,
 #endif
-        };
+    };
 
-        vkCreatePipelineLayout(g_State->m_Dev, &pipelineLayoutCreateInfo, nullptr, &pipelineData.layout);
+    vkCreatePipelineLayout(g_State->m_Dev, &pipelineLayoutCreateInfo, nullptr, &pipelineData.layout);
 
-        const VkPipelineDepthStencilStateCreateInfo depthStencilState{
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-            .depthTestEnable = desc.depthTestEnabled,
-            .depthWriteEnable = desc.depthWriteEnabled,
-            .depthCompareOp = VK_COMPARE_OP_LESS,
-            .depthBoundsTestEnable = false,
-            .stencilTestEnable = false,
-            .front = {},
-            .back = {},
-            .minDepthBounds = 0.0f,
-            .maxDepthBounds = 1.0f,
-        };
+    const VkPipelineDepthStencilStateCreateInfo depthStencilState{
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+        .depthTestEnable = desc.depthTestEnabled,
+        .depthWriteEnable = desc.depthWriteEnabled,
+        .depthCompareOp = VK_COMPARE_OP_LESS,
+        .depthBoundsTestEnable = false,
+        .stencilTestEnable = false,
+        .front = {},
+        .back = {},
+        .minDepthBounds = 0.0f,
+        .maxDepthBounds = 1.0f,
+    };
 
-        const VkGraphicsPipelineCreateInfo pipelineCreateInfo{
-            .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-            .pNext = &pipelineRenderingCreateInfo,
-            .stageCount = stages.Size(),
-            .pStages = stages.Data(),
-            .pVertexInputState = &vertexInputStateCreateInfo,
-            .pInputAssemblyState = &inputAssemblyCreateInfo,
-            .pViewportState = &viewportStateCreateInfo,
-            .pRasterizationState = &rasterizerCreateInfo,
-            .pMultisampleState = &multisamplingCreateInfo,
-            .pDepthStencilState = &depthStencilState,
-            .pColorBlendState = &colorBlendingCreateInfo,
-            .pDynamicState = &dynamicStateCreateInfo,
-            .layout = pipelineData.layout,
-            .subpass = 0,
-            .basePipelineHandle = VK_NULL_HANDLE,
-            .basePipelineIndex = -1,
-        };
+    const VkGraphicsPipelineCreateInfo pipelineCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+        .pNext = &pipelineRenderingCreateInfo,
+        .stageCount = Array::Size(stages),
+        .pStages = stages.data,
+        .pVertexInputState = &vertexInputStateCreateInfo,
+        .pInputAssemblyState = &inputAssemblyCreateInfo,
+        .pViewportState = &viewportStateCreateInfo,
+        .pRasterizationState = &rasterizerCreateInfo,
+        .pMultisampleState = &multisamplingCreateInfo,
+        .pDepthStencilState = &depthStencilState,
+        .pColorBlendState = &colorBlendingCreateInfo,
+        .pDynamicState = &dynamicStateCreateInfo,
+        .layout = pipelineData.layout,
+        .subpass = 0,
+        .basePipelineHandle = VK_NULL_HANDLE,
+        .basePipelineIndex = -1,
+    };
 
-        VK_CHECK(vkCreateGraphicsPipelines(g_State->m_Dev, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr,
-                                           &pipelineData.pipeline));
+    VK_CHECK(vkCreateGraphicsPipelines(g_State->m_Dev, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr,
+                                       &pipelineData.pipeline));
 
-        return g_State->m_GraphicsPipelines.Acquire(pipelineData);
-    });
+    SCRATCH_RESET;
+    return HandlePool::Acquire(g_State->m_GraphicsPipelines, pipelineData);
 }
 
-void Rhi::NameGraphicsPipeline(RhiGraphicsPipeline pipeline, Str name)
+void Rhi::NameGraphicsPipeline(RhiGraphicsPipeline pipeline, byteview name)
 {
-    const VulkanPipelineData &pipelineData = g_State->m_GraphicsPipelines.ResolveData(pipeline);
+    const VulkanPipelineData &pipelineData = HandlePool::ResolveData(g_State->m_GraphicsPipelines, pipeline);
     VulkanNameHandle(VK_OBJECT_TYPE_PIPELINE, (uint64_t)pipelineData.pipeline, name);
 }
 
-void Rhi::SetFrameConstant(RhiCmdList cmd, ByteView data)
+void Rhi::SetFrameConstant(RhiCmdList cmd, byteview data)
 {
-    NYLA_ASSERT(data.Size() <= g_State->m_Limits.frameConstantSize);
+    NYLA_ASSERT(data.size <= g_State->m_Limits.frameConstantSize);
 
-    const VulkanCmdListData &cmdData = g_State->m_CmdLists.ResolveData(cmd);
+    const VulkanCmdListData &cmdData = HandlePool::ResolveData(g_State->m_CmdLists, cmd);
 
     char *mem = MapBuffer(g_State->m_ConstantsUniformBuffer);
-    MemCpy(mem + cmdData.frameConstantHead, data.Data(), data.Size());
+    MemCpy(mem + cmdData.frameConstantHead, data.data, data.size);
 }
 
-void Rhi::SetPassConstant(RhiCmdList cmd, ByteView data)
+void Rhi::SetPassConstant(RhiCmdList cmd, byteview data)
 {
-    NYLA_ASSERT(data.Size() <= g_State->m_Limits.passConstantSize);
+    NYLA_ASSERT(data.size <= g_State->m_Limits.passConstantSize);
 
-    const VulkanCmdListData &cmdData = g_State->m_CmdLists.ResolveData(cmd);
+    const VulkanCmdListData &cmdData = HandlePool::ResolveData(g_State->m_CmdLists, cmd);
 
     char *mem = MapBuffer(g_State->m_ConstantsUniformBuffer);
-    MemCpy(mem + cmdData.passConstantHead, data.Data(), data.Size());
+    MemCpy(mem + cmdData.passConstantHead, data.data, data.size);
 }
 
-void Rhi::SetDrawConstant(RhiCmdList cmd, ByteView data)
+void Rhi::SetDrawConstant(RhiCmdList cmd, byteview data)
 {
-    NYLA_ASSERT(data.Size() <= g_State->m_Limits.drawConstantSize);
+    NYLA_ASSERT(data.size <= g_State->m_Limits.drawConstantSize);
 
-    const VulkanCmdListData &cmdData = g_State->m_CmdLists.ResolveData(cmd);
+    const VulkanCmdListData &cmdData = HandlePool::ResolveData(g_State->m_CmdLists, cmd);
 
     char *mem = MapBuffer(g_State->m_ConstantsUniformBuffer);
-    MemCpy(mem + cmdData.drawConstantHead, data.Data(), data.Size());
+    MemCpy(mem + cmdData.drawConstantHead, data.data, data.size);
 }
 
-void Rhi::SetLargeDrawConstant(RhiCmdList cmd, ByteView data)
+void Rhi::SetLargeDrawConstant(RhiCmdList cmd, byteview data)
 {
-    NYLA_ASSERT(data.Size() <= g_State->m_Limits.largeDrawConstantSize);
+    NYLA_ASSERT(data.size <= g_State->m_Limits.largeDrawConstantSize);
 
-    const VulkanCmdListData &cmdData = g_State->m_CmdLists.ResolveData(cmd);
+    const VulkanCmdListData &cmdData = HandlePool::ResolveData(g_State->m_CmdLists, cmd);
 
     char *mem = MapBuffer(g_State->m_ConstantsUniformBuffer);
-    MemCpy(mem + cmdData.largeDrawConstantHead, data.Data(), data.Size());
+    MemCpy(mem + cmdData.largeDrawConstantHead, data.data, data.size);
 
     if constexpr (false)
     {
-        const VulkanBufferData &bufferData = g_State->m_Buffers.ResolveData(g_State->m_ConstantsUniformBuffer);
+        const VulkanBufferData &bufferData =
+            HandlePool::ResolveData(g_State->m_Buffers, g_State->m_ConstantsUniformBuffer);
         const VkMappedMemoryRange range{
             .sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,
             .memory = bufferData.memory,
