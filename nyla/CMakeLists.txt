@@ -6,7 +6,6 @@ add_subdirectory(asset)
 
 add_subdirectory(audio)
 add_subdirectory(formats)
-add_subdirectory(spirview)
 add_subdirectory(tools)
 
 add_subdirectory(apps)

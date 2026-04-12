@@ -1,6 +1,7 @@
 #include "nyla/commons/mem.h"
 #include "nyla/commons/fmt.h"
 #include "nyla/commons/intrin.h"
+#include "nyla/commons/macros.h"
 
 #include <cstdint>
 
@@ -10,19 +11,31 @@ namespace nyla
 namespace internal_mem
 {
 
-auto NYLA_API CStrLen(const char *str) -> uint64_t
+auto NYLA_API CStrLen(const void *str, uint64_t maxLen) -> uint64_t
 {
-    // NYLA_ASSERT(reinterpret_cast<uintptr_t>(str) % 16 == 0);
+    const uint8_t *ptr = (uint8_t *)str;
 
-    __m128i zero = _mm_setzero_si128();
-    for (const char *ptr = str;; ptr += 16)
+    if (maxLen >= 16)
     {
-        int cmp = _mm_movemask_epi8(_mm_cmpeq_epi8(_mm_loadu_si128((const __m128i *)ptr), zero));
-        if (cmp)
+        __m128i zero = _mm_setzero_si128();
+
+        for (; maxLen >= 16; ptr += 16, maxLen -= 16)
         {
-            return (ptr - str) + BitScanForward32(cmp);
+            int cmp = _mm_movemask_epi8(_mm_cmpeq_epi8(_mm_loadu_si128((const __m128i *)ptr), zero));
+            if (cmp)
+                return (ptr - (uint8_t *)str) + BitScanForward32(cmp);
         }
     }
+
+    while (maxLen-- > 0)
+    {
+        if ((*ptr) == 0)
+            return ptr - ((uint8_t *)str);
+        ++ptr;
+    }
+
+    TRAP();
+    return 0;
 }
 
 } // namespace internal_mem

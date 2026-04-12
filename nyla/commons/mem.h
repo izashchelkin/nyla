@@ -88,24 +88,11 @@ auto NYLA_API MemEndsWith(const void *str, uint64_t strLen, const void *suffix, 
 
 //
 
-namespace internal_mem
+auto NYLA_API CStrLen(const void *str, uint64_t maxLen) -> uint64_t;
+
+INLINE auto CStrLen(const void *str) -> uint64_t
 {
-
-auto NYLA_API CStrLen(const char *str) -> uint64_t;
-
-} // namespace internal_mem
-
-template <uint64_t N> consteval auto CStrLen(const char (&str)[N]) -> uint64_t
-{
-    return N - 1;
-}
-
-template <typename T>
-auto INLINE CStrLen(T str) -> uint64_t
-    requires(std::same_as<T, char *> || std::same_as<T, const char *> || std::same_as<T, uint8_t *> ||
-             std::same_as<T, const uint8_t *>)
-{
-    return internal_mem::CStrLen(str);
+    return CStrLen(str, 0x400);
 }
 
 } // namespace nyla

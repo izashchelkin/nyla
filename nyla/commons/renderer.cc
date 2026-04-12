@@ -93,7 +93,7 @@ void Renderer::Init()
     auto *renderer = new Renderer{};
 
     const RhiGraphicsPipelineDesc pipelineDesc{
-        .debugName = "Renderer",
+        .debugName = "Renderer"_s,
         .vs = vs,
         .ps = ps,
         .vertexBindings = AssetManager::GetMeshVertexBindings(),

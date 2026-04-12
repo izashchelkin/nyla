@@ -66,7 +66,7 @@ enum class gltf_accessor_type
     MAT4,
 };
 
-inline auto GetGltfAccessorComponentCount(gltf_accessor_type accessorType) -> uint32_t
+INLINE auto GetGltfAccessorComponentCount(gltf_accessor_type accessorType) -> uint32_t
 {
     switch (accessorType)
     {
@@ -100,7 +100,7 @@ struct gltf_accessor
     gltf_accessor_type type;
 };
 
-inline auto GetGltfAccessorSize(const gltf_accessor &accessor)
+INLINE auto GetGltfAccessorSize(const gltf_accessor &accessor)
 {
     return GetGltfAccessorComponentCount(accessor.type) * GetGltfAccessorComponentSize(accessor.componentType);
 }

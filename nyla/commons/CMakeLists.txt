@@ -50,7 +50,6 @@ target_sources(${TARGET}
         entrypoint.cc
         fmt.h
         fmt_string.h
-        future.h
         gltf.h
         glyph_renderer.h
         gpu_upload_manager.h
@@ -82,6 +81,7 @@ target_sources(${TARGET}
         renderer.h
         rhi.h
         span.h
+        spirview.h
         staging.h
         staging_buffer.h
         str.h

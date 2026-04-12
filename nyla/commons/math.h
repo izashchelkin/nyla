@@ -1,11 +1,18 @@
 #pragma once
 
+#include <cstdint>
+
 #include "nyla/commons/intrin.h"
 
 namespace nyla
 {
 
-template <typename T> constexpr auto CeilDiv(T a, T b) -> T
+constexpr auto CeilDiv(uint32_t a, uint32_t b) -> uint32_t
+{
+    return (a + b - 1) / b;
+}
+
+constexpr auto CeilDiv(uint64_t a, uint64_t b) -> uint64_t
 {
     return (a + b - 1) / b;
 }
