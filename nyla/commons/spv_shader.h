@@ -11,7 +11,7 @@ struct spv_shader
 {
     span<uint32_t> data;
 
-    RhiShaderStage m_Stage;
+    RhiShaderStage stage;
 
     inline_vec<uint32_t, 8> inputVariables;
     inline_vec<uint32_t, 8> outputVariables;
