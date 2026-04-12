@@ -167,6 +167,11 @@ INLINE auto EndsWith(span<T> self, span<T> suffix) -> bool
     return MemEndsWith(self.data, Span::SizeBytes(self), suffix.data, Span::SizeBytes(suffix));
 }
 
+INLINE auto FromCStr(const void *str, uint64_t maxLength) -> byteview
+{
+    return byteview{(uint8_t *)str, CStrLen(str, maxLength)};
+}
+
 } // namespace Span
 
 #if 0

@@ -83,7 +83,7 @@ template <is_handle HandleType, typename DataType, uint64_t Capacity>
 }
 
 template <is_handle HandleType, typename DataType, uint64_t Capacity>
-auto ResolveData(handle_pool<HandleType, DataType, Capacity> &self, HandleType handle) -> const DataType &
+auto ResolveData(const handle_pool<HandleType, DataType, Capacity> &self, HandleType handle) -> const DataType &
 {
     return ResolveSlot(self, handle).data;
 }

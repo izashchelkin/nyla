@@ -170,4 +170,7 @@ INLINE auto Scope(region_alloc &self, uint64_t size, auto &&fn)
 
 } // namespace RegionAlloc
 
+#define SCRATCH_REMEMBER void *scratchResetMark = scratch.at
+#define SCRATCH_RESET RegionAlloc::Reset(scratch, scratchResetMark)
+
 } // namespace nyla

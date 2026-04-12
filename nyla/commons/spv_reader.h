@@ -26,7 +26,7 @@ constexpr inline uint32_t kWordCountShift = 16;
 constexpr inline uint32_t kNop = 1 << kWordCountShift;
 
 [[nodiscard]]
-INLINE auto ReadWord(span<uint32_t> &data) -> uint32_t
+INLINE auto ReadWord(span<uint32_t> &data) -> uint32_t &
 {
     uint32_t &ret = Span::Front(data);
     data = Span::SubSpan(data, 1);

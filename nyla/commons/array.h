@@ -154,7 +154,7 @@ namespace Array
 
 template <typename T, uint64_t ArraySize>
 [[nodiscard]]
-INLINE auto Size(const array<T, ArraySize> &self) -> uint64_t
+consteval auto Size(const array<T, ArraySize> &self) -> uint64_t
 {
     return ArraySize;
 }

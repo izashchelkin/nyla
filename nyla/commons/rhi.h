@@ -5,6 +5,7 @@
 #include "nyla/commons/bitenum.h"
 #include "nyla/commons/handle.h"
 #include "nyla/commons/inline_string.h"
+#include "nyla/commons/region_alloc.h"
 #include "nyla/commons/span.h"
 
 namespace nyla
@@ -317,7 +318,7 @@ struct RhiTextureInfo
 class Rhi
 {
   public:
-    static void Init(const RhiInitDesc &);
+    static void Init(region_alloc &scratch, const RhiInitDesc &);
     static auto GetNumFramesInFlight() -> uint32_t;
     static auto GetFrameIndex() -> uint32_t;
     static auto GetMinUniformBufferOffsetAlignment() -> uint32_t;

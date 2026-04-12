@@ -41,6 +41,16 @@ enum class spv_shader_storage_class
 namespace SpvShader
 {
 
+INLINE auto GetInputIds(spv_shader &self) -> span<const uint32_t>
+{
+    return self.inputVariables;
+}
+
+INLINE auto GetSemantics(spv_shader &self) -> span<const inline_string<16>>
+{
+    return self.semanticDataNames;
+}
+
 void ProcessShader(spv_shader &self, span<uint32_t> data, RhiShaderStage stage);
 
 auto FindLocationBySemantic(spv_shader &self, byteview semantic, spv_shader_storage_class storageClass,
@@ -51,8 +61,8 @@ auto FindIdBySemantic(spv_shader &self, byteview querySemantic, spv_shader_stora
 
 auto FindSemanticById(spv_shader &self, uint32_t id, byteview *outSemantic) -> bool;
 
-auto RewriteLocationForSemantic(spv_shader &self, byteview semantic, spv_shader_storage_class storageClass,
-                                uint32_t aLocation) -> bool;
+auto RewriteLocationForSemantic(spv_shader &self, span<uint32_t> data, byteview semantic,
+                                spv_shader_storage_class storageClass, uint32_t aLocation) -> bool;
 
 auto CheckStorageClass(spv_shader &self, uint32_t id, spv_shader_storage_class storageClass) -> bool;
 
@@ -64,18 +74,6 @@ INLINE auto CheckStorageClass(spv_shader &self, byteview semantic, spv_shader_st
 
     return false;
 }
-
-#if 0
-auto GetInputIds() -> span<const uint32_t>
-{
-    return m_InputVariables.GetSpan().AsConst();
-}
-
-auto GetSemantics() -> span<InlineString<16>>
-{
-    return m_SemanticDataNames.GetSpan();
-}
-#endif
 
 } // namespace SpvShader
 

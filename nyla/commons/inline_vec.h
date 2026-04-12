@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <type_traits>
 
 #include "nyla/commons/array.h"
 #include "nyla/commons/fmt.h"
@@ -81,7 +82,14 @@ namespace InlineVec
 
 template <typename T, uint64_t Capacity>
 [[nodiscard]]
-INLINE auto Front(const inline_vec<T, Capacity> &self) -> T &
+INLINE auto DataPtr(inline_vec<T, Capacity> &self) -> T *
+{
+    return self.data.data;
+}
+
+template <typename T, uint64_t Capacity>
+[[nodiscard]]
+INLINE auto Front(const inline_vec<T, Capacity> &self) -> const T &
 {
     NYLA_DASSERT(self.size);
     return self[0];
@@ -89,7 +97,7 @@ INLINE auto Front(const inline_vec<T, Capacity> &self) -> T &
 
 template <typename T, uint64_t Capacity>
 [[nodiscard]]
-INLINE auto Back(const inline_vec<T, Capacity> &self) -> T &
+INLINE auto Back(const inline_vec<T, Capacity> &self) -> const T &
 {
     NYLA_DASSERT(self.size);
     return self[self.size - 1];
@@ -113,7 +121,9 @@ template <typename T, uint64_t Capacity> INLINE auto Append(inline_vec<T, Capaci
     return *p;
 }
 
-template <typename T, uint64_t Capacity> INLINE auto Append(inline_vec<T, Capacity> &self, const T &data) -> T &
+template <typename T, typename D, uint64_t Capacity>
+INLINE auto Append(inline_vec<T, Capacity> &self, const D &data) -> T &
+    requires(std::is_convertible_v<D, T>)
 {
     T &ret = Append(self);
     ret = data;

@@ -10,14 +10,12 @@
 #include "nyla/commons/collections.h"
 #include "nyla/commons/handle_pool.h"
 #include "nyla/commons/inline_vec.h"
-#include "nyla/commons/limits.h"
 #include "nyla/commons/log.h"
 #include "nyla/commons/mem.h"
 #include "nyla/commons/minmax.h"
 #include "nyla/commons/region_alloc.h"
 #include "nyla/commons/rhi.h"
 #include "nyla/commons/span.h"
-#include "nyla/commons/spirview.h"
 
 #define spv_enable_utility_code
 
@@ -25,8 +23,6 @@
 #if defined(__linux__)
 #include "nyla/commons/linux/platform_linux.h"
 #include "vulkan/vulkan_xcb.h"
-
-#include <spirv/unified1/spirv.hpp>
 #else
 #include "nyla/commons/windows/platform_windows.h"
 #include "vulkan/vulkan_win32.h"
@@ -100,7 +96,7 @@ struct VulkanPipelineData
 
 struct VulkanShaderData
 {
-    Span<uint32_t> spv;
+    span<uint32_t> spv;
 };
 
 struct VulkanTextureData
@@ -355,6 +351,11 @@ auto ConvertTextureFormatIntoVkFormat(RhiTextureFormat format, VkImageAspectFlag
             *outAspectMask = 0;
         return VK_FORMAT_UNDEFINED;
     }
+    case nyla::RhiTextureFormat::R8_UNORM: {
+        if (outAspectMask)
+            *outAspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        return VK_FORMAT_R8_UNORM;
+    }
     case RhiTextureFormat::R8G8B8A8_sRGB: {
         if (outAspectMask)
             *outAspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -501,26 +502,18 @@ struct DescriptorTable
     VkDescriptorSet set;
 };
 
-struct RhiGlobalState
+struct rhi_state
 {
-    RegionAlloc rootAlloc;
-    RegionAlloc transientAlloc;
-    RegionAlloc permanentAlloc;
-
-    HandlePool<RhiCmdList, VulkanCmdListData, 16> m_CmdLists;
-
-    HandlePool<RhiShader, VulkanShaderData, 16> m_Shaders;
-    HandlePool<RhiGraphicsPipeline, VulkanPipelineData, 16> m_GraphicsPipelines;
-
-    HandlePool<RhiBuffer, VulkanBufferData, 16> m_Buffers;
-    HandlePool<RhiBuffer, VulkanBufferViewData, 16> m_CBVs;
-
-    HandlePool<RhiTexture, VulkanTextureData, 128> m_Textures;
-    HandlePool<RhiRenderTargetView, VulkanTextureViewData, 8> m_RenderTargetViews;
-    HandlePool<RhiDepthStencilView, VulkanTextureViewData, 8> m_DepthStencilViews;
-    HandlePool<RhiSampledTextureView, VulkanTextureViewData, 128> m_SampledTextureViews;
-
-    HandlePool<RhiSampler, VulkanSamplerData, 16> m_Samplers;
+    handle_pool<RhiBuffer, VulkanBufferData, 16> m_Buffers;
+    handle_pool<RhiBuffer, VulkanBufferViewData, 16> m_CBVs;
+    handle_pool<RhiCmdList, VulkanCmdListData, 16> m_CmdLists;
+    handle_pool<RhiDepthStencilView, VulkanTextureViewData, 8> m_DepthStencilViews;
+    handle_pool<RhiGraphicsPipeline, VulkanPipelineData, 16> m_GraphicsPipelines;
+    handle_pool<RhiRenderTargetView, VulkanTextureViewData, 8> m_RenderTargetViews;
+    handle_pool<RhiSampledTextureView, VulkanTextureViewData, 128> m_SampledTextureViews;
+    handle_pool<RhiSampler, VulkanSamplerData, 16> m_Samplers;
+    handle_pool<RhiShader, VulkanShaderData, 16> m_Shaders;
+    handle_pool<RhiTexture, VulkanTextureData, 128> m_Textures;
 
     VkAllocationCallbacks *vkAlloc;
 
@@ -541,35 +534,36 @@ struct RhiGlobalState
 
     VkSurfaceKHR m_Surface;
     VkSwapchainKHR m_Swapchain;
-    bool m_SwapchainUsable = true;
-    bool m_RecreateSwapchain = true;
+    bool m_SwapchainUsable;
+    bool m_RecreateSwapchain;
 
-    InlineVec<RhiRenderTargetView, kRhiMaxNumSwapchainTextures> m_SwapchainRTVs{};
+    inline_vec<RhiRenderTargetView, kRhiMaxNumSwapchainTextures> m_SwapchainRTVs{};
     uint32_t m_SwapchainTextureIndex;
 
-    Array<VkSemaphore, kRhiMaxNumSwapchainTextures> m_RenderFinishedSemaphores;
-    Array<VkSemaphore, kRhiMaxNumFramesInFlight> m_SwapchainAcquireSemaphores;
+    array<VkSemaphore, kRhiMaxNumSwapchainTextures> m_RenderFinishedSemaphores;
+    array<VkSemaphore, kRhiMaxNumFramesInFlight> m_SwapchainAcquireSemaphores;
 
     DeviceQueue m_GraphicsQueue;
     uint32_t m_FrameIndex;
-    Array<RhiCmdList, kRhiMaxNumFramesInFlight> m_GraphicsQueueCmd;
-    Array<uint64_t, kRhiMaxNumFramesInFlight> m_GraphicsQueueCmdDone;
+    array<RhiCmdList, kRhiMaxNumFramesInFlight> m_GraphicsQueueCmd;
+    array<uint64_t, kRhiMaxNumFramesInFlight> m_GraphicsQueueCmdDone;
 
     DeviceQueue m_TransferQueue;
     RhiCmdList m_TransferQueueCmd;
     uint64_t m_TransferQueueCmdDone;
 };
-RhiGlobalState *g_State;
+rhi_state *g_State;
+region_alloc g_Alloc;
 
 //
 
-void VulkanNameHandle(VkObjectType type, uint64_t handle, Str name)
+void VulkanNameHandle(VkObjectType type, uint64_t handle, byteview name)
 {
     const VkDebugUtilsObjectNameInfoEXT nameInfo{
         .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
         .objectType = type,
         .objectHandle = handle,
-        .pObjectName = name.Data(),
+        .pObjectName = (const char *)name.data,
     };
 
     static auto fn = VK_GET_INSTANCE_PROC_ADDR(vkSetDebugUtilsObjectNameEXT);
@@ -578,7 +572,7 @@ void VulkanNameHandle(VkObjectType type, uint64_t handle, Str name)
 
 auto CbvOffset(uint32_t offset) -> uint32_t
 {
-    return AlignedUp<uint32_t>(offset, g_State->m_PhysDevProps.limits.minUniformBufferOffsetAlignment);
+    return AlignedUp(offset, g_State->m_PhysDevProps.limits.minUniformBufferOffsetAlignment);
 }
 
 auto FindMemoryTypeIndex(VkMemoryRequirements memRequirements, VkMemoryPropertyFlags properties) -> uint32_t
@@ -700,9 +694,10 @@ auto GetDeviceQueue(RhiQueueType queueType) -> DeviceQueue &
 void CmdDrawInternal(VulkanCmdListData &cmdData)
 {
     VkCommandBuffer cmdbuf = cmdData.cmdbuf;
-    const VulkanPipelineData &pipelineData = g_State->m_GraphicsPipelines.ResolveData(cmdData.boundGraphicsPipeline);
+    const VulkanPipelineData &pipelineData =
+        HandlePool::ResolveData(g_State->m_GraphicsPipelines, cmdData.boundGraphicsPipeline);
 
-    const Array<uint32_t, 4> offsets{
+    const array<uint32_t, 4> offsets{
         cmdData.frameConstantHead,
         cmdData.passConstantHead,
         cmdData.drawConstantHead,
@@ -710,25 +705,27 @@ void CmdDrawInternal(VulkanCmdListData &cmdData)
     };
 
     vkCmdBindDescriptorSets(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineData.layout, 0, 1,
-                            &g_State->m_ConstantsDescriptorTable.set, offsets.Size(), offsets.Data());
+                            &g_State->m_ConstantsDescriptorTable.set, Array::Size(offsets), offsets.data);
 
     cmdData.drawConstantHead += CbvOffset(g_State->m_Limits.drawConstantSize);
     cmdData.largeDrawConstantHead += CbvOffset(g_State->m_Limits.largeDrawConstantSize);
 }
 
-void CreateSwapchain()
+void CreateSwapchain(region_alloc scratch)
 {
+    SCRATCH_REMEMBER;
+
     VkSwapchainKHR oldSwapchain = g_State->m_Swapchain;
 
     static bool logPresentModes = true;
-    VkPresentModeKHR presentMode = [] -> VkPresentModeKHR {
-        auto &presentModes = g_State->transientAlloc.PushVec<VkPresentModeKHR, 16>();
+    VkPresentModeKHR presentMode = [&] -> VkPresentModeKHR {
+        auto &presentModes = RegionAlloc::AllocVec<VkPresentModeKHR, 16>(scratch);
         uint32_t presentModeCount = 0;
         vkGetPhysicalDeviceSurfacePresentModesKHR(g_State->m_PhysDev, g_State->m_Surface, &presentModeCount, nullptr);
 
-        presentModes.ReSize(presentModeCount);
+        InlineVec::Resize(presentModes, presentModeCount);
         vkGetPhysicalDeviceSurfacePresentModesKHR(g_State->m_PhysDev, g_State->m_Surface, &presentModeCount,
-                                                  presentModes.Data());
+                                                  InlineVec::DataPtr(presentModes));
 
         VkPresentModeKHR bestMode = VK_PRESENT_MODE_FIFO_KHR;
         for (VkPresentModeKHR presentMode : presentModes)
@@ -769,18 +766,20 @@ void CreateSwapchain()
         return bestMode;
     }();
 
+    SCRATCH_RESET;
+
     VkSurfaceCapabilitiesKHR surfaceCapabilities;
     VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(g_State->m_PhysDev, g_State->m_Surface, &surfaceCapabilities));
 
-    auto surfaceFormat = [] -> VkSurfaceFormatKHR {
+    auto surfaceFormat = [&] -> VkSurfaceFormatKHR {
         uint32_t surfaceFormatCount;
         VK_CHECK(
             vkGetPhysicalDeviceSurfaceFormatsKHR(g_State->m_PhysDev, g_State->m_Surface, &surfaceFormatCount, nullptr));
 
-        auto &surfaceFormats = g_State->transientAlloc.PushVec<VkSurfaceFormatKHR, 16>();
-        surfaceFormats.ReSize(surfaceFormatCount);
+        auto &surfaceFormats = RegionAlloc::AllocVec<VkSurfaceFormatKHR, 16>(scratch);
+        InlineVec::Resize(surfaceFormats, surfaceFormatCount);
         vkGetPhysicalDeviceSurfaceFormatsKHR(g_State->m_PhysDev, g_State->m_Surface, &surfaceFormatCount,
-                                             surfaceFormats.Data());
+                                             InlineVec::DataPtr(surfaceFormats));
 
         auto it = std::ranges::find_if(surfaceFormats, [](VkSurfaceFormatKHR surfaceFormat) -> bool {
             return surfaceFormat.format == VK_FORMAT_B8G8R8A8_SRGB &&
@@ -789,6 +788,8 @@ void CreateSwapchain()
         NYLA_ASSERT(it != surfaceFormats.end());
         return *it;
     }();
+
+    SCRATCH_RESET;
 
     auto surfaceExtent = [surfaceCapabilities] -> VkExtent2D {
         if (surfaceCapabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
@@ -830,9 +831,9 @@ void CreateSwapchain()
     vkGetSwapchainImagesKHR(g_State->m_Dev, g_State->m_Swapchain, &swapchainTexturesCount, nullptr);
 
     NYLA_ASSERT(swapchainTexturesCount <= kRhiMaxNumSwapchainTextures);
-    Array<VkImage, kRhiMaxNumSwapchainTextures> swapchainImages;
+    array<VkImage, kRhiMaxNumSwapchainTextures> swapchainImages;
 
-    vkGetSwapchainImagesKHR(g_State->m_Dev, g_State->m_Swapchain, &swapchainTexturesCount, swapchainImages.Data());
+    vkGetSwapchainImagesKHR(g_State->m_Dev, g_State->m_Swapchain, &swapchainTexturesCount, swapchainImages.data);
 
     for (size_t i = 0; i < swapchainMinImageCount; ++i)
     {
@@ -1020,417 +1021,427 @@ void WriteDescriptorTables()
 
 } // namespace
 
-void Rhi::Init(const RhiInitDesc &rhiDesc)
+void Rhi::Init(region_alloc &scratch, const RhiInitDesc &rhiDesc)
 {
+    void *scratchResetMark = scratch.at;
+
     {
-        auto rootAlloc = rhiDesc.rootAlloc;
-        auto permanentAlloc = rootAlloc.PushSubAlloc(16_KiB);
-        auto transientAlloc = rootAlloc.PushSubAlloc(16_KiB);
-        g_State = permanentAlloc.Push(RhiGlobalState{});
-        g_State->rootAlloc = rootAlloc;
-        g_State->permanentAlloc = permanentAlloc;
-        g_State->transientAlloc = transientAlloc;
-    }
+        g_Alloc = RegionAlloc::Create(1_MiB, 0);
+        g_State = &RegionAlloc::Alloc<rhi_state>(g_Alloc);
 
-    constexpr uint32_t kInvalidIndex = std::numeric_limits<uint32_t>::max();
+        constexpr uint32_t kInvalidIndex = std::numeric_limits<uint32_t>::max();
 
-    NYLA_ASSERT(rhiDesc.limits.numFramesInFlight <= kRhiMaxNumFramesInFlight);
+        NYLA_ASSERT(rhiDesc.limits.numFramesInFlight <= kRhiMaxNumFramesInFlight);
 
-    g_State->m_Flags = rhiDesc.flags;
-    g_State->m_Limits = rhiDesc.limits;
+        g_State->m_Flags = rhiDesc.flags;
+        g_State->m_Limits = rhiDesc.limits;
 
-    const VkApplicationInfo appInfo{
-        .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
-        .pApplicationName = "nyla",
-        .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
-        .pEngineName = "nyla",
-        .engineVersion = VK_MAKE_VERSION(1, 0, 0),
-        .apiVersion = VK_API_VERSION_1_4,
-    };
+        const VkApplicationInfo appInfo{
+            .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
+            .pApplicationName = "nyla",
+            .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
+            .pEngineName = "nyla",
+            .engineVersion = VK_MAKE_VERSION(1, 0, 0),
+            .apiVersion = VK_API_VERSION_1_4,
+        };
 
-    auto &enabledInstanceExtensions = g_State->transientAlloc.PushVec<const char *, 5>();
-    enabledInstanceExtensions.PushBack(VK_KHR_SURFACE_EXTENSION_NAME);
+        auto &enabledInstanceExtensions = RegionAlloc::AllocVec<const char *, 5>(scratch);
+        InlineVec::Append(enabledInstanceExtensions, VK_KHR_SURFACE_EXTENSION_NAME);
 #if defined(__linux__)
-    enabledInstanceExtensions.PushBack(VK_KHR_XCB_SURFACE_EXTENSION_NAME);
+        InlineVec::Append(enabledInstanceExtensions, VK_KHR_XCB_SURFACE_EXTENSION_NAME);
 #else
-    enabledInstanceExtensions.PushBack(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
+        InlineVec::Append(enabledInstanceExtensions, VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
 #endif
 
-    auto &instanceLayers = g_State->transientAlloc.PushVec<const char *, 2>();
-    if (kRhiValidations)
-    {
-        instanceLayers.PushBack("VK_LAYER_KHRONOS_validation");
-    }
+        auto &instanceLayers = RegionAlloc::AllocVec<const char *, 2>(scratch);
+        if (kRhiValidations)
+        {
+            InlineVec::Append(instanceLayers, "VK_LAYER_KHRONOS_validation");
+        }
 
-    auto &validationEnabledFeatures = g_State->transientAlloc.PushVec<VkValidationFeatureEnableEXT, 4>();
-    auto &validationDisabledFeatures = g_State->transientAlloc.PushVec<VkValidationFeatureDisableEXT, 4>();
-    VkValidationFeaturesEXT validationFeatures = {
-        .sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT,
-        .enabledValidationFeatureCount = 0,
-        .pEnabledValidationFeatures = validationEnabledFeatures.Data(),
-        .disabledValidationFeatureCount = 0,
-        .pDisabledValidationFeatures = validationDisabledFeatures.Data(),
-    };
+        auto &validationEnabledFeatures = RegionAlloc::AllocVec<VkValidationFeatureEnableEXT, 4>(scratch);
+        auto &validationDisabledFeatures = RegionAlloc::AllocVec<VkValidationFeatureDisableEXT, 4>(scratch);
+        VkValidationFeaturesEXT validationFeatures = {
+            .sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT,
+            .enabledValidationFeatureCount = (uint32_t)validationEnabledFeatures.size,
+            .pEnabledValidationFeatures = InlineVec::DataPtr(validationEnabledFeatures),
+            .disabledValidationFeatureCount = (uint32_t)validationDisabledFeatures.size,
+            .pDisabledValidationFeatures = InlineVec::DataPtr(validationDisabledFeatures),
+        };
 
-    VkDebugUtilsMessengerCreateInfoEXT debugMessengerCreateInfo = {
-        .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
-        .pNext = &validationFeatures,
-        .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-                           VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-                           VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
-        .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-                       VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
-        .pfnUserCallback = DebugMessengerCallback,
-        .pUserData = nullptr,
-    };
+        VkDebugUtilsMessengerCreateInfoEXT debugMessengerCreateInfo = {
+            .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+            .pNext = &validationFeatures,
+            .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+                               VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                               VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
+            .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                           VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                           VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
+            .pfnUserCallback = DebugMessengerCallback,
+            .pUserData = nullptr,
+        };
 
-    uint32_t layerCount;
-    vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+        uint32_t layerCount;
+        vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
 
-    auto &layers = g_State->transientAlloc.PushVec<VkLayerProperties, 256>();
-    layers.ReSize(layerCount);
-    vkEnumerateInstanceLayerProperties(&layerCount, layers.Data());
+        auto &layers = RegionAlloc::AllocVec<VkLayerProperties, 256>(scratch);
+        InlineVec::Resize(layers, layerCount);
+        vkEnumerateInstanceLayerProperties(&layerCount, InlineVec::DataPtr(layers));
 
-    {
-        auto &instanceExtensions = g_State->transientAlloc.PushVec<VkExtensionProperties, 256>();
-        uint32_t instanceExtensionsCount;
-        vkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionsCount, nullptr);
+        {
+            auto &instanceExtensions = RegionAlloc::AllocVec<VkExtensionProperties, 256>(scratch);
+            uint32_t instanceExtensionsCount;
+            vkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionsCount, nullptr);
 
-        instanceExtensions.ReSize(instanceExtensionsCount);
-        vkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionsCount, instanceExtensions.Data());
+            InlineVec::Resize(instanceExtensions, instanceExtensionsCount);
+            vkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionsCount,
+                                                   InlineVec::DataPtr(instanceExtensions));
+
+            NYLA_LOG("");
+            NYLA_LOG("%d Instance Extensions available", instanceExtensionsCount);
+            for (uint32_t i = 0; i < instanceExtensionsCount; ++i)
+            {
+                const auto &extension = instanceExtensions[i];
+                NYLA_LOG("%s", extension.extensionName);
+            }
+        }
 
         NYLA_LOG("");
-        NYLA_LOG("%d Instance Extensions available", instanceExtensionsCount);
-        for (uint32_t i = 0; i < instanceExtensionsCount; ++i)
+        NYLA_LOG("%zd Layers available", layers.size);
+        for (uint32_t i = 0; i < layerCount; ++i)
         {
-            const auto &extension = instanceExtensions[i];
-            NYLA_LOG("%s", extension.extensionName);
-        }
-    }
+            const auto &layer = layers[i];
+            NYLA_LOG("    %s", layer.layerName);
 
-    NYLA_LOG("");
-    NYLA_LOG("%zd Layers available", layers.Size());
-    for (uint32_t i = 0; i < layerCount; ++i)
-    {
-        const auto &layer = layers[i];
-        NYLA_LOG("    %s", layer.layerName);
+            auto &layerExtensions = RegionAlloc::AllocVec<VkExtensionProperties, 256>(scratch);
+            uint32_t layerExtensionProperties;
+            vkEnumerateInstanceExtensionProperties(layer.layerName, &layerExtensionProperties, nullptr);
 
-        auto &layerExtensions = g_State->transientAlloc.PushVec<VkExtensionProperties, 256>();
-        uint32_t layerExtensionProperties;
-        vkEnumerateInstanceExtensionProperties(layer.layerName, &layerExtensionProperties, nullptr);
+            InlineVec::Resize(layerExtensions, layerExtensionProperties);
+            vkEnumerateInstanceExtensionProperties(layer.layerName, &layerExtensionProperties,
+                                                   InlineVec::DataPtr(layerExtensions));
 
-        layerExtensions.ReSize(layerExtensionProperties);
-        vkEnumerateInstanceExtensionProperties(layer.layerName, &layerExtensionProperties, layerExtensions.Data());
-
-        for (uint32_t i = 0; i < layerExtensionProperties; ++i)
-        {
-            const auto &extension = layerExtensions[i];
-            NYLA_LOG("        %s", extension.extensionName);
-        }
-    }
-
-    VkDebugUtilsMessengerEXT debugMessenger{};
-
-    const void *instancePNext = nullptr;
-    if constexpr (kRhiValidations)
-    {
-        if constexpr (false)
-        {
-            validationEnabledFeatures.PushBack(VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT);
-            validationEnabledFeatures.PushBack(VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_RESERVE_BINDING_SLOT_EXT);
-            validationEnabledFeatures.PushBack(VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT);
-            validationEnabledFeatures.PushBack(VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT);
-            validationFeatures.enabledValidationFeatureCount = validationEnabledFeatures.Size();
-
-            validationDisabledFeatures.PushBack(VK_VALIDATION_FEATURE_DISABLE_CORE_CHECKS_EXT);
-            validationFeatures.disabledValidationFeatureCount = validationEnabledFeatures.Size();
-        }
-
-        instancePNext = &debugMessengerCreateInfo;
-        enabledInstanceExtensions.PushBack(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-        enabledInstanceExtensions.PushBack(VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME);
-    }
-
-    const VkInstanceCreateInfo instanceCreateInfo{
-        .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-        .pNext = instancePNext,
-        .pApplicationInfo = &appInfo,
-        .enabledLayerCount = static_cast<uint32_t>(instanceLayers.Size()),
-        .ppEnabledLayerNames = instanceLayers.Data(),
-        .enabledExtensionCount = static_cast<uint32_t>(enabledInstanceExtensions.Size()),
-        .ppEnabledExtensionNames = enabledInstanceExtensions.Data(),
-    };
-    VK_CHECK(vkCreateInstance(&instanceCreateInfo, nullptr, &g_State->m_Instance));
-
-    if constexpr (kRhiValidations)
-    {
-        auto createDebugUtilsMessenger = VK_GET_INSTANCE_PROC_ADDR(vkCreateDebugUtilsMessengerEXT);
-        VK_CHECK(createDebugUtilsMessenger(g_State->m_Instance, &debugMessengerCreateInfo, nullptr, &debugMessenger));
-    }
-
-    uint32_t numPhysDevices = 0;
-    VK_CHECK(vkEnumeratePhysicalDevices(g_State->m_Instance, &numPhysDevices, nullptr));
-
-    auto &physDevs = g_State->transientAlloc.PushVec<VkPhysicalDevice, 16>();
-    physDevs.ReSize(numPhysDevices);
-    VK_CHECK(vkEnumeratePhysicalDevices(g_State->m_Instance, &numPhysDevices, physDevs.Data()));
-
-    auto &deviceExtensions = g_State->transientAlloc.PushVec<const char *, 256>();
-    deviceExtensions.PushBack(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-    deviceExtensions.PushBack(VK_EXT_PRESENT_MODE_FIFO_LATEST_READY_EXTENSION_NAME);
-    deviceExtensions.PushBack(VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME);
-
-    if constexpr (kRhiCheckpoints)
-    {
-        deviceExtensions.PushBack(VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_EXTENSION_NAME);
-    }
-
-    for (VkPhysicalDevice physDev : physDevs)
-    {
-        uint32_t extensionCount = 0;
-        vkEnumerateDeviceExtensionProperties(physDev, nullptr, &extensionCount, nullptr);
-        auto &extensions = g_State->transientAlloc.PushVec<VkExtensionProperties, 256>();
-        extensions.ReSize(256);
-        vkEnumerateDeviceExtensionProperties(physDev, nullptr, &extensionCount, extensions.Data());
-
-        uint32_t missingExtensions = deviceExtensions.Size();
-        for (auto &deviceExtension : deviceExtensions)
-        {
-            for (uint32_t i = 0; i < extensionCount; ++i)
+            for (uint32_t i = 0; i < layerExtensionProperties; ++i)
             {
-                if (AsStr<const char *>(extensions[i].extensionName) == AsStr(deviceExtension))
-                {
-                    NYLA_LOG("Found device extension: %s", deviceExtension);
-                    --missingExtensions;
-                    break;
-                }
+                const auto &extension = layerExtensions[i];
+                NYLA_LOG("        %s", extension.extensionName);
             }
         }
 
-        if (missingExtensions)
+        VkDebugUtilsMessengerEXT debugMessenger{};
+
+        const void *instancePNext = nullptr;
+        if constexpr (kRhiValidations)
         {
-            NYLA_LOG("Missing %d extensions", missingExtensions);
-            continue;
+            if constexpr (false)
+            {
+                InlineVec::Append(validationEnabledFeatures, VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT);
+                InlineVec::Append(validationEnabledFeatures,
+                                  VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_RESERVE_BINDING_SLOT_EXT);
+                InlineVec::Append(validationEnabledFeatures, VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT);
+                InlineVec::Append(validationEnabledFeatures,
+                                  VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT);
+                validationFeatures.enabledValidationFeatureCount = validationEnabledFeatures.size;
+
+                InlineVec::Append(validationDisabledFeatures, VK_VALIDATION_FEATURE_DISABLE_CORE_CHECKS_EXT);
+                validationFeatures.disabledValidationFeatureCount = validationEnabledFeatures.size;
+            }
+
+            instancePNext = &debugMessengerCreateInfo;
+            InlineVec::Append(enabledInstanceExtensions, VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+            InlineVec::Append(enabledInstanceExtensions, VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME);
         }
 
-        VkPhysicalDeviceProperties props;
-        vkGetPhysicalDeviceProperties(physDev, &props);
-
-        VkPhysicalDeviceMemoryProperties memProps;
-        vkGetPhysicalDeviceMemoryProperties(physDev, &memProps);
-
-        uint32_t queueFamilyPropCount = 0;
-        vkGetPhysicalDeviceQueueFamilyProperties(physDev, &queueFamilyPropCount, nullptr);
-        auto &queueFamilyProperties = g_State->transientAlloc.PushVec<VkQueueFamilyProperties, 256>();
-        queueFamilyProperties.ReSize(queueFamilyPropCount);
-        vkGetPhysicalDeviceQueueFamilyProperties(physDev, &queueFamilyPropCount, queueFamilyProperties.Data());
-
-        constexpr static uint32_t kInvalidQueueFamilyIndex = std::numeric_limits<uint32_t>::max();
-        uint32_t graphicsQueueIndex = kInvalidQueueFamilyIndex;
-        uint32_t transferQueueIndex = kInvalidQueueFamilyIndex;
-
-        for (size_t i = 0; i < queueFamilyPropCount; ++i)
-        {
-            VkQueueFamilyProperties &props = queueFamilyProperties[i];
-            if (!props.queueCount)
-            {
-                continue;
-            }
-
-            if (props.queueFlags & VK_QUEUE_GRAPHICS_BIT)
-            {
-                if (graphicsQueueIndex == kInvalidQueueFamilyIndex)
-                {
-                    graphicsQueueIndex = i;
-                }
-                continue;
-            }
-
-            if (props.queueFlags & VK_QUEUE_COMPUTE_BIT)
-            {
-                continue;
-            }
-
-            if (props.queueFlags & VK_QUEUE_TRANSFER_BIT)
-            {
-                if (transferQueueIndex == kInvalidQueueFamilyIndex)
-                {
-                    transferQueueIndex = i;
-                }
-                continue;
-            }
-        }
-
-        if (graphicsQueueIndex == kInvalidQueueFamilyIndex)
-        {
-            continue;
-        }
-
-        // TODO: pick best device
-        g_State->m_PhysDev = physDev;
-        g_State->m_PhysDevProps = props;
-        g_State->m_PhysDevMemProps = memProps;
-        g_State->m_GraphicsQueue.queueFamilyIndex = graphicsQueueIndex;
-        g_State->m_TransferQueue.queueFamilyIndex = transferQueueIndex;
-
-        break;
-    }
-
-    NYLA_ASSERT(g_State->m_PhysDev);
-
-    const float queuePriority = 1.0f;
-    auto &queueCreateInfos = g_State->transientAlloc.PushVec<VkDeviceQueueCreateInfo, 2>();
-    if (g_State->m_TransferQueue.queueFamilyIndex == kInvalidIndex)
-    {
-        queueCreateInfos.PushBack(VkDeviceQueueCreateInfo{
-            .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-            .queueFamilyIndex = g_State->m_GraphicsQueue.queueFamilyIndex,
-            .queueCount = 1,
-            .pQueuePriorities = &queuePriority,
-        });
-    }
-    else
-    {
-        queueCreateInfos.PushBack(VkDeviceQueueCreateInfo{
-            .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-            .queueFamilyIndex = g_State->m_GraphicsQueue.queueFamilyIndex,
-            .queueCount = 1,
-            .pQueuePriorities = &queuePriority,
-        });
-
-        queueCreateInfos.PushBack(VkDeviceQueueCreateInfo{
-            .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-            .queueFamilyIndex = g_State->m_TransferQueue.queueFamilyIndex,
-            .queueCount = 1,
-            .pQueuePriorities = &queuePriority,
-        });
-    }
-
-    VkPhysicalDeviceVulkan14Features v14{
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES,
-    };
-
-    VkPhysicalDeviceVulkan13Features v13{
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
-        .pNext = &v14,
-        .shaderDemoteToHelperInvocation = true,
-        .synchronization2 = true,
-        .dynamicRendering = true,
-    };
-
-    VkPhysicalDeviceVulkan12Features v12{
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
-        .pNext = &v13,
-        .descriptorIndexing = true,
-        .shaderSampledImageArrayNonUniformIndexing = true,
-        .descriptorBindingSampledImageUpdateAfterBind = true,
-        .descriptorBindingUpdateUnusedWhilePending = true,
-        .descriptorBindingPartiallyBound = true,
-        .descriptorBindingVariableDescriptorCount = true,
-        .runtimeDescriptorArray = true,
-        .timelineSemaphore = true,
-    };
-
-    VkPhysicalDeviceVulkan11Features v11{
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
-        .pNext = &v12,
-    };
-
-    VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT vertexInputDynamicStateFeatures{
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_INPUT_DYNAMIC_STATE_FEATURES_EXT,
-        .pNext = &v11,
-        .vertexInputDynamicState = true,
-    };
-
-    VkPhysicalDevicePresentModeFifoLatestReadyFeaturesKHR fifoLatestReadyFeatures = {
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRESENT_MODE_FIFO_LATEST_READY_FEATURES_KHR,
-        .pNext = &vertexInputDynamicStateFeatures,
-        .presentModeFifoLatestReady = true,
-    };
-
-    const VkPhysicalDeviceFeatures2 features{
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-        .pNext = &fifoLatestReadyFeatures,
-        .features = {},
-    };
-
-    const VkDeviceCreateInfo deviceCreateInfo{
-        .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-        .pNext = &features,
-        .queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.Size()),
-        .pQueueCreateInfos = queueCreateInfos.Data(),
-        .enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.Size()),
-        .ppEnabledExtensionNames = deviceExtensions.Data(),
-    };
-    VK_CHECK(vkCreateDevice(g_State->m_PhysDev, &deviceCreateInfo, nullptr, &g_State->m_Dev));
-
-    vkGetDeviceQueue(g_State->m_Dev, g_State->m_GraphicsQueue.queueFamilyIndex, 0, &g_State->m_GraphicsQueue.queue);
-
-    if (g_State->m_TransferQueue.queueFamilyIndex == kInvalidIndex)
-    {
-        g_State->m_TransferQueue.queueFamilyIndex = g_State->m_GraphicsQueue.queueFamilyIndex;
-        g_State->m_TransferQueue.queue = g_State->m_GraphicsQueue.queue;
-    }
-    else
-    {
-        vkGetDeviceQueue(g_State->m_Dev, g_State->m_TransferQueue.queueFamilyIndex, 0, &g_State->m_TransferQueue.queue);
-    }
-
-    auto initQueue = [](DeviceQueue &queue, RhiQueueType queueType, Span<RhiCmdList> cmd) -> void {
-        const VkCommandPoolCreateInfo commandPoolCreateInfo{
-            .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-            .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-            .queueFamilyIndex = queue.queueFamilyIndex,
+        const VkInstanceCreateInfo instanceCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+            .pNext = instancePNext,
+            .pApplicationInfo = &appInfo,
+            .enabledLayerCount = static_cast<uint32_t>(instanceLayers.size),
+            .ppEnabledLayerNames = InlineVec::DataPtr(instanceLayers),
+            .enabledExtensionCount = static_cast<uint32_t>(enabledInstanceExtensions.size),
+            .ppEnabledExtensionNames = InlineVec::DataPtr(enabledInstanceExtensions),
         };
-        VK_CHECK(vkCreateCommandPool(g_State->m_Dev, &commandPoolCreateInfo, nullptr, &queue.cmdPool));
+        VK_CHECK(vkCreateInstance(&instanceCreateInfo, nullptr, &g_State->m_Instance));
 
-        queue.timeline = CreateTimeline(0);
-        queue.timelineNext = 1;
-
-        for (auto &i : cmd)
+        if constexpr (kRhiValidations)
         {
-            i = CreateCmdList(queueType);
+            auto createDebugUtilsMessenger = VK_GET_INSTANCE_PROC_ADDR(vkCreateDebugUtilsMessengerEXT);
+            VK_CHECK(
+                createDebugUtilsMessenger(g_State->m_Instance, &debugMessengerCreateInfo, nullptr, &debugMessenger));
         }
-    };
-    initQueue(g_State->m_GraphicsQueue, RhiQueueType::Graphics,
-              Span{g_State->m_GraphicsQueueCmd.Data(), g_State->m_Limits.numFramesInFlight});
-    initQueue(g_State->m_TransferQueue, RhiQueueType::Transfer, Span{&g_State->m_TransferQueueCmd, 1});
 
-    const VkSemaphoreCreateInfo semaphoreCreateInfo{
-        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
-    };
-    for (size_t i = 0; i < g_State->m_Limits.numFramesInFlight; ++i)
-    {
-        VK_CHECK(vkCreateSemaphore(g_State->m_Dev, &semaphoreCreateInfo, nullptr,
-                                   g_State->m_SwapchainAcquireSemaphores.Data() + i));
-    }
-    for (size_t i = 0; i < kRhiMaxNumSwapchainTextures; ++i)
-    {
-        VK_CHECK(vkCreateSemaphore(g_State->m_Dev, &semaphoreCreateInfo, nullptr,
-                                   g_State->m_RenderFinishedSemaphores.Data() + i));
-    }
+        uint32_t numPhysDevices = 0;
+        VK_CHECK(vkEnumeratePhysicalDevices(g_State->m_Instance, &numPhysDevices, nullptr));
+
+        auto &physDevs = RegionAlloc::AllocVec<VkPhysicalDevice, 16>(scratch);
+        InlineVec::Resize(physDevs, numPhysDevices);
+        VK_CHECK(vkEnumeratePhysicalDevices(g_State->m_Instance, &numPhysDevices, InlineVec::DataPtr(physDevs)));
+
+        auto &deviceExtensions = RegionAlloc::AllocVec<const char *, 256>(scratch);
+        InlineVec::Append(deviceExtensions, VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+        InlineVec::Append(deviceExtensions, VK_EXT_PRESENT_MODE_FIFO_LATEST_READY_EXTENSION_NAME);
+        InlineVec::Append(deviceExtensions, VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME);
+
+        if constexpr (kRhiCheckpoints)
+        {
+            InlineVec::Append(deviceExtensions, VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_EXTENSION_NAME);
+        }
+
+        for (VkPhysicalDevice physDev : physDevs)
+        {
+            uint32_t extensionCount = 0;
+            vkEnumerateDeviceExtensionProperties(physDev, nullptr, &extensionCount, nullptr);
+            auto &extensions = RegionAlloc::AllocVec<VkExtensionProperties, 256>(scratch);
+            InlineVec::Resize(extensions, 256);
+            vkEnumerateDeviceExtensionProperties(physDev, nullptr, &extensionCount, InlineVec::DataPtr(extensions));
+
+            uint32_t missingExtensions = deviceExtensions.size;
+            for (const char *deviceExtensionCStr : deviceExtensions)
+            {
+                auto deviceExtension = Span::FromCStr(deviceExtensionCStr, VK_MAX_EXTENSION_NAME_SIZE);
+
+                for (uint32_t i = 0; i < extensionCount; ++i)
+                {
+                    if (Span::Eq(deviceExtension,
+                                 Span::FromCStr(extensions[i].extensionName, VK_MAX_EXTENSION_NAME_SIZE)))
+                    {
+                        NYLA_LOG("Found device extension: " NYLA_SV_FMT, NYLA_SV_ARG(deviceExtension));
+                        --missingExtensions;
+                        break;
+                    }
+                }
+            }
+
+            if (missingExtensions)
+            {
+                NYLA_LOG("Missing %d extensions", missingExtensions);
+                continue;
+            }
+
+            VkPhysicalDeviceProperties props;
+            vkGetPhysicalDeviceProperties(physDev, &props);
+
+            VkPhysicalDeviceMemoryProperties memProps;
+            vkGetPhysicalDeviceMemoryProperties(physDev, &memProps);
+
+            uint32_t queueFamilyPropCount = 0;
+            vkGetPhysicalDeviceQueueFamilyProperties(physDev, &queueFamilyPropCount, nullptr);
+            auto &queueFamilyProperties = RegionAlloc::AllocVec<VkQueueFamilyProperties, 256>(scratch);
+            InlineVec::Resize(queueFamilyProperties, queueFamilyPropCount);
+            vkGetPhysicalDeviceQueueFamilyProperties(physDev, &queueFamilyPropCount,
+                                                     InlineVec::DataPtr(queueFamilyProperties));
+
+            constexpr static uint32_t kInvalidQueueFamilyIndex = std::numeric_limits<uint32_t>::max();
+            uint32_t graphicsQueueIndex = kInvalidQueueFamilyIndex;
+            uint32_t transferQueueIndex = kInvalidQueueFamilyIndex;
+
+            for (size_t i = 0; i < queueFamilyPropCount; ++i)
+            {
+                VkQueueFamilyProperties &props = queueFamilyProperties[i];
+                if (!props.queueCount)
+                {
+                    continue;
+                }
+
+                if (props.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+                {
+                    if (graphicsQueueIndex == kInvalidQueueFamilyIndex)
+                    {
+                        graphicsQueueIndex = i;
+                    }
+                    continue;
+                }
+
+                if (props.queueFlags & VK_QUEUE_COMPUTE_BIT)
+                {
+                    continue;
+                }
+
+                if (props.queueFlags & VK_QUEUE_TRANSFER_BIT)
+                {
+                    if (transferQueueIndex == kInvalidQueueFamilyIndex)
+                    {
+                        transferQueueIndex = i;
+                    }
+                    continue;
+                }
+            }
+
+            if (graphicsQueueIndex == kInvalidQueueFamilyIndex)
+            {
+                continue;
+            }
+
+            // TODO: pick best device
+            g_State->m_PhysDev = physDev;
+            g_State->m_PhysDevProps = props;
+            g_State->m_PhysDevMemProps = memProps;
+            g_State->m_GraphicsQueue.queueFamilyIndex = graphicsQueueIndex;
+            g_State->m_TransferQueue.queueFamilyIndex = transferQueueIndex;
+
+            break;
+        }
+
+        NYLA_ASSERT(g_State->m_PhysDev);
+
+        const float queuePriority = 1.0f;
+        auto &queueCreateInfos = RegionAlloc::AllocVec<VkDeviceQueueCreateInfo, 2>(scratch);
+        if (g_State->m_TransferQueue.queueFamilyIndex == kInvalidIndex)
+        {
+            InlineVec::Append(queueCreateInfos, VkDeviceQueueCreateInfo{
+                                                    .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+                                                    .queueFamilyIndex = g_State->m_GraphicsQueue.queueFamilyIndex,
+                                                    .queueCount = 1,
+                                                    .pQueuePriorities = &queuePriority,
+                                                });
+        }
+        else
+        {
+            InlineVec::Append(queueCreateInfos, VkDeviceQueueCreateInfo{
+                                                    .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+                                                    .queueFamilyIndex = g_State->m_GraphicsQueue.queueFamilyIndex,
+                                                    .queueCount = 1,
+                                                    .pQueuePriorities = &queuePriority,
+                                                });
+
+            InlineVec::Append(queueCreateInfos, VkDeviceQueueCreateInfo{
+                                                    .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+                                                    .queueFamilyIndex = g_State->m_TransferQueue.queueFamilyIndex,
+                                                    .queueCount = 1,
+                                                    .pQueuePriorities = &queuePriority,
+                                                });
+        }
+
+        VkPhysicalDeviceVulkan14Features v14{
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES,
+        };
+
+        VkPhysicalDeviceVulkan13Features v13{
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
+            .pNext = &v14,
+            .shaderDemoteToHelperInvocation = true,
+            .synchronization2 = true,
+            .dynamicRendering = true,
+        };
+
+        VkPhysicalDeviceVulkan12Features v12{
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
+            .pNext = &v13,
+            .descriptorIndexing = true,
+            .shaderSampledImageArrayNonUniformIndexing = true,
+            .descriptorBindingSampledImageUpdateAfterBind = true,
+            .descriptorBindingUpdateUnusedWhilePending = true,
+            .descriptorBindingPartiallyBound = true,
+            .descriptorBindingVariableDescriptorCount = true,
+            .runtimeDescriptorArray = true,
+            .timelineSemaphore = true,
+        };
+
+        VkPhysicalDeviceVulkan11Features v11{
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
+            .pNext = &v12,
+        };
+
+        VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT vertexInputDynamicStateFeatures{
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_INPUT_DYNAMIC_STATE_FEATURES_EXT,
+            .pNext = &v11,
+            .vertexInputDynamicState = true,
+        };
+
+        VkPhysicalDevicePresentModeFifoLatestReadyFeaturesKHR fifoLatestReadyFeatures = {
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRESENT_MODE_FIFO_LATEST_READY_FEATURES_KHR,
+            .pNext = &vertexInputDynamicStateFeatures,
+            .presentModeFifoLatestReady = true,
+        };
+
+        const VkPhysicalDeviceFeatures2 features{
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+            .pNext = &fifoLatestReadyFeatures,
+            .features = {},
+        };
+
+        const VkDeviceCreateInfo deviceCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+            .pNext = &features,
+            .queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size),
+            .pQueueCreateInfos = InlineVec::DataPtr(queueCreateInfos),
+            .enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size),
+            .ppEnabledExtensionNames = InlineVec::DataPtr(deviceExtensions),
+        };
+        VK_CHECK(vkCreateDevice(g_State->m_PhysDev, &deviceCreateInfo, nullptr, &g_State->m_Dev));
+
+        vkGetDeviceQueue(g_State->m_Dev, g_State->m_GraphicsQueue.queueFamilyIndex, 0, &g_State->m_GraphicsQueue.queue);
+
+        if (g_State->m_TransferQueue.queueFamilyIndex == kInvalidIndex)
+        {
+            g_State->m_TransferQueue.queueFamilyIndex = g_State->m_GraphicsQueue.queueFamilyIndex;
+            g_State->m_TransferQueue.queue = g_State->m_GraphicsQueue.queue;
+        }
+        else
+        {
+            vkGetDeviceQueue(g_State->m_Dev, g_State->m_TransferQueue.queueFamilyIndex, 0,
+                             &g_State->m_TransferQueue.queue);
+        }
+
+        auto initQueue = [](DeviceQueue &queue, RhiQueueType queueType, span<RhiCmdList> cmd) -> void {
+            const VkCommandPoolCreateInfo commandPoolCreateInfo{
+                .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+                .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+                .queueFamilyIndex = queue.queueFamilyIndex,
+            };
+            VK_CHECK(vkCreateCommandPool(g_State->m_Dev, &commandPoolCreateInfo, nullptr, &queue.cmdPool));
+
+            queue.timeline = CreateTimeline(0);
+            queue.timelineNext = 1;
+
+            for (auto &i : cmd)
+            {
+                i = CreateCmdList(queueType);
+            }
+        };
+        initQueue(g_State->m_GraphicsQueue, RhiQueueType::Graphics,
+                  span{g_State->m_GraphicsQueueCmd.data, g_State->m_Limits.numFramesInFlight});
+        initQueue(g_State->m_TransferQueue, RhiQueueType::Transfer, span{&g_State->m_TransferQueueCmd, 1});
+
+        const VkSemaphoreCreateInfo semaphoreCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+        };
+        for (size_t i = 0; i < g_State->m_Limits.numFramesInFlight; ++i)
+        {
+            VK_CHECK(vkCreateSemaphore(g_State->m_Dev, &semaphoreCreateInfo, nullptr,
+                                       g_State->m_SwapchainAcquireSemaphores.data + i));
+        }
+        for (size_t i = 0; i < kRhiMaxNumSwapchainTextures; ++i)
+        {
+            VK_CHECK(vkCreateSemaphore(g_State->m_Dev, &semaphoreCreateInfo, nullptr,
+                                       g_State->m_RenderFinishedSemaphores.data + i));
+        }
 
 #if defined(__linux__)
-    const VkXcbSurfaceCreateInfoKHR surfaceCreateInfo{
-        .sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR,
-        .connection = xcb_connect(nullptr, nullptr),
-        .window = LinuxX11Platform::WinGetHandle(),
-    };
-    VK_CHECK(vkCreateXcbSurfaceKHR(g_State->m_Instance, &surfaceCreateInfo, g_State->vkAlloc, &g_State->m_Surface));
+        const VkXcbSurfaceCreateInfoKHR surfaceCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR,
+            .connection = xcb_connect(nullptr, nullptr),
+            .window = LinuxX11Platform::WinGetHandle(),
+        };
+        VK_CHECK(vkCreateXcbSurfaceKHR(g_State->m_Instance, &surfaceCreateInfo, g_State->vkAlloc, &g_State->m_Surface));
 #else
-    const VkWin32SurfaceCreateInfoKHR surfaceCreateInfo{
-        .sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
-        .hinstance = WindowsPlatform::GetHInstance(),
-        .hwnd = WindowsPlatform::WinGetHandle(),
-    };
-    vkCreateWin32SurfaceKHR(g_State->m_Instance, &surfaceCreateInfo, g_State->vkAlloc, &g_State->m_Surface);
+        const VkWin32SurfaceCreateInfoKHR surfaceCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
+            .hinstance = WindowsPlatform::GetHInstance(),
+            .hwnd = WindowsPlatform::WinGetHandle(),
+        };
+        vkCreateWin32SurfaceKHR(g_State->m_Instance, &surfaceCreateInfo, g_State->vkAlloc, &g_State->m_Surface);
 #endif
 
-    CreateSwapchain();
+        RegionAlloc::Reset(scratch, scratchResetMark);
+    }
+
+    CreateSwapchain(scratch);
 
     //
 
-    const Array<VkDescriptorPoolSize, 4> descriptorPoolSizes{
+    const array<VkDescriptorPoolSize, 4> descriptorPoolSizes{
         VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 16},
         VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 16},
         VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 256},
@@ -1441,8 +1452,8 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
         .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT | VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT,
         .maxSets = 16,
-        .poolSizeCount = static_cast<uint32_t>(descriptorPoolSizes.Size()),
-        .pPoolSizes = descriptorPoolSizes.Data(),
+        .poolSizeCount = (uint32_t)Array::Size(descriptorPoolSizes),
+        .pPoolSizes = descriptorPoolSizes.data,
     };
     vkCreateDescriptorPool(g_State->m_Dev, &descriptorPoolCreateInfo, nullptr, &g_State->m_DescriptorPool);
 
@@ -1462,7 +1473,7 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
 
     { // Constants
 
-        const Array<VkDescriptorSetLayoutBinding, 4> descriptorLayoutBindings{
+        const array<VkDescriptorSetLayoutBinding, 4> descriptorLayoutBindings{
             VkDescriptorSetLayoutBinding{
                 .binding = 0,
                 .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
@@ -1491,8 +1502,8 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
 
         const VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{
             .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-            .bindingCount = descriptorLayoutBindings.Size32(),
-            .pBindings = descriptorLayoutBindings.Data(),
+            .bindingCount = (uint32_t)Array::Size(descriptorLayoutBindings),
+            .pBindings = descriptorLayoutBindings.data,
         };
 
         initDescriptorTable(g_State->m_ConstantsDescriptorTable, descriptorSetLayoutCreateInfo);
@@ -1510,9 +1521,10 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
             .bufferUsage = RhiBufferUsage::Uniform,
             .memoryUsage = RhiMemoryUsage::CpuToGpu,
         });
-        const VkBuffer &vulkanBuffer = g_State->m_Buffers.ResolveData(g_State->m_ConstantsUniformBuffer).buffer;
+        const VkBuffer &vulkanBuffer =
+            HandlePool::ResolveData(g_State->m_Buffers, g_State->m_ConstantsUniformBuffer).buffer;
 
-        const Array<VkDescriptorBufferInfo, 4> bufferInfos{
+        const array<VkDescriptorBufferInfo, 4> bufferInfos{
             VkDescriptorBufferInfo{
                 .buffer = vulkanBuffer,
                 .range = CbvOffset(g_State->m_Limits.frameConstantSize),
@@ -1531,24 +1543,24 @@ void Rhi::Init(const RhiInitDesc &rhiDesc)
             },
         };
 
-        auto &descriptorWrites = g_State->transientAlloc.PushVec<VkWriteDescriptorSet, bufferInfos.Size()>();
-        for (uint32_t i = 0; i < bufferInfos.Size(); ++i)
+        auto &descriptorWrites = RegionAlloc::AllocVec<VkWriteDescriptorSet, Array::Size(bufferInfos)>(scratch);
+        for (uint32_t i = 0; i < Array::Size(bufferInfos); ++i)
         {
             const VkDescriptorBufferInfo &bufferInfo = bufferInfos[i];
             if (bufferInfo.range)
             {
-                descriptorWrites.PushBack(VkWriteDescriptorSet{
-                    .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                    .dstSet = g_State->m_ConstantsDescriptorTable.set,
-                    .dstBinding = i,
-                    .descriptorCount = 1,
-                    .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
-                    .pBufferInfo = &bufferInfo,
-                });
+                InlineVec::Append(descriptorWrites, VkWriteDescriptorSet{
+                                                        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                                                        .dstSet = g_State->m_ConstantsDescriptorTable.set,
+                                                        .dstBinding = i,
+                                                        .descriptorCount = 1,
+                                                        .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+                                                        .pBufferInfo = &bufferInfo,
+                                                    });
             }
         }
 
-        vkUpdateDescriptorSets(g_State->m_Dev, descriptorWrites.Size(), descriptorWrites.Data(), 0, nullptr);
+        vkUpdateDescriptorSets(g_State->m_Dev, descriptorWrites.size, InlineVec::DataPtr(descriptorWrites), 0, nullptr);
     }
 
     { // Textures
@@ -1639,18 +1651,18 @@ auto Rhi::CreateBuffer(const RhiBufferDesc &desc) -> RhiBuffer
     VK_CHECK(vkAllocateMemory(g_State->m_Dev, &memoryAllocInfo, nullptr, &bufferData.memory));
     VK_CHECK(vkBindBufferMemory(g_State->m_Dev, bufferData.buffer, bufferData.memory, 0));
 
-    return g_State->m_Buffers.Acquire(bufferData);
+    return HandlePool::Acquire<RhiBuffer>(g_State->m_Buffers, bufferData);
 }
 
-void Rhi::NameBuffer(RhiBuffer buf, Str name)
+void Rhi::NameBuffer(RhiBuffer buf, byteview name)
 {
-    const VulkanBufferData &bufferData = g_State->m_Buffers.ResolveData(buf);
+    const VulkanBufferData &bufferData = HandlePool::ResolveData(g_State->m_Buffers, buf);
     VulkanNameHandle(VK_OBJECT_TYPE_BUFFER, (uint64_t)bufferData.buffer, name);
 }
 
 void Rhi::DestroyBuffer(RhiBuffer buffer)
 {
-    VulkanBufferData bufferData = g_State->m_Buffers.ReleaseData(buffer);
+    VulkanBufferData bufferData = HandlePool::ResolveData(g_State->m_Buffers, buffer);
 
     if (bufferData.mapped)
     {
@@ -1662,12 +1674,12 @@ void Rhi::DestroyBuffer(RhiBuffer buffer)
 
 auto Rhi::GetBufferSize(RhiBuffer buffer) -> uint64_t
 {
-    return g_State->m_Buffers.ResolveData(buffer).size;
+    return HandlePool::ResolveData(g_State->m_Buffers, buffer).size;
 }
 
 auto Rhi::MapBuffer(RhiBuffer buffer) -> char *
 {
-    const VulkanBufferData &bufferData = g_State->m_Buffers.ResolveData(buffer);
+    const VulkanBufferData &bufferData = HandlePool::ResolveData(g_State->m_Buffers, buffer);
     if (!bufferData.mapped)
     {
         vkMapMemory(g_State->m_Dev, bufferData.memory, 0, VK_WHOLE_SIZE, 0, (void **)&bufferData.mapped);
@@ -1678,7 +1690,7 @@ auto Rhi::MapBuffer(RhiBuffer buffer) -> char *
 
 void Rhi::UnmapBuffer(RhiBuffer buffer)
 {
-    VulkanBufferData &bufferData = g_State->m_Buffers.ResolveData(buffer);
+    VulkanBufferData &bufferData = HandlePool::ResolveData(g_State->m_Buffers, buffer);
     if (bufferData.mapped)
     {
         vkUnmapMemory(g_State->m_Dev, bufferData.memory);
@@ -1689,10 +1701,10 @@ void Rhi::UnmapBuffer(RhiBuffer buffer)
 void Rhi::CmdCopyBuffer(RhiCmdList cmd, RhiBuffer dst, uint32_t dstOffset, RhiBuffer src, uint32_t srcOffset,
                         uint32_t size)
 {
-    const VkCommandBuffer &cmdbuf = g_State->m_CmdLists.ResolveData(cmd).cmdbuf;
+    const VkCommandBuffer &cmdbuf = HandlePool::ResolveData(g_State->m_CmdLists, cmd).cmdbuf;
 
-    VulkanBufferData &dstBufferData = g_State->m_Buffers.ResolveData(dst);
-    VulkanBufferData &srcBufferData = g_State->m_Buffers.ResolveData(src);
+    VulkanBufferData &dstBufferData = HandlePool::ResolveData(g_State->m_Buffers, dst);
+    VulkanBufferData &srcBufferData = HandlePool::ResolveData(g_State->m_Buffers, src);
 
     EnsureHostWritesVisible(cmdbuf, srcBufferData);
 
@@ -1706,8 +1718,8 @@ void Rhi::CmdCopyBuffer(RhiCmdList cmd, RhiBuffer dst, uint32_t dstOffset, RhiBu
 
 void Rhi::CmdTransitionBuffer(RhiCmdList cmd, RhiBuffer buffer, RhiBufferState newState)
 {
-    const VkCommandBuffer &cmdbuf = g_State->m_CmdLists.ResolveData(cmd).cmdbuf;
-    VulkanBufferData &bufferData = g_State->m_Buffers.ResolveData(buffer);
+    const VkCommandBuffer &cmdbuf = HandlePool::ResolveData(g_State->m_CmdLists, cmd).cmdbuf;
+    VulkanBufferData &bufferData = HandlePool::ResolveData(g_State->m_Buffers, buffer);
 
     VulkanBufferStateSyncInfo oldSync = VulkanBufferStateGetSyncInfo(bufferData.state);
     VulkanBufferStateSyncInfo newSync = VulkanBufferStateGetSyncInfo(newState);
@@ -1735,8 +1747,8 @@ void Rhi::CmdTransitionBuffer(RhiCmdList cmd, RhiBuffer buffer, RhiBufferState n
 
 void Rhi::CmdUavBarrierBuffer(RhiCmdList cmd, RhiBuffer buffer)
 {
-    const VkCommandBuffer &cmdbuf = g_State->m_CmdLists.ResolveData(cmd).cmdbuf;
-    VulkanBufferData &bufferData = g_State->m_Buffers.ResolveData(buffer);
+    const VkCommandBuffer &cmdbuf = HandlePool::ResolveData(g_State->m_CmdLists, cmd).cmdbuf;
+    VulkanBufferData &bufferData = HandlePool::ResolveData(g_State->m_Buffers, buffer);
 
     const VkBufferMemoryBarrier2 barrier{
         .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
@@ -1762,7 +1774,7 @@ void Rhi::CmdUavBarrierBuffer(RhiCmdList cmd, RhiBuffer buffer)
 
 void Rhi::BufferMarkWritten(RhiBuffer buffer, uint32_t offset, uint32_t size)
 {
-    VulkanBufferData &bufferData = g_State->m_Buffers.ResolveData(buffer);
+    VulkanBufferData &bufferData = HandlePool::ResolveData(g_State->m_Buffers, buffer);
 
     if (bufferData.dirty)
     {
@@ -1805,13 +1817,13 @@ auto Rhi::CreateCmdList(RhiQueueType queueType) -> RhiCmdList
         .queueType = queueType,
     };
 
-    RhiCmdList cmd = g_State->m_CmdLists.Acquire(cmdData);
+    RhiCmdList cmd = HandlePool::Acquire<RhiCmdList>(g_State->m_CmdLists, cmdData);
     return cmd;
 }
 
 void Rhi::ResetCmdList(RhiCmdList cmd)
 {
-    VulkanCmdListData &cmdData = g_State->m_CmdLists.ResolveData(cmd);
+    VulkanCmdListData &cmdData = HandlePool::ResolveData(g_State->m_CmdLists, cmd);
     VkCommandBuffer cmdbuf = cmdData.cmdbuf;
 
     VK_CHECK(vkResetCommandBuffer(cmdbuf, 0));
@@ -1831,9 +1843,9 @@ void Rhi::ResetCmdList(RhiCmdList cmd)
         cmdData.drawConstantHead + (g_State->m_Limits.maxDrawCount * CbvOffset(g_State->m_Limits.drawConstantSize));
 }
 
-void Rhi::NameCmdList(RhiCmdList cmd, Str name)
+void Rhi::NameCmdList(RhiCmdList cmd, byteview name)
 {
-    const VulkanCmdListData &cmdData = g_State->m_CmdLists.ResolveData(cmd);
+    const VulkanCmdListData &cmdData = HandlePool::ResolveData(g_State->m_CmdLists, cmd);
     VulkanNameHandle(VK_OBJECT_TYPE_COMMAND_BUFFER, (uint64_t)cmdData.cmdbuf, name);
 }
 

@@ -1,9 +1,10 @@
 #include "nyla/commons/spv_shader.h"
-#include "nyla/commons/byteliterals.h"
+
+#include <cstdint>
+
 #include "nyla/commons/fmt.h"
 #include "nyla/commons/span.h"
 #include "nyla/commons/spv_reader.h"
-#include <cstdint>
 
 namespace nyla
 {
@@ -1375,19 +1376,35 @@ void ProcessShader(spv_shader &self, span<uint32_t> data, RhiShaderStage stage)
     }
 }
 
-#if 0
-auto FindLocationBySemantic(Str semantic, StorageClass storageClass, uint32_t *outLocation) -> bool
+auto FindIdBySemantic(spv_shader &self, byteview querySemantic, spv_shader_storage_class storageClass, uint32_t *outId)
+    -> bool
+{
+    for (uint32_t i = 0; i < self.semanticDataNames.size; ++i)
+    {
+        const auto &semantic = self.semanticDataNames[i];
+        if (Span::Eq((byteview)semantic, querySemantic) &&
+            CheckStorageClass(self, self.semanticDataIds[i], storageClass))
+        {
+            *outId = self.semanticDataIds[i];
+            return true;
+        }
+    }
+    return false;
+}
+
+auto FindLocationBySemantic(spv_shader &self, byteview semantic, spv_shader_storage_class storageClass,
+                            uint32_t *outLocation) -> bool
 {
     uint32_t id;
-    if (!FindIdBySemantic(semantic, storageClass, &id))
+    if (!FindIdBySemantic(self, semantic, storageClass, &id))
         return false;
 
     uint32_t location;
-    for (uint32_t i = 0; i < m_Locations.Size(); ++i)
+    for (uint32_t i = 0; i < self.locations.size; ++i)
     {
-        if (m_Locations[i].id == id && CheckStorageClass(id, storageClass))
+        if (self.locations[i].id == id && CheckStorageClass(self, id, storageClass))
         {
-            *outLocation = m_Locations[i].location;
+            *outLocation = self.locations[i].location;
             return true;
         }
     }
@@ -1395,60 +1412,49 @@ auto FindLocationBySemantic(Str semantic, StorageClass storageClass, uint32_t *o
     return false;
 }
 
-auto FindIdBySemantic(Str querySemantic, StorageClass storageClass, uint32_t *outId) -> bool
+auto FindSemanticById(spv_shader &self, uint32_t id, byteview *outSemantic) -> bool
 {
-    for (uint32_t i = 0; i < m_SemanticDataNames.Size(); ++i)
+    for (uint32_t i = 0; i < self.semanticDataIds.size; ++i)
     {
-        const auto &semantic = m_SemanticDataNames[i];
-        if (semantic == querySemantic && CheckStorageClass(m_SemanticDataIds[i], storageClass))
+        if (self.semanticDataIds[i] == id)
         {
-            *outId = m_SemanticDataIds[i];
+            *outSemantic = (byteview)self.semanticDataNames[i];
             return true;
         }
     }
     return false;
 }
 
-auto FindSemanticById(uint32_t id, Str *outSemantic) -> bool
-{
-    for (uint32_t i = 0; i < m_SemanticDataIds.Size(); ++i)
-    {
-        if (m_SemanticDataIds[i] == id)
-        {
-            *outSemantic = m_SemanticDataNames[i].GetStr();
-            return true;
-        }
-    }
-    return false;
-}
-
-auto RewriteLocationForSemantic(Str semantic, StorageClass storageClass, uint32_t aLocation) -> bool
+auto RewriteLocationForSemantic(spv_shader &self, span<uint32_t> data, byteview semantic,
+                                spv_shader_storage_class storageClass, uint32_t aLocation) -> bool
 {
     uint32_t oldLocation;
-    if (!FindLocationBySemantic(semantic, storageClass, &oldLocation))
+    if (!FindLocationBySemantic(self, semantic, storageClass, &oldLocation))
         return false;
 
     if (oldLocation == aLocation)
         return true;
 
-    auto end = m_SpvView.end();
-    for (auto it = m_SpvView.begin(); it != end; ++it)
+    SpvReader::ReadHeader(data);
+
+    while (data.size)
     {
-        auto op = spv::Op(it.Op());
+        span<uint32_t> opWithOperands = SpvReader::ReadOpWithOperands(data);
+        uint32_t op = SpvReader::ParseOp(Span::Front(opWithOperands));
 
-        if (op != spv::OpDecorate)
+        if ((spv_op)op != spv_op::Decorate)
             continue;
 
-        SpvOperandReader operandReader = it.GetOperandReader();
+        span<uint32_t> operands = Span::SubSpan(opWithOperands, 1);
 
-        uint32_t id = operandReader.Word();
+        uint32_t id = SpvReader::ReadWord(data);
 
-        if (spv::Decoration(operandReader.Word()) != spv::DecorationLocation)
+        if ((spv_decoration)SpvReader::ReadWord(data) != spv_decoration::Location)
             continue;
-        if (!CheckStorageClass(id, storageClass))
+        if (!CheckStorageClass(self, id, storageClass))
             continue;
 
-        uint32_t &location = operandReader.Word();
+        uint32_t &location = SpvReader::ReadWord(data);
         if (location == oldLocation)
         {
             location = aLocation;
@@ -1458,7 +1464,6 @@ auto RewriteLocationForSemantic(Str semantic, StorageClass storageClass, uint32_
 
     return false;
 }
-#endif
 
 } // namespace SpvShader
 
