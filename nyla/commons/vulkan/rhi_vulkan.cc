@@ -840,14 +840,14 @@ void CreateSwapchain(region_alloc scratch)
         RhiTexture texture;
         RhiRenderTargetView rtv;
 
-        if (g_State->m_SwapchainRTVs.Size() > i)
+        if (g_State->m_SwapchainRTVs.size > i)
         {
             rtv = g_State->m_SwapchainRTVs[i];
-            VulkanTextureViewData &rtvData = g_State->m_RenderTargetViews.ResolveData(rtv);
+            VulkanTextureViewData &rtvData = HandlePool::ResolveData(g_State->m_RenderTargetViews, rtv);
             rtvData.format = surfaceFormat.format;
 
             texture = rtvData.texture;
-            VulkanTextureData &textureData = g_State->m_Textures.ResolveData(texture);
+            VulkanTextureData &textureData = HandlePool::ResolveData(g_State->m_Textures, texture);
             textureData.image = swapchainImages[i];
             textureData.state = RhiTextureState::Present;
             textureData.layout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -884,13 +884,13 @@ void CreateSwapchain(region_alloc scratch)
                 .extent = VkExtent3D{surfaceExtent.width, surfaceExtent.height, 1},
             };
 
-            texture = g_State->m_Textures.Acquire(textureData);
+            texture = HandlePool::Acquire(g_State->m_Textures, textureData);
 
             rtv = Rhi::CreateRenderTargetView(RhiRenderTargetViewDesc{
                 .texture = texture,
             });
 
-            g_State->m_SwapchainRTVs.PushBack(rtv);
+            InlineVec::Append(g_State->m_SwapchainRTVs, rtv);
         }
     }
 
@@ -948,75 +948,81 @@ void WaitTimeline(VkSemaphore timeline, uint64_t waitValue)
 #endif
 }
 
-void WriteDescriptorTables()
+void WriteDescriptorTables(region_alloc &scratch)
 {
-    g_State->transientAlloc.VoidScope(1_KiB, [](auto &alloc) -> void {
-        constexpr uint32_t kMaxDescriptorUpdates = 128;
+    SCRATCH_REMEMBER;
 
-        auto &descriptorWrites = alloc.template PushVec<VkWriteDescriptorSet, kMaxDescriptorUpdates>();
-        auto &descriptorImageInfos = alloc.template PushVec<VkDescriptorImageInfo, kMaxDescriptorUpdates>();
-        auto &descriptorBufferInfos = alloc.template PushVec<VkDescriptorBufferInfo, kMaxDescriptorUpdates>();
+    constexpr uint32_t kMaxDescriptorUpdates = 128;
 
-        { // TEXTURES
-            for (uint32_t i = 0; i < g_State->m_SampledTextureViews.Size(); ++i)
-            {
-                auto &slot = g_State->m_SampledTextureViews[i];
-                if (!slot.used)
-                    continue;
-                if (slot.data.descriptorWritten)
-                    continue;
+    auto &descriptorWrites = RegionAlloc::AllocVec<VkWriteDescriptorSet, kMaxDescriptorUpdates>(scratch);
+    auto &descriptorImageInfos = RegionAlloc::AllocVec<VkDescriptorImageInfo, kMaxDescriptorUpdates>(scratch);
+    auto &descriptorBufferInfos = RegionAlloc::AllocVec<VkDescriptorBufferInfo, kMaxDescriptorUpdates>(scratch);
 
-                const VulkanTextureViewData &textureViewData = slot.data;
-                const VulkanTextureData &textureData = g_State->m_Textures.ResolveData(textureViewData.texture);
+    { // TEXTURES
+        for (uint32_t i = 0; i < HandlePool::Capacity(g_State->m_SampledTextureViews); ++i)
+        {
+            auto &slot = g_State->m_SampledTextureViews[i];
+            if (!slot.used)
+                continue;
+            if (slot.data.descriptorWritten)
+                continue;
 
-                VkWriteDescriptorSet &vulkanSetWrite = descriptorWrites.PushBack(VkWriteDescriptorSet{
-                    .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                    .dstSet = g_State->m_TexturesDescriptorTable.set,
-                    .dstBinding = 0,
-                    .dstArrayElement = i,
-                    .descriptorCount = 1,
-                    .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-                });
+            const VulkanTextureViewData &textureViewData = slot.data;
+            const VulkanTextureData &textureData =
+                HandlePool::ResolveData(g_State->m_Textures, textureViewData.texture);
 
-                vulkanSetWrite.pImageInfo = &descriptorImageInfos.PushBack(VkDescriptorImageInfo{
-                    .imageView = textureViewData.imageView,
-                    .imageLayout = textureData.layout,
-                });
+            VkWriteDescriptorSet &vulkanSetWrite =
+                InlineVec::Append(descriptorWrites, VkWriteDescriptorSet{
+                                                        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                                                        .dstSet = g_State->m_TexturesDescriptorTable.set,
+                                                        .dstBinding = 0,
+                                                        .dstArrayElement = i,
+                                                        .descriptorCount = 1,
+                                                        .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+                                                    });
 
-                slot.data.descriptorWritten = true;
-            }
+            vulkanSetWrite.pImageInfo =
+                &InlineVec::Append(descriptorImageInfos, VkDescriptorImageInfo{
+                                                             .imageView = textureViewData.imageView,
+                                                             .imageLayout = textureData.layout,
+                                                         });
+
+            slot.data.descriptorWritten = true;
         }
+    }
 
-        { // SAMPLERS
-            for (uint32_t i = 0; i < g_State->m_Samplers.Size(); ++i)
-            {
-                auto &slot = g_State->m_Samplers[i];
-                if (!slot.used)
-                    continue;
-                if (slot.data.descriptorWritten)
-                    continue;
+    { // SAMPLERS
+        for (uint32_t i = 0; i < HandlePool::Capacity(g_State->m_Samplers); ++i)
+        {
+            auto &slot = g_State->m_Samplers[i];
+            if (!slot.used)
+                continue;
+            if (slot.data.descriptorWritten)
+                continue;
 
-                const VulkanSamplerData &samplerData = slot.data;
+            const VulkanSamplerData &samplerData = slot.data;
 
-                VkWriteDescriptorSet &vulkanSetWrite = descriptorWrites.PushBack(VkWriteDescriptorSet{
-                    .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                    .dstSet = g_State->m_SamplersDescriptorTable.set,
-                    .dstBinding = 0,
-                    .dstArrayElement = i,
-                    .descriptorCount = 1,
-                    .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
-                });
+            VkWriteDescriptorSet &vulkanSetWrite =
+                InlineVec::Append(descriptorWrites, VkWriteDescriptorSet{
+                                                        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                                                        .dstSet = g_State->m_SamplersDescriptorTable.set,
+                                                        .dstBinding = 0,
+                                                        .dstArrayElement = i,
+                                                        .descriptorCount = 1,
+                                                        .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
+                                                    });
 
-                vulkanSetWrite.pImageInfo = &descriptorImageInfos.PushBack(VkDescriptorImageInfo{
-                    .sampler = samplerData.sampler,
-                });
+            vulkanSetWrite.pImageInfo = &InlineVec::Append(descriptorImageInfos, VkDescriptorImageInfo{
+                                                                                     .sampler = samplerData.sampler,
+                                                                                 });
 
-                slot.data.descriptorWritten = true;
-            }
+            slot.data.descriptorWritten = true;
         }
+    }
 
-        vkUpdateDescriptorSets(g_State->m_Dev, descriptorWrites.Size(), descriptorWrites.Data(), 0, nullptr);
-    });
+    vkUpdateDescriptorSets(g_State->m_Dev, descriptorWrites.size, InlineVec::DataPtr(descriptorWrites), 0, nullptr);
+
+    SCRATCH_RESET;
 }
 
 } // namespace
@@ -1651,7 +1657,7 @@ auto Rhi::CreateBuffer(const RhiBufferDesc &desc) -> RhiBuffer
     VK_CHECK(vkAllocateMemory(g_State->m_Dev, &memoryAllocInfo, nullptr, &bufferData.memory));
     VK_CHECK(vkBindBufferMemory(g_State->m_Dev, bufferData.buffer, bufferData.memory, 0));
 
-    return HandlePool::Acquire<RhiBuffer>(g_State->m_Buffers, bufferData);
+    return HandlePool::Acquire(g_State->m_Buffers, bufferData);
 }
 
 void Rhi::NameBuffer(RhiBuffer buf, byteview name)
@@ -1817,7 +1823,7 @@ auto Rhi::CreateCmdList(RhiQueueType queueType) -> RhiCmdList
         .queueType = queueType,
     };
 
-    RhiCmdList cmd = HandlePool::Acquire<RhiCmdList>(g_State->m_CmdLists, cmdData);
+    RhiCmdList cmd = HandlePool::Acquire(g_State->m_CmdLists, cmdData);
     return cmd;
 }
 
@@ -1851,7 +1857,7 @@ void Rhi::NameCmdList(RhiCmdList cmd, byteview name)
 
 void Rhi::DestroyCmdList(RhiCmdList cmd)
 {
-    VulkanCmdListData cmdData = g_State->m_CmdLists.ReleaseData(cmd);
+    VulkanCmdListData cmdData = HandlePool::ReleaseData(g_State->m_CmdLists, cmd);
     VkCommandPool cmdPool = GetDeviceQueue(cmdData.queueType).cmdPool;
     vkFreeCommandBuffers(g_State->m_Dev, cmdPool, 1, &cmdData.cmdbuf);
 }
@@ -1863,7 +1869,7 @@ auto Rhi::CmdSetCheckpoint(RhiCmdList cmd, uint64_t data) -> uint64_t
         return data;
     }
 
-    const VulkanCmdListData &cmdData = g_State->m_CmdLists.ResolveData(cmd);
+    const VulkanCmdListData &cmdData = HandlePool::ResolveData(g_State->m_CmdLists, cmd);
 
     static auto fn = VK_GET_INSTANCE_PROC_ADDR(vkCmdSetCheckpointNV);
     fn(cmdData.cmdbuf, reinterpret_cast<void *>(data));
@@ -1889,12 +1895,14 @@ auto Rhi::GetLastCheckpointData(RhiQueueType queueType) -> uint64_t
     return (uint64_t)data.pCheckpointMarker;
 }
 
-auto Rhi::FrameBegin() -> RhiCmdList
+auto Rhi::FrameBegin(region_alloc &scratch) -> RhiCmdList
 {
+    SCRATCH_REMEMBER;
+
     if (g_State->m_RecreateSwapchain)
     {
         vkDeviceWaitIdle(g_State->m_Dev);
-        CreateSwapchain();
+        CreateSwapchain(scratch);
         g_State->m_SwapchainUsable = true;
         g_State->m_RecreateSwapchain = false;
     }
@@ -1941,7 +1949,7 @@ auto Rhi::FrameBegin() -> RhiCmdList
     const RhiCmdList cmd = g_State->m_GraphicsQueueCmd[g_State->m_FrameIndex];
     ResetCmdList(cmd);
 
-    const VulkanCmdListData &cmdData = g_State->m_CmdLists.ResolveData(cmd);
+    const VulkanCmdListData &cmdData = HandlePool::ResolveData(g_State->m_CmdLists, cmd);
     VkCommandBuffer cmdbuf = cmdData.cmdbuf;
 
     const VkCommandBufferBeginInfo commandBufferBeginInfo{
@@ -1952,24 +1960,26 @@ auto Rhi::FrameBegin() -> RhiCmdList
     return cmd;
 }
 
-void Rhi::FrameEnd()
+void Rhi::FrameEnd(region_alloc &scratch)
 {
+    SCRATCH_REMEMBER;
+
     RhiCmdList cmd = g_State->m_GraphicsQueueCmd[g_State->m_FrameIndex];
 
-    const VkCommandBuffer &cmdbuf = g_State->m_CmdLists.ResolveData(cmd).cmdbuf;
+    const VkCommandBuffer &cmdbuf = HandlePool::ResolveData(g_State->m_CmdLists, cmd).cmdbuf;
 
     VK_CHECK(vkEndCommandBuffer(cmdbuf));
 
-    WriteDescriptorTables();
+    WriteDescriptorTables(scratch);
 
-    const Array<VkPipelineStageFlags, 1> waitStages = {
+    const array<VkPipelineStageFlags, 1> waitStages = {
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
     };
 
     const VkSemaphore acquireSemaphore = g_State->m_SwapchainAcquireSemaphores[g_State->m_FrameIndex];
     const VkSemaphore renderFinishedSemaphore = g_State->m_RenderFinishedSemaphores[g_State->m_SwapchainTextureIndex];
 
-    const Array<VkSemaphore, 2> signalSemaphores{
+    const array<VkSemaphore, 2> signalSemaphores{
         g_State->m_GraphicsQueue.timeline,
         renderFinishedSemaphore,
     };
@@ -1978,7 +1988,7 @@ void Rhi::FrameEnd()
 
     const VkTimelineSemaphoreSubmitInfo timelineSubmitInfo{
         .sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
-        .signalSemaphoreValueCount = signalSemaphores.Size(),
+        .signalSemaphoreValueCount = Array::Size(signalSemaphores),
         .pSignalSemaphoreValues = &g_State->m_GraphicsQueueCmdDone[g_State->m_FrameIndex],
     };
 
@@ -1989,11 +1999,11 @@ void Rhi::FrameEnd()
             .pNext = &timelineSubmitInfo,
             .waitSemaphoreCount = 1,
             .pWaitSemaphores = &acquireSemaphore,
-            .pWaitDstStageMask = waitStages.Data(),
+            .pWaitDstStageMask = waitStages.data,
             .commandBufferCount = 1,
             .pCommandBuffers = &cmdbuf,
-            .signalSemaphoreCount = signalSemaphores.Size(),
-            .pSignalSemaphores = signalSemaphores.Data(),
+            .signalSemaphoreCount = Array::Size(signalSemaphores),
+            .pSignalSemaphores = signalSemaphores.data,
         };
         VK_CHECK(vkQueueSubmit(g_State->m_GraphicsQueue.queue, 1, &submitInfo, VK_NULL_HANDLE));
 
@@ -2020,10 +2030,10 @@ auto Rhi::FrameGetCmdList() -> RhiCmdList
 void Rhi::PassBegin(RhiPassDesc desc)
 {
     RhiCmdList cmd = g_State->m_GraphicsQueueCmd[g_State->m_FrameIndex];
-    const VkCommandBuffer &cmdbuf = g_State->m_CmdLists.ResolveData(cmd).cmdbuf;
+    const VkCommandBuffer &cmdbuf = HandlePool::ResolveData(g_State->m_CmdLists, cmd).cmdbuf;
 
-    const VulkanTextureViewData &rtvData = g_State->m_RenderTargetViews.ResolveData(desc.rtv);
-    const VulkanTextureData &renderTargetData = g_State->m_Textures.ResolveData(rtvData.texture);
+    const VulkanTextureViewData &rtvData = HandlePool::ResolveData(g_State->m_RenderTargetViews, desc.rtv);
+    const VulkanTextureData &renderTargetData = HandlePool::ResolveData(g_State->m_Textures, rtvData.texture);
 
     const VkRenderingAttachmentInfo colorAttachmentInfo{
         .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
@@ -2046,8 +2056,8 @@ void Rhi::PassBegin(RhiPassDesc desc)
 
     if (HandleIsSet(desc.dsv))
     {
-        const VulkanTextureViewData &dsvData = g_State->m_DepthStencilViews.ResolveData(desc.dsv);
-        const VulkanTextureData &depthStencilData = g_State->m_Textures.ResolveData(dsvData.texture);
+        const VulkanTextureViewData &dsvData = HandlePool::ResolveData(g_State->m_DepthStencilViews, desc.dsv);
+        const VulkanTextureData &depthStencilData = HandlePool::ResolveData(g_State->m_Textures, dsvData.texture);
 
         depthAttachmentInfo = {
             .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
@@ -2082,7 +2092,7 @@ void Rhi::PassBegin(RhiPassDesc desc)
 void Rhi::PassEnd()
 {
     RhiCmdList cmd = g_State->m_GraphicsQueueCmd[g_State->m_FrameIndex];
-    VulkanCmdListData &cmdData = g_State->m_CmdLists.ResolveData(cmd);
+    VulkanCmdListData &cmdData = HandlePool::ResolveData(g_State->m_CmdLists, cmd);
     VkCommandBuffer cmdbuf = cmdData.cmdbuf;
     vkCmdEndRendering(cmdbuf);
 
@@ -2091,7 +2101,7 @@ void Rhi::PassEnd()
 
 auto Rhi::CreateShader(const RhiShaderDesc &desc) -> RhiShader
 {
-    Span<uint32_t> spv = g_State->rootAlloc.PushCopySpan<uint32_t>(desc.code);
+    span<uint32_t> spv = g_State->rootAlloc.PushCopySpan<uint32_t>(desc.code);
     MemCpy(spv.Data(), desc.code.Data(), desc.code.Size());
 
     const RhiShader handle = g_State->m_Shaders.Acquire(VulkanShaderData{.spv = spv});
@@ -2102,7 +2112,7 @@ auto Rhi::CreateShader(const RhiShaderDesc &desc) -> RhiShader
 
 void Rhi::DestroyShader(RhiShader shader)
 {
-    g_State->m_Shaders.ReleaseData(shader);
+    HandlePool::ReleaseData(g_State->m_Shaders, shader);
 
 #if 0
     VkShaderModule shaderModule = g_State->m_Shaders.ReleaseData(shader);
@@ -2112,7 +2122,7 @@ void Rhi::DestroyShader(RhiShader shader)
 
 void Rhi::DestroyGraphicsPipeline(RhiGraphicsPipeline pipeline)
 {
-    auto pipelineData = g_State->m_GraphicsPipelines.ReleaseData(pipeline);
+    auto pipelineData = HandlePool::ReleaseData(g_State->m_GraphicsPipelines, pipeline);
     vkDeviceWaitIdle(g_State->m_Dev);
 
     if (pipelineData.layout)
@@ -2127,62 +2137,63 @@ void Rhi::DestroyGraphicsPipeline(RhiGraphicsPipeline pipeline)
 
 void Rhi::CmdBindGraphicsPipeline(RhiCmdList cmd, RhiGraphicsPipeline pipeline)
 {
-    VulkanCmdListData &cmdData = g_State->m_CmdLists.ResolveData(cmd);
+    VulkanCmdListData &cmdData = HandlePool::ResolveData(g_State->m_CmdLists, cmd);
     VkCommandBuffer cmdbuf = cmdData.cmdbuf;
 
-    const VulkanPipelineData &pipelineData = g_State->m_GraphicsPipelines.ResolveData(pipeline);
+    const VulkanPipelineData &pipelineData = HandlePool::ResolveData(g_State->m_GraphicsPipelines, pipeline);
 
     vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineData.pipeline);
     cmdData.boundGraphicsPipeline = pipeline;
 
-    Array<VkDescriptorSet, 2> descriptorSets{
+    array<VkDescriptorSet, 2> descriptorSets{
         g_State->m_TexturesDescriptorTable.set,
         g_State->m_SamplersDescriptorTable.set,
     };
 
-    vkCmdBindDescriptorSets(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineData.layout, 1, descriptorSets.Size(),
-                            descriptorSets.Data(), 0, nullptr);
+    vkCmdBindDescriptorSets(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineData.layout, 1,
+                            Array::Size(descriptorSets), descriptorSets.data, 0, nullptr);
 }
 
-void Rhi::CmdPushGraphicsConstants(RhiCmdList cmd, uint32_t offset, RhiShaderStage stage, ByteView data)
+void Rhi::CmdPushGraphicsConstants(RhiCmdList cmd, uint32_t offset, RhiShaderStage stage, byteview data)
 {
-    const VulkanCmdListData &cmdData = g_State->m_CmdLists.ResolveData(cmd);
-    const VulkanPipelineData &pipelineData = g_State->m_GraphicsPipelines.ResolveData(cmdData.boundGraphicsPipeline);
+    const VulkanCmdListData &cmdData = HandlePool::ResolveData(g_State->m_CmdLists, cmd);
+    const VulkanPipelineData &pipelineData =
+        HandlePool::ResolveData(g_State->m_GraphicsPipelines, cmdData.boundGraphicsPipeline);
 
     vkCmdPushConstants(cmdData.cmdbuf, pipelineData.layout, ConvertShaderStageIntoVkShaderStageFlags(stage), offset,
-                       data.Size(), data.Data());
+                       data.size, data.data);
 }
 
-void Rhi::CmdBindVertexBuffers(RhiCmdList cmd, uint32_t firstBinding, Span<const RhiBuffer> buffers,
-                               Span<const uint64_t> offsets)
+void Rhi::CmdBindVertexBuffers(RhiCmdList cmd, uint32_t firstBinding, span<const RhiBuffer> buffers,
+                               span<const uint64_t> offsets)
 {
-    NYLA_ASSERT(buffers.Size() == offsets.Size());
-    NYLA_ASSERT(buffers.Size() <= 4U);
+    NYLA_ASSERT(buffers.size == offsets.size);
+    NYLA_ASSERT(buffers.size <= 4U);
 
-    Array<VkBuffer, 4> vkBufs;
-    Array<VkDeviceSize, 4> vkOffsets;
-    for (uint32_t i = 0; i < buffers.Size(); ++i)
+    array<VkBuffer, 4> vkBufs;
+    array<VkDeviceSize, 4> vkOffsets;
+    for (uint32_t i = 0; i < buffers.size; ++i)
     {
-        vkBufs[i] = g_State->m_Buffers.ResolveData(buffers[i]).buffer;
+        vkBufs[i] = HandlePool::ResolveData(g_State->m_Buffers, buffers[i]).buffer;
         vkOffsets[i] = offsets[i];
     }
 
-    const VulkanCmdListData &cmdData = g_State->m_CmdLists.ResolveData(cmd);
-    vkCmdBindVertexBuffers(cmdData.cmdbuf, firstBinding, buffers.Size(), vkBufs.Data(), vkOffsets.Data());
+    const VulkanCmdListData &cmdData = HandlePool::ResolveData(g_State->m_CmdLists, cmd);
+    vkCmdBindVertexBuffers(cmdData.cmdbuf, firstBinding, buffers.size, vkBufs.data, vkOffsets.data);
 }
 
 void Rhi::CmdBindIndexBuffer(RhiCmdList cmd, RhiBuffer buffer, uint64_t offset)
 {
-    const VulkanBufferData &bufferData = g_State->m_Buffers.ResolveData(buffer);
+    const VulkanBufferData &bufferData = HandlePool::ResolveData(g_State->m_Buffers, buffer);
 
-    const VulkanCmdListData &cmdData = g_State->m_CmdLists.ResolveData(cmd);
+    const VulkanCmdListData &cmdData = HandlePool::ResolveData(g_State->m_CmdLists, cmd);
     vkCmdBindIndexBuffer(cmdData.cmdbuf, bufferData.buffer, offset, VkIndexType::VK_INDEX_TYPE_UINT16);
 }
 
 void Rhi::CmdDraw(RhiCmdList cmd, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
                   uint32_t firstInstance)
 {
-    VulkanCmdListData &cmdData = g_State->m_CmdLists.ResolveData(cmd);
+    VulkanCmdListData &cmdData = HandlePool::ResolveData(g_State->m_CmdLists, cmd);
     CmdDrawInternal(cmdData);
     vkCmdDraw(cmdData.cmdbuf, vertexCount, instanceCount, firstVertex, firstInstance);
 }
@@ -2190,7 +2201,7 @@ void Rhi::CmdDraw(RhiCmdList cmd, uint32_t vertexCount, uint32_t instanceCount, 
 void Rhi::CmdDrawIndexed(RhiCmdList cmd, uint32_t indexCount, int32_t vertexOffset, uint32_t instanceCount,
                          uint32_t firstIndex, uint32_t firstInstance)
 {
-    VulkanCmdListData &cmdData = g_State->m_CmdLists.ResolveData(cmd);
+    VulkanCmdListData &cmdData = HandlePool::ResolveData(g_State->m_CmdLists, cmd);
     CmdDrawInternal(cmdData);
     vkCmdDrawIndexed(cmdData.cmdbuf, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
 }
@@ -2215,12 +2226,12 @@ auto Rhi::CreateSampler(const RhiSamplerDesc &desc) -> RhiSampler
     VulkanSamplerData samplerData{};
     VK_CHECK(vkCreateSampler(g_State->m_Dev, &createInfo, g_State->vkAlloc, &samplerData.sampler));
 
-    return g_State->m_Samplers.Acquire(samplerData);
+    return HandlePool::Acquire(g_State->m_Samplers, samplerData);
 }
 
 void Rhi::DestroySampler(RhiSampler sampler)
 {
-    VulkanSamplerData samplerData = g_State->m_Samplers.ReleaseData(sampler);
+    VulkanSamplerData samplerData = HandlePool::ReleaseData(g_State->m_Samplers, sampler);
     vkDestroySampler(g_State->m_Dev, samplerData.sampler, g_State->vkAlloc);
 }
 
@@ -2265,12 +2276,12 @@ auto Rhi::CreateTexture(const RhiTextureDesc &desc) -> RhiTexture
     vkAllocateMemory(g_State->m_Dev, &memoryAllocInfo, g_State->vkAlloc, &textureData.memory);
     vkBindImageMemory(g_State->m_Dev, textureData.image, textureData.memory, 0);
 
-    return g_State->m_Textures.Acquire(textureData);
+    return HandlePool::Acquire(g_State->m_Textures, textureData);
 }
 
 auto Rhi::CreateSampledTextureView(const RhiTextureViewDesc &desc) -> RhiSampledTextureView
 {
-    VulkanTextureData &textureData = g_State->m_Textures.ResolveData(desc.texture);
+    VulkanTextureData &textureData = HandlePool::ResolveData(g_State->m_Textures, desc.texture);
 
     VulkanTextureViewData textureViewData{
         .texture = desc.texture,
@@ -2302,13 +2313,13 @@ auto Rhi::CreateSampledTextureView(const RhiTextureViewDesc &desc) -> RhiSampled
 
     VK_CHECK(vkCreateImageView(g_State->m_Dev, &imageViewCreateInfo, g_State->vkAlloc, &textureViewData.imageView));
 
-    const RhiSampledTextureView view = g_State->m_SampledTextureViews.Acquire(textureViewData);
+    const RhiSampledTextureView view = HandlePool::Acquire(g_State->m_SampledTextureViews, textureViewData);
     return view;
 }
 
 auto Rhi::CreateRenderTargetView(const RhiRenderTargetViewDesc &desc) -> RhiRenderTargetView
 {
-    VulkanTextureData &textureData = g_State->m_Textures.ResolveData(desc.texture);
+    VulkanTextureData &textureData = HandlePool::ResolveData(g_State->m_Textures, desc.texture);
 
     VulkanTextureViewData renderTargetViewData{
         .texture = desc.texture,
@@ -2340,13 +2351,13 @@ auto Rhi::CreateRenderTargetView(const RhiRenderTargetViewDesc &desc) -> RhiRend
 
     VK_CHECK(
         vkCreateImageView(g_State->m_Dev, &imageViewCreateInfo, g_State->vkAlloc, &renderTargetViewData.imageView));
-    const RhiRenderTargetView rtv = g_State->m_RenderTargetViews.Acquire(renderTargetViewData);
+    const RhiRenderTargetView rtv = HandlePool::Acquire(g_State->m_RenderTargetViews, renderTargetViewData);
     return rtv;
 }
 
 auto Rhi::CreateDepthStencilView(const RhiDepthStencilViewDesc &desc) -> RhiDepthStencilView
 {
-    VulkanTextureData &textureData = g_State->m_Textures.ResolveData(desc.texture);
+    VulkanTextureData &textureData = HandlePool::ResolveData(g_State->m_Textures, desc.texture);
 
     VulkanTextureViewData dsvData{
         .texture = desc.texture,
@@ -2377,28 +2388,28 @@ auto Rhi::CreateDepthStencilView(const RhiDepthStencilViewDesc &desc) -> RhiDept
     };
 
     VK_CHECK(vkCreateImageView(g_State->m_Dev, &imageViewCreateInfo, g_State->vkAlloc, &dsvData.imageView));
-    const RhiDepthStencilView dsv = g_State->m_DepthStencilViews.Acquire(dsvData);
+    const RhiDepthStencilView dsv = HandlePool::Acquire(g_State->m_DepthStencilViews, dsvData);
     return dsv;
 }
 
 auto Rhi::GetTexture(RhiSampledTextureView srv) -> RhiTexture
 {
-    return g_State->m_SampledTextureViews.ResolveData(srv).texture;
+    return HandlePool::ResolveData(g_State->m_SampledTextureViews, srv).texture;
 }
 
 auto Rhi::GetTexture(RhiRenderTargetView rtv) -> RhiTexture
 {
-    return g_State->m_RenderTargetViews.ResolveData(rtv).texture;
+    return HandlePool::ResolveData(g_State->m_RenderTargetViews, rtv).texture;
 }
 
 auto Rhi::GetTexture(RhiDepthStencilView dsv) -> RhiTexture
 {
-    return g_State->m_DepthStencilViews.ResolveData(dsv).texture;
+    return HandlePool::ResolveData(g_State->m_DepthStencilViews, dsv).texture;
 }
 
 auto Rhi::GetTextureInfo(RhiTexture texture) -> RhiTextureInfo
 {
-    const VulkanTextureData &textureData = g_State->m_Textures.ResolveData(texture);
+    const VulkanTextureData &textureData = HandlePool::ResolveData(g_State->m_Textures, texture);
     return {
         .width = textureData.extent.width,
         .height = textureData.extent.height,
@@ -2408,9 +2419,9 @@ auto Rhi::GetTextureInfo(RhiTexture texture) -> RhiTextureInfo
 
 void Rhi::CmdTransitionTexture(RhiCmdList cmd, RhiTexture texture, RhiTextureState newState)
 {
-    const VkCommandBuffer &cmdbuf = g_State->m_CmdLists.ResolveData(cmd).cmdbuf;
+    const VkCommandBuffer &cmdbuf = HandlePool::ResolveData(g_State->m_CmdLists, cmd).cmdbuf;
 
-    VulkanTextureData &textureData = g_State->m_Textures.ResolveData(texture);
+    VulkanTextureData &textureData = HandlePool::ResolveData(g_State->m_Textures, texture);
 
     const VulkanTextureStateSyncInfo newSyncInfo = VulkanTextureStateGetSyncInfo(newState);
     if (newSyncInfo.layout == textureData.layout)
@@ -2450,7 +2461,7 @@ void Rhi::CmdTransitionTexture(RhiCmdList cmd, RhiTexture texture, RhiTextureSta
 
 void Rhi::DestroyTexture(RhiTexture texture)
 {
-    VulkanTextureData textureData = g_State->m_Textures.ReleaseData(texture);
+    VulkanTextureData textureData = HandlePool::ResolveData(g_State->m_Textures, texture);
 
     NYLA_ASSERT(textureData.image);
     vkDestroyImage(g_State->m_Dev, textureData.image, g_State->vkAlloc);
@@ -2461,7 +2472,7 @@ void Rhi::DestroyTexture(RhiTexture texture)
 
 void Rhi::DestroySampledTextureView(RhiSampledTextureView textureView)
 {
-    const VulkanTextureViewData &textureViewData = g_State->m_SampledTextureViews.ReleaseData(textureView);
+    const VulkanTextureViewData &textureViewData = HandlePool::ResolveData(g_State->m_SampledTextureViews, textureView);
     NYLA_ASSERT(textureViewData.imageView);
 
     vkDestroyImageView(g_State->m_Dev, textureViewData.imageView, g_State->vkAlloc);
@@ -2469,7 +2480,7 @@ void Rhi::DestroySampledTextureView(RhiSampledTextureView textureView)
 
 void Rhi::DestroyRenderTargetView(RhiRenderTargetView textureView)
 {
-    const VulkanTextureViewData &textureViewData = g_State->m_RenderTargetViews.ReleaseData(textureView);
+    const VulkanTextureViewData &textureViewData = HandlePool::ResolveData(g_State->m_RenderTargetViews, textureView);
     NYLA_ASSERT(textureViewData.imageView);
 
     vkDestroyImageView(g_State->m_Dev, textureViewData.imageView, g_State->vkAlloc);
@@ -2477,7 +2488,7 @@ void Rhi::DestroyRenderTargetView(RhiRenderTargetView textureView)
 
 void Rhi::DestroyDepthStencilView(RhiDepthStencilView textureView)
 {
-    const VulkanTextureViewData &textureViewData = g_State->m_DepthStencilViews.ReleaseData(textureView);
+    const VulkanTextureViewData &textureViewData = HandlePool::ResolveData(g_State->m_DepthStencilViews, textureView);
     NYLA_ASSERT(textureViewData.imageView);
 
     vkDestroyImageView(g_State->m_Dev, textureViewData.imageView, g_State->vkAlloc);
@@ -2485,10 +2496,10 @@ void Rhi::DestroyDepthStencilView(RhiDepthStencilView textureView)
 
 void Rhi::CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, uint32_t srcOffset, uint32_t size)
 {
-    const VkCommandBuffer &cmdbuf = g_State->m_CmdLists.ResolveData(cmd).cmdbuf;
+    const VkCommandBuffer &cmdbuf = HandlePool::ResolveData(g_State->m_CmdLists, cmd).cmdbuf;
 
-    VulkanTextureData &dstTextureData = g_State->m_Textures.ResolveData(dst);
-    VulkanBufferData &srcBufferData = g_State->m_Buffers.ResolveData(src);
+    VulkanTextureData &dstTextureData = HandlePool::ResolveData(g_State->m_Textures, dst);
+    VulkanBufferData &srcBufferData = HandlePool::ResolveData(g_State->m_Buffers, src);
 
     EnsureHostWritesVisible(cmdbuf, srcBufferData);
 
@@ -2510,10 +2521,10 @@ void Rhi::CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiBuffer src, uint32_t
 
 void Rhi::CmdCopyTexture(RhiCmdList cmd, RhiTexture dst, RhiTexture src)
 {
-    const VkCommandBuffer &cmdbuf = g_State->m_CmdLists.ResolveData(cmd).cmdbuf;
+    const VkCommandBuffer &cmdbuf = HandlePool::ResolveData(g_State->m_CmdLists, cmd).cmdbuf;
 
-    VulkanTextureData &dstTextureData = g_State->m_Textures.ResolveData(dst);
-    VulkanTextureData &srcTextureData = g_State->m_Textures.ResolveData(src);
+    VulkanTextureData &dstTextureData = HandlePool::ResolveData(g_State->m_Textures, dst);
+    VulkanTextureData &srcTextureData = HandlePool::ResolveData(g_State->m_Textures, src);
 
     const VkImageCopy region{
         .srcSubresource =

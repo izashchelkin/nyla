@@ -17,10 +17,19 @@ template <typename DataType> struct handle_slot
 };
 
 template <is_handle HandleType, typename DataType, uint64_t Capacity>
-using handle_pool = array<handle_slot<DataType>, Capacity>;
+struct handle_pool : array<handle_slot<DataType>, Capacity>
+{
+};
 
 namespace HandlePool
 {
+
+template <is_handle HandleType, typename DataType, uint64_t PoolCapacity>
+[[nodiscard]]
+constexpr auto Capacity(const handle_pool<HandleType, DataType, PoolCapacity> &self) -> uint64_t
+{
+    return PoolCapacity;
+}
 
 template <is_handle HandleType, typename DataType, uint64_t Capacity>
 [[nodiscard]]

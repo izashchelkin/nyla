@@ -347,8 +347,8 @@ class Rhi
     static auto CmdSetCheckpoint(RhiCmdList cmd, uint64_t data) -> uint64_t;
     static auto GetLastCheckpointData(RhiQueueType queueType) -> uint64_t;
 
-    static auto FrameBegin() -> RhiCmdList;
-    static void FrameEnd();
+    static auto FrameBegin(region_alloc &scratch) -> RhiCmdList;
+    static void FrameEnd(region_alloc &scratch);
 
     static auto FrameGetCmdList() -> RhiCmdList;
 
