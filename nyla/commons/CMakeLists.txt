@@ -81,7 +81,8 @@ target_sources(${TARGET}
         renderer.h
         rhi.h
         span.h
-        spirview.h
+        spv_reader.h
+        spv_shader.h
         staging.h
         staging_buffer.h
         str.h
