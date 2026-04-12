@@ -1,4 +1,4 @@
-#include "nyla/commons/vulkan/rhi_vulkan.h"
+#include "nyla/commons/rhi.h"
 
 #include <cstdint>
 
@@ -14,7 +14,6 @@
 #include "nyla/commons/mem.h"
 #include "nyla/commons/minmax.h"
 #include "nyla/commons/region_alloc.h"
-#include "nyla/commons/rhi.h"
 #include "nyla/commons/span.h"
 #include "nyla/commons/spv_shader.h"
 
@@ -27,8 +26,6 @@
 #else
 #include "nyla/commons/windows/platform_windows.h"
 #include "vulkan/vulkan_win32.h"
-
-#include <spirv-headers/spirv.hpp>
 #endif
 // clang-format on
 

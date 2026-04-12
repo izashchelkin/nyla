@@ -9,5 +9,4 @@ target_sources(${TARGET} PRIVATE
 target_link_libraries(${TARGET}
     PRIVATE
         nyla::commons
-        nyla::formats::elf
 )

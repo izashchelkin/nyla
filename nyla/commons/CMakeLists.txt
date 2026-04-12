@@ -30,7 +30,6 @@ target_sources(${TARGET}
     PUBLIC
         align.h
         array.h
-        assert.h
         asset_manager.h
         bdf.h
         bitenum.h
@@ -38,12 +37,10 @@ target_sources(${TARGET}
         byteliterals.h
         byteparser.h
         cast.h
-        cleanup.h
         collections.h
         color.h
         complex.h
         concepts.h
-        cstr.h
         debug_text_renderer.h
         engine.h
         engine0_internal.h
@@ -101,17 +98,12 @@ target_sources(${TARGET}
         add_subdirectory(d3d12)
 endif()
 
-add_subdirectory(vulkan)
-
 find_package(Vulkan)
 
 if (Vulkan_FOUND)
     target_sources(${TARGET}
         PRIVATE
-            vulkan/rhi_vulkan.cc
-
-        PUBLIC
-            vulkan/rhi_vulkan.h
+            rhi_vulkan.cc
 
         INTERFACE
             rhi.h
@@ -144,10 +136,10 @@ target_sources(${target_audio}
 if (WIN32)
     target_sources(${TARGET}
         PRIVATE
-            windows/platform_windows.cc
+            platform_windows.cc
 
         PUBLIC
-            windows/platform_windows.h
+            platform_windows.h
     )
 
     target_link_libraries(${TARGET}
@@ -170,5 +162,3 @@ elseif (UNIX AND NOT APPLE)
     #         nyla::platform::linux::audio
     # )
 endif()
-
-add_subdirectory(elf)

@@ -1,7 +1,5 @@
 #pragma once
 
-#include "nyla/commons/byteparser.h"
-#include "nyla/commons/region_alloc.h"
 #include <cstdint>
 
 namespace nyla
@@ -53,21 +51,5 @@ struct Elf64SectionHeader
     uint64_t entrySizae;
 };
 static_assert(sizeof(Elf64SectionHeader) == 64);
-
-class ElfParser : public ByteParser
-{
-  public:
-    void Init(RegionAlloc *alloc, const char *base, uint32_t size)
-    {
-        m_Alloc = alloc;
-        m_At = base;
-        m_Left = size;
-    }
-
-    void Parse();
-
-  private:
-    RegionAlloc *m_Alloc;
-};
 
 } // namespace nyla
