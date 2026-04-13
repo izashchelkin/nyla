@@ -1,4 +1,5 @@
 #include "nyla/commons/tween_manager.h"
+#include "nyla/commons/fmt.h"
 #include "nyla/commons/handle_pool.h"
 
 namespace nyla
@@ -7,7 +8,7 @@ namespace nyla
 namespace
 {
 
-struct TweenData
+struct tween_data
 {
     float *value;
     float begin;
@@ -15,40 +16,44 @@ struct TweenData
     float startValue;
     float endValue;
 };
-HandlePool<Tween, TweenData, 1024> m_Tweens;
 
-float m_Now;
+struct tweenmanager_state
+{
+    float ts;
+    handle_pool<tween, tween_data, 1024> tweens;
+};
+tweenmanager_state *g_State; // TODO: init this guy!
 
 } // namespace
 
 auto TweenManager::Now() -> float
 {
-    return m_Now;
+    return g_State->ts;
 }
 
 void TweenManager::Update(float dt)
 {
-    m_Now += dt;
+    g_State->ts += dt;
 
-    for (auto &slot : m_Tweens)
+    for (auto &slot : g_State->tweens)
     {
         if (!slot.used)
             continue;
 
-        TweenData &tweenData = slot.data;
+        tween_data &tweenData = slot.data;
         ASSERT(tweenData.end > tweenData.begin);
 
-        if (m_Now >= tweenData.end)
+        if (g_State->ts >= tweenData.end)
         {
             *tweenData.value = tweenData.endValue;
-            slot.Free();
+            HandlePool::Free(slot);
             continue;
         }
 
-        if (m_Now >= tweenData.begin)
+        if (g_State->ts >= tweenData.begin)
         {
             float duration = tweenData.end - tweenData.begin;
-            float passed = m_Now - tweenData.begin;
+            float passed = g_State->ts - tweenData.begin;
             float t = passed / duration;
 
             *tweenData.value = tweenData.endValue * t + tweenData.startValue * (1.f - t);
@@ -56,36 +61,36 @@ void TweenManager::Update(float dt)
     }
 }
 
-void TweenManager::Cancel(Tween tween)
+void TweenManager::Cancel(tween tween)
 {
-    if (auto [ok, slot] = m_Tweens.TryResolveSlot(tween); ok)
-        slot->Free();
+    if (auto [ok, slotPtr] = HandlePool::TryResolveSlot(g_State->tweens, tween); ok)
+        HandlePool::Free(*slotPtr);
 }
 
-auto TweenManager::Lerp(float &value, float endValue, float begin, float end) -> Tween
+auto TweenManager::Lerp(float &value, float endValue, float begin, float end) -> tween
 {
     ASSERT(end > begin);
-    return m_Tweens.Acquire(TweenData{
-        .value = &value,
-        .begin = begin,
-        .end = end,
-        .startValue = value,
-        .endValue = endValue,
-    });
+    return HandlePool::Acquire(g_State->tweens, tween_data{
+                                                    .value = &value,
+                                                    .begin = begin,
+                                                    .end = end,
+                                                    .startValue = value,
+                                                    .endValue = endValue,
+                                                });
 }
 
-auto TweenManager::BeginOf(Tween tween) -> float
+auto TweenManager::BeginOf(tween tween) -> float
 {
-    if (auto [ok, slot] = m_Tweens.TryResolveSlot(tween); ok)
-        return slot->data.begin;
+    if (auto [ok, slotPtr] = HandlePool::TryResolveSlot(g_State->tweens, tween); ok)
+        return slotPtr->data.begin;
     else
         return 0.f;
 }
 
-auto TweenManager::EndOf(Tween tween) -> float
+auto TweenManager::EndOf(tween tween) -> float
 {
-    if (auto [ok, slot] = m_Tweens.TryResolveSlot(tween); ok)
-        return slot->data.begin;
+    if (auto [ok, slotPtr] = HandlePool::TryResolveSlot(g_State->tweens, tween); ok)
+        return slotPtr->data.begin;
     else
         return 0.f;
 }

@@ -1,27 +1,27 @@
 #pragma once
 
 #include "nyla/commons/handle.h"
+#include "nyla/commons/macros.h"
 
 namespace nyla
 {
 
-struct Tween : Handle
+struct tween : handle
 {
 };
 
-class TweenManager
+namespace TweenManager
 {
-  public:
-    static auto Now() -> float;
-    static void Update(float dt);
 
-    static auto BeginOf(Tween) -> float;
-    static auto EndOf(Tween) -> float;
+auto API Now() -> float;
+void API Update(float dt);
 
-    static void Cancel(Tween);
-    static auto Lerp(float &value, float endValue, float begin, float end) -> Tween;
+auto API BeginOf(tween) -> float;
+auto API EndOf(tween) -> float;
 
-  private:
-};
+void API Cancel(tween);
+auto API Lerp(float &value, float endValue, float begin, float end) -> tween;
+
+} // namespace TweenManager
 
 } // namespace nyla

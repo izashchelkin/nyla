@@ -10,7 +10,6 @@
 #include "nyla/commons/intrin.h"
 #include "nyla/commons/macros.h"
 #include "nyla/commons/platform.h"
-#include "nyla/commons/platform_base.h"
 #include "nyla/commons/region_alloc.h"
 #include "nyla/commons/renderer.h"
 #include "nyla/commons/rhi.h"
@@ -54,11 +53,11 @@ void API Init(const EngineInitDesc &desc)
 
     g_Engine->targetFrameDurationUs = static_cast<uint64_t>(1'000'000.0 / maxFps);
 
-    RhiFlags flags = None<RhiFlags>();
+    rhi_flags flags = None<rhi_flags>();
     if (desc.vsync)
-        flags |= RhiFlags::VSync;
+        flags |= rhi_flags::VSync;
 
-    Rhi::Init(RhiInitDesc{
+    Rhi::Init(rhi_init_desc{
         .flags = flags,
     });
 
@@ -70,7 +69,7 @@ void API Init(const EngineInitDesc &desc)
 
 auto API FrameBegin() -> EngineFrameBeginResult
 {
-    RhiCmdList cmd = Rhi::FrameBegin();
+    rhi_cmdlist cmd = Rhi::FrameBegin();
 
     const uint64_t frameStart = Platform::GetMonotonicTimeMicros();
 

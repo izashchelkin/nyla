@@ -16,7 +16,7 @@ struct EngineInitDesc
 
 struct EngineFrameBeginResult
 {
-    RhiCmdList cmd;
+    rhi_cmdlist cmd;
     float dt;
     uint32_t fps;
 };

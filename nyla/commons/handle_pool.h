@@ -105,6 +105,12 @@ auto ReleaseData(handle_pool<HandleType, DataType, Capacity> &self, HandleType h
     return slot.data;
 }
 
+template <typename DataType> auto Free(const handle_slot<DataType> &slot) -> DataType
+{
+    slot.used = false;
+    return slot.data;
+}
+
 } // namespace HandlePool
 
 } // namespace nyla
