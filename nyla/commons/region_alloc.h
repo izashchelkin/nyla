@@ -134,7 +134,7 @@ template <uint64_t Capacity>
 INLINE auto AllocString(region_alloc &self, byteview str) -> inline_string<Capacity> &
 {
     auto &ret = AllocString<Capacity>(self);
-    InlineString::AppendSuffix(str);
+    InlineString::AppendSuffix(ret, str);
     return ret;
 }
 
@@ -143,7 +143,7 @@ template <uint64_t Capacity>
 INLINE auto SafeCStr(region_alloc &self, byteview str) -> const char *
 {
     auto &ret = AllocString<Capacity>(self);
-    InlineString::AppendSuffix(str);
+    InlineString::AppendSuffix(ret, str);
     return Span::CStr((byteview)ret);
 }
 

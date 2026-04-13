@@ -1,4 +1,3 @@
-#include <array>
 #include <cstdint>
 #include <fcntl.h>
 #include <linux/close_range.h>
@@ -14,13 +13,10 @@
 #include <xkbcommon/xkbcommon.h>
 
 #include "nyla/commons/align.h"
-#include "nyla/commons/assert.h"
 #include "nyla/commons/byteliterals.h"
-#include "nyla/commons/cleanup.h"
-#include "nyla/commons/linux/platform_linux.h"
 #include "nyla/commons/log.h"
 #include "nyla/commons/platform.h"
-#include "nyla/commons/string.h"
+#include "nyla/commons/platform_linux.h"
 
 #ifdef __clang__
 #pragma clang diagnostic push

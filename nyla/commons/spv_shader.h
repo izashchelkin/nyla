@@ -1,3 +1,13 @@
+/*
+** Copyright: 2014-2024 The Khronos Group Inc.
+** License: MIT
+**
+** MODIFICATIONS TO THIS FILE MAY MEAN IT NO LONGER ACCURATELY REFLECTS
+** KHRONOS STANDARDS. THE UNMODIFIED, NORMATIVE VERSIONS OF KHRONOS
+** SPECIFICATIONS AND HEADER INFORMATION ARE LOCATED AT
+** https://www.khronos.org/registry/
+*/
+
 #pragma once
 
 #include "nyla/commons/inline_string.h"
