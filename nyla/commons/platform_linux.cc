@@ -84,21 +84,21 @@ auto Platform::GetGamepadRightTrigger(uint32_t index) -> float
 auto Platform::GetMonotonicTimeMillis() -> uint64_t
 {
     timespec ts{};
-    NYLA_ASSERT(clock_gettime(CLOCK_MONOTONIC_RAW, &ts) == 0);
+    ASSERT(clock_gettime(CLOCK_MONOTONIC_RAW, &ts) == 0);
     return ts.tv_sec * 1'000 + ts.tv_nsec / 1'000'000;
 }
 
 auto Platform::GetMonotonicTimeMicros() -> uint64_t
 {
     timespec ts{};
-    NYLA_ASSERT(clock_gettime(CLOCK_MONOTONIC_RAW, &ts) == 0);
+    ASSERT(clock_gettime(CLOCK_MONOTONIC_RAW, &ts) == 0);
     return ts.tv_sec * 1'000'000 + ts.tv_nsec / 1'000;
 }
 
 auto Platform::GetMonotonicTimeNanos() -> uint64_t
 {
     timespec ts{};
-    NYLA_ASSERT(clock_gettime(CLOCK_MONOTONIC_RAW, &ts) == 0);
+    ASSERT(clock_gettime(CLOCK_MONOTONIC_RAW, &ts) == 0);
     return ts.tv_sec * 1'000'000'000 + ts.tv_nsec;
 }
 
@@ -116,7 +116,7 @@ auto Platform::ReserveMemPages(uint64_t size) -> char *
 
 void Platform::CommitMemPages(void *page, uint64_t size)
 {
-    NYLA_ASSERT(((page - g_AddressSpaceBase) % g_PageSize) == 0);
+    ASSERT(((page - g_AddressSpaceBase) % g_PageSize) == 0);
 
     AlignUp(size, GetMemPageSize());
 
@@ -125,7 +125,7 @@ void Platform::CommitMemPages(void *page, uint64_t size)
 
 void Platform::DecommitMemPages(char *page, uint64_t size)
 {
-    NYLA_ASSERT(((page - g_AddressSpaceBase) % g_PageSize) == 0);
+    ASSERT(((page - g_AddressSpaceBase) % g_PageSize) == 0);
 
     AlignUp(size, GetMemPageSize());
 
@@ -211,7 +211,7 @@ auto LinuxX11Platform::InternAtom(Str name, bool onlyIfExists) -> xcb_atom_t
     xcb_intern_atom_reply_t *reply =
         xcb_intern_atom_reply(g_Conn, xcb_intern_atom(g_Conn, onlyIfExists, name.Size(), name.Data()), nullptr);
     if (!reply || !reply->atom)
-        NYLA_LOG("could not intern atom " NYLA_SV_FMT, NYLA_SV_ARG(name));
+        LOG("could not intern atom " NYLA_SV_FMT, NYLA_SV_ARG(name));
 
     auto ret = reply->atom;
     free(reply);
@@ -226,7 +226,7 @@ void Platform::Init(const PlatformInitDesc &desc)
 
     g_AddressSpaceSize = AlignedUp<uint64_t>(16_GiB, g_PageSize);
     g_AddressSpaceBase = (char *)mmap(nullptr, g_AddressSpaceSize, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    NYLA_ASSERT(g_AddressSpaceBase != MAP_FAILED);
+    ASSERT(g_AddressSpaceBase != MAP_FAILED);
 
     g_AddressSpaceAt = g_AddressSpaceBase;
 
@@ -234,10 +234,10 @@ void Platform::Init(const PlatformInitDesc &desc)
     {
         g_Conn = xcb_connect(nullptr, &g_ScreenIndex);
         if (xcb_connection_has_error(g_Conn))
-            NYLA_ASSERT(false && "could not connect to X server");
+            ASSERT(false && "could not connect to X server");
 
         g_Screen = xcb_aux_get_screen(g_Conn, g_ScreenIndex);
-        NYLA_ASSERT(g_Screen);
+        ASSERT(g_Screen);
 
 #define X(name) m_Atoms.name = LinuxX11Platform::InternAtom(AsciiStrToUpper(#name), false);
         NYLA_X11_ATOMS(X)
@@ -251,12 +251,12 @@ void Platform::Init(const PlatformInitDesc &desc)
             if (!xkb_x11_setup_xkb_extension(g_Conn, XKB_X11_MIN_MAJOR_XKB_VERSION, XKB_X11_MIN_MINOR_XKB_VERSION,
                                              XKB_X11_SETUP_XKB_EXTENSION_NO_FLAGS, &majorXkbVersionOut,
                                              &minorXkbVersionOut, &baseEventOut, &baseErrorOut))
-                NYLA_ASSERT(false && "could not set up xkb extension");
+                ASSERT(false && "could not set up xkb extension");
 
             if (majorXkbVersionOut < XKB_X11_MIN_MAJOR_XKB_VERSION ||
                 (majorXkbVersionOut == XKB_X11_MIN_MAJOR_XKB_VERSION &&
                  minorXkbVersionOut < XKB_X11_MIN_MINOR_XKB_VERSION))
-                NYLA_ASSERT(false && "could not set up xkb extension");
+                ASSERT(false && "could not set up xkb extension");
 
             xcb_generic_error_t *err = nullptr;
             xcb_xkb_per_client_flags_reply_t *reply = xcb_xkb_per_client_flags_reply(
@@ -266,24 +266,24 @@ void Platform::Init(const PlatformInitDesc &desc)
                                          XCB_XKB_PER_CLIENT_FLAG_DETECTABLE_AUTO_REPEAT, 0, 0, 0),
                 &err);
             if (!reply || err)
-                NYLA_ASSERT(false && "could not set up detectable autorepeat");
+                ASSERT(false && "could not set up detectable autorepeat");
 
             {
                 xkb_context *ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
-                NYLA_ASSERT(ctx);
+                ASSERT(ctx);
 
                 const int32_t deviceId = xkb_x11_get_core_keyboard_device_id(g_Conn);
-                NYLA_ASSERT(deviceId != -1);
+                ASSERT(deviceId != -1);
 
                 xkb_keymap *keymap = xkb_x11_keymap_new_from_device(ctx, g_Conn, deviceId, XKB_KEYMAP_COMPILE_NO_FLAGS);
-                NYLA_ASSERT(keymap);
+                ASSERT(keymap);
 
                 for (uint32_t i = 1; i < static_cast<uint32_t>(KeyPhysical::Count); ++i)
                 {
                     const auto key = static_cast<KeyPhysical>(i);
                     const char *xkbName = LinuxX11Platform::ConvertKeyPhysicalIntoXkbName(key);
                     const xkb_keycode_t keycode = xkb_keymap_key_by_name(keymap, xkbName);
-                    NYLA_ASSERT(xkb_keycode_is_legal_x11(keycode));
+                    ASSERT(xkb_keycode_is_legal_x11(keycode));
                     g_KeyPhysicalCodes[i] = keycode;
                 }
 
@@ -296,7 +296,7 @@ void Platform::Init(const PlatformInitDesc &desc)
         {
             const xcb_query_extension_reply_t *ext = xcb_get_extension_data(g_Conn, &xcb_input_id);
             if (!ext || !ext->present)
-                NYLA_ASSERT(false && "could nolt set up XI2 extension");
+                ASSERT(false && "could nolt set up XI2 extension");
 
             struct
             {
@@ -310,7 +310,7 @@ void Platform::Init(const PlatformInitDesc &desc)
 
             if (xcb_request_check(g_Conn,
                                   xcb_input_xi_select_events_checked(g_Conn, g_Screen->root, 1, &mask.eventMask)))
-                NYLA_ASSERT(false && "could not setup XI2 extension");
+                ASSERT(false && "could not setup XI2 extension");
 
             g_ExtensionXInput2MajorOpCode = ext->major_opcode;
         }
@@ -702,7 +702,7 @@ auto Platform::Spawn(Span<const char *const> cmd) -> bool
             sa.sa_flags = SA_RESTART;
             if (sigaction(SIGCHLD, &sa, nullptr) == -1)
             {
-                NYLA_LOG("sigaction failed");
+                LOG("sigaction failed");
                 return false;
             }
             else

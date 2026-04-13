@@ -51,7 +51,7 @@ auto ConvertHsvToRgb(float3 hsv) -> float3
         b = q;
         break;
     default:
-        NYLA_ASSERT(false);
+        ASSERT(false);
     }
 
     return {r, g, b};

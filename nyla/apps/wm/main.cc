@@ -19,7 +19,7 @@ auto PlatformMain(Span<const char *> argv) -> int
     sa.sa_handler = [](int signum) -> void { std::abort(); };
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = SA_RESTART;
-    NYLA_ASSERT(sigaction(SIGINT, &sa, nullptr) != -1);
+    ASSERT(sigaction(SIGINT, &sa, nullptr) != -1);
 
     Platform::Init({
         .enabledFeatures = PlatformFeature::Gfx | PlatformFeature::KeyboardInput | PlatformFeature::MouseInput,
@@ -40,7 +40,7 @@ auto PlatformMain(Span<const char *> argv) -> int
         };
         if (poll(fds.Data(), fds.Size(), -1) == -1)
         {
-            NYLA_LOG("poll(): %s", strerror(errno));
+            LOG("poll(): %s", strerror(errno));
             continue;
         }
 
@@ -51,7 +51,7 @@ auto PlatformMain(Span<const char *> argv) -> int
         }
     }
 
-    NYLA_LOG("exiting");
+    LOG("exiting");
     return 0;
 }
 

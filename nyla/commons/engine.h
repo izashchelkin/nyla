@@ -24,13 +24,13 @@ struct EngineFrameBeginResult
 namespace Engine
 {
 
-void NYLA_API Init(const EngineInitDesc &);
-auto NYLA_API ShouldExit() -> bool;
+void API Init(const EngineInitDesc &);
+auto API ShouldExit() -> bool;
 
-auto NYLA_API FrameBegin() -> EngineFrameBeginResult;
-auto NYLA_API FrameEnd() -> void;
+auto API FrameBegin() -> EngineFrameBeginResult;
+auto API FrameEnd() -> void;
 
-auto NYLA_API GetPerFrameAlloc() -> region_alloc &;
+auto API GetPerFrameAlloc() -> region_alloc &;
 
 } // namespace Engine
 

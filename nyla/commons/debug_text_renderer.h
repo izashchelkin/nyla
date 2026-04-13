@@ -1,13 +1,19 @@
 #pragma once
 
-#include "nyla/commons/engine.h"
-#include "nyla/commons/rhi.h"
 #include <cstdint>
-#include <cstdio>
-#include <string_view>
+
+#include "nyla/commons/rhi.h"
 
 namespace nyla
 {
+
+struct debug_text_renderer
+{
+};
+
+namespace DebugTextRender
+{
+}
 
 class DebugTextRenderer
 {

@@ -133,7 +133,7 @@ auto Parse(gltf_parser &self, region_alloc &alloc) -> bool
                 break;
 
             default:
-                NYLA_ASSERT(false);
+                ASSERT(false);
             };
 
             byteview accessorType = JsonValue::String(*it, "type"_s);
@@ -152,7 +152,7 @@ auto Parse(gltf_parser &self, region_alloc &alloc) -> bool
             else if (Span::Eq(accessorType, "MAT4"_s))
                 accessor.type = gltf_accessor_type::MAT4;
             else
-                NYLA_ASSERT(false);
+                ASSERT(false);
         }
     }
 

@@ -3,6 +3,7 @@
 #include <cstdarg>
 #include <cstdint>
 
+#include "nyla/commons/array.h"
 #include "nyla/commons/byteparser.h"
 #include "nyla/commons/macros.h"
 #include "nyla/commons/mem.h"
@@ -22,7 +23,7 @@ auto U64ToBuffer(uint8_t *buf, uint64_t val) -> uint32_t
         return 1;
     }
 
-    uint8_t temp[20]; // Max digits for u64
+    uint8_t temp[20];
     uint32_t i = 0;
     while (val > 0)
     {
@@ -82,7 +83,7 @@ void WriteFmt(auto &&consumer, byteview fmt, ...)
                 }
 
                 default: {
-                    NYLA_ASSERT(false);
+                    ASSERT(false);
                     break;
                 }
                 }
@@ -117,7 +118,7 @@ void WriteFmt(auto &&consumer, byteview fmt, ...)
             }
 
             default:
-                NYLA_ASSERT(false);
+                ASSERT(false);
                 break;
             }
 
@@ -148,35 +149,30 @@ void BufferWriteFmt(auto &&consumer, span<uint8_t> buffer, byteview fmt, ...)
     va_start(args, fmt);
 
     WriteFmt(
-        [&](const uint8_t *data, uint32_t size) -> void {
-            if (bufferUsed + size > buffer.size)
+        [&](const uint8_t *data, uint32_t dataSize) -> void {
+            if (bufferUsed + dataSize < buffer.size)
             {
-                if (bufferUsed + size > buffer.size * 3 / 2)
-                {
-                    consumer(buffer.data, bufferUsed);
-                    consumer(data, size);
-                    bufferUsed = 0;
-                }
-                else
-                {
-                    uint64_t remainingInBuffer = buffer.size - bufferUsed;
-                    MemCpy(buffer.data + bufferUsed, data, remainingInBuffer);
+                MemCpy(buffer.data + bufferUsed, data, dataSize);
+                return;
+            }
+
+            if (bufferUsed + dataSize >= buffer.size * 2)
+            {
+                if (bufferUsed > 0)
                     consumer(buffer.data, bufferUsed);
 
-                    bufferUsed = size - remainingInBuffer;
-                    MemCpy(buffer.data, data + remainingInBuffer, bufferUsed);
-                }
+                consumer(data, dataSize);
+                bufferUsed = 0;
+                return;
             }
-            else
-            {
-                MemCpy(buffer.data + bufferUsed, data, size);
 
-                if (bufferUsed + size == buffer.size)
-                {
-                    consumer(buffer.data, bufferUsed);
-                    bufferUsed = 0;
-                }
-            }
+            uint64_t remainingInBuffer = buffer.size - bufferUsed;
+            MemCpy(buffer.data + bufferUsed, data, remainingInBuffer);
+            consumer(buffer.data, buffer.size);
+
+            bufferUsed = dataSize - remainingInBuffer;
+            if (bufferUsed > 0)
+                MemCpy(buffer.data, data + remainingInBuffer, bufferUsed);
         },
         fmt, args);
 
@@ -188,32 +184,42 @@ void BufferWriteFmt(auto &&consumer, span<uint8_t> buffer, byteview fmt, ...)
 
 } // namespace
 
-void NYLA_API StringWriteFmt(uint8_t *out, uint64_t outSize, byteview fmt, ...)
+void API StringWriteFmt(span<uint8_t> out, byteview fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
 
-    uint64_t outWritten = 0;
+    uint64_t written = 0;
 
     WriteFmt(
-        [&](const uint8_t *data, uint64_t size) -> void {
-            NYLA_ASSERT(outWritten + size < outSize);
-            MemCpy(out + outSize, data, size);
-            outSize += size;
+        [&](const uint8_t *data, uint64_t dataSize) -> void {
+            written += dataSize;
+            ASSERT(written <= out.size);
+            MemCpy(out.data + written, data, dataSize);
         },
         fmt, args);
 
     va_end(args);
 }
 
-void NYLA_API FileWriteFmt(FileHandle handle, span<uint8_t> buffer, byteview fmt, ...)
+void API FileWriteFmt(FileHandle handle, span<uint8_t> buffer, byteview fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
 
-    BufferWriteFmt(
-        [handle](const uint8_t *data, uint64_t size) -> void { Platform::FileWrite(handle, (uint32_t)size, data); },
-        buffer, fmt, args);
+    BufferWriteFmt([handle](const uint8_t *data, uint64_t size) -> void { FileWrite(handle, (uint32_t)size, data); },
+                   buffer, fmt, args);
+
+    va_end(args);
+}
+
+void API FileWriteFmt(FileHandle handle, byteview fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+
+    static array<uint8_t, 1024> buffer; // TODO:
+    FileWriteFmt(handle, buffer, fmt, args);
 
     va_end(args);
 }

@@ -245,18 +245,18 @@ void DebugFsInitialize(const std::string &path)
     }
 
     debugfs.session = fuse_session_new(&args, &op, sizeof(op), nullptr);
-    NYLA_ASSERT(debugfs.session);
-    NYLA_ASSERT(!fuse_session_mount(debugfs.session, pathCstr));
+    ASSERT(debugfs.session);
+    ASSERT(!fuse_session_mount(debugfs.session, pathCstr));
 
     debugfs.fd = fuse_session_fd(debugfs.session);
 
-    NYLA_LOG("initialized debugfs");
+    LOG("initialized debugfs");
 }
 
 void DebugFsRegister(const char *name, void *data, void (*setContentHandler)(DebugFsFile &),
                      void (*readNotifyHandler)(DebugFsFile &))
 {
-    NYLA_LOG("registering debugfs file %s", name);
+    LOG("registering debugfs file %s", name);
 
     CHECK(setContentHandler);
     debugfs.files.emplace(nextInode++, DebugFsFile{

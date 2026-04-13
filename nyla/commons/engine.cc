@@ -41,7 +41,7 @@ engine *g_Engine;
 namespace Engine
 {
 
-void NYLA_API Init(const EngineInitDesc &desc)
+void API Init(const EngineInitDesc &desc)
 {
     g_Engine = &RegionAlloc::Alloc<engine>(RegionAlloc::g_BootstrapAlloc);
     g_Engine->perFrameAlloc = RegionAlloc::Create(64_MiB, 0);
@@ -68,7 +68,7 @@ void NYLA_API Init(const EngineInitDesc &desc)
     DebugTextRenderer::Init();
 }
 
-auto NYLA_API FrameBegin() -> EngineFrameBeginResult
+auto API FrameBegin() -> EngineFrameBeginResult
 {
     RhiCmdList cmd = Rhi::FrameBegin();
 
@@ -147,7 +147,7 @@ auto NYLA_API FrameBegin() -> EngineFrameBeginResult
 
 } // namespace Engine
 
-auto NYLA_API FrameEnd() -> void
+auto API FrameEnd() -> void
 {
     Rhi::FrameEnd();
 
@@ -159,12 +159,12 @@ auto NYLA_API FrameEnd() -> void
         Platform::Sleep(sleepForMillis);
 }
 
-auto NYLA_API GetPerFrameAlloc() -> region_alloc &
+auto API GetPerFrameAlloc() -> region_alloc &
 {
     return g_Engine->perFrameAlloc;
 }
 
-auto NYLA_API ShouldExit() -> bool
+auto API ShouldExit() -> bool
 {
     return g_Engine->shouldExit;
 }

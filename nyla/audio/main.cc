@@ -66,11 +66,11 @@ void AudioMixer::RunThread()
         auto *slot = m_Voices.Data();
         for (const auto &cmd : m_CmdRead)
         {
-            NYLA_ASSERT(slot != m_Voices.end());
+            ASSERT(slot != m_Voices.end());
             while (!slot->frames.empty())
             {
                 ++slot;
-                NYLA_ASSERT(slot != m_Voices.end());
+                ASSERT(slot != m_Voices.end());
             }
 
             slot->frames = cmd.frames;

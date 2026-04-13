@@ -36,7 +36,7 @@ void TweenManager::Update(float dt)
             continue;
 
         TweenData &tweenData = slot.data;
-        NYLA_ASSERT(tweenData.end > tweenData.begin);
+        ASSERT(tweenData.end > tweenData.begin);
 
         if (m_Now >= tweenData.end)
         {
@@ -64,7 +64,7 @@ void TweenManager::Cancel(Tween tween)
 
 auto TweenManager::Lerp(float &value, float endValue, float begin, float end) -> Tween
 {
-    NYLA_ASSERT(end > begin);
+    ASSERT(end > begin);
     return m_Tweens.Acquire(TweenData{
         .value = &value,
         .begin = begin,

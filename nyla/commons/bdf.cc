@@ -25,29 +25,29 @@ auto NextGlyph(bdf_parser &self, region_alloc &alloc, bdf_glyph &out) -> bool
         out.encoding = CastU32(ByteParser::ParseLong(self));
         ByteParser::NextLine(self);
 
-        NYLA_ASSERT(ByteParser::StartsWithAdvance(self, "SWIDTH "_s));
+        ASSERT(ByteParser::StartsWithAdvance(self, "SWIDTH "_s));
         ByteParser::NextLine(self);
 
-        NYLA_ASSERT(ByteParser::StartsWithAdvance(self, "DWIDTH "_s));
+        ASSERT(ByteParser::StartsWithAdvance(self, "DWIDTH "_s));
         for (uint32_t i = 0; i < 2; ++i)
         {
             out.dwidth[i] = CastI32(ByteParser::ParseLong(self));
             if (i != 1)
-                NYLA_ASSERT(ByteParser::Read(self) == ' ');
+                ASSERT(ByteParser::Read(self) == ' ');
         }
         ByteParser::NextLine(self);
 
-        NYLA_ASSERT(ByteParser::StartsWithAdvance(self, "BBX "_s));
+        ASSERT(ByteParser::StartsWithAdvance(self, "BBX "_s));
         for (uint32_t i = 0; i < 4; ++i)
         {
             int64_t l = ByteParser::ParseLong(self);
             out.bbx[i] = CastI32(l);
             if (i != 3)
-                NYLA_ASSERT(ByteParser::Read(self) == ' ');
+                ASSERT(ByteParser::Read(self) == ' ');
         }
         ByteParser::NextLine(self);
 
-        NYLA_ASSERT(ByteParser::StartsWithAdvance(self, "BITMAP"_s));
+        ASSERT(ByteParser::StartsWithAdvance(self, "BITMAP"_s));
         ByteParser::NextLine(self);
 
         span<uint8_t> data = RegionAlloc::AllocArray<uint8_t>(alloc, 32ULL * 2ULL);

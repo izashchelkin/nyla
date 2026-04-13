@@ -1,13 +1,17 @@
 #pragma once
 
-#include <concepts>
 #include <cstdint>
 #include <type_traits>
 
+#include "nyla/commons/intrin.h"
 #include "nyla/commons/macros.h"
 
 namespace nyla
 {
+
+auto API ReserveMemPages(uint64_t size) -> void *;
+void API CommitMemPages(void *page, uint64_t size);
+void API DecommitMemPages(void *page, uint64_t size);
 
 INLINE void MemCpy(void *RESTRICT dest, const void *RESTRICT src, uint64_t size)
 {
@@ -80,15 +84,15 @@ INLINE void Swap(T &lhs, T &rhs)
 }
 
 [[nodiscard]]
-auto NYLA_API MemEq(const void *p1, const void *p2, uint64_t len) -> bool;
+auto API MemEq(const void *p1, const void *p2, uint64_t len) -> bool;
 [[nodiscard]]
-auto NYLA_API MemStartsWith(const void *str, uint64_t strLen, const void *prefix, uint64_t prefixLen) -> bool;
+auto API MemStartsWith(const void *str, uint64_t strLen, const void *prefix, uint64_t prefixLen) -> bool;
 [[nodiscard]]
-auto NYLA_API MemEndsWith(const void *str, uint64_t strLen, const void *suffix, uint64_t suffixLen) -> bool;
+auto API MemEndsWith(const void *str, uint64_t strLen, const void *suffix, uint64_t suffixLen) -> bool;
 
 //
 
-auto NYLA_API CStrLen(const void *str, uint64_t maxLen) -> uint64_t;
+auto API CStrLen(const void *str, uint64_t maxLen) -> uint64_t;
 
 INLINE auto CStrLen(const void *str) -> uint64_t
 {

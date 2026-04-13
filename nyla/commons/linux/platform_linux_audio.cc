@@ -28,8 +28,8 @@ void PlatformAudio::Impl::Init(const PlatformAudioInitDesc &desc)
     int res = snd_pcm_open(&m_Pcm, "default", SND_PCM_STREAM_PLAYBACK, 0);
     if (res != 0)
     {
-        NYLA_LOG(snd_strerror(res));
-        NYLA_ASSERT(false);
+        LOG(snd_strerror(res));
+        ASSERT(false);
     }
 
     m_SampleRate = desc.sampleRate;
@@ -53,7 +53,7 @@ void PlatformAudio::Impl::Destroy()
 void PlatformAudio::Impl::Write(Span<const std::byte> data)
 {
     const uint32_t frameSize = m_Channels * m_BytesPerChannel;
-    NYLA_ASSERT(data.Size() % frameSize == 0);
+    ASSERT(data.Size() % frameSize == 0);
 
     auto *p = data.Data();
 
@@ -80,7 +80,7 @@ void PlatformAudio::Impl::Write(Span<const std::byte> data)
 
 void PlatformAudio::Init(const PlatformAudioInitDesc &desc)
 {
-    NYLA_ASSERT(!m_Impl);
+    ASSERT(!m_Impl);
     m_Impl = new Impl{};
     m_Impl->Init(desc);
 }

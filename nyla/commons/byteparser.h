@@ -88,7 +88,7 @@ INLINE auto Peek(const byte_parser &self) -> const uint8_t &
 INLINE void Advance(byte_parser &self, uint64_t i)
 {
     self.at += i;
-    NYLA_DASSERT(self.at < self.end);
+    DASSERT(self.at < self.end);
 }
 
 INLINE void Advance(byte_parser &self)
@@ -213,7 +213,7 @@ INLINE auto ParseLong(byte_parser &self) -> int64_t
     double d;
     int64_t l;
     const ParseNumberResult res = ParseDecimal(self, d, l);
-    NYLA_ASSERT(res == ParseNumberResult::Long);
+    ASSERT(res == ParseNumberResult::Long);
     return l;
 }
 

@@ -82,14 +82,14 @@ INLINE auto ParseWordCount(uint32_t word) -> uint16_t
 // [[nodiscard]]
 INLINE auto ReadHeader(span<uint32_t> &data) -> spv_shader_header
 {
-    NYLA_ASSERT(data.size >= 5);
-    NYLA_ASSERT(data[0] == kMagicNumber);
+    ASSERT(data.size >= 5);
+    ASSERT(data[0] == kMagicNumber);
 
     uint32_t version = ReadWord(data);
     uint32_t generator = ReadWord(data);
     uint32_t bound = ReadWord(data);
     uint32_t reserved = ReadWord(data);
-    NYLA_ASSERT(reserved == 0);
+    ASSERT(reserved == 0);
 
     return spv_shader_header{
         .version = version,

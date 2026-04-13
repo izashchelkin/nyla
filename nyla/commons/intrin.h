@@ -1,4 +1,5 @@
-#pragma once
+#ifndef NYLA_FMT_H
+#define NYLA_FMT_H
 
 #include <cstdint>
 #include <type_traits>
@@ -19,7 +20,6 @@ template <typename T>
 INLINE void LoadU(const void *ptr, T &out)
     requires(std::is_trivially_constructible_v<T> and std::is_trivially_copyable_v<T>)
 {
-
 #if defined(_MSC_VER)
     out = *(const __unaligned T *)(ptr);
 #else
@@ -53,7 +53,7 @@ INLINE void WriteU(void *ptr, const T &val)
 
 INLINE uint32_t BitScanForward32(uint32_t n)
 {
-    NYLA_DASSERT(n != 0);
+    DASSERT(n != 0);
 
 #if defined(_MSC_VER)
     unsigned long index;
@@ -66,7 +66,7 @@ INLINE uint32_t BitScanForward32(uint32_t n)
 
 INLINE uint32_t BitScanForward64(uint64_t n)
 {
-    NYLA_DASSERT(n != 0);
+    DASSERT(n != 0);
 
 #if defined(_MSC_VER)
     unsigned long index;
@@ -87,3 +87,5 @@ INLINE int64_t LRound(double x)
 }
 
 } // namespace nyla
+
+#endif

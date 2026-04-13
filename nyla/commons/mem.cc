@@ -11,7 +11,7 @@ namespace nyla
 namespace internal_mem
 {
 
-auto NYLA_API CStrLen(const void *str, uint64_t maxLen) -> uint64_t
+auto API CStrLen(const void *str, uint64_t maxLen) -> uint64_t
 {
     const uint8_t *ptr = (uint8_t *)str;
 

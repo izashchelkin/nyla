@@ -10,21 +10,20 @@
 #include "nyla/commons/collections.h"
 #include "nyla/commons/handle_pool.h"
 #include "nyla/commons/inline_vec.h"
-#include "nyla/commons/log.h"
 #include "nyla/commons/mem.h"
 #include "nyla/commons/minmax.h"
+#include "nyla/commons/platform_base.h"
 #include "nyla/commons/region_alloc.h"
+#include "nyla/commons/region_alloc_utils.h"
 #include "nyla/commons/span.h"
 #include "nyla/commons/spv_shader.h"
 
-#define spv_enable_utility_code
-
 // clang-format off
-#if defined(__linux__)
-#include "nyla/commons/linux/platform_linux.h"
+#ifdef __linux__
+#include "nyla/commons/platform_linux.h"
 #include "vulkan/vulkan_xcb.h"
 #else
-#include "nyla/commons/windows/platform_windows.h"
+#include "nyla/commons/platform_windows.h"
 #include "vulkan/vulkan_win32.h"
 #endif
 // clang-format on
@@ -171,7 +170,7 @@ auto ConvertMemoryUsageIntoVkMemoryPropertyFlags(RhiMemoryUsage usage) -> VkMemo
         return VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT |
                VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
     }
-    NYLA_ASSERT(false);
+    ASSERT(false);
     return 0;
 }
 
@@ -188,7 +187,7 @@ auto ConvertVertexFormatIntoVkFormat(RhiVertexFormat format) -> VkFormat
     case RhiVertexFormat::R32G32Float:
         return VK_FORMAT_R32G32_SFLOAT;
     }
-    NYLA_ASSERT(false);
+    ASSERT(false);
     return static_cast<VkFormat>(0);
 }
 
@@ -219,7 +218,7 @@ auto ConvertVulkanCullMode(RhiCullMode cullMode) -> VkCullModeFlags
     case RhiCullMode::Front:
         return VK_CULL_MODE_FRONT_BIT;
     }
-    NYLA_ASSERT(false);
+    ASSERT(false);
     return static_cast<VkCullModeFlags>(0);
 }
 
@@ -233,7 +232,7 @@ auto ConvertVulkanFrontFace(RhiFrontFace frontFace) -> VkFrontFace
     case RhiFrontFace::CW:
         return VK_FRONT_FACE_CLOCKWISE;
     }
-    NYLA_ASSERT(false);
+    ASSERT(false);
     return static_cast<VkFrontFace>(0);
 }
 
@@ -246,7 +245,7 @@ auto ConvertFilter(RhiFilter filter) -> VkFilter
     case RhiFilter::Nearest:
         return VK_FILTER_NEAREST;
     }
-    NYLA_ASSERT(false);
+    ASSERT(false);
     return {};
 }
 
@@ -259,7 +258,7 @@ auto ConvertSamplerAddressMode(RhiSamplerAddressMode addressMode) -> VkSamplerAd
     case RhiSamplerAddressMode::ClampToEdge:
         return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
     }
-    NYLA_ASSERT(false);
+    ASSERT(false);
     return {};
 }
 
@@ -272,7 +271,7 @@ auto ConvertVulkanInputRate(RhiInputRate inputRate) -> VkVertexInputRate
     case RhiInputRate::PerVertex:
         return VK_VERTEX_INPUT_RATE_VERTEX;
     }
-    NYLA_ASSERT(false);
+    ASSERT(false);
     return static_cast<VkVertexInputRate>(0);
 }
 
@@ -336,7 +335,7 @@ auto VulkanTextureStateGetSyncInfo(RhiTextureState state) -> VulkanTextureStateS
             .layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
         };
     }
-    NYLA_ASSERT(false);
+    ASSERT(false);
     return {};
 }
 
@@ -349,7 +348,7 @@ auto ConvertTextureFormatIntoVkFormat(RhiTextureFormat format, VkImageAspectFlag
             *outAspectMask = 0;
         return VK_FORMAT_UNDEFINED;
     }
-    case nyla::RhiTextureFormat::R8_UNORM: {
+    case RhiTextureFormat::R8_UNORM: {
         if (outAspectMask)
             *outAspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         return VK_FORMAT_R8_UNORM;
@@ -375,7 +374,7 @@ auto ConvertTextureFormatIntoVkFormat(RhiTextureFormat format, VkImageAspectFlag
         return VK_FORMAT_D32_SFLOAT_S8_UINT;
     }
     }
-    NYLA_ASSERT(false);
+    ASSERT(false);
     return static_cast<VkFormat>(0);
 }
 
@@ -394,7 +393,7 @@ auto ConvertVkFormatIntoTextureFormat(VkFormat format) -> RhiTextureFormat
     default:
         break;
     }
-    NYLA_ASSERT(false);
+    ASSERT(false);
     return static_cast<RhiTextureFormat>(0);
 }
 
@@ -446,7 +445,7 @@ auto GetVertexFormatSize(RhiVertexFormat format) -> uint32_t
     case RhiVertexFormat::R32G32B32A32Float:
         return 16;
     }
-    NYLA_ASSERT(false);
+    ASSERT(false);
     return 0;
 }
 
@@ -457,16 +456,16 @@ auto DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeveri
     switch (messageSeverity)
     {
     case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT: {
-        NYLA_LOG("%s", callbackData->pMessage);
-        NYLA_DEBUGBREAK();
+        LOG("%s", callbackData->pMessage);
+        TRAP();
         break;
     }
     case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT: {
-        NYLA_LOG("%s", callbackData->pMessage);
+        LOG("%s", callbackData->pMessage);
         break;
     }
     default: {
-        NYLA_LOG("%s", callbackData->pMessage);
+        LOG("%s", callbackData->pMessage);
         break;
     }
     }
@@ -482,12 +481,12 @@ inline auto VkCheckImpl(VkResult res)
 
     case VK_ERROR_DEVICE_LOST:
         // TODO:
-        // NYLA_LOG("Last checkpoint: %I64d", RhiGetLastCheckpointData(RhiQueueType::Graphics));
+        // LOG("Last checkpoint: %I64d", RhiGetLastCheckpointData(RhiQueueType::Graphics));
         // FALLTHROUGH
 
     default: {
-        NYLA_LOG("Vulkan error: %s", string_VkResult(res));
-        NYLA_ASSERT(false);
+        LOG("Vulkan error: %s", string_VkResult(res));
+        ASSERT(false);
     }
     }
 };
@@ -598,7 +597,7 @@ auto FindMemoryTypeIndex(VkMemoryRequirements memRequirements, VkMemoryPropertyF
         return i;
     }
 
-    NYLA_ASSERT(false);
+    ASSERT(false);
     return 0;
 }
 
@@ -672,7 +671,7 @@ auto VulkanBufferStateGetSyncInfo(RhiBufferState state) -> VulkanBufferStateSync
         return {.stage = VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT, .access = VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT};
     }
     }
-    NYLA_ASSERT(false);
+    ASSERT(false);
     return {};
 }
 
@@ -685,7 +684,7 @@ auto GetDeviceQueue(RhiQueueType queueType) -> DeviceQueue &
     case RhiQueueType::Transfer:
         return g_State->m_TransferQueue;
     }
-    NYLA_ASSERT(false);
+    ASSERT(false);
     return g_State->m_GraphicsQueue;
 }
 
@@ -729,7 +728,7 @@ void CreateSwapchain(region_alloc scratch)
         for (VkPresentModeKHR presentMode : presentModes)
         {
             if (logPresentModes)
-                NYLA_LOG("Present Mode available: %s", string_VkPresentModeKHR(presentMode));
+                LOG("Present Mode available: %s", string_VkPresentModeKHR(presentMode));
 
             bool better;
             switch (presentMode)
@@ -756,7 +755,7 @@ void CreateSwapchain(region_alloc scratch)
 
         if (logPresentModes)
         {
-            NYLA_LOG("Chose %s", string_VkPresentModeKHR(bestMode));
+            LOG("Chose %s", string_VkPresentModeKHR(bestMode));
         }
 
         logPresentModes = false;
@@ -783,7 +782,7 @@ void CreateSwapchain(region_alloc scratch)
             return surfaceFormat.format == VK_FORMAT_B8G8R8A8_SRGB &&
                    surfaceFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
         });
-        NYLA_ASSERT(it != surfaceFormats.end());
+        ASSERT(it != surfaceFormats.end());
         return *it;
     }();
 
@@ -802,7 +801,7 @@ void CreateSwapchain(region_alloc scratch)
         };
     }();
 
-    NYLA_ASSERT(kRhiMaxNumSwapchainTextures >= surfaceCapabilities.minImageCount);
+    ASSERT(kRhiMaxNumSwapchainTextures >= surfaceCapabilities.minImageCount);
     uint32_t swapchainMinImageCount = std::min(kRhiMaxNumSwapchainTextures, surfaceCapabilities.minImageCount + 1);
     if (surfaceCapabilities.maxImageCount)
         swapchainMinImageCount = std::min(surfaceCapabilities.maxImageCount, swapchainMinImageCount);
@@ -828,7 +827,7 @@ void CreateSwapchain(region_alloc scratch)
     uint32_t swapchainTexturesCount;
     vkGetSwapchainImagesKHR(g_State->m_Dev, g_State->m_Swapchain, &swapchainTexturesCount, nullptr);
 
-    NYLA_ASSERT(swapchainTexturesCount <= kRhiMaxNumSwapchainTextures);
+    ASSERT(swapchainTexturesCount <= kRhiMaxNumSwapchainTextures);
     array<VkImage, kRhiMaxNumSwapchainTextures> swapchainImages;
 
     vkGetSwapchainImagesKHR(g_State->m_Dev, g_State->m_Swapchain, &swapchainTexturesCount, swapchainImages.data);
@@ -1035,7 +1034,7 @@ void Rhi::Init(region_alloc &scratch, const RhiInitDesc &rhiDesc)
 
         constexpr uint32_t kInvalidIndex = std::numeric_limits<uint32_t>::max();
 
-        NYLA_ASSERT(rhiDesc.limits.numFramesInFlight <= kRhiMaxNumFramesInFlight);
+        ASSERT(rhiDesc.limits.numFramesInFlight <= kRhiMaxNumFramesInFlight);
 
         g_State->m_Flags = rhiDesc.flags;
         g_State->m_Limits = rhiDesc.limits;
@@ -1102,21 +1101,21 @@ void Rhi::Init(region_alloc &scratch, const RhiInitDesc &rhiDesc)
             vkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionsCount,
                                                    InlineVec::DataPtr(instanceExtensions));
 
-            NYLA_LOG("");
-            NYLA_LOG("%d Instance Extensions available", instanceExtensionsCount);
+            LOG("");
+            LOG("%d Instance Extensions available", instanceExtensionsCount);
             for (uint32_t i = 0; i < instanceExtensionsCount; ++i)
             {
                 const auto &extension = instanceExtensions[i];
-                NYLA_LOG("%s", extension.extensionName);
+                LOG("%s", extension.extensionName);
             }
         }
 
-        NYLA_LOG("");
-        NYLA_LOG("%zd Layers available", layers.size);
+        LOG("");
+        LOG("%zd Layers available", layers.size);
         for (uint32_t i = 0; i < layerCount; ++i)
         {
             const auto &layer = layers[i];
-            NYLA_LOG("    %s", layer.layerName);
+            LOG("    %s", layer.layerName);
 
             auto &layerExtensions = RegionAlloc::AllocVec<VkExtensionProperties, 256>(scratch);
             uint32_t layerExtensionProperties;
@@ -1129,7 +1128,7 @@ void Rhi::Init(region_alloc &scratch, const RhiInitDesc &rhiDesc)
             for (uint32_t i = 0; i < layerExtensionProperties; ++i)
             {
                 const auto &extension = layerExtensions[i];
-                NYLA_LOG("        %s", extension.extensionName);
+                LOG("        %s", extension.extensionName);
             }
         }
 
@@ -1210,7 +1209,7 @@ void Rhi::Init(region_alloc &scratch, const RhiInitDesc &rhiDesc)
                     if (Span::Eq(deviceExtension,
                                  Span::FromCStr(extensions[i].extensionName, VK_MAX_EXTENSION_NAME_SIZE)))
                     {
-                        NYLA_LOG("Found device extension: " NYLA_SV_FMT, NYLA_SV_ARG(deviceExtension));
+                        LOG("Found device extension: " SV_FMT, SV_ARG(deviceExtension));
                         --missingExtensions;
                         break;
                     }
@@ -1219,7 +1218,7 @@ void Rhi::Init(region_alloc &scratch, const RhiInitDesc &rhiDesc)
 
             if (missingExtensions)
             {
-                NYLA_LOG("Missing %d extensions", missingExtensions);
+                LOG("Missing %d extensions", missingExtensions);
                 continue;
             }
 
@@ -1287,7 +1286,7 @@ void Rhi::Init(region_alloc &scratch, const RhiInitDesc &rhiDesc)
             break;
         }
 
-        NYLA_ASSERT(g_State->m_PhysDev);
+        ASSERT(g_State->m_PhysDev);
 
         const float queuePriority = 1.0f;
         auto &queueCreateInfos = RegionAlloc::AllocVec<VkDeviceQueueCreateInfo, 2>(scratch);
@@ -1518,7 +1517,7 @@ void Rhi::Init(region_alloc &scratch, const RhiInitDesc &rhiDesc)
              g_State->m_Limits.maxPassCount * CbvOffset(g_State->m_Limits.passConstantSize) +
              g_State->m_Limits.maxDrawCount * CbvOffset(g_State->m_Limits.drawConstantSize) +
              g_State->m_Limits.maxDrawCount * CbvOffset(g_State->m_Limits.largeDrawConstantSize));
-        NYLA_LOG("Constants Buffer Size: %fmb", (double)bufferSize / 1024.0 / 1024.0);
+        LOG("Constants Buffer Size: %fmb", (double)bufferSize / 1024.0 / 1024.0);
 
         g_State->m_ConstantsUniformBuffer = CreateBuffer(RhiBufferDesc{
             .size = bufferSize,
@@ -2168,8 +2167,8 @@ void Rhi::CmdPushGraphicsConstants(RhiCmdList cmd, uint32_t offset, RhiShaderSta
 void Rhi::CmdBindVertexBuffers(RhiCmdList cmd, uint32_t firstBinding, span<const RhiBuffer> buffers,
                                span<const uint64_t> offsets)
 {
-    NYLA_ASSERT(buffers.size == offsets.size);
-    NYLA_ASSERT(buffers.size <= 4U);
+    ASSERT(buffers.size == offsets.size);
+    ASSERT(buffers.size <= 4U);
 
     array<VkBuffer, 4> vkBufs;
     array<VkDeviceSize, 4> vkOffsets;
@@ -2464,17 +2463,17 @@ void Rhi::DestroyTexture(RhiTexture texture)
 {
     VulkanTextureData textureData = HandlePool::ResolveData(g_State->m_Textures, texture);
 
-    NYLA_ASSERT(textureData.image);
+    ASSERT(textureData.image);
     vkDestroyImage(g_State->m_Dev, textureData.image, g_State->vkAlloc);
 
-    NYLA_ASSERT(textureData.memory);
+    ASSERT(textureData.memory);
     vkFreeMemory(g_State->m_Dev, textureData.memory, g_State->vkAlloc);
 }
 
 void Rhi::DestroySampledTextureView(RhiSampledTextureView textureView)
 {
     const VulkanTextureViewData &textureViewData = HandlePool::ResolveData(g_State->m_SampledTextureViews, textureView);
-    NYLA_ASSERT(textureViewData.imageView);
+    ASSERT(textureViewData.imageView);
 
     vkDestroyImageView(g_State->m_Dev, textureViewData.imageView, g_State->vkAlloc);
 }
@@ -2482,7 +2481,7 @@ void Rhi::DestroySampledTextureView(RhiSampledTextureView textureView)
 void Rhi::DestroyRenderTargetView(RhiRenderTargetView textureView)
 {
     const VulkanTextureViewData &textureViewData = HandlePool::ResolveData(g_State->m_RenderTargetViews, textureView);
-    NYLA_ASSERT(textureViewData.imageView);
+    ASSERT(textureViewData.imageView);
 
     vkDestroyImageView(g_State->m_Dev, textureViewData.imageView, g_State->vkAlloc);
 }
@@ -2490,7 +2489,7 @@ void Rhi::DestroyRenderTargetView(RhiRenderTargetView textureView)
 void Rhi::DestroyDepthStencilView(RhiDepthStencilView textureView)
 {
     const VulkanTextureViewData &textureViewData = HandlePool::ResolveData(g_State->m_DepthStencilViews, textureView);
-    NYLA_ASSERT(textureViewData.imageView);
+    ASSERT(textureViewData.imageView);
 
     vkDestroyImageView(g_State->m_Dev, textureViewData.imageView, g_State->vkAlloc);
 }
@@ -2577,7 +2576,7 @@ auto Rhi::CreateGraphicsPipeline(region_alloc &scratch, const RhiGraphicsPipelin
     {
         uint32_t location;
         if (!SpvShader::FindLocationBySemantic(vsMan, attribute.semantic, spv_shader_storage_class::Input, &location))
-            NYLA_ASSERT(false);
+            ASSERT(false);
 
         InlineVec::Append(vertexAttributes, VkVertexInputAttributeDescription{
                                                 .location = location,
@@ -2591,18 +2590,18 @@ auto Rhi::CreateGraphicsPipeline(region_alloc &scratch, const RhiGraphicsPipelin
     {
         byteview semantic;
         if (!SpvShader::FindSemanticById(psMan, id, &semantic))
-            NYLA_ASSERT(false);
+            ASSERT(false);
 
         if (Span::StartsWith(semantic, "SV_"_s))
             continue;
 
         uint32_t location;
         if (!SpvShader::FindLocationBySemantic(vsMan, semantic, spv_shader_storage_class::Output, &location))
-            NYLA_ASSERT(false);
+            ASSERT(false);
 
         if (!SpvShader::RewriteLocationForSemantic(psMan, pixelShaderData.spv, semantic,
                                                    spv_shader_storage_class::Input, location))
-            NYLA_ASSERT(false);
+            ASSERT(false);
     }
 
     auto createShaderModule = [](span<const uint32_t> spv) -> VkShaderModule {
@@ -2720,13 +2719,13 @@ auto Rhi::CreateGraphicsPipeline(region_alloc &scratch, const RhiGraphicsPipelin
     };
 
 #if 0
-    NYLA_ASSERT(desc.bindGroupLayoutsCount <= std::Size(desc.bindGroupLayouts));
+    ASSERT(desc.bindGroupLayoutsCount <= std::Size(desc.bindGroupLayouts));
     pipelineData.bindGroupLayoutCount = desc.bindGroupLayoutsCount;
     pipelineData.bindGroupLayouts = desc.bindGroupLayouts;
 #endif
 
 #if 0
-    NYLA_ASSERT(desc.pushConstantSize <= kRhiMaxPushConstantSize);
+    ASSERT(desc.pushConstantSize <= kRhiMaxPushConstantSize);
     const VkPushConstantRange pushConstantRange{
         .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
         .offset = 0,
@@ -2799,7 +2798,7 @@ void Rhi::NameGraphicsPipeline(RhiGraphicsPipeline pipeline, byteview name)
 
 void Rhi::SetFrameConstant(RhiCmdList cmd, byteview data)
 {
-    NYLA_ASSERT(data.size <= g_State->m_Limits.frameConstantSize);
+    ASSERT(data.size <= g_State->m_Limits.frameConstantSize);
 
     const VulkanCmdListData &cmdData = HandlePool::ResolveData(g_State->m_CmdLists, cmd);
 
@@ -2809,7 +2808,7 @@ void Rhi::SetFrameConstant(RhiCmdList cmd, byteview data)
 
 void Rhi::SetPassConstant(RhiCmdList cmd, byteview data)
 {
-    NYLA_ASSERT(data.size <= g_State->m_Limits.passConstantSize);
+    ASSERT(data.size <= g_State->m_Limits.passConstantSize);
 
     const VulkanCmdListData &cmdData = HandlePool::ResolveData(g_State->m_CmdLists, cmd);
 
@@ -2819,7 +2818,7 @@ void Rhi::SetPassConstant(RhiCmdList cmd, byteview data)
 
 void Rhi::SetDrawConstant(RhiCmdList cmd, byteview data)
 {
-    NYLA_ASSERT(data.size <= g_State->m_Limits.drawConstantSize);
+    ASSERT(data.size <= g_State->m_Limits.drawConstantSize);
 
     const VulkanCmdListData &cmdData = HandlePool::ResolveData(g_State->m_CmdLists, cmd);
 
@@ -2829,7 +2828,7 @@ void Rhi::SetDrawConstant(RhiCmdList cmd, byteview data)
 
 void Rhi::SetLargeDrawConstant(RhiCmdList cmd, byteview data)
 {
-    NYLA_ASSERT(data.size <= g_State->m_Limits.largeDrawConstantSize);
+    ASSERT(data.size <= g_State->m_Limits.largeDrawConstantSize);
 
     const VulkanCmdListData &cmdData = HandlePool::ResolveData(g_State->m_CmdLists, cmd);
 

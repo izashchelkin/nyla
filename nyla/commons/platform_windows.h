@@ -1,13 +1,14 @@
 #pragma once
 
 #include <cstdint>
+
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
 
 #include <Xinput.h>
 
-#include "nyla/commons/platform.h"
+#include "nyla/commons/keyboard.h"
 
 namespace nyla
 {

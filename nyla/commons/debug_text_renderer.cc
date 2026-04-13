@@ -1,12 +1,12 @@
 #include "nyla/commons/debug_text_renderer.h"
-#include "nyla/commons/asset_manager.h"
-#include "nyla/commons/engine0_internal.h"
-#include "nyla/commons/inline_vec.h"
-#include "nyla/commons/span.h"
 
 #include <cstdint>
 
+#include "nyla/commons/asset_manager.h"
+#include "nyla/commons/engine0_internal.h"
+#include "nyla/commons/inline_vec.h"
 #include "nyla/commons/rhi.h"
+#include "nyla/commons/span.h"
 
 namespace nyla
 {
@@ -18,19 +18,17 @@ RhiGraphicsPipeline m_Pipeline;
 
 struct DrawData
 {
-    Array<uint4, 17> words;
+    array<uint4, 17> words;
     int32_t originX;
     int32_t originY;
     uint32_t wordCount;
     uint32_t pad;
-    Array<float, 4> fg;
-    Array<float, 4> bg;
+    array<float, 4> fg;
+    array<float, 4> bg;
 };
-InlineVec<DrawData, 4> m_PendingDraws;
+inline_vec<DrawData, 4> m_PendingDraws;
 
 } // namespace
-
-using namespace engine0_internal;
 
 void DebugTextRenderer::Init()
 {
@@ -40,7 +38,7 @@ void DebugTextRenderer::Init()
     auto *renderer = new DebugTextRenderer{};
 
     const RhiGraphicsPipelineDesc pipelineDesc{
-        .debugName = "DebugTextRender",
+        .debugName = "DebugTextRender"_s,
         .vs = vs,
         .ps = ps,
         .colorTargetFormats = AssetManager::GetMeshPipelineColorTargetFormats(),
@@ -49,7 +47,7 @@ void DebugTextRenderer::Init()
     m_Pipeline = Rhi::CreateGraphicsPipeline(pipelineDesc);
 }
 
-void DebugTextRenderer::Text(int32_t x, int32_t y, Str text)
+void DebugTextRenderer::Text(int32_t x, int32_t y, byteview text)
 {
     DrawData drawData{
         .originX = x,

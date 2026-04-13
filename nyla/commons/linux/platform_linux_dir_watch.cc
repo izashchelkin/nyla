@@ -31,10 +31,10 @@ class PlatformDirWatch::Impl
 void PlatformDirWatch::Impl::Init(const char *path)
 {
     m_InotifyFd = inotify_init1(IN_NONBLOCK);
-    NYLA_ASSERT(m_InotifyFd > 0);
+    ASSERT(m_InotifyFd > 0);
 
     int wd = inotify_add_watch(m_InotifyFd, path, IN_MODIFY | IN_DELETE | IN_MOVED_FROM | IN_MOVED_TO);
-    NYLA_ASSERT(wd != -1);
+    ASSERT(wd != -1);
 }
 
 void PlatformDirWatch::Impl::Destroy()
@@ -47,7 +47,7 @@ auto PlatformDirWatch::Impl::Poll(PlatformDirWatchEvent &outChange) -> bool
 {
     for (;;)
     {
-        NYLA_ASSERT(m_BufPos <= m_BufLen);
+        ASSERT(m_BufPos <= m_BufLen);
         if (!m_BufPos || m_BufPos == m_BufLen)
         {
             m_BufLen = read(m_InotifyFd, m_Buf.Data(), m_Buf.Size());
@@ -85,7 +85,7 @@ auto PlatformDirWatch::Impl::Poll(PlatformDirWatchEvent &outChange) -> bool
 
 void PlatformDirWatch::Init(const char *path)
 {
-    NYLA_ASSERT(!m_Impl);
+    ASSERT(!m_Impl);
     m_Impl = new PlatformDirWatch::Impl{};
     m_Impl->Init(path);
 }

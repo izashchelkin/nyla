@@ -4,7 +4,7 @@ namespace nyla
 {
 
 auto UserMain() -> int;
-void NYLA_API NORETURN LibMain(int (*userMain)());
+void API NORETURN LibMain(int (*userMain)());
 
 } // namespace nyla
 

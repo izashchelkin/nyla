@@ -25,21 +25,21 @@ auto UserMain() -> int
 
     if (args.size < 2)
     {
-        NYLA_LOG("usage: %s [output] {[input] [processor config]}", args[0]);
+        LOG("usage: %s [output] {[input] [processor config]}", args[0]);
         return 1;
     }
 
     for (auto arg : args)
 
         if (arg.size > 0)
-            NYLA_LOG("" NYLA_SV_FMT, NYLA_SV_ARG(arg));
+            LOG("" NYLA_SV_FMT, NYLA_SV_ARG(arg));
 }
 
-NYLA_LOG("Writing into " NYLA_SV_FMT, NYLA_SV_ARG(args[1]));
+LOG("Writing into " NYLA_SV_FMT, NYLA_SV_ARG(args[1]));
 
 const FileHandle outputFile =
     Platform::FileOpen(RegionAlloc::SafeCStr<64>(arena, args[1]), FileOpenMode::Append | FileOpenMode::Write);
-NYLA_ASSERT(Platform::FileValid(outputFile));
+ASSERT(Platform::FileValid(outputFile));
 
 RegionAlloc::Reset(arena);
 auto &cmdLineBuffer = RegionAlloc::AllocString<1_KiB>(arena);
@@ -61,7 +61,7 @@ for (uint32_t i = 2; i < args.size;)
     byteview dataPath = args[i++];
     byteview processorConfig = args[i++];
 
-    // NYLA_LOG("Packing " NYLA_SV_FMT " using config " NYLA_SV_FMT, NYLA_SV_ARG(dataPath),
+    // LOG("Packing " NYLA_SV_FMT " using config " NYLA_SV_FMT, NYLA_SV_ARG(dataPath),
     //          NYLA_SV_ARG(processorConfig));
 }
 

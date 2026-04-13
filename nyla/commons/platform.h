@@ -2,44 +2,68 @@
 
 #include <cstdint>
 
-#include "nyla/commons/concepts.h"
-#include "nyla/commons/platform_base.h"
-#include "nyla/commons/region_alloc.h"
-#include "nyla/commons/span.h"
+#include "nyla/commons/bitenum.h"
+#include "nyla/commons/macros.h"
+#include "nyla/commons/span_def.h"
 
 namespace nyla
 {
 
-namespace Platform
-{
-
 void ParseStdArgs(byteview *args, uint32_t maxArgs);
 
-//
+enum class KeyPhysical;
 
-template <is_plain T> INLINE void FileWrite(FileHandle file, const T &data)
+enum class PlatformFeature
 {
-    NYLA_ASSERT(Platform::FileWrite(file, sizeof(data), reinterpret_cast<const char *>(&data)) == sizeof(data));
-}
+    Gfx = 1 << 0,
+    KeyboardInput = 1 << 1,
+    MouseInput = 1 << 2,
+};
+NYLA_BITENUM(PlatformFeature);
 
-template <is_plain T> INLINE void FileWriteSpan(FileHandle file, span<T> data)
+struct PlatformWindow
 {
-    uint64_t expectedSize = Span::SizeBytes(data);
-    NYLA_ASSERT(Platform::FileWrite(file, expectedSize, reinterpret_cast<const char *>(&data[0])) == expectedSize);
-}
+    std::uintptr_t handle;
+};
 
-INLINE auto FileRead(region_alloc &alloc, byteview path, uint32_t size) -> span<uint8_t>
+struct PlatformWindowSize
 {
-    auto file = Platform::FileOpen(Span::CStr(path), FileOpenMode::Read);
-    NYLA_ASSERT(Platform::FileValid(file));
+    uint32_t width;
+    uint32_t height;
+};
 
-    uint8_t *data = RegionAlloc::Alloc(alloc, size, 1);
-    uint32_t numRead = Platform::FileRead(file, size, data);
-    NYLA_ASSERT(numRead == size);
+enum class PlatformEventType
+{
+    None,
 
-    return {data, size};
-}
+    KeyDown,
+    KeyUp,
+    MousePress,
+    MouseRelease,
 
-} // namespace Platform
+    WinResize,
+
+    Repaint,
+    Quit
+};
+
+struct PlatformEvent
+{
+    PlatformEventType type;
+    union {
+        KeyPhysical key;
+
+        struct
+        {
+            uint32_t code;
+        } mouse;
+    };
+};
+
+auto API Sleep(uint64_t millis);
+auto API Spawn(const char *const cmd, uint64_t count) -> bool;
+void API WinOpen();
+auto API WinGetSize() -> PlatformWindowSize;
+auto API WinPollEvent(PlatformEvent &outEvent) -> bool;
 
 } // namespace nyla

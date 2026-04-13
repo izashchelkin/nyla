@@ -22,11 +22,11 @@ static auto GetRenderDocAPI() -> RENDERDOC_API_1_6_0 *
         pRENDERDOC_GetAPI renderdocGetApi = reinterpret_cast<pRENDERDOC_GetAPI>(dlsym(mod, "RENDERDOC_GetAPI"));
         if (renderdocGetApi && renderdocGetApi(eRENDERDOC_API_Version_1_6_0, (void **)&renderdocApi) == 1)
         {
-            NYLA_LOG("got renderdoc api");
+            LOG("got renderdoc api");
             return renderdocApi;
         }
 
-        NYLA_LOG("failed to get renderdoc api");
+        LOG("failed to get renderdoc api");
         DebugBreak();
     }
 

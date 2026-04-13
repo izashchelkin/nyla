@@ -8,12 +8,12 @@
 #define TRAP() __debugbreak()
 #define UNREACHABLE() __assume(0)
 
-#ifdef NYLA_DLL_EXPORT
-#define NYLA_API __declspec(dllexport)
+#ifdef DLL_EXPORT
+#define API __declspec(dllexport)
 #endif
 
-#ifdef NYLA_DLL_IMPORT
-#define NYLA_API __declspec(dllimport)
+#ifdef DLL_IMPORT
+#define API __declspec(dllimport)
 #endif
 
 #else
@@ -24,12 +24,15 @@
 #define TRAP() __builtin_trap()
 #define UNREACHABLE() __builtin_unreachable()
 
-#ifdef NYLA_DLL_EXPORT
-#define NYLA_API __attribute__((visibility("default")))
+#ifdef DLL_EXPORT
+#define API __attribute__((visibility("default")))
 #endif
 
 #endif
 
-#ifndef NYLA_API
-#define NYLA_API
+#ifndef API
+#define API
 #endif
+
+#define XSTRINGIFY(a) STRINGIFY(a)
+#define STRINGIFY(a) #a

@@ -38,7 +38,7 @@ void WindowManager::Init()
                                            XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE |
                                            XCB_EVENT_MASK_FOCUS_CHANGE | XCB_EVENT_MASK_POINTER_MOTION})))
     {
-        NYLA_ASSERT(false && "another wm is already running");
+        ASSERT(false && "another wm is already running");
     }
 
     LinuxX11Platform::Grab();
@@ -85,7 +85,7 @@ void WindowManager::Init()
             xcb_request_check(LinuxX11Platform::GetConn(),
                               xcb_grab_key_checked(LinuxX11Platform::GetConn(), 1, LinuxX11Platform::GetRoot(), mod,
                                                    keycode, XCB_GRAB_MODE_ASYNC, XCB_GRAB_MODE_ASYNC));
-        NYLA_ASSERT(!error);
+        ASSERT(!error);
     };
 
     grabKey(1, 0, 0, 0, KeyPhysical::W);
@@ -109,7 +109,7 @@ void WindowManager::Init()
 
 auto WindowManager::GetActiveStack() -> WindowStack &
 {
-    NYLA_ASSERT((m_ActiveStackIdx & 0xFF) < m_Stacks.Size());
+    ASSERT((m_ActiveStackIdx & 0xFF) < m_Stacks.Size());
     return m_Stacks.at(m_ActiveStackIdx & 0xFF);
 }
 
@@ -172,10 +172,10 @@ void WindowManager::UnmanageClient(xcb_window_t clientWindow)
 
     if (client.transientFor)
     {
-        NYLA_ASSERT(client.subwindows.empty());
+        ASSERT(client.subwindows.empty());
         auto &subwindows = m_Clients.at(client.transientFor).subwindows;
         auto it = std::ranges::find(subwindows, clientWindow);
-        NYLA_ASSERT(it != subwindows.end());
+        ASSERT(it != subwindows.end());
         subwindows.erase(it);
     }
     else
@@ -534,7 +534,7 @@ void WindowManager::Process(bool &isRunning)
         case XCB_MAPPING_NOTIFY: {
             // auto mappingnotify =
             //     reinterpret_cast<xcb_mapping_notify_event_t*>(event);
-            NYLA_LOG("mapping notify");
+            LOG("mapping notify");
             break;
         }
 
@@ -587,7 +587,7 @@ void WindowManager::Process(bool &isRunning)
 
         case 0: {
             auto error = reinterpret_cast<xcb_generic_error_t *>(event);
-            NYLA_LOG("xcb error: %d, sequence: %d", error->error_code, error->sequence);
+            LOG("xcb error: %d, sequence: %d", error->error_code, error->sequence);
             break;
         }
         }
@@ -645,7 +645,7 @@ void WindowManager::Process(bool &isRunning)
             case XCB_ATOM_WM_NAME: {
                 if (!reply)
                 {
-                    NYLA_LOG("property fetch error");
+                    LOG("property fetch error");
                     break;
                 }
 
@@ -808,7 +808,7 @@ void WindowManager::Process(bool &isRunning)
         auto configureWindows = [this](Rect boundingRect, Span<const xcb_window_t> windows, LayoutType layoutType,
                                        auto visitor) -> auto {
             std::vector<Rect> layout = ComputeLayout(boundingRect, windows.Size(), 2, layoutType);
-            NYLA_ASSERT(layout.Size() == windows.Size());
+            ASSERT(layout.Size() == windows.Size());
 
             for (auto [rect, client_window] : std::ranges::views::zip(layout, windows))
             {
@@ -964,7 +964,7 @@ void WindowManager::MoveStack(xcb_timestamp_t time, auto computeIdx)
             oldstack.zoom = false;
 
             auto it = std::ranges::find(oldstack.windows, oldstack.activeWindow);
-            NYLA_ASSERT(it != oldstack.windows.end());
+            ASSERT(it != oldstack.windows.end());
             oldstack.windows.erase(it);
 
             if (oldstack.windows.empty())

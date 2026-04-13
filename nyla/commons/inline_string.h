@@ -2,12 +2,14 @@
 
 #include <cstdint>
 
+#include "nyla/commons/fmt.h"
 #include "nyla/commons/inline_vec.h"
+#include "nyla/commons/span_def.h"
 
 namespace nyla
 {
 
-void NYLA_API StringWriteFmt(char *out, uint64_t outSize, byteview fmt, ...);
+void API StringWriteFmt(span<uint8_t> out, byteview fmt, ...);
 
 template <uint64_t Capacity> using inline_string = inline_vec<uint8_t, Capacity>;
 
@@ -18,12 +20,12 @@ template <uint64_t Capacity> INLINE void AppendSuffix(inline_string<Capacity> &s
 {
     InlineVec::Append(self, suffix);
     if (self.size < Capacity)
-        NYLA_DASSERT((self.data + self.size) == '\0');
+        DASSERT((self.data + self.size) == '\0');
 }
 
 template <uint64_t Capacity> INLINE void RemoveSuffix(inline_string<Capacity> &self, uint64_t suffixLen)
 {
-    NYLA_DASSERT(suffixLen <= self.size);
+    DASSERT(suffixLen <= self.size);
     self.size -= suffixLen;
     self.data + self.size = '\0';
 }

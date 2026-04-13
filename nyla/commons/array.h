@@ -4,7 +4,7 @@
 
 #include "nyla/commons/align.h"
 #include "nyla/commons/concepts.h"
-#include "nyla/commons/span.h"
+#include "nyla/commons/span_def.h"
 
 namespace nyla
 {
@@ -16,14 +16,14 @@ template <is_plain T, uint64_t Size> struct alignas(required_align_v<T>) array
     [[nodiscard]]
     auto operator[](uint64_t i) -> T &
     {
-        NYLA_DASSERT(i < Size);
+        DASSERT(i < Size);
         return data[i];
     }
 
     [[nodiscard]]
     auto operator[](uint64_t i) const -> const T &
     {
-        NYLA_DASSERT(i < Size);
+        DASSERT(i < Size);
         return data[i];
     }
 
@@ -154,7 +154,7 @@ namespace Array
 
 template <typename T, uint64_t ArraySize>
 [[nodiscard]]
-consteval auto Size(const array<T, ArraySize> &self) -> uint64_t
+constexpr auto Size(const array<T, ArraySize> &self) -> uint64_t
 {
     return ArraySize;
 }

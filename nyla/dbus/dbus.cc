@@ -14,7 +14,7 @@ void DBusInitialize()
     dbus.conn = dbus_bus_get(DBUS_BUS_SESSION, err);
     if (err.Bad() || !dbus.conn)
     {
-        NYLA_LOG("could not connect to dbus: %s", err.inner.message);
+        LOG("could not connect to dbus: %s", err.inner.message);
         dbus.conn = nullptr;
         return;
     }
@@ -67,7 +67,7 @@ void DBusProcess()
                                        DBUS_TYPE_STRING, &newOwner, //
                                        DBUS_TYPE_INVALID))
             {
-                NYLA_LOG("%s", err.Message());
+                LOG("%s", err.Message());
                 continue;
             }
 
@@ -110,19 +110,19 @@ void DBusRegisterHandler(const char *bus, const char *path, DBusObjectPathHandle
     if (!dbus.conn)
         return;
 
-    NYLA_ASSERT(handler);
+    ASSERT(handler);
 
     DBusErrorWrapper err;
 
     int ret = dbus_bus_request_name(dbus.conn, bus, DBUS_NAME_FLAG_DO_NOT_QUEUE, err);
     if (err.Bad() || (ret != DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER && ret != DBUS_REQUEST_NAME_REPLY_ALREADY_OWNER))
     {
-        NYLA_LOG("could not become owner of the bus %s", bus);
+        LOG("could not become owner of the bus %s", bus);
         return;
     }
 
     auto [_, ok] = dbus.handlers.try_emplace(path, handler);
-    NYLA_ASSERT(ok);
+    ASSERT(ok);
 }
 
 void DBusReplyInvalidArguments(DBusMessage *msg, const DBusErrorWrapper &err)

@@ -77,13 +77,13 @@ struct json_value
 
     auto begin() -> json_value_iterator
     {
-        NYLA_ASSERT(tag == json_tag::ArrayBegin || tag == json_tag::ObjectBegin);
+        ASSERT(tag == json_tag::ArrayBegin || tag == json_tag::ObjectBegin);
         return json_value_iterator{this + 1};
     }
 
     auto end() -> json_value_iterator
     {
-        NYLA_ASSERT(tag == json_tag::ArrayBegin || tag == json_tag::ObjectBegin);
+        ASSERT(tag == json_tag::ArrayBegin || tag == json_tag::ObjectBegin);
         return json_value_iterator{val.valHeader.end};
     }
 };
@@ -93,13 +93,13 @@ namespace JsonValue
 
 INLINE auto GetCount(const json_value &self)
 {
-    NYLA_ASSERT(self.tag == json_tag::ArrayBegin || self.tag == json_tag::ObjectBegin);
+    ASSERT(self.tag == json_tag::ArrayBegin || self.tag == json_tag::ObjectBegin);
     return self.val.valHeader.count;
 }
 
 INLINE auto GetFront(json_value &self) -> json_value *
 {
-    NYLA_ASSERT(self.tag == json_tag::ArrayBegin || self.tag == json_tag::ObjectBegin);
+    ASSERT(self.tag == json_tag::ArrayBegin || self.tag == json_tag::ObjectBegin);
     return &self + 1;
 }
 
@@ -146,7 +146,7 @@ INLINE void SetValue(json_value &self, json_tag tag, uint32_t count, json_value 
     INLINE auto name(json_value &self, span<byteview> path) -> out                                                     \
     {                                                                                                                  \
         out ret;                                                                                                       \
-        NYLA_ASSERT(Try##name(self, path, ret));                                                                       \
+        ASSERT(Try##name(self, path, ret));                                                                            \
         return ret;                                                                                                    \
     }                                                                                                                  \
     INLINE auto Try##name(json_value &self, byteview path, out &ret) -> bool                                           \

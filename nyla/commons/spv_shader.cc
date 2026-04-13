@@ -1306,7 +1306,7 @@ auto HandleOpDecorateString(spv_shader &self, span<uint32_t> operands) -> spv_op
 
         InlineString::AsciiToUpper(name);
 
-        NYLA_LOG("" NYLA_SV_FMT, NYLA_SV_ARG((byteview)name));
+        LOG("" SV_FMT, SV_ARG((byteview)name));
         return spv_op_process_result::Ok;
     }
 
@@ -1375,7 +1375,7 @@ void ProcessShader(spv_shader &self, span<uint32_t> data, RhiShaderStage stage)
             break;
         }
         case spv_op_process_result::InvalidState: {
-            NYLA_ASSERT(false);
+            ASSERT(false);
             break;
         }
         case spv_op_process_result::MakeNop: {

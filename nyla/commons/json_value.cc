@@ -138,27 +138,27 @@ void Log(json_value &self, uint32_t indent)
     switch (self.tag)
     {
     case json_tag::Null: {
-        NYLA_LOG("%*snull", indent, " ");
+        LOG("%*snull", indent, " ");
         return;
     }
     case json_tag::Bool: {
-        NYLA_LOG("%*s%d", indent, " ", JsonValue::Bool(self));
+        LOG("%*s%d", indent, " ", JsonValue::Bool(self));
         return;
     }
     case json_tag::Integer: {
-        NYLA_LOG("%*s%" PRIu64, indent, " ", JsonValue::QWord(self));
+        LOG("%*s%" PRIu64, indent, " ", JsonValue::QWord(self));
         return;
     }
     case json_tag::Double: {
-        NYLA_LOG("%*s%f", indent, " ", JsonValue::Double(self));
+        LOG("%*s%f", indent, " ", JsonValue::Double(self));
         return;
     }
     case json_tag::String: {
-        NYLA_LOG("%*s\"" NYLA_SV_FMT "\"", indent, " ", NYLA_SV_ARG(JsonValue::String(self)));
+        LOG("%*s\"" NYLA_SV_FMT "\"", indent, " ", NYLA_SV_ARG(JsonValue::String(self)));
         return;
     }
     case json_tag::ArrayBegin: {
-        NYLA_LOG("%*s[", indent, " ");
+        LOG("%*s[", indent, " ");
 
         auto end = self.end();
         for (auto it = self.begin(); it != end; ++it)
@@ -167,11 +167,11 @@ void Log(json_value &self, uint32_t indent)
         // Fallthrough
     }
     case json_tag::ArrayEnd: {
-        NYLA_LOG("%*s]", indent, " ");
+        LOG("%*s]", indent, " ");
         return;
     }
     case json_tag::ObjectBegin: {
-        NYLA_LOG("%*s{", indent, " ");
+        LOG("%*s{", indent, " ");
 
         auto end = self.end();
         for (auto it = self.begin(); it != end; ++it)
@@ -182,11 +182,11 @@ void Log(json_value &self, uint32_t indent)
         // Fallthrough
     }
     case json_tag::ObjectEnd: {
-        NYLA_LOG("%*s}", indent, " ");
+        LOG("%*s}", indent, " ");
         return;
     }
     default: {
-        NYLA_ASSERT(false);
+        ASSERT(false);
     }
     }
 }

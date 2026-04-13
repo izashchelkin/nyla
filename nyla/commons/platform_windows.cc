@@ -12,6 +12,10 @@
 #include "nyla/commons/platform.h"
 #include "nyla/commons/span.h"
 
+#include "nyla/commons/gamepad.h"
+#include "nyla/commons/keyboard.h"
+#include "nyla/commons/time.h"
+
 auto CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) -> LRESULT;
 
 namespace nyla
@@ -70,37 +74,32 @@ auto TicksTo(uint64_t ticks, uint64_t scale) -> uint64_t
 
 } // namespace
 
-auto NYLA_API Platform::GetMonotonicTimeMillis() -> uint64_t
+auto API GetMonotonicTimeMillis() -> uint64_t
 {
     return TicksTo(GetPerformanceTicks(), 1'000ULL);
 }
 
-auto NYLA_API Platform::GetMonotonicTimeMicros() -> uint64_t
+auto API GetMonotonicTimeMicros() -> uint64_t
 {
     return TicksTo(GetPerformanceTicks(), 1'000'000ULL);
 }
 
-auto NYLA_API Platform::GetMemPageSize() -> uint64_t
-{
-    return g_SysInfo.dwPageSize;
-}
-
-auto NYLA_API Platform::ReserveMemPages(uint64_t size) -> void *
+auto API ReserveMemPages(uint64_t size) -> void *
 {
     return VirtualAlloc(nullptr, size, MEM_RESERVE, PAGE_NOACCESS);
 }
 
-void NYLA_API Platform::CommitMemPages(void *page, uint64_t size)
+void API CommitMemPages(void *page, uint64_t size)
 {
     VirtualAlloc(page, size, MEM_COMMIT, PAGE_READWRITE);
 }
 
-void NYLA_API Platform::DecommitMemPages(void *page, uint64_t size)
+void API DecommitMemPages(void *page, uint64_t size)
 {
     VirtualAlloc(page, size, MEM_DECOMMIT, PAGE_NOACCESS);
 }
 
-auto NYLA_API Platform::WinPollEvent(PlatformEvent &outEvent) -> bool
+auto API WinPollEvent(PlatformEvent &outEvent) -> bool
 {
     for (;;)
     {
@@ -162,11 +161,11 @@ auto NYLA_API Platform::WinPollEvent(PlatformEvent &outEvent) -> bool
 
 auto WindowsPlatform::WinGetHandle() -> HWND
 {
-    NYLA_ASSERT(g_HWnd);
+    ASSERT(g_HWnd);
     return g_HWnd;
 }
 
-void NYLA_API Platform::WinOpen()
+void API WinOpen()
 {
     if (!g_HWnd)
     {
@@ -189,7 +188,7 @@ void NYLA_API Platform::WinOpen()
     GetWindowRect(g_HWnd, &g_WinRect);
 }
 
-auto NYLA_API Platform::WinGetSize() -> PlatformWindowSize
+auto API WinGetSize() -> PlatformWindowSize
 {
     return {
         .width = static_cast<uint32_t>(g_WinRect.right - g_WinRect.left),
@@ -209,7 +208,7 @@ void WindowsPlatform::SetHInstance(HINSTANCE hInstance)
 
 //
 
-auto Platform::UpdateGamepad(uint32_t index) -> bool
+auto UpdateGamepad(uint32_t index) -> bool
 {
     auto &state = g_Gamepads[index];
     MemZero(&state.Gamepad);
@@ -259,25 +258,25 @@ auto GetGamepadTrigger(uint8_t rawValue, uint8_t rawDeadzone) -> float
 
 } // namespace
 
-void NYLA_API GetGamepadLeftStick(uint32_t index, float &outX, float &outY)
+void API GetGamepadLeftStick(uint32_t index, float &outX, float &outY)
 {
     auto &gamepad = g_Gamepads[index].Gamepad;
     return GetGamepadStick(gamepad.sThumbLX, gamepad.sThumbLY, XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, outX, outY);
 }
 
-void NYLA_API GetGamepadRightStick(uint32_t index, float &outX, float &outY)
+void API GetGamepadRightStick(uint32_t index, float &outX, float &outY)
 {
     auto &gamepad = g_Gamepads[index].Gamepad;
     return GetGamepadStick(gamepad.sThumbRX, gamepad.sThumbRY, XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE, outX, outY);
 }
 
-auto NYLA_API Platform::GetGamepadLeftTrigger(uint32_t index) -> float
+auto API GetGamepadLeftTrigger(uint32_t index) -> float
 {
     auto &gamepad = g_Gamepads[index].Gamepad;
     return GetGamepadTrigger(gamepad.bLeftTrigger, XINPUT_GAMEPAD_TRIGGER_THRESHOLD);
 }
 
-auto NYLA_API Platform::GetGamepadRightTrigger(uint32_t index) -> float
+auto API GetGamepadRightTrigger(uint32_t index) -> float
 {
     auto &gamepad = g_Gamepads[index].Gamepad;
     return GetGamepadTrigger(gamepad.bRightTrigger, XINPUT_GAMEPAD_TRIGGER_THRESHOLD);
@@ -525,13 +524,13 @@ auto WindowsPlatform::ScanCodeToKeyPhysical(uint8_t scanCode, bool extended) -> 
     }
 }
 
-auto Platform::FileValid(FileHandle file) -> bool
+auto FileValid(file_handle file) -> bool
 {
     auto hFile = reinterpret_cast<HANDLE>(file);
     return hFile != nullptr && hFile != INVALID_HANDLE_VALUE;
 }
 
-auto Platform::FileOpen(const char *path, FileOpenMode mode) -> FileHandle
+auto FileOpen(byteview path, FileOpenMode mode) -> file_handle
 {
     DWORD dwDesiredAccess = 0;
     DWORD dwCreationDisposition = 0;
@@ -553,7 +552,7 @@ auto Platform::FileOpen(const char *path, FileOpenMode mode) -> FileHandle
         dwCreationDisposition = CREATE_ALWAYS;
     }
 
-    auto hFile = CreateFileA(path, // lpFileName
+    auto hFile = CreateFileA(Span::CStr(path), // lpFileName
                              dwDesiredAccess,
                              FILE_SHARE_READ, // dwShareMode
                              nullptr,         // lpSecurityAttributes
@@ -574,7 +573,7 @@ auto Platform::FileOpen(const char *path, FileOpenMode mode) -> FileHandle
     return reinterpret_cast<void *>(hFile);
 }
 
-void Platform::FileClose(FileHandle file)
+void FileClose(file_handle file)
 {
     if (!FileValid(file))
         return;
@@ -583,7 +582,7 @@ void Platform::FileClose(FileHandle file)
     CloseHandle(hFile);
 }
 
-auto Platform::FileRead(FileHandle file, uint32_t size, uint8_t *out) -> uint32_t
+auto FileRead(file_handle file, uint32_t size, uint8_t *out) -> uint32_t
 {
     auto hFile = reinterpret_cast<HANDLE>(file);
     DWORD bytesRead = 0;
@@ -597,7 +596,7 @@ auto Platform::FileRead(FileHandle file, uint32_t size, uint8_t *out) -> uint32_
     return bytesRead;
 }
 
-auto Platform::FileWrite(FileHandle file, uint32_t size, const uint8_t *in) -> uint32_t
+auto FileWrite(file_handle file, uint32_t size, const uint8_t *in) -> uint32_t
 {
     auto hFile = reinterpret_cast<HANDLE>(file);
     DWORD bytesWritten = 0;
@@ -611,7 +610,7 @@ auto Platform::FileWrite(FileHandle file, uint32_t size, const uint8_t *in) -> u
     return bytesWritten;
 }
 
-void Platform::FileSeek(FileHandle file, int64_t at)
+void FileSeek(file_handle file, int64_t at)
 {
     auto hFile = reinterpret_cast<HANDLE>(file);
 
@@ -625,7 +624,7 @@ void Platform::FileSeek(FileHandle file, int64_t at)
     );
 }
 
-auto Platform::FileTell(FileHandle file) -> uint64_t
+auto FileTell(file_handle file) -> uint64_t
 {
     auto hFile = reinterpret_cast<HANDLE>(file);
 
@@ -638,27 +637,27 @@ auto Platform::FileTell(FileHandle file) -> uint64_t
     }
     else
     { // failed
-        NYLA_ASSERT(false);
+        ASSERT(false);
         return 0ULL;
     }
 }
 
-auto Platform::GetStdin() -> FileHandle
+auto GetStdin() -> file_handle
 {
     return GetStdHandle(STD_INPUT_HANDLE);
 }
 
-auto Platform::GetStdout() -> FileHandle
+auto GetStdout() -> file_handle
 {
     return GetStdHandle(STD_OUTPUT_HANDLE);
 }
 
-auto Platform::GetStderr() -> FileHandle
+auto GetStderr() -> file_handle
 {
     return GetStdHandle(STD_ERROR_HANDLE);
 }
 
-void Platform::ParseStdArgs(byteview *args, uint32_t maxArgs)
+void ParseStdArgs(byteview *args, uint32_t maxArgs)
 {
     uint8_t *cmdLine = (uint8_t *)GetCommandLineA();
     uint64_t cmdLineLen = CStrLen(cmdLine);
@@ -708,15 +707,16 @@ void Platform::ParseStdArgs(byteview *args, uint32_t maxArgs)
         args[argCount++] = byteview{argStart, (uint32_t)((cmdLine + cmdLineLen) - argStart)};
     }
 
-    NYLA_ASSERT(!inQuotes);
+    ASSERT(!inQuotes);
 }
 
-auto NYLA_API LibMain(int (*userMain)()) -> int
+auto API LibMain(int (*userMain)()) -> int
 {
     GetNativeSystemInfo(&g_SysInfo);
+    ASSERT(g_SysInfo.dwPageSize == kPageSize);
 
 #ifndef NDEBUG
-    NYLA_ASSERT(AllocConsole());
+    ASSERT(AllocConsole());
 
     HANDLE hConOut =
         CreateFileA("CONOUT$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr);

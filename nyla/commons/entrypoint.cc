@@ -1,5 +1,5 @@
 #ifdef WIN32
-#include "nyla/commons/windows/entrypoint.cc"
+#include "nyla/commons/entrypoint_windows.cc"
 #else
-#include "nyla/commons/linux/entrypoint.cc"
+#include "nyla/commons/entrypoint_linux.cc"
 #endif

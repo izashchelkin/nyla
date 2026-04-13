@@ -4,73 +4,28 @@
 
 #include "nyla/commons/concepts.h"
 #include "nyla/commons/fmt.h"
+#include "nyla/commons/macros.h"
 #include "nyla/commons/mem.h"
+#include "nyla/commons/span_def.h"
 
 namespace nyla
 {
 
-template <is_plain T> struct span
+template <is_plain T>
+[[nodiscard]]
+auto span<T>::operator[](uint64_t i) -> T &
 {
-    T *data;
-    uint64_t size;
+    DASSERT(i < size);
+    return data[i];
+}
 
-    [[nodiscard]]
-    auto operator[](uint64_t i) -> T &
-    {
-        NYLA_DASSERT(i < size);
-        return data[i];
-    }
-
-    [[nodiscard]]
-    auto operator[](uint64_t i) const -> const T &
-    {
-        NYLA_DASSERT(i < size);
-        return data[i];
-    }
-
-    [[nodiscard]]
-    auto begin() -> T *
-    {
-        return data;
-    }
-
-    [[nodiscard]]
-    auto begin() const -> const T *
-    {
-        return data;
-    }
-
-    [[nodiscard]]
-    auto cbegin() const -> const T *
-    {
-        return data;
-    }
-
-    [[nodiscard]]
-    auto end() -> T *
-    {
-        return data + size;
-    }
-
-    [[nodiscard]]
-    auto end() const -> const T *
-    {
-        return data + size;
-    }
-
-    [[nodiscard]]
-    auto cend() const -> const T *
-    {
-        return data + size;
-    }
-
-    operator span<const T>() const
-    {
-        return span<const T>{data, size};
-    }
-};
-
-using byteview = span<const uint8_t>;
+template <is_plain T>
+[[nodiscard]]
+auto span<T>::operator[](uint64_t i) const -> const T &
+{
+    DASSERT(i < size);
+    return data[i];
+}
 
 namespace Span
 {
@@ -87,7 +42,7 @@ template <typename T>
 INLINE auto CStr(span<T> self) -> const char *
     requires(sizeof(T) == 1)
 {
-    NYLA_ASSERT(*(self.data + self.size) == 0);
+    ASSERT(*(self.data + self.size) == 0);
     return (const char *)self.data;
 }
 
@@ -108,7 +63,7 @@ template <typename T>
 INLINE auto SubSpan(span<T> self, uint64_t from) -> span<T>
 {
     const uint64_t retSize = self.size - from;
-    NYLA_DASSERT(retSize >= 0);
+    DASSERT(retSize >= 0);
     return {self.data + from, retSize};
 }
 
@@ -116,11 +71,11 @@ template <typename T>
 [[nodiscard]]
 INLINE auto SubSpan(span<T> self, uint64_t from, uint64_t size) -> span<T>
 {
-    NYLA_DASSERT(self.size - from >= size);
+    DASSERT(self.size - from >= size);
     return {self.data + from, size};
 }
 
-template <typename T, typename K>
+template <typename K, typename T>
 [[nodiscard]]
 INLINE auto Cast(span<T> self) -> span<K>
 {
@@ -171,19 +126,5 @@ INLINE auto FromCStr(const void *str, uint64_t maxLength) -> byteview
 }
 
 } // namespace Span
-
-#if 0
-template <uint64_t N>
-[[nodiscard]]
-INLINE auto StringLiteralAsView(const char (&str)[N]) -> byteview
-{
-    return byteview{(uint8_t *)str, N - 1};
-}
-#endif
-
-constexpr byteview operator""_s(const char *str, uint64_t len)
-{
-    return byteview{(uint8_t *)str, len};
-}
 
 } // namespace nyla

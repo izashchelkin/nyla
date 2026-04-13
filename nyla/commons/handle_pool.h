@@ -53,7 +53,7 @@ auto Acquire(handle_pool<HandleType, DataType, Capacity> &self, const DataType &
         };
     }
 
-    NYLA_ASSERT(false);
+    ASSERT(false);
     return {};
 }
 
@@ -62,7 +62,7 @@ template <is_handle HandleType, typename DataType, uint64_t Capacity>
 auto TryResolveSlot(handle_pool<HandleType, DataType, Capacity> &self, HandleType handle)
     -> pair<bool, handle_slot<DataType> *>
 {
-    NYLA_DASSERT(handle.index < Capacity);
+    DASSERT(handle.index < Capacity);
 
     if (!handle.gen)
         return {false, nullptr};
@@ -81,7 +81,7 @@ template <is_handle HandleType, typename DataType, uint64_t Capacity>
     -> handle_slot<DataType> &
 {
     auto [ok, slot] = TryResolveSlot(self, handle);
-    NYLA_ASSERT(ok);
+    ASSERT(ok);
     return *slot;
 }
 

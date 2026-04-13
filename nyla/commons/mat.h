@@ -19,7 +19,7 @@ template <typename T, uint32_t N> class Mat
 
     Mat(std::initializer_list<T> elems)
     {
-        NYLA_ASSERT(elems.Size() == static_cast<size_t>(N * N));
+        ASSERT(elems.Size() == static_cast<size_t>(N * N));
         auto it = elems.begin();
         for (uint32_t col = 0; col < N; ++col)
         {
@@ -30,7 +30,7 @@ template <typename T, uint32_t N> class Mat
 
     Mat(std::initializer_list<Vec<T, N>> cols)
     {
-        NYLA_ASSERT(cols.Size() == static_cast<size_t>(N));
+        ASSERT(cols.Size() == static_cast<size_t>(N));
         auto it = cols.begin();
         for (uint32_t col = 0; col < N; ++col, ++it)
         {
@@ -63,12 +63,12 @@ template <typename T, uint32_t N> class Mat
 
     [[nodiscard]] auto operator[](uint32_t col) -> Array<T, N> &
     {
-        NYLA_ASSERT(col < N);
+        ASSERT(col < N);
         return m_Data[col];
     }
     [[nodiscard]] auto operator[](uint32_t col) const -> const Array<T, N> &
     {
-        NYLA_ASSERT(col < N);
+        ASSERT(col < N);
         return m_Data[col];
     }
 
@@ -118,7 +118,7 @@ template <typename T, uint32_t N> class Mat
                 }
             }
 
-            NYLA_ASSERT(maxAbs > static_cast<T>(1e-8));
+            ASSERT(maxAbs > static_cast<T>(1e-8));
 
             if (pivotRow != col)
             {
@@ -227,8 +227,8 @@ template <typename T, uint32_t N> class Mat
     static auto Perspective(T fovRadians, T aspect, T nearPlane, T farPlane) -> Mat
         requires(N == 4 && std::floating_point<T>)
     {
-        NYLA_ASSERT(aspect != static_cast<T>(0));
-        NYLA_ASSERT(farPlane != nearPlane);
+        ASSERT(aspect != static_cast<T>(0));
+        ASSERT(farPlane != nearPlane);
 
         const T halfFov = fovRadians * static_cast<T>(0.5);
         const T f = static_cast<T>(1) / std::tan(halfFov);

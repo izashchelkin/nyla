@@ -34,7 +34,7 @@ auto BuildFontAtlas(BdfParser &parser, RegionAlloc &alloc) -> Span<uint8_t>
             }
         }
 
-        NYLA_ASSERT(ipixel == 16 * 32);
+        ASSERT(ipixel == 16 * 32);
     }
     alloc.Pop(scratch.GetBase());
 

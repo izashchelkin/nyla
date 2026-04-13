@@ -3,79 +3,29 @@
 #include <cstdint>
 #include <type_traits>
 
-#include "nyla/commons/array.h"
 #include "nyla/commons/fmt.h"
+#include "nyla/commons/inline_vec_def.h"
 #include "nyla/commons/mem.h"
 #include "nyla/commons/span.h"
 
 namespace nyla
 {
 
-template <is_plain T, uint64_t Capacity> struct inline_vec
+template <is_plain T, uint64_t Capacity>
+[[nodiscard]]
+auto inline_vec<T, Capacity>::operator[](uint64_t i) -> T &
 {
-    array<T, sizeof(T) * Capacity> data;
-    uint64_t size;
+    DASSERT(i < size);
+    return data[i];
+}
 
-    [[nodiscard]]
-    auto operator[](uint64_t i) -> T &
-    {
-        NYLA_DASSERT(i < size);
-        return data[i];
-    }
-
-    [[nodiscard]]
-    auto operator[](uint64_t i) const -> const T &
-    {
-        NYLA_DASSERT(i < size);
-        return data[i];
-    }
-
-    [[nodiscard]]
-    auto begin() -> T *
-    {
-        return data;
-    }
-
-    [[nodiscard]]
-    auto begin() const -> const T *
-    {
-        return data;
-    }
-
-    [[nodiscard]]
-    auto cbegin() const -> const T *
-    {
-        return data;
-    }
-
-    [[nodiscard]]
-    auto end() -> T *
-    {
-        return data + Capacity;
-    }
-
-    [[nodiscard]]
-    auto end() const -> const T *
-    {
-        return data + Capacity;
-    }
-
-    [[nodiscard]]
-    auto cend() const -> const T *
-    {
-        return data + Capacity;
-    }
-
-    operator span<T>()
-    {
-        return span<T>{data, size};
-    }
-
-    operator span<const T>() const
-    {
-        return span<const T>{data, size};
-    }
-};
+template <is_plain T, uint64_t Capacity>
+[[nodiscard]]
+auto inline_vec<T, Capacity>::operator[](uint64_t i) const -> const T &
+{
+    DASSERT(i < size);
+    return data[i];
+}
 
 namespace InlineVec
 {
@@ -91,7 +41,7 @@ template <typename T, uint64_t Capacity>
 [[nodiscard]]
 INLINE auto Front(const inline_vec<T, Capacity> &self) -> const T &
 {
-    NYLA_DASSERT(self.size);
+    DASSERT(self.size);
     return self[0];
 }
 
@@ -99,13 +49,13 @@ template <typename T, uint64_t Capacity>
 [[nodiscard]]
 INLINE auto Back(const inline_vec<T, Capacity> &self) -> const T &
 {
-    NYLA_DASSERT(self.size);
+    DASSERT(self.size);
     return self[self.size - 1];
 }
 
 template <typename T, uint64_t Capacity> INLINE void Resize(inline_vec<T, Capacity> &self, uint64_t newSize)
 {
-    NYLA_DASSERT(newSize <= Capacity);
+    DASSERT(newSize <= Capacity);
     self.size = newSize;
 }
 
@@ -116,7 +66,7 @@ template <typename T, uint64_t Capacity> INLINE void Clear(inline_vec<T, Capacit
 
 template <typename T, uint64_t Capacity> INLINE auto Append(inline_vec<T, Capacity> &self) -> T &
 {
-    NYLA_DASSERT(self.size < Capacity);
+    DASSERT(self.size < Capacity);
     T *p = self.data + self.size++;
     return *p;
 }
@@ -132,7 +82,7 @@ INLINE auto Append(inline_vec<T, Capacity> &self, const D &data) -> T &
 
 template <typename T, uint64_t Capacity> INLINE auto Append(inline_vec<T, Capacity> &self, span<const T> data) -> T &
 {
-    NYLA_DASSERT(self.size + data.size < Capacity);
+    DASSERT(self.size + data.size < Capacity);
     T &ret = Back(self);
     MemCpy(&ret, data.data, Span::SizeBytes(data));
     self.size += data.size;
@@ -148,7 +98,7 @@ template <typename T, uint64_t Capacity> INLINE auto PopBack(inline_vec<T, Capac
 
 template <typename T, uint64_t Capacity> INLINE auto Erase(inline_vec<T, Capacity> &self, const T *pos) -> T *
 {
-    NYLA_DASSERT(pos >= self.begin() && pos < self.end());
+    DASSERT(pos >= self.begin() && pos < self.end());
     return Erase(pos, pos + 1);
 }
 

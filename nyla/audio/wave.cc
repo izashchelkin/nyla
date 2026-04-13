@@ -45,8 +45,8 @@ auto ParseWavFile(Span<const std::byte> bytes) -> ParseWavFileResult
         memcpy(&masterChunk, p, sizeof(masterChunk));
         p += sizeof(masterChunk);
 
-        NYLA_ASSERT(masterChunk.chunkId == Word32("RIFF"));
-        NYLA_ASSERT(masterChunk.waveId == Word32("WAVE"));
+        ASSERT(masterChunk.chunkId == Word32("RIFF"));
+        ASSERT(masterChunk.waveId == Word32("WAVE"));
     }
 
     while (p != bytes.Data() + bytes.Size())
@@ -59,7 +59,7 @@ auto ParseWavFile(Span<const std::byte> bytes) -> ParseWavFileResult
         case Word32("fmt "): {
             result.fmt = (WaveFmtChunk *)p;
 
-            NYLA_ASSERT(result.fmt->bitsPerSample == 16);
+            ASSERT(result.fmt->bitsPerSample == 16);
 
             break;
         }
@@ -71,7 +71,7 @@ auto ParseWavFile(Span<const std::byte> bytes) -> ParseWavFileResult
             return result;
         }
         default: {
-            NYLA_ASSERT(false);
+            ASSERT(false);
             break;
         }
         }
@@ -79,7 +79,7 @@ auto ParseWavFile(Span<const std::byte> bytes) -> ParseWavFileResult
         p += header.chunkSize + sizeof(header);
     }
 
-    NYLA_ASSERT(false);
+    ASSERT(false);
     return {};
 }
 

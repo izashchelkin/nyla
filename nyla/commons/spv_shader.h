@@ -11,7 +11,6 @@
 #pragma once
 
 #include "nyla/commons/inline_string.h"
-#include "nyla/commons/inline_vec.h"
 #include "nyla/commons/rhi.h"
 
 namespace nyla

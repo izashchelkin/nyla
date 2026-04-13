@@ -14,7 +14,7 @@ template <class T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
 void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
 {
-    NYLA_ASSERT(rhiDesc.limits.numFramesInFlight <= kRhiMaxNumFramesInFlight);
+    ASSERT(rhiDesc.limits.numFramesInFlight <= kRhiMaxNumFramesInFlight);
 
     m_Flags = rhiDesc.flags;
     m_Limits = rhiDesc.limits;
@@ -36,7 +36,7 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
     HRESULT res;
 
     res = CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&m_Factory));
-    NYLA_ASSERT(SUCCEEDED(res));
+    ASSERT(SUCCEEDED(res));
 
     const DXGI_GPU_PREFERENCE gpuPreference = DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE;
 
@@ -73,25 +73,25 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
         }
     }
 
-    NYLA_ASSERT(adapter.Get());
+    ASSERT(adapter.Get());
     res = adapter.As(&m_Adapter);
-    NYLA_ASSERT(SUCCEEDED(res));
+    ASSERT(SUCCEEDED(res));
 
     res = D3D12CreateDevice(m_Adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_Device));
-    NYLA_ASSERT(SUCCEEDED(res));
+    ASSERT(SUCCEEDED(res));
 
     D3D12_COMMAND_QUEUE_DESC directQueueDesc = {
         .Type = D3D12_COMMAND_LIST_TYPE_DIRECT,
         .Flags = D3D12_COMMAND_QUEUE_FLAG_NONE,
     };
     res = m_Device->CreateCommandQueue(&directQueueDesc, IID_PPV_ARGS(&m_DirectCommandQueue));
-    NYLA_ASSERT(SUCCEEDED(res));
+    ASSERT(SUCCEEDED(res));
 
     CreateSwapchain();
 
     HWND wnd = g_Platform->GetImpl()->WinGetHandle();
     res = m_Factory->MakeWindowAssociation(wnd, DXGI_MWA_NO_ALT_ENTER);
-    NYLA_ASSERT(SUCCEEDED(res));
+    ASSERT(SUCCEEDED(res));
 
     m_FrameIndex = m_Swapchain->GetCurrentBackBufferIndex();
 
@@ -101,7 +101,7 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
         .Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE,
     };
     res = m_Device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_RtvHeap));
-    NYLA_ASSERT(SUCCEEDED(res));
+    ASSERT(SUCCEEDED(res));
 
     const D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc{
         .Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV,
@@ -109,7 +109,7 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
         .Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE,
     };
     res = m_Device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&m_DsvHeap));
-    NYLA_ASSERT(SUCCEEDED(res));
+    ASSERT(SUCCEEDED(res));
 
     const D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc{
         .Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
@@ -117,14 +117,14 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
         .Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE,
     };
     res = m_Device->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(&m_CbvHeap));
-    NYLA_ASSERT(SUCCEEDED(res));
+    ASSERT(SUCCEEDED(res));
 
     const D3D12_QUERY_HEAP_DESC queryHeapDesc{
         .Type = D3D12_QUERY_HEAP_TYPE_OCCLUSION,
         .Count = 1,
     };
     res = m_Device->CreateQueryHeap(&queryHeapDesc, IID_PPV_ARGS(&m_QueryHeap));
-    NYLA_ASSERT(SUCCEEDED(res));
+    ASSERT(SUCCEEDED(res));
 
     m_RTVDescriptorSize = m_Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
     m_CBVDescriptorSize = m_Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -135,17 +135,17 @@ void Rhi::Impl::Init(const RhiInitDesc &rhiDesc)
         FrameContext &frameContext = m_FrameContext.PushBack(FrameContext{});
 
         res = m_Swapchain->GetBuffer(i, IID_PPV_ARGS(&frameContext.renderTarget));
-        NYLA_ASSERT(SUCCEEDED(res));
+        ASSERT(SUCCEEDED(res));
 
         m_Device->CreateRenderTargetView(frameContext.renderTarget.Get(), nullptr, rtvHandle);
         rtvHandle.ptr += m_RTVDescriptorSize;
 
         res = m_Device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&frameContext.cmdAlloc));
-        NYLA_ASSERT(SUCCEEDED(res));
+        ASSERT(SUCCEEDED(res));
 
         res = m_Device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, frameContext.cmdAlloc.Get(), nullptr,
                                           IID_PPV_ARGS(&frameContext.cmd));
-        NYLA_ASSERT(SUCCEEDED(res));
+        ASSERT(SUCCEEDED(res));
     }
 }
 

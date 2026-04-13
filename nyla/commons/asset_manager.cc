@@ -98,7 +98,7 @@ auto AssetManager::GetMeshPipelineColorTargetFormats() -> Span<RhiTextureFormat>
 void AssetManager::Init()
 {
     static bool inited = false;
-    NYLA_ASSERT(!inited);
+    ASSERT(!inited);
     inited = true;
 
     //
@@ -156,7 +156,7 @@ void AssetManager::Upload(RhiCmdList cmd)
             if (meshData.isStatic)
             {
                 meshData.indexCount = meshData.indices.Size();
-                NYLA_ASSERT(meshData.indexCount % 3 == 0);
+                ASSERT(meshData.indexCount % 3 == 0);
 
                 char *uploadMemory = GpuUploadManager::CmdCopyStaticIndices(cmd, meshData.indices.SizeBytes(),
                                                                             meshData.indexBufferOffset);
@@ -168,7 +168,7 @@ void AssetManager::Upload(RhiCmdList cmd)
             }
             else
             {
-                NYLA_ASSERT(meshData.gltfPath.EndsWith(AsStr(".gltf")));
+                ASSERT(meshData.gltfPath.EndsWith(AsStr(".gltf")));
                 Span gltfData = Platform::FileRead(meshData.gltfPath.GetStr());
                 Span binData = Platform::FileRead(
                     alloc, ClonePath(alloc, meshData.gltfPath).SetExtension(".bin").GetStr(), 1 << 20);
@@ -177,9 +177,9 @@ void AssetManager::Upload(RhiCmdList cmd)
                     GltfParser parser;
                     parser.Init(&alloc, Span{(char *)gltfData.Data(), gltfData.Size()},
                                 Span{(char *)binData.Data(), binData.Size()});
-                    NYLA_ASSERT(parser.Parse());
+                    ASSERT(parser.Parse());
 
-                    NYLA_ASSERT(parser.GetImages().Size() == 1);
+                    ASSERT(parser.GetImages().Size() == 1);
 
                     {
                         GltfImage image = parser.GetImages().Front();
@@ -193,8 +193,8 @@ void AssetManager::Upload(RhiCmdList cmd)
                         {
                             {
                                 GltfAccessor indices = parser.GetAccessor(primitive.indices);
-                                NYLA_ASSERT(indices.type == GltfAccessorType::SCALAR);
-                                NYLA_ASSERT(indices.componentType == GltfAccessorComponentType::UNSIGNED_SHORT);
+                                ASSERT(indices.type == GltfAccessorType::SCALAR);
+                                ASSERT(indices.componentType == GltfAccessorComponentType::UNSIGNED_SHORT);
 
                                 GltfBufferView bufferView = parser.GetBufferView(indices.bufferView);
 
@@ -217,9 +217,9 @@ void AssetManager::Upload(RhiCmdList cmd)
 
                                 memcpy(uploadMemory, indicesData.Data(), indicesData.SizeBytes());
 
-                                NYLA_ASSERT((indicesData.SizeBytes() % sizeof(uint16_t)) == 0);
+                                ASSERT((indicesData.SizeBytes() % sizeof(uint16_t)) == 0);
                                 meshData.indexCount = indicesData.SizeBytes() / sizeof(uint16_t);
-                                NYLA_ASSERT(meshData.indexCount % 3 == 0);
+                                ASSERT(meshData.indexCount % 3 == 0);
                             }
 
                             {
@@ -239,23 +239,23 @@ void AssetManager::Upload(RhiCmdList cmd)
                                 };
 
                                 GltfAccessor pos;
-                                NYLA_ASSERT(parser.FindAttributeAccessor(attrs, AsStr("POSITION"), pos));
-                                NYLA_ASSERT(pos.type == GltfAccessorType::VEC3);
-                                NYLA_ASSERT(pos.componentType == GltfAccessorComponentType::FLOAT);
+                                ASSERT(parser.FindAttributeAccessor(attrs, AsStr("POSITION"), pos));
+                                ASSERT(pos.type == GltfAccessorType::VEC3);
+                                ASSERT(pos.componentType == GltfAccessorComponentType::FLOAT);
                                 const uint32_t posOffset = countStride(pos);
 
                                 GltfAccessor norm;
-                                NYLA_ASSERT(parser.FindAttributeAccessor(attrs, AsStr("NORMAL"), norm));
-                                NYLA_ASSERT(norm.type == GltfAccessorType::VEC3);
-                                NYLA_ASSERT(norm.componentType == GltfAccessorComponentType::FLOAT);
-                                NYLA_ASSERT(norm.count == pos.count);
+                                ASSERT(parser.FindAttributeAccessor(attrs, AsStr("NORMAL"), norm));
+                                ASSERT(norm.type == GltfAccessorType::VEC3);
+                                ASSERT(norm.componentType == GltfAccessorComponentType::FLOAT);
+                                ASSERT(norm.count == pos.count);
                                 const uint32_t normOffset = countStride(norm);
 
                                 GltfAccessor texCoord;
-                                NYLA_ASSERT(parser.FindAttributeAccessor(attrs, AsStr("TEXCOORD_0"), texCoord));
-                                NYLA_ASSERT(texCoord.type == GltfAccessorType::VEC2);
-                                NYLA_ASSERT(texCoord.componentType == GltfAccessorComponentType::FLOAT);
-                                NYLA_ASSERT(texCoord.count == pos.count);
+                                ASSERT(parser.FindAttributeAccessor(attrs, AsStr("TEXCOORD_0"), texCoord));
+                                ASSERT(texCoord.type == GltfAccessorType::VEC2);
+                                ASSERT(texCoord.componentType == GltfAccessorComponentType::FLOAT);
+                                ASSERT(texCoord.count == pos.count);
                                 const uint32_t texCoordOffset = countStride(texCoord);
 
                                 alignStride(pos);
@@ -329,8 +329,8 @@ void AssetManager::Upload(RhiCmdList cmd)
 
             if (!data)
             {
-                // NYLA_LOG("stbi_load failed for '%s': %s", textureAssetData.path.Data(), stbi_failure_reason());
-                NYLA_ASSERT(false);
+                // LOG("stbi_load failed for '%s': %s", textureAssetData.path.Data(), stbi_failure_reason());
+                ASSERT(false);
             }
 
             const RhiTexture texture = Rhi::CreateTexture(RhiTextureDesc{
@@ -359,7 +359,7 @@ void AssetManager::Upload(RhiCmdList cmd)
             // TODO: this barrier does not need to be here
             Rhi::CmdTransitionTexture(cmd, texture, RhiTextureState::ShaderRead);
 
-            NYLA_LOG("Uploading '%s'", (const char *)textureAssetData.path.Data());
+            LOG("Uploading '%s'", (const char *)textureAssetData.path.Data());
 
             textureAssetData.needsUpload = false;
         }
@@ -417,7 +417,7 @@ auto AssetManager::DeclareStaticMesh(Span<const char> vertexData, Span<const uin
 void AssetManager::CmdBindMesh(RhiCmdList cmd, Mesh mesh)
 {
     const auto &meshData = g_Meshes.ResolveData(mesh);
-    NYLA_ASSERT(!meshData.needsUpload);
+    ASSERT(!meshData.needsUpload);
 
     GpuUploadManager::CmdBindStaticMeshVertexBuffer(cmd, meshData.vertexBufferOffset);
     GpuUploadManager::CmdBindStaticMeshIndexBuffer(cmd, meshData.indexBufferOffset);
@@ -426,7 +426,7 @@ void AssetManager::CmdBindMesh(RhiCmdList cmd, Mesh mesh)
 void AssetManager::CmdDrawMesh(RhiCmdList cmd, AssetManager::Mesh mesh)
 {
     const auto &meshData = g_Meshes.ResolveData(mesh);
-    NYLA_ASSERT(!meshData.needsUpload);
+    ASSERT(!meshData.needsUpload);
 
     Rhi::CmdDrawIndexed(cmd, meshData.indexCount, 0, 1, 0, 0);
 }

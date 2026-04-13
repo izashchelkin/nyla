@@ -1,14 +1,14 @@
-#include "nyla/commons/platform_base.h"
-#pragma oncn
+#pragma once
 
 #include <cstdint>
 
 #include "nyla/commons/array.h"
+#include "nyla/commons/byteliterals.h"
 #include "nyla/commons/fmt.h"
 #include "nyla/commons/intrin.h"
 #include "nyla/commons/limits.h"
 #include "nyla/commons/macros.h"
-#include "nyla/commons/span.h"
+#include "nyla/commons/mem.h"
 
 namespace nyla
 {
@@ -51,7 +51,7 @@ INLINE auto AcquireChunk() -> span<uint8_t>
         };
     }
 
-    NYLA_ASSERT(false);
+    ASSERT(false);
     return {};
 }
 
@@ -61,19 +61,11 @@ INLINE void ReleaseChunk(void *p)
     uint64_t &qword = g_MemPagePool->bitset[ichunk / sizeof(uint64_t)];
 
     uint64_t mask = ((uint64_t)1) << (ichunk % sizeof(uint64_t));
-    NYLA_DASSERT(qword & mask);
+    DASSERT(qword & mask);
+
+    DecommitMemPages(p, kChunkSize);
 
     qword &= ~(mask);
-}
-
-INLINE auto Init(void *addressSpace)
-{
-    g_MemPagePool = (mempage_pool *)addressSpace;
-    Platform::CommitMemPages(addressSpace, sizeof(*g_MemPagePool));
-
-    AcquireChunk();
-
-    Platform::GetMemPageSize();
 }
 
 } // namespace MemPagePool

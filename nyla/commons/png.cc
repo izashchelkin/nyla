@@ -17,13 +17,13 @@ const uint8_t PNGSig[8]{137, 80, 78, 71, 13, 10, 26, 10};
 
 auto Error(Instance &self, const char *err) -> bool
 {
-    NYLA_LOG("%s", err);
+    LOG("%s", err);
     return false;
 }
 
 auto Error(Instance &self, const char *err, const char *detail) -> bool
 {
-    NYLA_LOG(NYLA_SV_FMT " " NYLA_SV_FMT, err, detail);
+    LOG(NYLA_SV_FMT " " NYLA_SV_FMT, err, detail);
     return false;
 }
 

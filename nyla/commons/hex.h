@@ -66,7 +66,7 @@ constexpr inline auto ParseHexChar(char ch) -> uint8_t
         return 15;
 
     default: {
-        NYLA_ASSERT(false);
+        ASSERT(false);
         return 0xFF;
     }
     }

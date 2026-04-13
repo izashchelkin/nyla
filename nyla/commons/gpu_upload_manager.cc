@@ -29,7 +29,7 @@ RhiBuffer m_StaticIndexBuffer;
 auto PrepareCopySrc(uint64_t copySize) -> uint64_t
 {
     AlignUp<uint64_t>(m_StagingBufferAt, Rhi::GetOptimalBufferCopyOffsetAlignment());
-    NYLA_ASSERT(m_StagingBufferAt + copySize <= kPerFrameUploadMaxSize);
+    ASSERT(m_StagingBufferAt + copySize <= kPerFrameUploadMaxSize);
 
     Rhi::BufferMarkWritten(m_StagingBuffer, m_StagingBufferAt, copySize);
 

@@ -32,7 +32,7 @@ static float gameCameraZoom = 1.f;
 
 static auto GenCircle(size_t n, float radius, float3 color) -> std::vector<Vertex>
 {
-    NYLA_ASSERT(n > 4);
+    ASSERT(n > 4);
 
     std::vector<Vertex> ret;
     ret.reserve(n * 3);

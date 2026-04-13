@@ -11,17 +11,17 @@ namespace nyla
 void Bootstrap()
 {
     uint8_t *addressSpaceBase = (uint8_t *)Platform::ReserveMemPages(MemPagePool::kPoolSize);
-    Platform::CommitMemPages(addressSpaceBase, Platform::GetMemPageSize());
+    Platform::CommitMemPages(addressSpaceBase, Platform::kPageSize);
 
     RegionAlloc::g_BootstrapAlloc.begin = (uint8_t *)addressSpaceBase;
     RegionAlloc::g_BootstrapAlloc.at = RegionAlloc::g_BootstrapAlloc.begin;
-    RegionAlloc::g_BootstrapAlloc.end = RegionAlloc::g_BootstrapAlloc.begin + Platform::GetMemPageSize();
+    RegionAlloc::g_BootstrapAlloc.end = RegionAlloc::g_BootstrapAlloc.begin + Platform::kPageSize;
     RegionAlloc::g_BootstrapAlloc.commitedEnd = RegionAlloc::g_BootstrapAlloc.end;
 
     MemPagePool::g_MemPagePool = &RegionAlloc::Alloc<mempage_pool>(RegionAlloc::g_BootstrapAlloc);
     MemZero(MemPagePool::g_MemPagePool);
 
-    MemPagePool::g_MemPagePool->begin = (uint8_t *)addressSpaceBase + Platform::GetMemPageSize();
+    MemPagePool::g_MemPagePool->begin = (uint8_t *)addressSpaceBase + Platform::kPageSize;
 }
 
 } // namespace nyla

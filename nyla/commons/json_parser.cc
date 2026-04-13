@@ -16,7 +16,7 @@ namespace
 
 auto PushOut(json_parser &self, const json_value &value) -> json_value *
 {
-    NYLA_ASSERT(self.outSize > 0);
+    ASSERT(self.outSize > 0);
 
     json_value *ret = self.out;
     *ret = value;
@@ -32,17 +32,17 @@ auto ParseLiteral(json_parser &self) -> json_value *
     switch (ByteParser::Read(self))
     {
     case 'n': {
-        NYLA_ASSERT(ByteParser::Read(self) == 'u');
-        NYLA_ASSERT(ByteParser::Read(self) == 'l');
-        NYLA_ASSERT(ByteParser::Read(self) == 'l');
+        ASSERT(ByteParser::Read(self) == 'u');
+        ASSERT(ByteParser::Read(self) == 'l');
+        ASSERT(ByteParser::Read(self) == 'l');
 
         return PushOut(self, json_value{});
     }
 
     case 't': {
-        NYLA_ASSERT(ByteParser::Read(self) == 'r');
-        NYLA_ASSERT(ByteParser::Read(self) == 'u');
-        NYLA_ASSERT(ByteParser::Read(self) == 'e');
+        ASSERT(ByteParser::Read(self) == 'r');
+        ASSERT(ByteParser::Read(self) == 'u');
+        ASSERT(ByteParser::Read(self) == 'e');
 
         json_value val;
         JsonValue::SetValue(val, true);
@@ -51,10 +51,10 @@ auto ParseLiteral(json_parser &self) -> json_value *
     }
 
     case 'f': {
-        NYLA_ASSERT(ByteParser::Read(self) == 'a');
-        NYLA_ASSERT(ByteParser::Read(self) == 'l');
-        NYLA_ASSERT(ByteParser::Read(self) == 's');
-        NYLA_ASSERT(ByteParser::Read(self) == 'e');
+        ASSERT(ByteParser::Read(self) == 'a');
+        ASSERT(ByteParser::Read(self) == 'l');
+        ASSERT(ByteParser::Read(self) == 's');
+        ASSERT(ByteParser::Read(self) == 'e');
 
         json_value val;
         JsonValue::SetValue(val, false);
@@ -63,7 +63,7 @@ auto ParseLiteral(json_parser &self) -> json_value *
     }
 
     default: {
-        NYLA_ASSERT(false);
+        ASSERT(false);
         return nullptr;
     }
     }
@@ -135,7 +135,7 @@ auto ParseArray(json_parser &self) -> json_value *
         if (ch == ']')
             break;
 
-        NYLA_ASSERT(ch == ',');
+        ASSERT(ch == ',');
     }
 
     json_value *end = PushOut(self, json_value());
@@ -162,10 +162,10 @@ auto ParseObject(json_parser &self) -> json_value *
         ++count;
 
         json_value *key = ParseNext(self);
-        NYLA_ASSERT(key->tag == json_tag::String);
+        ASSERT(key->tag == json_tag::String);
 
         ByteParser::SkipWhitespace(self);
-        NYLA_ASSERT(ByteParser::Read(self) == ':');
+        ASSERT(ByteParser::Read(self) == ':');
 
         json_value *val = ParseNext(self);
 
@@ -174,7 +174,7 @@ auto ParseObject(json_parser &self) -> json_value *
         if (ch == '}')
             break;
 
-        NYLA_ASSERT(ch == ',');
+        ASSERT(ch == ',');
     }
 
     json_value *end = PushOut(self, json_value());
@@ -205,7 +205,7 @@ auto ParseNext(json_parser &self) -> json_value *
     if (ch == '{')
         return ParseObject(self);
 
-    NYLA_ASSERT(false);
+    ASSERT(false);
     return nullptr;
 }
 

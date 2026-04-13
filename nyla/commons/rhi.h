@@ -6,12 +6,9 @@
 #include "nyla/commons/handle.h"
 #include "nyla/commons/inline_string.h"
 #include "nyla/commons/region_alloc.h"
-#include "nyla/commons/span.h"
 
 namespace nyla
 {
-
-//
 
 enum class RhiFlags : uint32_t
 {

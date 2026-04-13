@@ -30,10 +30,10 @@ void Rhi::Impl::CreateSwapchain()
     HRESULT res;
     res = m_Factory->CreateSwapChainForHwnd(directQueue, g_Platform->GetImpl()->WinGetHandle(), &swapchainDesc, nullptr,
                                             nullptr, swapchain.GetAddressOf());
-    NYLA_ASSERT(SUCCEEDED(res));
+    ASSERT(SUCCEEDED(res));
 
     res = swapchain.As(&m_Swapchain);
-    NYLA_ASSERT(SUCCEEDED(res));
+    ASSERT(SUCCEEDED(res));
 }
 
 } // namespace nyla
