@@ -1,28 +1,26 @@
 """
-SBA2 (Simple Binary Archive) Specification v2.2
------------------------------------------------
+SBA (Simple Binary Archive) Specification
+-----------------------------------------
 Endianness: Little-Endian (LE)
-Alignment:  8-byte boundary for all metadata fields and data blocks.
+Alignment:  8-byte boundary for all index entries and data blocks.
 
 1. GLOBAL HEADER (8 Bytes)
-   - [0x00] Magic Number: char[4] = 'SBA2'
+   - [0x00] Magic Number: char[4] = 'SBA '
    - [0x04] File Count:  uint32
 
 2. INDEX AREA (Variable Length)
-   Repeated 'File Count' times. Each entry follows this layout:
-   - Path Length:  uint32 (N)
-   - Path String:  char[N] (UTF-8, no null-terminator)
-   - Padding:      uint8[0-7] (Aligns following fields to 8-byte boundary)
-   - Data Offset:  uint64 (Absolute byte position in file)
-   - Data Size:    uint64 (Actual bytes of file data)
-   - Timestamp:    uint64 (Unix epoch in seconds)
-   - CRC32:        uint32 (Checksum of the uncompressed data)
-   - Reserved:     uint32 (Padding to keep index entry size predictable)
+   Fixed-size fields precede the variable-length path for easier parsing.
+   - [0x00] Data Offset:  uint64 (Absolute position)
+   - [0x08] Data Size:    uint64 (Bytes)
+   - [0x10] Timestamp:    uint64 (Unix epoch)
+   - [0x18] CRC32:        uint32 (Checksum)
+   - [0x1C] Path Length:  uint32 (N)
+   - [0x20] Path String:  char[N] (UTF-8)
+   - [Next] Padding:      uint8[0-7] (Aligns the NEXT entry to 8-byte boundary)
 
 3. DATA AREA
    - File contents concatenated.
    - Requirement: Every data block MUST start at an 8-byte aligned offset.
-   - Padding bytes (0x00) between blocks are ignored.
 """
 
 import os
@@ -31,7 +29,7 @@ import struct
 import zlib
 from datetime import datetime
 
-MAGIC = b'SBA2'
+MAGIC = b'SBA '
 
 def format_size(size_bytes):
     if size_bytes < 1024: return f"{size_bytes} B"
@@ -77,15 +75,17 @@ def pack_directory(source_dir):
             })
 
     if not file_entries:
-        print("Fehler: Keine Dateien gefunden.")
+        print("Error: No files found.")
         return
 
-    # Header + Index Offset Berechnung
+    # 1. Calculate Index Size and Data Offsets
+    # Header(8) + Entries
     current_pos = 8
     for e in file_entries:
-        current_pos += 4 + len(e['rel'])
-        current_pos += (8 - (current_pos % 8)) % 8
-        current_pos += 32 
+        # Fixed part (32) + Path(N)
+        current_pos += 32 + len(e['rel'])
+        # Align next entry to 8
+        current_pos = (current_pos + 7) & ~7
 
     header_index_size = current_pos
     current_data_ptr = header_index_size
@@ -95,70 +95,75 @@ def pack_directory(source_dir):
         current_data_ptr += e['size']
 
     with open(output_file, 'wb') as f:
+        # Write Header
         f.write(struct.pack('<4sI', MAGIC, len(file_entries)))
-        for e in file_entries:
-            f.write(struct.pack('<I', len(e['rel'])))
-            f.write(e['rel'])
-            f.write(b'\x00' * ((8 - (f.tell() % 8)) % 8))
-            f.write(struct.pack('<QQQII', e['offset'], e['size'], e['mtime'], e['crc'], 0))
 
+        # Write Index
+        for e in file_entries:
+            # Fixed fields first
+            f.write(struct.pack('<QQQII', e['offset'], e['size'], e['mtime'], e['crc'], len(e['rel'])))
+            f.write(e['rel'])
+            # Padding for 8-byte alignment of the next record
+            f.write(b'\x00' * ((8 - (f.tell() % 8)) % 8))
+
+        # Write Data
         for e in file_entries:
             f.write(b'\x00' * ((8 - (f.tell() % 8)) % 8))
             with open(e['full'], 'rb') as src:
                 f.write(src.read())
     
-    print(f"Archiv erstellt: {output_file}")
+    print(f"Archive created: {output_file}")
 
 def list_contents(bin_file):
     if not os.path.exists(bin_file):
-        print(f"Fehler: {bin_file} nicht gefunden.")
+        print(f"Error: {bin_file} not found.")
         return
 
     with open(bin_file, 'rb') as f:
-        data = f.read(8)
-        if len(data) < 8: return
-        magic, count = struct.unpack('<4sI', data)
-        if magic != MAGIC:
-            print("Fehler: Ungültiges SBA2-Archiv.")
+        header = f.read(8)
+        if len(header) < 8: return
+        magic, count = struct.unpack('<4sI', header)
+        if magic.strip() != b'SBA':
+            print("Error: Not a valid SBA archive.")
             return
         
-        print(f"Archiv: {bin_file} | Dateien: {count}")
-        # Breite Spaltenkonfiguration
+        print(f"Archive: {bin_file} | Total Files: {count}")
         fmt = "{:<80} | {:>10} | {:>8} | {:^7} | {:<16}"
-        header_text = fmt.format("Dateipfad", "Größe", "CRC32", "Check", "Zeitstempel")
-        print(header_text)
-        print("-" * len(header_text))
+        h_text = fmt.format("Path", "Size", "CRC32", "Integr", "Timestamp")
+        print(h_text)
+        print("-" * len(h_text))
         
         total_size = 0
-        index_pos = 8
-
         for _ in range(count):
-            f.seek(index_pos)
-            path_len = struct.unpack('<I', f.read(4))[0]
+            # Read fixed block
+            fixed_block = f.read(32)
+            offset, size, mtime, crc_stored, path_len = struct.unpack('<QQQII', fixed_block)
+            
+            # Read variable path
             path = f.read(path_len).decode('utf-8')
+            
+            # Skip padding to reach next 8-byte aligned entry
             f.read((8 - (f.tell() % 8)) % 8)
             
-            offset, size, mtime, crc_stored, _ = struct.unpack('<QQQII', f.read(32))
-            index_pos = f.tell()
-
-            # Integritätsprüfung
+            # Integrity Check
+            current_ptr = f.tell()
             f.seek(offset)
             crc_calc = get_crc32(f, is_stream=True, length=size)
             integrity = "PASS" if crc_calc == crc_stored else "FAIL"
+            f.seek(current_ptr)
             
             total_size += size
             dt = datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M')
             
-            # Pfad wird bei extremer Überlänge gekürzt, Spalte ist aber auf 80 Zeichen gesetzt
             display_path = (path[:77] + '..') if len(path) > 80 else path
             print(fmt.format(display_path, format_size(size), f"{crc_stored:08X}", integrity, dt))
 
-        print("-" * len(header_text))
-        print(f"Gesamte Nutzlast: {format_size(total_size)}")
+        print("-" * len(h_text))
+        print(f"Accumulated Payload: {format_size(total_size)}")
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Nutzung: python sba2.py <verzeichnis | archiv.bin>")
+        print("Usage: python sba.py <directory | archive.bin>")
         sys.exit(1)
     
     target = sys.argv[1]
@@ -167,4 +172,4 @@ if __name__ == "__main__":
     elif os.path.isfile(target) and target.lower().endswith('.bin'):
         list_contents(target)
     else:
-        print("Fehler: Ungültiges Argument.")
+        print("Error: Invalid argument.")

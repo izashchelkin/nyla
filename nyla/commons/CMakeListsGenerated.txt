@@ -1,5 +1,6 @@
 target_sources(${TARGET} PRIVATE
     asset_manager.cc
+    assetfile.cc
     bdf.cc
     byteparser.cc
     debug_text_renderer.cc
@@ -28,6 +29,7 @@ target_sources(${TARGET} PUBLIC
     array_def.h
     array.h
     asset_manager.h
+    assetfile.h
     bdf.h
     bitenum.h
     byteliterals.h

@@ -151,6 +151,3 @@ INLINE auto SubAlloc(region_alloc &self, uint64_t size) -> region_alloc
 
 } // namespace RegionAlloc
 } // namespace nyla
-
-#define SCRATCH_REMEMBER void *scratchResetMark = scratch.at
-#define SCRATCH_RESET RegionAlloc::Reset(scratch, scratchResetMark)

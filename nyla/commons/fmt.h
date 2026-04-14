@@ -5,12 +5,12 @@
 #define SV_FMT "%.*s"
 #define SV_ARG(sv) (sv).size, (sv).data
 
-#define ASSERT(cond)                                                                                                   \
+#define ASSERT(cond, ...)                                                                                              \
     do                                                                                                                 \
     {                                                                                                                  \
         if (!(cond)) [[unlikely]]                                                                                      \
         {                                                                                                              \
-            LOG(__FILE__ ":" XSTRINGIFY(__LINE__) ": assertion failed: " #cond ""_s);                                  \
+            LOG(__FILE__ ":" XSTRINGIFY(__LINE__) ": assertion failed: " #cond __VA_OPT__(" | ") __VA_ARGS__);         \
             TRAP();                                                                                                    \
             UNREACHABLE();                                                                                             \
         }                                                                                                              \

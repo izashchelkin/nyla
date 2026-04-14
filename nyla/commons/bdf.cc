@@ -5,14 +5,19 @@
 #include "nyla/commons/cast.h"
 #include "nyla/commons/hex.h"
 #include "nyla/commons/macros.h"
+#include "nyla/commons/region_alloc.h"
 
 namespace nyla
 {
 
 auto NextGlyph(bdf_parser &self, region_alloc &alloc, bdf_glyph &out) -> bool
 {
+    auto allocMark = alloc.at;
+
     for (;;)
     {
+        RegionAlloc::Reset(alloc, allocMark);
+
         if (ByteParser::StartsWith(self, "ENDFONT"_s))
             return false;
 

@@ -234,6 +234,7 @@ void AssetManager::Upload(RhiCmdList cmd)
                                 auto countStride = [&](GltfAccessor accessor) -> uint32_t {
                                     alignStride(accessor);
                                     const uint32_t offset = stride;
+
                                     stride += GetGltfAccessorSize(accessor);
                                     return offset;
                                 };
@@ -304,64 +305,6 @@ void AssetManager::Upload(RhiCmdList cmd)
 
             meshData.needsUpload = false;
             alloc.Reset();
-        }
-
-        for (uint32_t i = 0; i < g_Textures.Size(); ++i)
-        {
-            auto &slot = *(g_Textures.begin() + i);
-            if (!slot.used)
-                continue;
-
-            TextureData &textureAssetData = slot.data;
-            if (!textureAssetData.needsUpload)
-                continue;
-
-            // stbi_set_flip_vertically_on_load(true);
-
-            void *data = nullptr;
-#if 0
-                stbi_load(textureAssetData.path.c_str(), (int *)&textureAssetData.width,
-                                   (int *)&textureAssetData.height, (int *)&textureAssetData.channels, STBI_rgb_alpha);
-#endif
-
-            if (textureAssetData.channels != 4) // alpha missing?
-                textureAssetData.channels = 4;
-
-            if (!data)
-            {
-                // LOG("stbi_load failed for '%s': %s", textureAssetData.path.Data(), stbi_failure_reason());
-                ASSERT(false);
-            }
-
-            const RhiTexture texture = Rhi::CreateTexture(RhiTextureDesc{
-                .width = textureAssetData.width,
-                .height = textureAssetData.height,
-                .memoryUsage = RhiMemoryUsage::GpuOnly,
-                .usage = RhiTextureUsage::TransferDst | RhiTextureUsage::ShaderSampled,
-                .format = RhiTextureFormat::R8G8B8A8_sRGB,
-            });
-            textureAssetData.texture = texture;
-
-            const RhiSampledTextureView textureView = Rhi::CreateSampledTextureView(RhiTextureViewDesc{
-                .texture = texture,
-            });
-            textureAssetData.textureView = textureView;
-
-            Rhi::CmdTransitionTexture(cmd, texture, RhiTextureState::TransferDst);
-
-            const uint32_t size = textureAssetData.width * textureAssetData.height * textureAssetData.channels;
-
-            char *uploadMemory = GpuUploadManager::CmdCopyTexture(cmd, texture, size);
-            memcpy(uploadMemory, data, size);
-
-            free(data);
-
-            // TODO: this barrier does not need to be here
-            Rhi::CmdTransitionTexture(cmd, texture, RhiTextureState::ShaderRead);
-
-            LOG("Uploading '%s'", (const char *)textureAssetData.path.Data());
-
-            textureAssetData.needsUpload = false;
         }
     });
 }
