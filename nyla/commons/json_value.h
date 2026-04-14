@@ -3,7 +3,7 @@
 #include <cstdint>
 
 #include "nyla/commons/fmt.h"
-#include "nyla/commons/span.h"
+#include "nyla/commons/span_def.h"
 
 namespace nyla
 {

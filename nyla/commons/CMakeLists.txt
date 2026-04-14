@@ -4,110 +4,131 @@ add_library(nyla::commons ALIAS ${TARGET})
 
 target_compile_definitions(${TARGET} PRIVATE NYLA_DLL_EXPORT)
 
-target_sources(${TARGET}
-    PRIVATE
-       asset_manager.cc
-       bdf.cc
-       bootstrap.cc
-       byteparser.cc
-       debug_text_renderer.cc
-       engine.cc
-       fmt.cc
-       gltf.cc
-       glyph_renderer.cc
-       gpu_upload_manager.cc
-       input_manager.cc
-       json_parser.cc
-       json_value.cc
-       mem.cc
-       platform_windows.cc
-       png.cc
-       region_alloc.cc
-       render_targets.cc
-       renderer.cc
-       rhi_vulkan.cc
-       shader.cc
-       spv_shader.cc
-       staging_buffer.cc
-       staging.cc
-       tween_manager.cc
+find_package(Vulkan)
 
-    PUBLIC
-       entrypoint_windows.cc
-       entrypoint.cc
-       align.h
-       array.h
-       asset_manager.h
-       bdf.h
-       bitenum.h
-       bootstrap.h
-       byteliterals.h
-       byteparser.h
-       cast.h
-       collections.h
-       color.h
-       complex.h
-       concepts.h
-       debug_text_renderer.h
-       elf.h
-       engine.h
-       file_utils.h
-       file.h
-       fmt.h
-       gamepad.h
-       gltf.h
-       glyph_renderer.h
-       gpu_upload_manager.h
-       handle_pool.h
-       handle.h
-       hex.h
-       inline_path.h
-       inline_queue.h
-       inline_string.h
-       inline_vec_def.h
-       inline_vec.h
-       input_manager.h
-       intrin.h
-       json_parser.h
-       json_value.h
-       keyboard.h
-       lerp.h
-       limits.h
-       macros.h
-       mat.h
-       math.h
-       mem.h
-       mempage_pool.h
-       minmax.h
-       platform_audio.h
-       platform_dir_watch.h
-       platform_windows.h
-       platform.h
-       png.h
-       region_alloc_utils.h
-       region_alloc.h
-       render_targets.h
-       renderer.h
-       rhi.h
-       shader.h
-       span_def.h
-       span.h
-       spv_reader.h
-       spv_shader.h
-       staging_buffer.h
-       staging.h
-       time.h
-       tuple.h
-       tween_manager.h
-       vec.h
-       word.h
+target_sources (${TARGET} PRIVATE
+    asset_manager.cc
+    bdf.cc
+    bootstrap.cc
+    byteparser.cc
+    debug_text_renderer.cc
+    engine.cc
+    engine0_internal.cc
+    fmt.cc
+    gltf.cc
+    glyph_renderer.cc
+    gpu_upload_manager.cc
+    input_manager.cc
+    json_parser.cc
+    json_value.cc
+    mem.cc
+    mempage_pool.cc
+    png.cc
+    region_alloc.cc
+    render_targets.cc
+    renderer.cc
+    shader.cc
+    spv_shader.cc
+    staging_buffer.cc
+    staging.cc
+    tween_manager.cc
 )
 
-if(WIN32)
-    add_subdirectory(d3d12)
+target_sources (${TARGET} PUBLIC
+    align.h
+    array_def.h
+    array.h
+    asset_manager.h
+    bdf.h
+    bitenum.h
+    bootstrap.h
+    byteliterals.h
+    byteparser.h
+    cast.h
+    collections.h
+    color.h
+    complex.h
+    concepts.h
+    debug_text_renderer.h
+    elf.h
+    engine.h
+    engine0_internal.h
+    entrypoint.h
+    file_utils.h
+    file.h
+    fmt.h
+    gamepad.h
+    gltf.h
+    glyph_renderer.h
+    gpu_upload_manager.h
+    handle_pool.h
+    handle.h
+    hex.h
+    inline_path.h
+    inline_queue.h
+    inline_string.h
+    inline_vec_def.h
+    inline_vec.h
+    input_manager.h
+    intrin.h
+    json_parser.h
+    json_value.h
+    keyboard.h
+    lerp.h
+    limits.h
+    linux_abi.h
+    macros.h
+    mat.h
+    math.h
+    mem.h
+    mempage_pool.h
+    minmax.h
+    platform_audio.h
+    platform_dir_watch.h
+    platform.h
+    png.h
+    region_alloc_def.h
+    region_alloc.h
+    render_targets.h
+    renderer.h
+    rhi.h
+    shader.h
+    span_def.h
+    span.h
+    spv_reader.h
+    spv_shader.h
+    staging_buffer.h
+    staging.h
+    time.h
+    tuple.h
+    tween_manager.h
+    vec.h
+    word.h
+)
+
+if (WIN32)
+    target_sources (${TARGET} PRIVATE
+        platform_windows.cc
+    )
+    target_sources (${TARGET} PUBLIC
+        entrypoint_windows.h
+        platform_windows.h
+    )
+else()
+    target_sources (${TARGET} PRIVATE
+        platform_linux.cc
+    )
+    target_sources (${TARGET} PUBLIC
+        entrypoint_linux.h
+        platform_linux.h
+    )
 endif()
 
-find_package(Vulkan)
+if (Vulkan_FOUND)
+    target_sources (${TARGET} PRIVATE
+        rhi_vulkan.cc
+    )
+endif()
 
 if (Vulkan_FOUND)
     target_sources(${TARGET}

@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include "nyla/commons/array.h"
+#include "nyla/commons/array_def.h"
 #include "nyla/commons/concepts.h"
 
 namespace nyla

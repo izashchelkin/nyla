@@ -1,16 +1,30 @@
 #pragma once
 
-#include "nyla/commons/assert.h"
+#include "nyla/commons/fmt.h"
+#include "nyla/commons/mem.h"
 #include "nyla/commons/vec.h"
 
-#include <algorithm>
-#include <array>
-#include <cmath>
-#include <concepts>
 #include <cstdint>
 
 namespace nyla
 {
+
+template <uint64_t N, uint64_t M, typename T> using mat = array<array<T, M>, N>;
+
+using mat4 = mat<4, 4, float>;
+
+namespace Mat
+{
+
+template <uint64_t N, uint64_t M, typename T> INLINE void Identity(mat<N, M, T> &out)
+{
+    MemZero(&out);
+
+    for (uint32_t i = 0; i < N; ++i)
+        out[i][i] = 1;
+}
+
+} // namespace Mat
 
 template <typename T, uint32_t N> class Mat
 {
@@ -50,15 +64,6 @@ template <typename T, uint32_t N> class Mat
             for (uint32_t row = 0; row < count; ++row)
                 m_Data[col][row] = static_cast<T>(v[col][row]);
         }
-    }
-
-    [[nodiscard]]
-    static auto Identity() -> Mat
-    {
-        Mat ret{};
-        for (uint32_t i = 0; i < N; ++i)
-            ret[i][i] = static_cast<T>(1);
-        return ret;
     }
 
     [[nodiscard]] auto operator[](uint32_t col) -> Array<T, N> &

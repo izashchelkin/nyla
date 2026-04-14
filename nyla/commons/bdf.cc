@@ -2,9 +2,9 @@
 
 #include <cstdint>
 
-#include "nyla/commons/assert.h"
 #include "nyla/commons/cast.h"
 #include "nyla/commons/hex.h"
+#include "nyla/commons/macros.h"
 
 namespace nyla
 {

@@ -30,6 +30,20 @@ auto inline_vec<T, Capacity>::operator[](uint64_t i) const -> const T &
 namespace InlineVec
 {
 
+template <typename T, uint64_t VecCapacity>
+[[nodiscard]]
+INLINE auto Capacity(inline_vec<T, VecCapacity> &self) -> uint64_t
+{
+    return VecCapacity;
+}
+
+template <typename T, uint64_t Capacity>
+[[nodiscard]]
+INLINE auto Size(inline_vec<T, Capacity> &self) -> uint64_t
+{
+    return self.size;
+}
+
 template <typename T, uint64_t Capacity>
 [[nodiscard]]
 INLINE auto DataPtr(inline_vec<T, Capacity> &self) -> T *

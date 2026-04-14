@@ -5,6 +5,7 @@
 
 #include "nyla/commons/array.h"
 #include "nyla/commons/byteparser.h"
+#include "nyla/commons/file.h"
 #include "nyla/commons/macros.h"
 #include "nyla/commons/mem.h"
 #include "nyla/commons/word.h"
@@ -150,19 +151,25 @@ void BufferWriteFmt(auto &&consumer, span<uint8_t> buffer, byteview fmt, ...)
 
     WriteFmt(
         [&](const uint8_t *data, uint32_t dataSize) -> void {
-            if (bufferUsed + dataSize < buffer.size)
+            if (dataSize == 0)
+                return;
+
+            if (dataSize >= buffer.size)
             {
-                MemCpy(buffer.data + bufferUsed, data, dataSize);
+                if (bufferUsed > 0)
+                {
+                    consumer(buffer.data, bufferUsed);
+                    bufferUsed = 0;
+                }
+
+                consumer(data, dataSize);
                 return;
             }
 
-            if (bufferUsed + dataSize >= buffer.size * 2)
+            if (bufferUsed + dataSize < buffer.size)
             {
-                if (bufferUsed > 0)
-                    consumer(buffer.data, bufferUsed);
-
-                consumer(data, dataSize);
-                bufferUsed = 0;
+                MemCpy(buffer.data + bufferUsed, data, dataSize);
+                bufferUsed += dataSize;
                 return;
             }
 
@@ -202,7 +209,7 @@ void API StringWriteFmt(span<uint8_t> out, byteview fmt, ...)
     va_end(args);
 }
 
-void API FileWriteFmt(FileHandle handle, span<uint8_t> buffer, byteview fmt, ...)
+void API FileWriteFmt(file_handle handle, span<uint8_t> buffer, byteview fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
@@ -213,7 +220,7 @@ void API FileWriteFmt(FileHandle handle, span<uint8_t> buffer, byteview fmt, ...
     va_end(args);
 }
 
-void API FileWriteFmt(FileHandle handle, byteview fmt, ...)
+void API FileWriteFmt(file_handle handle, byteview fmt, ...)
 {
     va_list args;
     va_start(args, fmt);

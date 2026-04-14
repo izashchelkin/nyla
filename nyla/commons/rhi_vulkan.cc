@@ -11,6 +11,7 @@
 #include "nyla/commons/collections.h"
 #include "nyla/commons/handle_pool.h"
 #include "nyla/commons/inline_vec.h"
+#include "nyla/commons/limits.h"
 #include "nyla/commons/mem.h"
 #include "nyla/commons/minmax.h"
 #include "nyla/commons/region_alloc.h"

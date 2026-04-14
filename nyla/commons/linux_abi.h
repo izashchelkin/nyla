@@ -41,6 +41,12 @@
 
 #pragma once
 
+#if 1
+
+// NOTE: Unfortunately Linux development is miserable without libc
+
+#else
+
 #include "nyla/commons/fmt.h"
 #include "nyla/commons/macros.h"
 
@@ -83,24 +89,24 @@
 /* Types of sockets.  */
 enum __socket_type
 {
-    SOCK_STREAM = 1, /* Sequenced, reliable, connection-based
-                byte streams.  */
+    SOCK_STREAM = 1,    /* Sequenced, reliable, connection-based
+                   byte streams.  */
 #define SOCK_STREAM SOCK_STREAM
-    SOCK_DGRAM = 2, /* Connectionless, unreliable datagrams
-               of fixed maximum length.  */
+    SOCK_DGRAM = 2,     /* Connectionless, unreliable datagrams
+                   of fixed maximum length.  */
 #define SOCK_DGRAM SOCK_DGRAM
-    SOCK_RAW = 3, /* Raw protocol interface.  */
+    SOCK_RAW = 3,       /* Raw protocol interface.  */
 #define SOCK_RAW SOCK_RAW
-    SOCK_RDM = 4, /* Reliably-delivered messages.  */
+    SOCK_RDM = 4,       /* Reliably-delivered messages.  */
 #define SOCK_RDM SOCK_RDM
     SOCK_SEQPACKET = 5, /* Sequenced, reliable, connection-based,
                datagrams of fixed maximum length.  */
 #define SOCK_SEQPACKET SOCK_SEQPACKET
-    SOCK_DCCP = 6, /* Datagram Congestion Control Protocol.  */
+    SOCK_DCCP = 6,      /* Datagram Congestion Control Protocol.  */
 #define SOCK_DCCP SOCK_DCCP
-    SOCK_PACKET = 10, /* Linux specific way of getting packets
-                 at the dev level.  For writing rarp and
-                 other similar things on the user level. */
+    SOCK_PACKET = 10,   /* Linux specific way of getting packets
+                   at the dev level.  For writing rarp and
+                   other similar things on the user level. */
 #define SOCK_PACKET SOCK_PACKET
 
     /* Flags to be ORed into the type parameter of socket and socketpair and
@@ -287,9 +293,9 @@ struct __attribute_struct_may_alias__ sockaddr_storage
 /* Bits in the FLAGS argument to `send', `recv', et al.  */
 enum
 {
-    MSG_OOB = 0x01, /* Process out-of-band data.  */
+    MSG_OOB = 0x01,       /* Process out-of-band data.  */
 #define MSG_OOB MSG_OOB
-    MSG_PEEK = 0x02, /* Peek at incoming messages.  */
+    MSG_PEEK = 0x02,      /* Peek at incoming messages.  */
 #define MSG_PEEK MSG_PEEK
     MSG_DONTROUTE = 0x04, /* Don't use local routing.  */
 #define MSG_DONTROUTE MSG_DONTROUTE
@@ -300,13 +306,13 @@ enum
 #endif
     MSG_CTRUNC = 0x08, /* Control data lost before delivery.  */
 #define MSG_CTRUNC MSG_CTRUNC
-    MSG_PROXY = 0x10, /* Supply or ask second address.  */
+    MSG_PROXY = 0x10,  /* Supply or ask second address.  */
 #define MSG_PROXY MSG_PROXY
     MSG_TRUNC = 0x20,
 #define MSG_TRUNC MSG_TRUNC
     MSG_DONTWAIT = 0x40, /* Nonblocking IO.  */
 #define MSG_DONTWAIT MSG_DONTWAIT
-    MSG_EOR = 0x80, /* End of record.  */
+    MSG_EOR = 0x80,      /* End of record.  */
 #define MSG_EOR MSG_EOR
     MSG_WAITALL = 0x100, /* Wait for a full request.  */
 #define MSG_WAITALL MSG_WAITALL
@@ -318,21 +324,21 @@ enum
 #define MSG_CONFIRM MSG_CONFIRM
     MSG_RST = 0x1000,
 #define MSG_RST MSG_RST
-    MSG_ERRQUEUE = 0x2000, /* Fetch message from error queue.  */
+    MSG_ERRQUEUE = 0x2000,       /* Fetch message from error queue.  */
 #define MSG_ERRQUEUE MSG_ERRQUEUE
-    MSG_NOSIGNAL = 0x4000, /* Do not generate SIGPIPE.  */
+    MSG_NOSIGNAL = 0x4000,       /* Do not generate SIGPIPE.  */
 #define MSG_NOSIGNAL MSG_NOSIGNAL
-    MSG_MORE = 0x8000, /* Sender will send more.  */
+    MSG_MORE = 0x8000,           /* Sender will send more.  */
 #define MSG_MORE MSG_MORE
-    MSG_WAITFORONE = 0x10000, /* Wait for at least one packet to return.*/
+    MSG_WAITFORONE = 0x10000,    /* Wait for at least one packet to return.*/
 #define MSG_WAITFORONE MSG_WAITFORONE
-    MSG_BATCH = 0x40000, /* sendmmsg: more messages coming.  */
+    MSG_BATCH = 0x40000,         /* sendmmsg: more messages coming.  */
 #define MSG_BATCH MSG_BATCH
     MSG_SOCK_DEVMEM = 0x2000000, /* Receive devmem skbs as cmsg.  */
 #define MSG_SOCK_DEVMEM MSG_SOCK_DEVMEM
-    MSG_ZEROCOPY = 0x4000000, /* Use user data in kernel path.  */
+    MSG_ZEROCOPY = 0x4000000,    /* Use user data in kernel path.  */
 #define MSG_ZEROCOPY MSG_ZEROCOPY
-    MSG_FASTOPEN = 0x20000000, /* Send data in TCP SYN.  */
+    MSG_FASTOPEN = 0x20000000,   /* Send data in TCP SYN.  */
 #define MSG_FASTOPEN MSG_FASTOPEN
 
     MSG_CMSG_CLOEXEC = 0x40000000 /* Set close_on_exit for file
@@ -671,3 +677,5 @@ INLINE auto SysCall6(int64_t num, int64_t arg1, int64_t arg2, int64_t arg3, int6
 } // namespace sys
 
 } // namespace nyla
+
+#endif

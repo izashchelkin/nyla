@@ -1,21 +1,21 @@
 #pragma once
 
-#include <algorithm>
-#include <cmath>
 #include <cstdint>
-#include <numbers>
 
-#include "nyla/commons/vec.h"
+#include "nyla/commons/array_def.h"
+#include "nyla/commons/macros.h"
+#include "nyla/commons/math.h"
+#include "nyla/commons/minmax.h"
 
 namespace nyla
 {
 
 [[nodiscard]]
-auto Lerp(float a, float b, float p) -> float
+INLINE auto Lerp(float a, float b, float p) -> float
 {
     if (a == b)
         return b;
-    p = std::clamp(p, 0.f, 1.f);
+    p = Clamp(p, 0.f, 1.f);
 
     if (p >= 1.f - 1e-6)
     {
@@ -26,22 +26,22 @@ auto Lerp(float a, float b, float p) -> float
     return ret;
 }
 
-template <typename T, uint32_t N>
+template <typename T, uint64_t N>
 [[nodiscard]]
-auto Lerp(const Vec<T, N> &a, const Vec<T, N> &b, T t) -> Vec<T, N>
+INLINE auto Lerp(const array<T, N> &a, const array<T, N> &b, T t) -> array<T, N>
 {
-    Vec<T, N> ret;
+    array<T, N> ret;
     for (uint32_t i = 0; i < N; ++i)
         ret[i] = Lerp(a[i], b[i], t);
     return ret;
 }
 
 [[nodiscard]]
-auto LerpAngle(float a, float b, float p) -> float
+INLINE auto LerpAngle(float a, float b, float p) -> float
 {
     if (a == b)
         return b;
-    p = std::clamp(p, 0.f, 1.f);
+    p = Clamp(p, 0.f, 1.f);
 
     if (p >= 1.f - 1e-6)
     {
@@ -49,10 +49,10 @@ auto LerpAngle(float a, float b, float p) -> float
     }
 
     float delta = b - a;
-    while (delta > std::numbers::pi_v<float>)
-        delta -= 2 * std::numbers::pi_v<float>;
-    while (delta < -std::numbers::pi_v<float>)
-        delta += 2 * std::numbers::pi_v<float>;
+    while (delta > math::pi)
+        delta -= 2 * math::pi;
+    while (delta < -math::pi)
+        delta += 2 * math::pi;
 
     if (std::abs(delta) < 10e-3)
         return b;

@@ -2,10 +2,17 @@
 
 #include <cstdint>
 
-#include "nyla/commons/intrin.h"
+#include "nyla/commons/intrin.h" // IWYU pragma: keep
 
 namespace nyla
 {
+
+namespace math
+{
+
+constexpr inline float pi = 3.141592653589793f;
+
+}
 
 constexpr auto CeilDiv(uint32_t a, uint32_t b) -> uint32_t
 {

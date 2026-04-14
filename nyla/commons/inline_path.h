@@ -1,10 +1,10 @@
 #pragma once
 
+#include <cstdint>
+
 #include "nyla/commons/inline_string.h"
 #include "nyla/commons/inline_vec.h"
 #include "nyla/commons/macros.h"
-#include "nyla/commons/span.h"
-#include <cstdint>
 
 namespace nyla
 {

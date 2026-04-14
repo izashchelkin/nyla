@@ -154,7 +154,7 @@ void Log(json_value &self, uint32_t indent)
         return;
     }
     case json_tag::String: {
-        LOG("%*s\"" NYLA_SV_FMT "\"", indent, " ", NYLA_SV_ARG(JsonValue::String(self)));
+        LOG("%*s\"" SV_FMT "\"", indent, " ", SV_ARG(JsonValue::String(self)));
         return;
     }
     case json_tag::ArrayBegin: {

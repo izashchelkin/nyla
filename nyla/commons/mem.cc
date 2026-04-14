@@ -1,15 +1,15 @@
 #include "nyla/commons/mem.h"
-#include "nyla/commons/fmt.h"
-#include "nyla/commons/intrin.h"
-#include "nyla/commons/macros.h"
 
-#include <cstdint>
+#include <cstdint> // IWYU pragma: keep
+
+#include "nyla/commons/fmt.h"    // IWYU pragma: keep
+#include "nyla/commons/intrin.h" // IWYU pragma: keep
+#include "nyla/commons/macros.h" // IWYU pragma: keep
 
 namespace nyla
 {
 
-namespace internal_mem
-{
+#if 0
 
 auto API CStrLen(const void *str, uint64_t maxLen) -> uint64_t
 {
@@ -37,8 +37,6 @@ auto API CStrLen(const void *str, uint64_t maxLen) -> uint64_t
     TRAP();
     return 0;
 }
-
-} // namespace internal_mem
 
 auto MemEq(const void *p1, const void *p2, uint64_t len) -> bool
 {
@@ -79,20 +77,6 @@ auto MemEq(const void *p1, const void *p2, uint64_t len) -> bool
     return _mm_movemask_epi8(tailCmp) == 0xFFFF;
 }
 
-auto MemStartsWith(const void *str, uint64_t strLen, const void *prefix, uint64_t prefixLen) -> bool
-{
-    if (prefixLen > strLen)
-        return false;
-    else
-        return MemEq(str, prefix, prefixLen);
-}
-
-auto MemEndsWith(const void *str, uint64_t strLen, const void *suffix, uint64_t suffixLen) -> bool
-{
-    if (suffixLen > strLen)
-        return false;
-    else
-        return MemEq((const char *)str + strLen - suffixLen, suffix, suffixLen);
-}
+#endif
 
 } // namespace nyla

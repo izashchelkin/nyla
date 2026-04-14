@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include "nyla/commons/assert.h"
+#include "nyla/commons/fmt.h"
 
 namespace nyla
 {

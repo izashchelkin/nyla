@@ -1,9 +1,8 @@
-#include <cstdint>
-#include <limits>
-
-#include "nyla/commons/array.h"
-#include "nyla/commons/inline_vec.h"
 #include "nyla/commons/input_manager.h"
+
+#include <cstdint>
+
+#include "nyla/commons/inline_vec.h" // IWYU pragma: keep
 #include "nyla/commons/minmax.h"
 
 namespace nyla
@@ -12,83 +11,75 @@ namespace nyla
 namespace
 {
 
-struct InputState
+struct input_state
 {
     uint64_t pressedAt;
+    uint32_t code;
+    input_interface_type type;
     bool released;
-
-    struct Physical
-    {
-        uint32_t type;
-        uint32_t code;
-    };
-    Physical mappedTo;
 };
-InlineVec<InputState, std::numeric_limits<uint8_t>::max() + 1> m_InputStates;
+
+struct input_manager_state
+{
+    inline_vec<input_state, 0xFF> inputStates;
+};
+input_manager_state *g_State;
+
+//
+
+auto FindInput(input_interface_type type, uint32_t code) -> input_state *
+{
+    for (auto it = g_State->inputStates.begin(), end = g_State->inputStates.end(); it != end; ++it)
+    {
+        if (it->type == type && it->code == code)
+            return it;
+    }
+
+    return nullptr;
+}
 
 } // namespace
 
-auto InputManager::NewId() -> InputId
+namespace InputManager
 {
-    m_InputStates.PushBack(InputState{});
-    return {.index = static_cast<uint8_t>(m_InputStates.Size() - 1)};
+
+void Map(input_id input, input_interface_type type, uint32_t code)
+{
+    auto &state = g_State->inputStates[(uint8_t)input];
+    state.type = type;
+    state.code = code;
 }
 
-auto InputManager::NewIdMapped(uint32_t type, uint32_t code) -> InputId
+void HandlePressed(input_interface_type type, uint32_t code, uint64_t time)
 {
-    auto ret = NewId();
-    Map(ret, type, code);
-    return ret;
+    if (auto state = FindInput(type, code); state)
+        state->pressedAt = Max(state->pressedAt, time);
 }
 
-void InputManager::Map(InputId input, uint32_t type, uint32_t code)
+void HandleReleased(input_interface_type type, uint32_t code, uint64_t time)
 {
-    m_InputStates[input.index].mappedTo = {
-        .type = type,
-        .code = code,
-    };
+    if (auto state = FindInput(type, code); state)
+        state->released = true;
 }
 
-void InputManager::HandlePressed(uint32_t type, uint32_t code, uint64_t time)
+auto IsPressed(input_id input) -> bool
 {
-    for (auto &state : m_InputStates)
-    {
-        if (state.mappedTo.type == type && state.mappedTo.code == code)
-        {
-            state.pressedAt = Max(state.pressedAt, time);
-            break;
-        }
-    }
-}
-
-void InputManager::HandleReleased(uint32_t type, uint32_t code, uint64_t time)
-{
-    for (auto &state : m_InputStates)
-    {
-        if (state.mappedTo.type == type && state.mappedTo.code == code)
-        {
-            state.released = true;
-            break;
-        }
-    }
-}
-
-auto InputManager::IsPressed(InputId input) -> bool
-{
-    auto &state = m_InputStates[input.index];
+    auto &state = g_State->inputStates[(uint8_t)input];
     return !state.released && state.pressedAt;
 }
 
-void InputManager::Update()
+void Update()
 {
-    for (auto &state : m_InputStates)
+    for (auto &state : g_State->inputStates)
     {
-        if (!state.released)
-            continue;
-
-        state.pressedAt = 0;
-        state.released = false;
+        if (state.released)
+        {
+            state.pressedAt = 0;
+            state.released = false;
+        }
     }
 }
+
+} // namespace InputManager
 
 } // namespace nyla
