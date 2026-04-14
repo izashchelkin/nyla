@@ -26,10 +26,10 @@ mempage_pool *g_MemPagePool;
 namespace MemPagePool
 {
 
-void Bootstrap(region_alloc &bootstrapAlloc)
+void Bootstrap()
 {
-    g_MemPagePool = &RegionAlloc::Alloc<mempage_pool>(bootstrapAlloc);
-    g_MemPagePool->begin = bootstrapAlloc.end;
+    g_MemPagePool = &RegionAlloc::Alloc<mempage_pool>(RegionAlloc::g_BootstrapAlloc);
+    g_MemPagePool->begin = RegionAlloc::g_BootstrapAlloc.begin;
     g_MemPagePool->bitset[0] |= 1; // bootstrapAlloc owns first chunk
 }
 

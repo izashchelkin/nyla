@@ -7,14 +7,13 @@ target_sources(${TARGET} PRIVATE
     fmt.cc
     gltf.cc
     glyph_renderer.cc
-    gpu_upload_manager.cc
+    gpu_upload.cc
     input_manager.cc
     json_parser.cc
     json_value.cc
     libmain.cc
     mem.cc
     mempage_pool.cc
-    png.cc
     region_alloc.cc
     render_targets.cc
     renderer.cc
@@ -48,7 +47,7 @@ target_sources(${TARGET} PUBLIC
     gamepad.h
     gltf.h
     glyph_renderer.h
-    gpu_upload_manager.h
+    gpu_upload.h
     handle_pool.h
     handle.h
     hex.h
@@ -75,7 +74,6 @@ target_sources(${TARGET} PUBLIC
     platform_audio.h
     platform_dir_watch.h
     platform.h
-    png.h
     region_alloc_def.h
     region_alloc.h
     render_targets.h

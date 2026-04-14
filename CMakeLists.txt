@@ -2,9 +2,6 @@ cmake_minimum_required(VERSION 4.0)
 project(nyla LANGUAGES CXX)
 enable_testing()
 
-if(MSVC)
- add_compile_options( /MP )
-endif()
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -13,36 +10,37 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 include_directories(${PROJECT_SOURCE_DIR})
 
-add_definitions(-D_ITERATOR_DEBUG_LEVEL=0)
+# add_definitions(-D_ITERATOR_DEBUG_LEVEL=0)
 
 if(MSVC)
-    foreach(flag_var 
-            CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
-            CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE)
-        
-        string(REPLACE "/RTC1" "" ${flag_var} "${${flag_var}}")
-        string(REPLACE "/EHsc" "" ${flag_var} "${${flag_var}}")
-    endforeach()
-
     add_compile_options(
-        "/GS-"           
-        "/GR-"          
-        "/EHs-c-"         
-        "/Oi-"             
-        "/Zc:threadSafeInit-"
-    )
-
-    add_compile_options(
+        "/MP"
         "/arch:AVX2"
     )
-    
-    add_link_options(
-        "/NODEFAULTLIB"     
-        "/SUBSYSTEM:WINDOWS" 
-        "/STACK:0x4000,0x4000"
-    )
 
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /NOENTRY")
+    # foreach(flag_var 
+    #         CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
+    #         CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE)
+    #     
+    #     string(REPLACE "/RTC1" "" ${flag_var} "${${flag_var}}")
+    #     string(REPLACE "/EHsc" "" ${flag_var} "${${flag_var}}")
+    # endforeach()
+
+    # add_compile_options(
+    #     "/GS-"           
+    #     "/GR-"          
+    #     "/EHs-c-"         
+    #     "/Oi-"             
+    #     "/Zc:threadSafeInit-"
+    # )
+    
+    # add_link_options(
+    #     "/NODEFAULTLIB"     
+    #     "/SUBSYSTEM:WINDOWS" 
+    #     "/STACK:0x4000,0x4000"
+    # )
+
+    # set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /NOENTRY")
 
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
     add_compile_options(

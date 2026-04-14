@@ -4,6 +4,7 @@
 
 #include "nyla/commons/mem.h"
 #include "nyla/commons/mempage_pool.h"
+#include "nyla/commons/region_alloc.h"
 #include "nyla/commons/region_alloc_def.h"
 
 namespace nyla
@@ -12,20 +13,17 @@ namespace nyla
 void PlatformBootstrap();
 void PlatformTearDown();
 
-void LibMain(void (*userMain)())
+void API LibMain(void (*userMain)())
 {
     PlatformBootstrap();
 
     uint8_t *addressSpaceBase = (uint8_t *)ReserveMemPages(MemPagePool::kPoolSize);
-    CommitMemPages(addressSpaceBase, kPageSize);
+    RegionAlloc::g_BootstrapAlloc = {};
+    RegionAlloc::g_BootstrapAlloc.at = addressSpaceBase;
+    RegionAlloc::g_BootstrapAlloc.begin = addressSpaceBase;
+    RegionAlloc::g_BootstrapAlloc.end = addressSpaceBase + MemPagePool::kChunkSize;
 
-    region_alloc bootstrapAlloc{
-        .at = addressSpaceBase,
-        .begin = addressSpaceBase,
-        .end = addressSpaceBase + kPageSize,
-        .commitedEnd = addressSpaceBase + kPageSize,
-    };
-    MemPagePool::Bootstrap(bootstrapAlloc);
+    MemPagePool::Bootstrap();
 
     userMain();
     PlatformTearDown();

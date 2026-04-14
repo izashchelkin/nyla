@@ -28,7 +28,8 @@
 
 auto main() -> int
 {
-    return nyla::LibMain(nyla::UserMain);
+    nyla::LibMain(nyla::UserMain);
+    return 0;
 }
 
 #else

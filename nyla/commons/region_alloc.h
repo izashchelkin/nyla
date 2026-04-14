@@ -12,6 +12,8 @@ namespace nyla
 namespace RegionAlloc
 {
 
+extern API region_alloc g_BootstrapAlloc;
+
 [[nodiscard]]
 INLINE auto Create(uint64_t maxSize, uint64_t precommitSize) -> region_alloc
 {

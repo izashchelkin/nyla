@@ -3,7 +3,6 @@
 #include <cstdint>
 
 #include "nyla/commons/asset_manager.h"
-#include "nyla/commons/engine0_internal.h"
 #include "nyla/commons/inline_vec.h"
 #include "nyla/commons/rhi.h"
 #include "nyla/commons/span.h"

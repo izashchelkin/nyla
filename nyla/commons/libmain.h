@@ -1,8 +1,10 @@
 #pragma once
 
+#include "nyla/commons/macros.h"
+
 namespace nyla
 {
 
-void LibMain(void (*userMain)());
+void API LibMain(void (*userMain)());
 
 } // namespace nyla

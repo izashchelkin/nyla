@@ -22,19 +22,19 @@ class AssetManager
         float2 uv;
     };
 
-    static auto GetMeshVertexAttributes() -> span<RhiVertexAttributeDesc>;
-    static auto GetMeshVertexBindings() -> span<RhiVertexBindingDesc>;
-    static auto GetMeshPipelineColorTargetFormats() -> span<RhiTextureFormat>;
+    static auto GetMeshVertexAttributes() -> span<rhi_vertex_attribute_desc>;
+    static auto GetMeshVertexBindings() -> span<rhi_vertex_binding_desc>;
+    static auto GetMeshPipelineColorTargetFormats() -> span<rhi_texture_format>;
 
-    struct Texture : Handle
+    struct Texture : handle
     {
     };
 
-    struct Mesh : Handle
+    struct Mesh : handle
     {
     };
 
-    struct MeshPrimitive : Handle
+    struct MeshPrimitive : handle
     {
     };
 
@@ -47,7 +47,7 @@ class AssetManager
     };
 
     static void Init();
-    static void Upload(RhiCmdList cmd);
+    static void Upload(rhi_cmdlist cmd);
 
     static void Flush();
 

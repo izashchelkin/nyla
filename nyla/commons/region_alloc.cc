@@ -2,4 +2,12 @@
 
 namespace nyla
 {
+
+namespace RegionAlloc
+{
+
+API region_alloc g_BootstrapAlloc;
+
+}
+
 } // namespace nyla
