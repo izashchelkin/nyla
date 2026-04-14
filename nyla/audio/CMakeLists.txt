@@ -17,8 +17,8 @@ target_sources(${TARGET_EXEC}
         main.cc
 )
 
-target_link_libraries(${TARGET_EXEC}
-    PUBLIC
-        nyla::platform::audio
-        nyla::audio::wave
-)
+# target_link_libraries(${TARGET_EXEC}
+#     PUBLIC
+#         nyla::platform::audio
+#         nyla::audio::wave
+# )

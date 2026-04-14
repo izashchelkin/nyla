@@ -1,37 +1,11 @@
-#include "nyla/commons/macros.h"
+#pragma once
 
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <windows.h>
+#include "nyla/commons/entrypoint.h"
+#include "nyla/commons/headers_windows.h"
+#include "nyla/commons/libmain.h"
 
-namespace nyla
+int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
 {
-
-auto UserMain() -> int;
-void API NORETURN LibMain(int (*userMain)());
-
-} // namespace nyla
-
-extern "C"
-{
-    int _fltused = 0;
-    void __cdecl _RTC_InitBase()
-    {
-    }
-    void __cdecl _RTC_Shutdown()
-    {
-    }
-    void __cdecl _RTC_CheckStackVars(void *, void *)
-    {
-    }
-    void __chkstk()
-    {
-    }
-
-    void NORETURN WINAPI _start()
-    {
-        nyla::LibMain(nyla::UserMain);
-        TRAP();
-        UNREACHABLE();
-    }
+    nyla::LibMain(nyla::UserMain);
+    return 0;
 }

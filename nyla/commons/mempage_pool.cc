@@ -5,6 +5,8 @@
 #include "nyla/commons/limits.h"
 #include "nyla/commons/mem.h"
 #include "nyla/commons/mempage_pool.h"
+#include "nyla/commons/region_alloc.h"
+#include "nyla/commons/region_alloc_def.h"
 
 namespace nyla
 {
@@ -23,6 +25,13 @@ mempage_pool *g_MemPagePool;
 
 namespace MemPagePool
 {
+
+void Bootstrap(region_alloc &bootstrapAlloc)
+{
+    g_MemPagePool = &RegionAlloc::Alloc<mempage_pool>(bootstrapAlloc);
+    g_MemPagePool->begin = bootstrapAlloc.end;
+    g_MemPagePool->bitset[0] |= 1; // bootstrapAlloc owns first chunk
+}
 
 auto API AcquireChunk() -> span<uint8_t>
 {

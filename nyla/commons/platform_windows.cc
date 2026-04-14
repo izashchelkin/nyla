@@ -1,19 +1,18 @@
 #include "nyla/commons/platform_windows.h"
 
 #include <cstdint>
+#include <immintrin.h>
 
-#include "nyla/commons/bootstrap.h"
+#include "nyla/commons/gamepad.h"
 #include "nyla/commons/inline_queue.h"
 #include "nyla/commons/intrin.h"
+#include "nyla/commons/keyboard.h"
 #include "nyla/commons/limits.h"
 #include "nyla/commons/macros.h"
 #include "nyla/commons/math.h"
 #include "nyla/commons/mem.h"
 #include "nyla/commons/platform.h"
 #include "nyla/commons/span.h"
-
-#include "nyla/commons/gamepad.h"
-#include "nyla/commons/keyboard.h"
 #include "nyla/commons/time.h"
 
 auto CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) -> LRESULT;
@@ -64,12 +63,10 @@ auto GetPerformanceTicks() -> uint64_t
 
 auto TicksTo(uint64_t ticks, uint64_t scale) -> uint64_t
 {
-    unsigned __int64 hi = 0;
-    unsigned __int64 lo = _umul128(ticks, scale, &hi);
-
-    unsigned __int64 rem = 0;
-    unsigned __int64 q = _udiv128(hi, lo, GetPerformanceFreq(), &rem);
-    return static_cast<uint64_t>(q);
+    uint64_t hi;
+    uint64_t lo = UMul128(ticks, scale, hi);
+    uint64_t rem;
+    return UDiv128(hi, lo, GetPerformanceFreq(), rem);
 }
 
 } // namespace
@@ -660,7 +657,7 @@ auto GetStderr() -> file_handle
 void ParseStdArgs(byteview *args, uint32_t maxArgs)
 {
     uint8_t *cmdLine = (uint8_t *)GetCommandLineA();
-    uint64_t cmdLineLen = CStrLen(cmdLine);
+    uint64_t cmdLineLen = CStrLen(cmdLine, 256);
 
     const uint8_t *cursor = cmdLine;
     bool inQuotes = false;
@@ -710,7 +707,7 @@ void ParseStdArgs(byteview *args, uint32_t maxArgs)
     ASSERT(!inQuotes);
 }
 
-auto API LibMain(int (*userMain)()) -> int
+void PlatformBootstrap()
 {
     GetNativeSystemInfo(&g_SysInfo);
     ASSERT(g_SysInfo.dwPageSize == kPageSize);
@@ -727,12 +724,14 @@ auto API LibMain(int (*userMain)()) -> int
     SetStdHandle(STD_OUTPUT_HANDLE, hConOut);
     SetStdHandle(STD_ERROR_HANDLE, hConOut);
 #endif
+}
 
-    Bootstrap();
-
-    const int retCode = userMain();
-
+void PlatformTearDown()
+{
 #ifndef NDEBUG
+    HANDLE hConIn =
+        CreateFileA("CONIN$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
+
     for (;;)
     {
         INPUT_RECORD ir;
@@ -746,25 +745,6 @@ auto API LibMain(int (*userMain)()) -> int
 
     PostMessage(GetConsoleWindow(), WM_CLOSE, 0, 0);
 #endif
-
-    return retCode;
 }
 
 } // namespace nyla
-
-extern "C"
-{
-    int _fltused = 0;
-    void __cdecl _RTC_InitBase()
-    {
-    }
-    void __cdecl _RTC_Shutdown()
-    {
-    }
-    void __cdecl _RTC_CheckStackVars(void *, void *)
-    {
-    }
-    void __chkstk()
-    {
-    }
-}

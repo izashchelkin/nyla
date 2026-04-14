@@ -31,6 +31,10 @@ if(MSVC)
         "/Oi-"             
         "/Zc:threadSafeInit-"
     )
+
+    add_compile_options(
+        "/arch:AVX2"
+    )
     
     add_link_options(
         "/NODEFAULTLIB"     
@@ -49,6 +53,10 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
         "-fno-rtti"
         "-fno-strict-aliasing"
         "-fvisibility=hidden"
+    )
+
+    add_compile_options(
+        "-mavx2"
     )
     
     add_link_options(

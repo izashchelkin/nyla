@@ -22,24 +22,18 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "nyla/commons/macros.h"
-
-namespace nyla
-{
-
-auto UserMain() -> int;
-void API LibMain(int (*userMain)());
-
-} // namespace nyla
+#include "nyla/commons/entrypoint.h"
 
 #if 1
 
 auto main() -> int
 {
-    nyla::LibMain(nyla::UserMain);
+    return nyla::LibMain(nyla::UserMain);
 }
 
 #else
+
+#include "nyla/commons/macros.h"
 
 int g_argc;
 char **g_argv;

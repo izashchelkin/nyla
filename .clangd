@@ -1,9 +1,10 @@
 Style:
-  QuotedHeaders: ["nyla/.*", "absl/.*", "xcb/.*", "fuse/.*"]
-
-Index:
-  Background: Skip
-  StandardLibrary: false
+  QuotedHeaders: ["nyla/.*"]
 
 CompileFlags:
-  Add: [ -std=c++23 ]
+  Add: [-std=c++23, -fms-extensions, -fms-compatibility]
+  CompilationDatabase: "build/clangd-db"
+
+# Index:
+#   Background: Skip
+#   StandardLibrary: false

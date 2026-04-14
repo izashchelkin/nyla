@@ -6,7 +6,6 @@
 #include "nyla/commons/fmt.h"
 #include "nyla/commons/macros.h"
 #include "nyla/commons/region_alloc.h"
-#include "nyla/commons/region_alloc_utils.h"
 #include "nyla/commons/span.h"
 
 namespace nyla

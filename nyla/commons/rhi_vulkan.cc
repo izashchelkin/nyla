@@ -15,7 +15,6 @@
 #include "nyla/commons/mem.h"
 #include "nyla/commons/minmax.h"
 #include "nyla/commons/region_alloc.h"
-#include "nyla/commons/region_alloc_utils.h"
 #include "nyla/commons/span.h"
 #include "nyla/commons/spv_shader.h"
 

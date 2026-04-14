@@ -4,85 +4,95 @@
 #include <cstdint>
 #include <type_traits>
 
+#include <immintrin.h>
+
 #include "nyla/commons/fmt.h"
 #include "nyla/commons/macros.h"
-
-#if defined(_MSC_VER)
-#include <intrin.h> // IWYU pragma: export
-#else
-#include <x86intrin.h> // IWYU pragma: export
-#endif
 
 namespace nyla
 {
 
 template <typename T>
 INLINE void LoadU(const void *ptr, T &out)
-    requires(std::is_trivially_constructible_v<T> and std::is_trivially_copyable_v<T>)
+    requires(std::is_trivially_copyable_v<T>)
 {
-#if defined(_MSC_VER)
-    out = *(const __unaligned T *)(ptr);
-#else
+#if defined(__clang__) || defined(__GNUC__)
     __builtin_memcpy(&out, ptr, sizeof(T));
+#else
+    out = *(const __unaligned T *)(ptr);
 #endif
-};
+}
 
 template <typename T> INLINE auto LoadU(const void *ptr) -> T
 {
     T ret;
     LoadU<T>(ptr, ret);
     return ret;
-};
-
-INLINE auto Load64U(const void *ptr) -> uint64_t
-{
-    return LoadU<uint64_t>(ptr);
 }
 
 template <typename T>
 INLINE void WriteU(void *ptr, const T &val)
-    requires(std::is_trivially_constructible_v<T>() and std::is_trivially_copyable_v<T>)
+    requires(std::is_trivially_copyable_v<T>)
 {
-
-#if defined(_MSC_VER)
-    *(__unaligned T *)(ptr) = val;
-#else
+#if defined(__clang__) || defined(__GNUC__)
     __builtin_memcpy(ptr, &val, sizeof(T));
+#else
+    *(__unaligned T *)(ptr) = val;
 #endif
 }
 
 INLINE uint32_t BitScanForward32(uint32_t n)
 {
     DASSERT(n != 0);
-
-#if defined(_MSC_VER)
+#if defined(__clang__) || defined(__GNUC__)
+    return (uint32_t)__builtin_ctz(n);
+#else
     unsigned long index;
     _BitScanForward(&index, (unsigned long)n);
     return (uint32_t)index;
-#else
-    return __builtin_ctz((unsigned int)n);
 #endif
 }
 
 INLINE uint32_t BitScanForward64(uint64_t n)
 {
     DASSERT(n != 0);
-
-#if defined(_MSC_VER)
-    unsigned long index;
-    _BitScanForward64(&index, (unsigned __int64)n);
-    return (uint32_t)index;
+#if defined(__clang__) || defined(__GNUC__)
+    return (uint32_t)__builtin_ctzll(n);
 #else
-    return __builtin_ctzll((unsigned long long)n);
+    unsigned long index;
+    _BitScanForward64(&index, n);
+    return (uint32_t)index;
 #endif
 }
 
 INLINE int64_t LRound(double x)
 {
-#if defined(_MSC_VER)
-    return _mm_cvtsd_si64(_mm_set_sd(x + (x >= 0 ? 0.5 : -0.5)));
-#else
+#if defined(__clang__) || defined(__GNUC__)
     return __builtin_lround(x);
+#else
+    return _mm_cvtsd_si64(_mm_set_sd(x + (x >= 0 ? 0.5 : -0.5)));
+#endif
+}
+
+INLINE uint64_t UMul128(uint64_t a, uint64_t b, uint64_t &hi)
+{
+#if defined(__clang__) || defined(__GNUC__)
+    unsigned __int128 res = (unsigned __int128)a * b;
+    hi = (uint64_t)(res >> 64);
+    return (uint64_t)res;
+#else
+    return _umul128(a, b, &hi);
+#endif
+}
+
+INLINE uint64_t UDiv128(uint64_t hi, uint64_t lo, uint64_t divisor, uint64_t &reminder)
+{
+#if defined(__clang__) || defined(__GNUC__)
+    unsigned __int128 dividend = ((unsigned __int128)hi << 64) | lo;
+    reminder = (uint64_t)(dividend % divisor);
+    return (uint64_t)(dividend / divisor);
+#else
+    return _udiv128(hi, lo, divisor, &reminder);
 #endif
 }
 
