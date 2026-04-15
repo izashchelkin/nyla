@@ -22,11 +22,12 @@ struct AssetFileIndexEntry
     uint64_t dataOffset;
     uint64_t dataSize;
     uint64_t timestamp;
+    uint64_t guid;
     uint64_t crc32;
     uint64_t pathLength;
 };
 
 auto API AssetFileLoad(file_handle file) -> byteview;
-auto API AssetFileGetData(byteview assetFileData, byteview path) -> byteview;
+auto API AssetFileGetData(byteview assetFileData, uint64_t guid) -> byteview;
 
 } // namespace nyla

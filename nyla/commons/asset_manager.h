@@ -38,14 +38,6 @@ class AssetManager
     {
     };
 
-    enum class SamplerType
-    {
-        LinearClamp = 0,
-        LinearRepeat = 1,
-        NearestClamp = 2,
-        NearestRepeat = 3,
-    };
-
     static void Init();
     static void Upload(rhi_cmdlist cmd);
 

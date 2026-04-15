@@ -21,20 +21,6 @@ namespace nyla
 namespace
 {
 
-struct TextureData
-{
-    bool isStatic;
-    Str path;
-    bool needsUpload;
-
-    RhiTexture texture;
-    RhiSampledTextureView textureView;
-    uint32_t width;
-    uint32_t height;
-    uint32_t channels;
-};
-HandlePool<AssetManager::Texture, TextureData, 128> g_Textures;
-
 struct MeshData
 {
     bool isStatic;
@@ -103,19 +89,6 @@ void AssetManager::Init()
 
     //
 
-    auto addSampler = [](SamplerType samplerType, RhiFilter filter, RhiSamplerAddressMode addressMode) -> void {
-        RhiSampler sampler = Rhi::CreateSampler({
-            .minFilter = filter,
-            .magFilter = filter,
-            .addressModeU = addressMode,
-            .addressModeV = addressMode,
-            .addressModeW = addressMode,
-        });
-    };
-    addSampler(SamplerType::LinearClamp, RhiFilter::Linear, RhiSamplerAddressMode::ClampToEdge);
-    addSampler(SamplerType::LinearRepeat, RhiFilter::Linear, RhiSamplerAddressMode::Repeat);
-    addSampler(SamplerType::NearestClamp, RhiFilter::Nearest, RhiSamplerAddressMode::ClampToEdge);
-    addSampler(SamplerType::NearestRepeat, RhiFilter::Nearest, RhiSamplerAddressMode::Repeat);
 }
 
 void AssetManager::Flush()
@@ -306,14 +279,6 @@ void AssetManager::Upload(RhiCmdList cmd)
             meshData.needsUpload = false;
             alloc.Reset();
         }
-    });
-}
-
-auto AssetManager::DeclareTexture(Str path) -> Texture
-{
-    return g_Textures.Acquire(TextureData{
-        .path = path,
-        .needsUpload = true,
     });
 }
 

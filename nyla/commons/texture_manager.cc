@@ -1,5 +1,6 @@
 #include "nyla/commons/texture_manager.h"
 
+#include <cinttypes>
 #include <cstdint>
 
 #include "nyla/commons/asset_file.h"
@@ -24,14 +25,14 @@ namespace
 
 enum class texture_state
 {
-    NotUploaded,
+    NotUploaded = 0,
     Uploaded
 };
 
 struct texture_metadata
 {
+    uint64_t guid;
     texture_state state;
-    byteview path;
     rhi_texture texture;
     rhi_stv textureView;
     uint32_t width;
@@ -67,13 +68,13 @@ void API Update(rhi_cmdlist cmd, byteview assetFile)
         if (metadata.state != texture_state::NotUploaded)
             continue;
 
-        LOG("Uploading '" SV_FMT "'", metadata.path);
+        LOG("Uploading '" SV_FMT "'", metadata.guid);
 
-        byteview rawBytes = AssetFileGetData(assetFile, metadata.path);
+        byteview rawBytes = AssetFileGetData(assetFile, metadata.guid);
 
         uint8_t *pixelData = stbi_load_from_memory(rawBytes.data, rawBytes.size, (int *)&metadata.width,
                                                    (int *)&metadata.height, (int *)&metadata.channels, 4);
-        ASSERT(pixelData, "stbi_load failed for '" SV_FMT "': %s", SV_ARG(metadata.path), stbi_failure_reason());
+        ASSERT(pixelData, "stbi_load failed for '" PRIu64 "': %s", metadata.guid, stbi_failure_reason());
         ASSERT(metadata.channels == 4, "Unexpected channels: %d", metadata.channels);
 
         const rhi_texture texture = Rhi::CreateTexture(rhi_texture_desc{
@@ -103,6 +104,14 @@ void API Update(rhi_cmdlist cmd, byteview assetFile)
         Rhi::CmdTransitionTexture(cmd, texture, rhi_texture_state::ShaderRead);
         metadata.state = texture_state::Uploaded;
     }
+}
+
+auto API DeclareTexture(byteview assetFileData, uint64_t guid) -> texture
+{
+    return HandlePool::Acquire(manager->textures, texture_metadata{
+                                                      .guid = guid,
+                                                      .state = texture_state::NotUploaded,
+                                                  });
 }
 
 } // namespace TextureManager

@@ -10,7 +10,6 @@
 #include "nyla/commons/mempage_pool.h"
 #include "nyla/commons/region_alloc.h"
 #include "nyla/commons/region_alloc_def.h"
-#include "nyla/commons/span.h"
 
 namespace nyla
 {
@@ -25,7 +24,7 @@ auto API AssetFileLoad(file_handle file) -> byteview
     return data;
 }
 
-auto API AssetFileGetData(byteview assetFileData, byteview path) -> byteview
+auto API AssetFileGetData(byteview assetFileData, uint64_t guid) -> byteview
 {
     uint8_t *ptr = (uint8_t *)assetFileData.data;
     ptr += 4;
@@ -37,7 +36,7 @@ auto API AssetFileGetData(byteview assetFileData, byteview path) -> byteview
     {
         AssetFileIndexEntry *ent = (AssetFileIndexEntry *)ptr;
 
-        if (Span::Eq(byteview{(uint8_t *)(ent + 1), ent->pathLength}, path))
+        if (ent->guid == guid)
             return {assetFileData.data + ent->dataOffset, ent->dataSize};
 
         ptr += sizeof(AssetFileIndexEntry);
