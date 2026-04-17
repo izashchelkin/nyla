@@ -125,6 +125,11 @@ INLINE auto FromCStr(const void *str, uint64_t maxLength) -> byteview
     return byteview{(uint8_t *)str, CStrLen(str, maxLength)};
 }
 
+template <typename T> INLINE auto ByteViewPtr(T *ptr) -> byteview
+{
+    return byteview{(uint8_t *)ptr, sizeof(T)};
+}
+
 } // namespace Span
 
 } // namespace nyla

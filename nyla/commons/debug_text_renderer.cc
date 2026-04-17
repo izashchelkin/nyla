@@ -2,10 +2,15 @@
 
 #include <cstdint>
 
-#include "nyla/commons/asset_manager.h"
 #include "nyla/commons/inline_vec.h"
+#include "nyla/commons/minmax.h"
+#include "nyla/commons/region_alloc.h"
+#include "nyla/commons/region_alloc_def.h"
 #include "nyla/commons/rhi.h"
+#include "nyla/commons/shader.h"
 #include "nyla/commons/span.h"
+#include "nyla/commons/span_def.h"
+#include "nyla/commons/vec.h"
 
 namespace nyla
 {
@@ -13,9 +18,9 @@ namespace nyla
 namespace
 {
 
-RhiGraphicsPipeline m_Pipeline;
+rhi_graphics_pipeline m_Pipeline;
 
-struct DrawData
+struct draw_data
 {
     array<uint4, 17> words;
     int32_t originX;
@@ -25,37 +30,46 @@ struct DrawData
     array<float, 4> fg;
     array<float, 4> bg;
 };
-inline_vec<DrawData, 4> m_PendingDraws;
+
+struct debug_text_renderer
+{
+    inline_vec<draw_data, 4> pendingDraws;
+};
+debug_text_renderer* renderer;
 
 } // namespace
 
-void DebugTextRenderer::Init()
+namespace DebugTextRenderer
 {
-    const RhiShader vs = GetShader("fullscreen.vs", RhiShaderStage::Vertex);
-    const RhiShader ps = GetShader("debug_text_renderer.ps", RhiShaderStage::Pixel);
 
-    auto *renderer = new DebugTextRenderer{};
+void API Bootstrap(region_alloc &alloc)
+{
+    renderer = &RegionAlloc::Alloc<debug_text_renderer>(RegionAlloc::g_BootstrapAlloc);
 
-    const RhiGraphicsPipelineDesc pipelineDesc{
+    const rhi_shader vs = GetShader(alloc, "fullscreen.vs"_s, rhi_shader_stage::Vertex);
+    const rhi_shader ps = GetShader(alloc, "debug_text_renderer.ps"_s, rhi_shader_stage::Pixel);
+
+    rhi_texture_format colorFormat = rhi_texture_format::R8G8B8A8_sRGB;
+    const rhi_graphics_pipeline_desc pipelineDesc{
         .debugName = "DebugTextRender"_s,
         .vs = vs,
         .ps = ps,
-        .colorTargetFormats = AssetManager::GetMeshPipelineColorTargetFormats(),
-        .depthFormat = RhiTextureFormat::D32_Float_S8_UINT,
+        .colorTargetFormats = {&colorFormat, 1},
+        .depthFormat = rhi_texture_format::D32_Float_S8_UINT,
     };
-    m_Pipeline = Rhi::CreateGraphicsPipeline(pipelineDesc);
+    m_Pipeline = Rhi::CreateGraphicsPipeline(alloc, pipelineDesc);
 }
 
-void DebugTextRenderer::Text(int32_t x, int32_t y, byteview text)
+void API Text(int32_t x, int32_t y, byteview text)
 {
-    DrawData drawData{
+    draw_data drawData{
         .originX = x,
         .originY = y,
-        .wordCount = std::min<uint32_t>((text.Size() + 3) / 4, 68),
+        .wordCount = Min<uint32_t>((text.size + 3) / 4, 68),
         .fg = {1.f, 1.f, 1.f, 1.f},
     };
 
-    const size_t numBytes = std::min(text.Size(), size_t(drawData.wordCount) * 4);
+    const uint64_t numBytes = Min(text.size, uint64_t(drawData.wordCount) * 4);
 
     for (size_t i = 0; i < drawData.wordCount; ++i)
     {
@@ -70,24 +84,27 @@ void DebugTextRenderer::Text(int32_t x, int32_t y, byteview text)
         drawData.words[i / 4][i % 4] = word;
     }
 
-    m_PendingDraws.PushBack(drawData);
+    InlineVec::Append(renderer->pendingDraws, drawData);
 }
 
-void DebugTextRenderer::CmdFlush(RhiCmdList cmd)
+void API CmdFlush(rhi_cmdlist cmd)
 {
-    if (m_PendingDraws.Empty())
+    if (renderer->pendingDraws.size == 0)
         return;
 
     const uint32_t frameIndex = Rhi::GetFrameIndex();
 
     Rhi::CmdBindGraphicsPipeline(cmd, m_Pipeline);
 
-    for (const DrawData &drawData : m_PendingDraws)
+    for (const draw_data &drawData : renderer->pendingDraws)
     {
-        Rhi::SetLargeDrawConstant(cmd, ByteViewPtr(&drawData));
+        Rhi::SetLargeDrawConstant(cmd, Span::ByteViewPtr(&drawData));
         Rhi::CmdDraw(cmd, 3, 1, 0, 0);
     }
-    m_PendingDraws.Clear();
+
+    InlineVec::Clear(renderer->pendingDraws);
 }
+
+} // namespace DebugTextRenderer
 
 } // namespace nyla

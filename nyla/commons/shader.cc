@@ -10,19 +10,23 @@
 namespace nyla
 {
 
-auto API GetShader(region_alloc &scratch, byteview name, rhi_shader_stage stage) -> rhi_shader
+auto API GetShader(region_alloc &alloc, byteview name, rhi_shader_stage stage) -> rhi_shader
 {
-    auto path = RegionAlloc::AllocString<256>(scratch);
+    void* allocMark = alloc.at;
+
+    auto path = RegionAlloc::AllocString<256>(alloc);
     StringWriteFmt(path, R"(D:\nyla\nyla\shaders\build\)" SV_FMT R"(.hlsl.spv)"_s, name);
 
     file_handle file = FileOpen(path, FileOpenMode::Read);
-    span<uint8_t> data = FileReadFully(scratch, file);
+    span<uint8_t> data = FileReadFully(alloc, file);
 
     // TODO: this makes an unnecessary copy!
     rhi_shader shader = Rhi::CreateShader(rhi_shader_desc{
         .stage = stage,
         .code = Span::Cast<uint32_t>(data),
     });
+
+    RegionAlloc::Reset(alloc, allocMark);
     return shader;
 }
 

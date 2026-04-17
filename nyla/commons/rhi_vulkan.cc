@@ -2544,9 +2544,9 @@ void Rhi::CmdCopyTexture(rhi_cmdlist cmd, rhi_texture dst, rhi_texture src)
                    &region);
 }
 
-auto Rhi::CreateGraphicsPipeline(region_alloc &scratch, const rhi_graphics_pipeline_desc &desc) -> rhi_graphics_pipeline
+auto Rhi::CreateGraphicsPipeline(region_alloc &alloc, const rhi_graphics_pipeline_desc &desc) -> rhi_graphics_pipeline
 {
-    SCRATCH_REMEMBER;
+    void* allocMark = alloc.at;
 
     auto &vertexShaderData = HandlePool::ResolveData(g_State->m_Shaders, desc.vs);
     auto &pixelShaderData = HandlePool::ResolveData(g_State->m_Shaders, desc.ps);
@@ -2561,7 +2561,7 @@ auto Rhi::CreateGraphicsPipeline(region_alloc &scratch, const rhi_graphics_pipel
         .bindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
     };
 
-    auto &vertexBindings = RegionAlloc::AllocVec<VkVertexInputBindingDescription, 16>(scratch);
+    auto &vertexBindings = RegionAlloc::AllocVec<VkVertexInputBindingDescription, 16>(alloc);
     for (auto &binding : desc.vertexBindings)
     {
         InlineVec::Append(vertexBindings, VkVertexInputBindingDescription{
@@ -2571,7 +2571,7 @@ auto Rhi::CreateGraphicsPipeline(region_alloc &scratch, const rhi_graphics_pipel
                                           });
     }
 
-    auto &vertexAttributes = RegionAlloc::AllocVec<VkVertexInputAttributeDescription, 16>(scratch);
+    auto &vertexAttributes = RegionAlloc::AllocVec<VkVertexInputAttributeDescription, 16>(alloc);
     for (auto &attribute : desc.vertexAttributes)
     {
         uint32_t location;
@@ -2705,7 +2705,7 @@ auto Rhi::CreateGraphicsPipeline(region_alloc &scratch, const rhi_graphics_pipel
         .pDynamicStates = dynamicStates.data,
     };
 
-    auto &colorTargetFormats = RegionAlloc::AllocVec<VkFormat, 16>(scratch);
+    auto &colorTargetFormats = RegionAlloc::AllocVec<VkFormat, 16>(alloc);
     for (rhi_texture_format colorTargetFormat : desc.colorTargetFormats)
     {
         InlineVec::Append(colorTargetFormats, ConvertTextureFormatIntoVkFormat(colorTargetFormat, nullptr));
@@ -2786,7 +2786,7 @@ auto Rhi::CreateGraphicsPipeline(region_alloc &scratch, const rhi_graphics_pipel
     VK_CHECK(vkCreateGraphicsPipelines(g_State->m_Dev, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr,
                                        &pipelineData.pipeline));
 
-    SCRATCH_RESET;
+    RegionAlloc::Reset(alloc, allocMark);
     return HandlePool::Acquire(g_State->m_GraphicsPipelines, pipelineData);
 }
 

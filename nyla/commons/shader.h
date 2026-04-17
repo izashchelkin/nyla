@@ -1,6 +1,5 @@
 #pragma once
 
-#include "nyla/commons/region_alloc.h"
 #include "nyla/commons/rhi.h"
 
 namespace nyla

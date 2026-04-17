@@ -35,6 +35,6 @@ namespace nyla
 
 void API FileWriteFmt(file_handle handle, span<uint8_t> buffer, byteview fmt, ...);
 void API FileWriteFmt(file_handle handle, byteview fmt, ...);
-void API StringWriteFmt(span<uint8_t> out, byteview fmt, ...);
+auto API StringWriteFmt(span<uint8_t> out, byteview fmt, ...) -> uint64_t;
 
 } // namespace nyla

@@ -94,7 +94,7 @@ void WriteFmt(auto &&consumer, byteview fmt, ...)
 
             case 's': {
                 const uint8_t *s = va_arg(args, const uint8_t *);
-                consumer(s, static_cast<uint32_t>(CStrLen(s)));
+                consumer(s, static_cast<uint32_t>(CStrLen(s, 1024)));
                 break;
             }
             case 'd': {
@@ -191,7 +191,7 @@ void BufferWriteFmt(auto &&consumer, span<uint8_t> buffer, byteview fmt, ...)
 
 } // namespace
 
-void API StringWriteFmt(span<uint8_t> out, byteview fmt, ...)
+auto API StringWriteFmt(span<uint8_t> out, byteview fmt, ...) -> uint64_t
 {
     va_list args;
     va_start(args, fmt);
@@ -207,6 +207,8 @@ void API StringWriteFmt(span<uint8_t> out, byteview fmt, ...)
         fmt, args);
 
     va_end(args);
+
+    return written;
 }
 
 void API FileWriteFmt(file_handle handle, span<uint8_t> buffer, byteview fmt, ...)

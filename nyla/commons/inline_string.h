@@ -10,8 +10,6 @@
 namespace nyla
 {
 
-void API StringWriteFmt(span<uint8_t> out, byteview fmt, ...);
-
 template <uint64_t Capacity> using inline_string = inline_vec<uint8_t, Capacity>;
 
 namespace InlineString
