@@ -2,8 +2,11 @@
 
 #include <cstdint>
 
-#include "nyla/commons/region_alloc.h"
+#include "nyla/commons/fmt.h"
+#include "nyla/commons/macros.h"
+#include "nyla/commons/region_alloc_def.h"
 #include "nyla/commons/span.h"
+#include "nyla/commons/span_def.h"
 
 namespace nyla
 {
@@ -149,9 +152,6 @@ struct gltf_parser
     byteview jsonChunk;
     byteview binChunk;
 
-    uint8_t *out;
-    uint64_t outSize;
-
     span<gltf_buffer_view> bufferViews;
     span<gltf_buffer> buffers;
     span<gltf_accessor> accessors;
@@ -163,6 +163,14 @@ namespace GltfParser
 {
 
 auto Parse(gltf_parser &self, region_alloc &alloc) -> bool;
+
+INLINE auto GetAccessorData(gltf_parser &self, const gltf_accessor &accessor) -> byteview
+{
+    const auto &bufferView = self.bufferViews[accessor.bufferView];
+    ASSERT(bufferView.buffer == 0);
+
+    return Span::SubSpan(self.binChunk, bufferView.byteOffset + accessor.byteOffset, bufferView.byteLength);
+}
 
 auto FindAttributeAccessor(gltf_parser &self, span<gltf_mesh_primitive_attribute> attributes, byteview attributeName,
                            gltf_accessor &out) -> bool;
