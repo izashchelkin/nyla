@@ -12,7 +12,7 @@ namespace nyla
 
 auto API GetShader(region_alloc &alloc, byteview name, rhi_shader_stage stage) -> rhi_shader
 {
-    void* allocMark = alloc.at;
+    void *allocMark = alloc.at;
 
     auto path = RegionAlloc::AllocString<256>(alloc);
     StringWriteFmt(path, R"(D:\nyla\nyla\shaders\build\)" SV_FMT R"(.hlsl.spv)"_s, name);

@@ -110,27 +110,6 @@ template <typename T, uint64_t Capacity> INLINE auto PopBack(inline_vec<T, Capac
     return ret;
 }
 
-template <typename T, uint64_t Capacity> INLINE auto Erase(inline_vec<T, Capacity> &self, const T *pos) -> T *
-{
-    DASSERT(pos >= self.begin() && pos < self.end());
-    return Erase(pos, pos + 1);
-}
-
-template <typename T, uint64_t Capacity> INLINE auto Erase(inline_vec<T, Capacity> &self, T *first, T *last) -> T *
-{
-    if (first == last)
-        return first;
-
-    uint64_t numRemoved = last - first;
-    uint64_t numToMove = self.end() - last;
-
-    if (numToMove > 0)
-        MemMove(first, last, numToMove * sizeof(T));
-
-    self.size -= numRemoved;
-    return first;
-}
-
 }; // namespace InlineVec
 
 } // namespace nyla

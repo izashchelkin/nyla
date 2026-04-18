@@ -35,7 +35,7 @@ struct debug_text_renderer
 {
     inline_vec<draw_data, 4> pendingDraws;
 };
-debug_text_renderer* renderer;
+debug_text_renderer *renderer;
 
 } // namespace
 

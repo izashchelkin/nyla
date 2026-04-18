@@ -42,7 +42,7 @@ class CellBuffer
     uint32_t m_CellHeight = 32;
     uint32_t m_CellWidth = 16;
 
-    void* memory;
+    void *memory;
     span<cell> m_Cells;
     uint32_t m_Height;
     uint32_t m_Width;

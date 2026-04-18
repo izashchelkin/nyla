@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <type_traits>
 
 #include "nyla/commons/concepts.h"
 #include "nyla/commons/fmt.h"
@@ -128,6 +129,41 @@ INLINE auto FromCStr(const void *str, uint64_t maxLength) -> byteview
 template <typename T> INLINE auto ByteViewPtr(T *ptr) -> byteview
 {
     return byteview{(uint8_t *)ptr, sizeof(T)};
+}
+
+template <typename T> INLINE auto Erase(span<T> &self, const T *pos) -> T *
+{
+    DASSERT(pos >= self.begin() && pos < self.end());
+    return Erase(pos, pos + 1);
+}
+
+template <typename T> INLINE auto Erase(span<T> &self, T *first, T *last) -> T *
+{
+    static_assert(!std::is_const_v<T>);
+
+    if (first == last)
+        return first;
+
+    uint64_t numRemoved = last - first;
+    uint64_t numToMove = self.end() - last;
+
+    if (numToMove > 0)
+        MemMove(first, last, numToMove * sizeof(T));
+
+    self.size -= numRemoved;
+    return first;
+}
+
+template <typename T> INLINE auto EraseIfEquals(span<T> &self, T value) -> T *
+{
+    for (uint64_t i = 0; i < self.size;)
+    {
+        T *ptr = self.data + i;
+        if (*ptr == value)
+            EraseIfEquals(self, ptr);
+        else
+            ++i;
+    }
 }
 
 } // namespace Span

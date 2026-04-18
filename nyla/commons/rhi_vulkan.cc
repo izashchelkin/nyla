@@ -8,7 +8,6 @@
 
 #include "nyla/commons/array.h"
 #include "nyla/commons/bitenum.h"
-#include "nyla/commons/collections.h"
 #include "nyla/commons/handle_pool.h"
 #include "nyla/commons/inline_vec.h"
 #include "nyla/commons/limits.h"
@@ -708,15 +707,15 @@ void CmdDrawInternal(VulkanCmdListData &cmdData)
     cmdData.largeDrawConstantHead += CbvOffset(g_State->m_Limits.largeDrawConstantSize);
 }
 
-void CreateSwapchain(region_alloc scratch)
+void CreateSwapchain(region_alloc alloc)
 {
-    SCRATCH_REMEMBER;
+    void *allocMark;
 
     VkSwapchainKHR oldSwapchain = g_State->m_Swapchain;
 
     static bool logPresentModes = true;
     VkPresentModeKHR presentMode = [&] -> VkPresentModeKHR {
-        auto &presentModes = RegionAlloc::AllocVec<VkPresentModeKHR, 16>(scratch);
+        auto &presentModes = RegionAlloc::AllocVec<VkPresentModeKHR, 16>(alloc);
         uint32_t presentModeCount = 0;
         vkGetPhysicalDeviceSurfacePresentModesKHR(g_State->m_PhysDev, g_State->m_Surface, &presentModeCount, nullptr);
 
@@ -763,8 +762,6 @@ void CreateSwapchain(region_alloc scratch)
         return bestMode;
     }();
 
-    SCRATCH_RESET;
-
     VkSurfaceCapabilitiesKHR surfaceCapabilities;
     VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(g_State->m_PhysDev, g_State->m_Surface, &surfaceCapabilities));
 
@@ -773,7 +770,7 @@ void CreateSwapchain(region_alloc scratch)
         VK_CHECK(
             vkGetPhysicalDeviceSurfaceFormatsKHR(g_State->m_PhysDev, g_State->m_Surface, &surfaceFormatCount, nullptr));
 
-        auto &surfaceFormats = RegionAlloc::AllocVec<VkSurfaceFormatKHR, 16>(scratch);
+        auto &surfaceFormats = RegionAlloc::AllocVec<VkSurfaceFormatKHR, 16>(alloc);
         InlineVec::Resize(surfaceFormats, surfaceFormatCount);
         vkGetPhysicalDeviceSurfaceFormatsKHR(g_State->m_PhysDev, g_State->m_Surface, &surfaceFormatCount,
                                              InlineVec::DataPtr(surfaceFormats));
@@ -785,8 +782,6 @@ void CreateSwapchain(region_alloc scratch)
         ASSERT(it != surfaceFormats.end());
         return *it;
     }();
-
-    SCRATCH_RESET;
 
     auto surfaceExtent = [surfaceCapabilities] -> VkExtent2D {
         if (surfaceCapabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
@@ -893,6 +888,8 @@ void CreateSwapchain(region_alloc scratch)
 
     if (oldSwapchain)
         vkDestroySwapchainKHR(g_State->m_Dev, oldSwapchain, g_State->vkAlloc);
+
+    RegionAlloc::Reset(alloc, allocMark);
 }
 
 auto CreateTimeline(uint64_t initialValue) -> VkSemaphore
@@ -945,15 +942,15 @@ void WaitTimeline(VkSemaphore timeline, uint64_t waitValue)
 #endif
 }
 
-void WriteDescriptorTables(region_alloc &scratch)
+void WriteDescriptorTables(region_alloc &alloc)
 {
-    SCRATCH_REMEMBER;
+    void *allocMark = alloc.at;
 
     constexpr uint32_t kMaxDescriptorUpdates = 128;
 
-    auto &descriptorWrites = RegionAlloc::AllocVec<VkWriteDescriptorSet, kMaxDescriptorUpdates>(scratch);
-    auto &descriptorImageInfos = RegionAlloc::AllocVec<VkDescriptorImageInfo, kMaxDescriptorUpdates>(scratch);
-    auto &descriptorBufferInfos = RegionAlloc::AllocVec<VkDescriptorBufferInfo, kMaxDescriptorUpdates>(scratch);
+    auto &descriptorWrites = RegionAlloc::AllocVec<VkWriteDescriptorSet, kMaxDescriptorUpdates>(alloc);
+    auto &descriptorImageInfos = RegionAlloc::AllocVec<VkDescriptorImageInfo, kMaxDescriptorUpdates>(alloc);
+    auto &descriptorBufferInfos = RegionAlloc::AllocVec<VkDescriptorBufferInfo, kMaxDescriptorUpdates>(alloc);
 
     { // TEXTURES
         for (uint32_t i = 0; i < HandlePool::Capacity(g_State->m_SampledTextureViews); ++i)
@@ -1019,7 +1016,7 @@ void WriteDescriptorTables(region_alloc &scratch)
 
     vkUpdateDescriptorSets(g_State->m_Dev, descriptorWrites.size, InlineVec::DataPtr(descriptorWrites), 0, nullptr);
 
-    SCRATCH_RESET;
+    RegionAlloc::Reset(alloc, allocMark);
 }
 
 } // namespace
@@ -1892,14 +1889,14 @@ auto Rhi::GetLastCheckpointData(rhi_queue_type queueType) -> uint64_t
     return (uint64_t)data.pCheckpointMarker;
 }
 
-auto Rhi::FrameBegin(region_alloc &scratch) -> rhi_cmdlist
+auto Rhi::FrameBegin(region_alloc &alloc) -> rhi_cmdlist
 {
-    SCRATCH_REMEMBER;
+    void *allocMark = alloc.at;
 
     if (g_State->m_RecreateSwapchain)
     {
         vkDeviceWaitIdle(g_State->m_Dev);
-        CreateSwapchain(scratch);
+        CreateSwapchain(alloc);
         g_State->m_SwapchainUsable = true;
         g_State->m_RecreateSwapchain = false;
     }
@@ -1954,12 +1951,13 @@ auto Rhi::FrameBegin(region_alloc &scratch) -> rhi_cmdlist
     };
     VK_CHECK(vkBeginCommandBuffer(cmdbuf, &commandBufferBeginInfo));
 
+    RegionAlloc::Reset(alloc, allocMark);
     return cmd;
 }
 
-void Rhi::FrameEnd(region_alloc &scratch)
+void Rhi::FrameEnd(region_alloc &alloc)
 {
-    SCRATCH_REMEMBER;
+    void *allocMark = alloc.at;
 
     rhi_cmdlist cmd = g_State->m_GraphicsQueueCmd[g_State->m_FrameIndex];
 
@@ -1967,7 +1965,7 @@ void Rhi::FrameEnd(region_alloc &scratch)
 
     VK_CHECK(vkEndCommandBuffer(cmdbuf));
 
-    WriteDescriptorTables(scratch);
+    WriteDescriptorTables(alloc);
 
     const array<VkPipelineStageFlags, 1> waitStages = {
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
@@ -2017,6 +2015,7 @@ void Rhi::FrameEnd(region_alloc &scratch)
     }
 
     g_State->m_FrameIndex = (g_State->m_FrameIndex + 1) % g_State->m_Limits.numFramesInFlight;
+    RegionAlloc::Reset(alloc, allocMark);
 }
 
 auto Rhi::FrameGetCmdList() -> rhi_cmdlist
@@ -2051,7 +2050,7 @@ void Rhi::PassBegin(rhi_pass_desc desc)
 
     VkRenderingAttachmentInfo depthAttachmentInfo{};
 
-    if (HandleIsSet(desc.dsv))
+    if (desc.dsv)
     {
         const VulkanTextureViewData &dsvData = HandlePool::ResolveData(g_State->m_DepthStencilViews, desc.dsv);
         const VulkanTextureData &depthStencilData = HandlePool::ResolveData(g_State->m_Textures, dsvData.texture);
@@ -2546,7 +2545,7 @@ void Rhi::CmdCopyTexture(rhi_cmdlist cmd, rhi_texture dst, rhi_texture src)
 
 auto Rhi::CreateGraphicsPipeline(region_alloc &alloc, const rhi_graphics_pipeline_desc &desc) -> rhi_graphics_pipeline
 {
-    void* allocMark = alloc.at;
+    void *allocMark = alloc.at;
 
     auto &vertexShaderData = HandlePool::ResolveData(g_State->m_Shaders, desc.vs);
     auto &pixelShaderData = HandlePool::ResolveData(g_State->m_Shaders, desc.ps);
@@ -2617,8 +2616,8 @@ auto Rhi::CreateGraphicsPipeline(region_alloc &alloc, const rhi_graphics_pipelin
         return shaderModule;
     };
 
-    Erase(vertexShaderData.spv, 0);
-    Erase(pixelShaderData.spv, 0);
+    Span::EraseIfEquals(vertexShaderData.spv, (uint32_t)0);
+    Span::EraseIfEquals(pixelShaderData.spv, (uint32_t)0);
 
     const array<VkPipelineShaderStageCreateInfo, 2> stages{
         VkPipelineShaderStageCreateInfo{
