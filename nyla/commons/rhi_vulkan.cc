@@ -1,6 +1,8 @@
+#include "nyla/commons/macros.h"
 #include "nyla/commons/platform.h"
 #include "nyla/commons/rhi.h"
 
+#include <cinttypes>
 #include <cstdint>
 
 #include <vulkan/vk_enum_string_helper.h>
@@ -1099,7 +1101,7 @@ void Rhi::Bootstrap(region_alloc &alloc, const rhi_init_desc &rhiDesc)
                                                    InlineVec::DataPtr(instanceExtensions));
 
             LOG("");
-            LOG("%d Instance Extensions available", instanceExtensionsCount);
+            LOG("%" PRIu64 " Instance Extensions available", instanceExtensionsCount);
             for (uint32_t i = 0; i < instanceExtensionsCount; ++i)
             {
                 const auto &extension = instanceExtensions[i];
@@ -1108,7 +1110,7 @@ void Rhi::Bootstrap(region_alloc &alloc, const rhi_init_desc &rhiDesc)
         }
 
         LOG("");
-        LOG("%zd Layers available", layers.size);
+        LOG("%" PRIu64 " Layers available", layers.size);
         for (uint32_t i = 0; i < layerCount; ++i)
         {
             const auto &layer = layers[i];
@@ -1192,8 +1194,9 @@ void Rhi::Bootstrap(region_alloc &alloc, const rhi_init_desc &rhiDesc)
         {
             uint32_t extensionCount = 0;
             vkEnumerateDeviceExtensionProperties(physDev, nullptr, &extensionCount, nullptr);
-            auto &extensions = RegionAlloc::AllocVec<VkExtensionProperties, 256>(alloc);
-            InlineVec::Resize(extensions, 256);
+
+            auto &extensions = RegionAlloc::AllocVec<VkExtensionProperties, 1024>(alloc);
+            InlineVec::Resize(extensions, extensionCount);
             vkEnumerateDeviceExtensionProperties(physDev, nullptr, &extensionCount, InlineVec::DataPtr(extensions));
 
             uint32_t missingExtensions = deviceExtensions.size;

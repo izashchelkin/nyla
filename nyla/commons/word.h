@@ -7,9 +7,18 @@
 namespace nyla
 {
 
+INLINE constexpr auto Word(const char str[2]) -> uint16_t
+{
+    uint16_t out = 0;
+    for (uint64_t i = 0; i < 2; ++i)
+        out |= str[i] << (i * 8);
+    return out;
+}
+static_assert(Word("JS") == 0x534A);
+
 INLINE constexpr auto DWord(const char str[4]) -> uint32_t
 {
-    uint64_t out = 0;
+    uint32_t out = 0;
     for (uint64_t i = 0; i < 4; ++i)
         out |= str[i] << (i * 8);
     return out;

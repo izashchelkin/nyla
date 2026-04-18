@@ -40,19 +40,19 @@ template <is_plain T, uint64_t Capacity> struct inline_vec
     [[nodiscard]]
     auto end() -> T *
     {
-        return data.end();
+        return data.begin() + size;
     }
 
     [[nodiscard]]
     auto end() const -> const T *
     {
-        return data.end();
+        return data.begin() + size;
     }
 
     [[nodiscard]]
     auto cend() const -> const T *
     {
-        return data.cend();
+        return data.cbegin() + size;
     }
 
     operator span<T>()

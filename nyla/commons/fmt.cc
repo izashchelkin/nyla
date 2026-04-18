@@ -3,7 +3,7 @@
 #include <cstdarg>
 #include <cstdint>
 
-#include "nyla/commons/array.h"
+#include "nyla/commons/array_def.h"
 #include "nyla/commons/byteparser.h"
 #include "nyla/commons/file.h"
 #include "nyla/commons/macros.h"
@@ -50,11 +50,8 @@ auto S64ToBuffer(uint8_t *buf, int64_t val) -> uint32_t
     return U64ToBuffer(buf, (uint64_t)val);
 }
 
-void WriteFmt(auto &&consumer, byteview fmt, ...)
+void _WriteFmt(auto &&consumer, byteview fmt, va_list args)
 {
-    va_list args;
-    va_start(args, fmt);
-
     byte_parser parser;
     ByteParser::Init(parser, fmt.data, fmt.size);
 
@@ -74,9 +71,9 @@ void WriteFmt(auto &&consumer, byteview fmt, ...)
                 uint8_t ch2 = ByteParser::ReadOrDefault(parser, '\0');
                 uint8_t ch3 = ByteParser::ReadOrDefault(parser, '\0');
 
-                switch ((uint32_t)(ch2 | (ch3 << 8)))
+                switch ((uint16_t)(ch2 | (ch3 << 8)))
                 {
-                case DWord("*s\0\0"): {
+                case Word("*s"): {
                     uint64_t len = va_arg(args, uint64_t);
                     const uint8_t *str = va_arg(args, const uint8_t *);
                     consumer(str, (uint32_t)len);
@@ -97,22 +94,48 @@ void WriteFmt(auto &&consumer, byteview fmt, ...)
                 consumer(s, static_cast<uint32_t>(CStrLen(s, 1024)));
                 break;
             }
+
+            case 'l': {
+                uint8_t ch2 = ByteParser::ReadOrDefault(parser, '\0');
+                uint8_t ch3 = ByteParser::ReadOrDefault(parser, '\0');
+
+                switch ((uint16_t)(ch2 | (ch3 << 8)))
+                {
+                case Word("lu"): {
+                    uint8_t buf[32];
+                    uint32_t len = U64ToBuffer(buf, va_arg(args, uint64_t));
+                    consumer(buf, len);
+                    break;
+                }
+
+                default: {
+                    TRAP();
+                    UNREACHABLE();
+                }
+                }
+
+                break;
+            }
+
             case 'd': {
                 uint8_t buf[32];
                 uint32_t len = S64ToBuffer(buf, va_arg(args, int));
                 consumer(buf, len);
                 break;
             }
+
             case 'u': {
                 uint8_t buf[32];
                 uint32_t len = U64ToBuffer(buf, va_arg(args, uint32_t));
                 consumer(buf, len);
                 break;
             }
+
             case 'p': {
                 consumer((uint8_t *)"0x[pointer]", 11);
                 break;
             }
+
             case '%': {
                 consumer((uint8_t *)"%", 1);
                 break;
@@ -138,18 +161,13 @@ void WriteFmt(auto &&consumer, byteview fmt, ...)
     }
 
     consumer((uint8_t *)"\n", 1);
-
-    va_end(args);
 }
 
-void BufferWriteFmt(auto &&consumer, span<uint8_t> buffer, byteview fmt, ...)
+void _BufferWriteFmt(auto &&consumer, span<uint8_t> buffer, byteview fmt, va_list args)
 {
     uint64_t bufferUsed = 0;
 
-    va_list args;
-    va_start(args, fmt);
-
-    WriteFmt(
+    _WriteFmt(
         [&](const uint8_t *data, uint32_t dataSize) -> void {
             if (dataSize == 0)
                 return;
@@ -185,20 +203,13 @@ void BufferWriteFmt(auto &&consumer, span<uint8_t> buffer, byteview fmt, ...)
 
     if (bufferUsed > 0)
         consumer(buffer.data, bufferUsed);
-
-    va_end(args);
 }
 
-} // namespace
-
-auto API StringWriteFmt(span<uint8_t> out, byteview fmt, ...) -> uint64_t
+auto _StringWriteFmt(span<uint8_t> out, byteview fmt, va_list args) -> uint64_t
 {
-    va_list args;
-    va_start(args, fmt);
-
     uint64_t written = 0;
 
-    WriteFmt(
+    _WriteFmt(
         [&](const uint8_t *data, uint64_t dataSize) -> void {
             written += dataSize;
             ASSERT(written <= out.size);
@@ -206,31 +217,46 @@ auto API StringWriteFmt(span<uint8_t> out, byteview fmt, ...) -> uint64_t
         },
         fmt, args);
 
-    va_end(args);
-
     return written;
 }
 
+void _FileWriteFmt(file_handle handle, span<uint8_t> buffer, byteview fmt, va_list args)
+{
+    _BufferWriteFmt([handle](const uint8_t *data, uint64_t size) -> void { FileWrite(handle, (uint32_t)size, data); },
+                    buffer, fmt, args);
+}
+
+void _FileWriteFmt(file_handle handle, byteview fmt, va_list args)
+{
+    static array<uint8_t, 1024> buffer; // TODO:
+    _FileWriteFmt(handle, buffer, fmt, args);
+}
+
+} // namespace
+
 void API FileWriteFmt(file_handle handle, span<uint8_t> buffer, byteview fmt, ...)
 {
-    va_list args;
+    va_list(args);
     va_start(args, fmt);
-
-    BufferWriteFmt([handle](const uint8_t *data, uint64_t size) -> void { FileWrite(handle, (uint32_t)size, data); },
-                   buffer, fmt, args);
-
+    _FileWriteFmt(handle, buffer, fmt, args);
     va_end(args);
 }
 
 void API FileWriteFmt(file_handle handle, byteview fmt, ...)
 {
-    va_list args;
+    va_list(args);
     va_start(args, fmt);
-
-    static array<uint8_t, 1024> buffer; // TODO:
-    FileWriteFmt(handle, buffer, fmt, args);
-
+    _FileWriteFmt(handle, fmt, args);
     va_end(args);
+}
+
+auto API StringWriteFmt(span<uint8_t> out, byteview fmt, ...) -> uint64_t
+{
+    va_list(args);
+    va_start(args, fmt);
+    uint64_t written = _StringWriteFmt(out, fmt, args);
+    va_end(args);
+    return written;
 }
 
 } // namespace nyla

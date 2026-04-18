@@ -5,7 +5,7 @@
 #include "nyla/commons/fmt.h"
 #include "nyla/commons/intrin.h"
 #include "nyla/commons/mem.h"
-#include "nyla/commons/span.h"
+#include "nyla/commons/span_def.h"
 
 namespace nyla
 {
@@ -88,7 +88,7 @@ INLINE auto Peek(const byte_parser &self) -> const uint8_t &
 INLINE void Advance(byte_parser &self, uint64_t i)
 {
     self.at += i;
-    DASSERT(self.at < self.end);
+    DASSERT(self.at <= self.end);
 }
 
 INLINE void Advance(byte_parser &self)
