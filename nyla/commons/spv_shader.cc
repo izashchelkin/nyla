@@ -13,6 +13,7 @@
 #include <cstdint>
 
 #include "nyla/commons/fmt.h"
+#include "nyla/commons/rhi.h"
 #include "nyla/commons/span.h"
 #include "nyla/commons/spv_reader.h"
 
@@ -1232,14 +1233,14 @@ auto HandleOpEntryPoint(spv_shader &self, span<uint32_t> operands) -> spv_op_pro
     switch (executionModel)
     {
     case spv_execution_model::Vertex: {
-        if (self.stage == RhiShaderStage::Vertex)
+        if (self.stage == rhi_shader_stage::Vertex)
             return spv_op_process_result::Ok;
 
         return spv_op_process_result::InvalidState;
     }
 
     case spv_execution_model::Fragment: {
-        if (self.stage == RhiShaderStage::Pixel)
+        if (self.stage == rhi_shader_stage::Pixel)
             return spv_op_process_result::Ok;
 
         return spv_op_process_result::InvalidState;
@@ -1338,7 +1339,7 @@ auto HandleOpVariable(spv_shader &self, span<uint32_t> operands) -> spv_op_proce
 
 } // namespace
 
-void ProcessShader(spv_shader &self, span<uint32_t> data, RhiShaderStage stage)
+void ProcessShader(spv_shader &self, span<uint32_t> data, rhi_shader_stage stage)
 {
     SpvReader::ReadHeader(data);
     while (data.size)

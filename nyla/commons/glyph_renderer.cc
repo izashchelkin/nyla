@@ -1,7 +1,8 @@
+#include "nyla/commons/glyph_renderer.h"
+
 #include <cstdint>
 
 #include "nyla/commons/asset_manager.h"
-#include "nyla/commons/glyph_renderer.h"
 #include "nyla/commons/rhi.h"
 
 namespace nyla
@@ -9,7 +10,7 @@ namespace nyla
 
 namespace
 {
-RhiTexture g_AtlasTexture;
+rhi_texture g_AtlasTexture;
 }
 
 void GlyphRenderer::Init(uint8_t *atlas, uint32_t width, uint32_t height)

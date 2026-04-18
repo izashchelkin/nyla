@@ -1,30 +1,26 @@
 #pragma once
 
-#include "nyla/commons/inline_vec.h"
 #include "nyla/commons/rhi.h"
 
 namespace nyla
 {
 
-class RenderTargets
+struct render_targets
 {
-  public:
-    void Init(RhiTextureFormat colorFormat, RhiTextureFormat depthStencilFormat)
-    {
-        m_ColorFormat = colorFormat;
-        m_DepthStencilFormat = depthStencilFormat;
-    }
+    rhi_texture_format ColorFormat;
+    inline_vec<rhi_texture, kRhiMaxNumFramesInFlight> ColorTextures;
+    inline_vec<rhi_rtv, kRhiMaxNumFramesInFlight> Rtvs;
 
-    void GetTargets(uint32_t width, uint32_t height, RhiRenderTargetView &outRtv, RhiDepthStencilView &outDsv);
+    rhi_texture_format DepthStencilFormat;
+    inline_vec<rhi_texture, kRhiMaxNumFramesInFlight> DepthStencilTextures;
+    inline_vec<rhi_dsv, kRhiMaxNumFramesInFlight> Dsvs;
+};
 
-  private:
-    RhiTextureFormat m_ColorFormat;
-    InlineVec<RhiTexture, kRhiMaxNumFramesInFlight> m_ColorTextures;
-    InlineVec<RhiRenderTargetView, kRhiMaxNumFramesInFlight> m_Rtvs;
+namespace RenderTargets
+{
 
-    RhiTextureFormat m_DepthStencilFormat;
-    InlineVec<RhiTexture, kRhiMaxNumFramesInFlight> m_DepthStencilTextures;
-    InlineVec<RhiDepthStencilView, kRhiMaxNumFramesInFlight> m_Dsvs;
+void API GetTargets(render_targets& self, uint32_t width, uint32_t height, rhi_rtv &outRtv, rhi_dsv &outDsv);
+
 };
 
 } // namespace nyla

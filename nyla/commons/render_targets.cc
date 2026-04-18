@@ -1,50 +1,55 @@
 #include "nyla/commons/render_targets.h"
+
 #include "nyla/commons/rhi.h"
 
 namespace nyla
 {
 
-void RenderTargets::GetTargets(uint32_t width, uint32_t height, RhiRenderTargetView &outRtv,
-                               RhiDepthStencilView &outDsv)
+namespace RenderTargets
+{
+
+void API GetTargets(render_targets &self, uint32_t width, uint32_t height, rhi_rtv &outRtv, rhi_dsv &outDsv)
 {
     uint32_t frameIndex = Rhi::GetFrameIndex();
 
-    if (frameIndex >= m_Rtvs.Size())
+    if (frameIndex >= self.Rtvs.size)
     {
-        RhiTexture texture = Rhi::CreateTexture(RhiTextureDesc{
+        rhi_texture Texture = Rhi::CreateTexture(rhi_texture_desc{
             .width = width,
             .height = height,
-            .memoryUsage = RhiMemoryUsage::GpuOnly,
-            .usage = RhiTextureUsage::ColorTarget | /* RhiTextureUsage::ShaderSampled | */ RhiTextureUsage::TransferSrc,
-            .format = m_ColorFormat,
+            .memoryUsage = rhi_memory_usage::GpuOnly,
+            .usage = rhi_texture_usage::ColorTarget |
+                     /* rhi_texture_usage::ShaderSampled | */ rhi_texture_usage::TransferSrc,
+            .format = self.ColorFormat,
         });
-        m_ColorTextures.PushBack(texture);
+        InlineVec::Append(self.ColorTextures, Texture);
 
-        m_Rtvs.PushBack(Rhi::CreateRenderTargetView(RhiRenderTargetViewDesc{
-            .texture = texture,
-            .format = m_ColorFormat,
-        }));
+        InlineVec::Append(self.Rtvs, Rhi::CreateRenderTargetView(rhi_render_target_view_desc{
+                                         .texture = Texture,
+                                         .format = self.ColorFormat,
+                                     }));
     }
+    outRtv = self.Rtvs[frameIndex];
 
-    if (frameIndex >= m_Dsvs.Size())
+    if (frameIndex >= self.Dsvs.size)
     {
-        RhiTexture texture = Rhi::CreateTexture(RhiTextureDesc{
+        rhi_texture Texture = Rhi::CreateTexture(rhi_texture_desc{
             .width = width,
             .height = height,
-            .memoryUsage = RhiMemoryUsage::GpuOnly,
-            .usage = RhiTextureUsage::DepthStencil,
-            .format = m_DepthStencilFormat,
+            .memoryUsage = rhi_memory_usage::GpuOnly,
+            .usage = rhi_texture_usage::DepthStencil,
+            .format = self.DepthStencilFormat,
         });
-        m_DepthStencilTextures.PushBack(texture);
+        InlineVec::Append(self.DepthStencilTextures, Texture);
 
-        m_Dsvs.PushBack(Rhi::CreateDepthStencilView(RhiDepthStencilViewDesc{
-            .texture = texture,
-            .format = m_DepthStencilFormat,
-        }));
+        InlineVec::Append(self.Dsvs, Rhi::CreateDepthStencilView(rhi_depth_stencil_view_desc{
+                                         .texture = Texture,
+                                         .format = self.DepthStencilFormat,
+                                     }));
     }
-
-    outRtv = m_Rtvs[frameIndex];
-    outDsv = m_Dsvs[frameIndex];
+    outDsv = self.Dsvs[frameIndex];
 }
+
+} // namespace RenderTargets
 
 } // namespace nyla

@@ -14,6 +14,7 @@ include_directories(${PROJECT_SOURCE_DIR})
 
 if(MSVC)
     add_compile_options(
+        "/Zc:preprocessor"
         "/MP"
         "/arch:AVX2"
     )

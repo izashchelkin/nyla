@@ -1,8 +1,7 @@
 #pragma once
 
+#include "nyla/commons/span_def.h"
 #include <cstdint>
-
-#include "nyla/commons/region_alloc.h"
 
 namespace nyla
 {
@@ -18,7 +17,7 @@ class GlyphRenderer
 class CellBuffer
 {
   public:
-    struct Cell
+    struct cell
     {
         uint32_t codepoint;
         uint8_t fg;
@@ -37,21 +36,14 @@ class CellBuffer
         static constexpr inline uint16_t kDim = 1 << 8;
     };
 
-    void Init(RegionAlloc *alloc)
-    {
-        m_Alloc = alloc;
-    }
-
     void ResizeIfNeeded(uint32_t width, uint32_t height);
 
   private:
-    // it would be nice to have here a growable subarena here!
-    RegionAlloc *m_Alloc;
-
     uint32_t m_CellHeight = 32;
     uint32_t m_CellWidth = 16;
 
-    Span<Cell> m_Cells;
+    void* memory;
+    span<cell> m_Cells;
     uint32_t m_Height;
     uint32_t m_Width;
     uint32_t m_Head;

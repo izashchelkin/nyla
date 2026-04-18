@@ -4,6 +4,7 @@
 #include <cstdint>
 
 #include "nyla/commons/fmt.h"
+#include "nyla/commons/span.h"
 
 namespace nyla
 {
