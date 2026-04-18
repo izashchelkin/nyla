@@ -54,9 +54,10 @@ INLINE auto SizeBytes(span<T> self) -> uint64_t
     return self.size * sizeof(T);
 }
 
-template <typename T> INLINE void Resize(span<T> self, uint64_t newSize)
+template <typename T> INLINE auto Resize(span<T> self, uint64_t newSize) -> span<T>
 {
     self.size = newSize;
+    return self;
 }
 
 template <typename T>

@@ -76,7 +76,7 @@ void _WriteFmt(auto &&consumer, byteview fmt, va_list args)
                 case Word("*s"): {
                     uint64_t len = va_arg(args, uint64_t);
                     const uint8_t *str = va_arg(args, const uint8_t *);
-                    consumer(str, (uint32_t)len);
+                    consumer(str, len);
                     break;
                 }
 
@@ -91,7 +91,7 @@ void _WriteFmt(auto &&consumer, byteview fmt, va_list args)
 
             case 's': {
                 const uint8_t *s = va_arg(args, const uint8_t *);
-                consumer(s, static_cast<uint32_t>(CStrLen(s, 1024)));
+                consumer(s, CStrLen(s, 1024));
                 break;
             }
 
@@ -103,7 +103,7 @@ void _WriteFmt(auto &&consumer, byteview fmt, va_list args)
                 {
                 case Word("lu"): {
                     uint8_t buf[32];
-                    uint32_t len = U64ToBuffer(buf, va_arg(args, uint64_t));
+                    uint64_t len = U64ToBuffer(buf, va_arg(args, uint64_t));
                     consumer(buf, len);
                     break;
                 }
@@ -121,6 +121,12 @@ void _WriteFmt(auto &&consumer, byteview fmt, va_list args)
                 uint8_t buf[32];
                 uint32_t len = S64ToBuffer(buf, va_arg(args, int));
                 consumer(buf, len);
+                break;
+            }
+
+            case 'f': {
+                TRAP();
+                UNREACHABLE();
                 break;
             }
 
@@ -154,13 +160,11 @@ void _WriteFmt(auto &&consumer, byteview fmt, va_list args)
             while (ByteParser::HasNext(parser) && ByteParser::Peek(parser) != '%')
                 ByteParser::Advance(parser);
 
-            consumer(start, (&ByteParser::Peek(parser) - start));
+            consumer(start, parser.at - start);
             break;
         }
         }
     }
-
-    consumer((uint8_t *)"\n", 1);
 }
 
 void _BufferWriteFmt(auto &&consumer, span<uint8_t> buffer, byteview fmt, va_list args)
@@ -211,9 +215,9 @@ auto _StringWriteFmt(span<uint8_t> out, byteview fmt, va_list args) -> uint64_t
 
     _WriteFmt(
         [&](const uint8_t *data, uint64_t dataSize) -> void {
-            written += dataSize;
-            ASSERT(written <= out.size);
+            ASSERT(written + dataSize <= out.size);
             MemCpy(out.data + written, data, dataSize);
+            written += dataSize;
         },
         fmt, args);
 

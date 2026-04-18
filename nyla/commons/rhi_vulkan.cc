@@ -1,4 +1,5 @@
 #include "nyla/commons/macros.h"
+#include "nyla/commons/math.h"
 #include "nyla/commons/platform.h"
 #include "nyla/commons/rhi.h"
 
@@ -1509,13 +1510,13 @@ void Rhi::Bootstrap(region_alloc &alloc, const rhi_init_desc &rhiDesc)
 
         initDescriptorTable(g_State->m_ConstantsDescriptorTable, descriptorSetLayoutCreateInfo);
 
-        const uint32_t bufferSize =
+        const uint64_t bufferSize =
             g_State->m_Limits.numFramesInFlight *
             (CbvOffset(g_State->m_Limits.frameConstantSize) +
              g_State->m_Limits.maxPassCount * CbvOffset(g_State->m_Limits.passConstantSize) +
              g_State->m_Limits.maxDrawCount * CbvOffset(g_State->m_Limits.drawConstantSize) +
              g_State->m_Limits.maxDrawCount * CbvOffset(g_State->m_Limits.largeDrawConstantSize));
-        LOG("Constants Buffer Size: %fmb", (double)bufferSize / 1024.0 / 1024.0);
+        LOG("Constants Buffer Size: %" PRIu64 "mb", CeilDiv(bufferSize, 1 << 20));
 
         g_State->m_ConstantsUniformBuffer = CreateBuffer(rhi_buffer_desc{
             .size = bufferSize,

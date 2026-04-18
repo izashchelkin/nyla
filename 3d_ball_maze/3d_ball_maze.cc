@@ -10,6 +10,7 @@
 #include "nyla/commons/gamepad.h"
 #include "nyla/commons/gpu_upload.h"
 #include "nyla/commons/input_manager.h"
+#include "nyla/commons/macros.h"
 #include "nyla/commons/math.h"
 #include "nyla/commons/mesh_manager.h"
 #include "nyla/commons/minmax.h"
@@ -51,6 +52,7 @@ void UserMain()
 
     region_alloc alloc = RegionAlloc::Create(16_MiB, 0);
 
+    WinOpen();
     Rhi::Bootstrap(alloc, {
                               .flags = rhi_flags::VSync,
                           });

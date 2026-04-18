@@ -3,6 +3,7 @@
 #include "nyla/commons/file.h"
 #include "nyla/commons/file_utils.h"
 #include "nyla/commons/fmt.h"
+#include "nyla/commons/inline_vec.h"
 #include "nyla/commons/region_alloc.h"
 #include "nyla/commons/rhi.h"
 
@@ -14,7 +15,8 @@ auto API GetShader(region_alloc &alloc, byteview name, rhi_shader_stage stage) -
     void *allocMark = alloc.at;
 
     auto &path = RegionAlloc::AllocString<256>(alloc);
-    StringWriteFmt(path, R"(D:\nyla\nyla\shaders\build\)" SV_FMT R"(.hlsl.spv)"_s, name);
+    InlineVec::Resize(path, StringWriteFmt(Span::Resize((span<uint8_t>)path, InlineVec::Capacity(path)),
+                                           R"(D:\nyla\nyla\shaders\build\)" SV_FMT R"(.hlsl.spv)"_s, SV_ARG(name)));
 
     file_handle file = FileOpen(path, FileOpenMode::Read);
     span<uint8_t> data = FileReadFully(alloc, file);

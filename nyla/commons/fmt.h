@@ -1,6 +1,6 @@
 #pragma once
 
-#define LOG(fmt, ...) FileWriteFmt(GetStderr(), fmt ""_s, ##__VA_ARGS__)
+#define LOG(fmt, ...) FileWriteFmt(GetStderr(), fmt "\n"_s, ##__VA_ARGS__)
 
 #define SV_FMT "%.*s"
 #define SV_ARG(sv) (sv).size, (sv).data
