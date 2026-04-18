@@ -311,95 +311,95 @@ struct rhi_texture_info
     rhi_texture_format format;
 };
 
-class Rhi
+namespace Rhi
 {
-  public:
-    static void Init(region_alloc &alloc, const rhi_init_desc &);
-    static auto GetNumFramesInFlight() -> uint32_t;
-    static auto GetFrameIndex() -> uint32_t;
-    static auto GetMinUniformBufferOffsetAlignment() -> uint32_t;
-    static auto GetOptimalBufferCopyOffsetAlignment() -> uint32_t;
 
-    static auto CreateBuffer(const rhi_buffer_desc &) -> rhi_buffer;
-    static void NameBuffer(rhi_buffer, byteview name);
-    static void DestroyBuffer(rhi_buffer);
+void API Bootstrap(region_alloc &alloc, const rhi_init_desc &);
+auto API GetNumFramesInFlight() -> uint32_t;
+auto API GetFrameIndex() -> uint32_t;
+auto API GetMinUniformBufferOffsetAlignment() -> uint32_t;
+auto API GetOptimalBufferCopyOffsetAlignment() -> uint32_t;
 
-    static auto GetBufferSize(rhi_buffer) -> uint64_t;
+auto API CreateBuffer(const rhi_buffer_desc &) -> rhi_buffer;
+void API NameBuffer(rhi_buffer, byteview name);
+void API DestroyBuffer(rhi_buffer);
 
-    static auto MapBuffer(rhi_buffer) -> char *;
-    static void UnmapBuffer(rhi_buffer);
-    static void BufferMarkWritten(rhi_buffer, uint32_t offset, uint32_t size);
+auto API GetBufferSize(rhi_buffer) -> uint64_t;
 
-    static void CmdCopyBuffer(rhi_cmdlist cmd, rhi_buffer dst, uint32_t dstOffset, rhi_buffer src, uint32_t srcOffset,
-                              uint32_t size);
-    static void CmdTransitionBuffer(rhi_cmdlist cmd, rhi_buffer buffer, rhi_buffer_state newState);
-    static void CmdUavBarrierBuffer(rhi_cmdlist cmd, rhi_buffer buffer);
+auto API MapBuffer(rhi_buffer) -> char *;
+void API UnmapBuffer(rhi_buffer);
+void API BufferMarkWritten(rhi_buffer, uint32_t offset, uint32_t size);
 
-    static auto CreateCmdList(rhi_queue_type queueType) -> rhi_cmdlist;
-    static void NameCmdList(rhi_cmdlist, byteview name);
-    static void DestroyCmdList(rhi_cmdlist cmd);
-    static void ResetCmdList(rhi_cmdlist cmd);
+void API CmdCopyBuffer(rhi_cmdlist cmd, rhi_buffer dst, uint32_t dstOffset, rhi_buffer src, uint32_t srcOffset,
+                       uint32_t size);
+void API CmdTransitionBuffer(rhi_cmdlist cmd, rhi_buffer buffer, rhi_buffer_state newState);
+void API CmdUavBarrierBuffer(rhi_cmdlist cmd, rhi_buffer buffer);
 
-    static auto CmdSetCheckpoint(rhi_cmdlist cmd, uint64_t data) -> uint64_t;
-    static auto GetLastCheckpointData(rhi_queue_type queueType) -> uint64_t;
+auto API CreateCmdList(rhi_queue_type queueType) -> rhi_cmdlist;
+void API NameCmdList(rhi_cmdlist, byteview name);
+void API DestroyCmdList(rhi_cmdlist cmd);
+void API ResetCmdList(rhi_cmdlist cmd);
 
-    static auto FrameBegin(region_alloc &scratch) -> rhi_cmdlist;
-    static void FrameEnd(region_alloc &scratch);
+auto API CmdSetCheckpoint(rhi_cmdlist cmd, uint64_t data) -> uint64_t;
+auto API GetLastCheckpointData(rhi_queue_type queueType) -> uint64_t;
 
-    static auto FrameGetCmdList() -> rhi_cmdlist;
+auto API FrameBegin(region_alloc &scratch) -> rhi_cmdlist;
+void API FrameEnd(region_alloc &scratch);
 
-    static void PassBegin(rhi_pass_desc);
-    static void PassEnd();
+auto API FrameGetCmdList() -> rhi_cmdlist;
 
-    static auto GetVertexFormatSize(rhi_vertex_format) -> uint32_t;
+void API PassBegin(rhi_pass_desc);
+void API PassEnd();
 
-    static auto CreateGraphicsPipeline(region_alloc &scratch, const rhi_graphics_pipeline_desc &)
-        -> rhi_graphics_pipeline;
-    static void NameGraphicsPipeline(rhi_graphics_pipeline, byteview name);
-    static void DestroyGraphicsPipeline(rhi_graphics_pipeline);
+auto API GetVertexFormatSize(rhi_vertex_format) -> uint32_t;
 
-    static void CmdBindGraphicsPipeline(rhi_cmdlist, rhi_graphics_pipeline);
-    static void CmdBindVertexBuffers(rhi_cmdlist cmd, uint32_t firstBinding, span<const rhi_buffer> buffers,
-                                     span<const uint64_t> offsets);
-    static void CmdBindIndexBuffer(rhi_cmdlist cmd, rhi_buffer buffer, uint64_t offset);
-    static void CmdPushGraphicsConstants(rhi_cmdlist cmd, uint32_t offset, rhi_shader_stage stage, byteview data);
-    static void CmdDraw(rhi_cmdlist cmd, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
-                        uint32_t firstInstance);
-    static void CmdDrawIndexed(rhi_cmdlist cmd, uint32_t indexCount, int32_t vertexOffset, uint32_t instanceCount,
-                               uint32_t firstIndex, uint32_t firstInstance);
+auto API CreateGraphicsPipeline(region_alloc &scratch, const rhi_graphics_pipeline_desc &) -> rhi_graphics_pipeline;
+void API NameGraphicsPipeline(rhi_graphics_pipeline, byteview name);
+void API DestroyGraphicsPipeline(rhi_graphics_pipeline);
 
-    static auto CreateSampler(const rhi_sampler_desc &) -> rhi_sampler;
-    static void DestroySampler(rhi_sampler);
+void API CmdBindGraphicsPipeline(rhi_cmdlist, rhi_graphics_pipeline);
+void API CmdBindVertexBuffers(rhi_cmdlist cmd, uint32_t firstBinding, span<const rhi_buffer> buffers,
+                              span<const uint64_t> offsets);
+void API CmdBindIndexBuffer(rhi_cmdlist cmd, rhi_buffer buffer, uint64_t offset);
+void API CmdPushGraphicsConstants(rhi_cmdlist cmd, uint32_t offset, rhi_shader_stage stage, byteview data);
+void API CmdDraw(rhi_cmdlist cmd, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
+                 uint32_t firstInstance);
+void API CmdDrawIndexed(rhi_cmdlist cmd, uint32_t indexCount, int32_t vertexOffset, uint32_t instanceCount,
+                        uint32_t firstIndex, uint32_t firstInstance);
 
-    static auto CreateShader(const rhi_shader_desc &) -> rhi_shader;
-    static void DestroyShader(rhi_shader);
+auto API CreateSampler(const rhi_sampler_desc &) -> rhi_sampler;
+void API DestroySampler(rhi_sampler);
 
-    static auto CreateTexture(const rhi_texture_desc &) -> rhi_texture;
-    static void DestroyTexture(rhi_texture);
-    static auto GetTextureInfo(rhi_texture) -> rhi_texture_info;
-    static void CmdTransitionTexture(rhi_cmdlist, rhi_texture, rhi_texture_state);
-    static void CmdCopyTexture(rhi_cmdlist cmd, rhi_texture dst, rhi_buffer src, uint32_t srcOffset, uint32_t size);
-    static void CmdCopyTexture(rhi_cmdlist cmd, rhi_texture dst, rhi_texture src);
+auto API CreateShader(const rhi_shader_desc &) -> rhi_shader;
+void API DestroyShader(rhi_shader);
 
-    static auto CreateSampledTextureView(const rhi_texture_view_desc &) -> rhi_srv;
-    static void DestroySampledTextureView(rhi_srv);
-    static auto GetTexture(rhi_srv srv) -> rhi_texture;
+auto API CreateTexture(const rhi_texture_desc &) -> rhi_texture;
+void API DestroyTexture(rhi_texture);
+auto API GetTextureInfo(rhi_texture) -> rhi_texture_info;
+void API CmdTransitionTexture(rhi_cmdlist, rhi_texture, rhi_texture_state);
+void API CmdCopyTexture(rhi_cmdlist cmd, rhi_texture dst, rhi_buffer src, uint32_t srcOffset, uint32_t size);
+void API CmdCopyTexture(rhi_cmdlist cmd, rhi_texture dst, rhi_texture src);
 
-    static auto CreateRenderTargetView(const rhi_render_target_view_desc &) -> rhi_rtv;
-    static void DestroyRenderTargetView(rhi_rtv);
-    static auto GetTexture(rhi_rtv srv) -> rhi_texture;
+auto API CreateSampledTextureView(const rhi_texture_view_desc &) -> rhi_srv;
+void API DestroySampledTextureView(rhi_srv);
+auto API GetTexture(rhi_srv srv) -> rhi_texture;
 
-    static auto CreateDepthStencilView(const rhi_depth_stencil_view_desc &desc) -> rhi_dsv;
-    static void DestroyDepthStencilView(rhi_dsv textureView);
-    static auto GetTexture(rhi_dsv dsv) -> rhi_texture;
+auto API CreateRenderTargetView(const rhi_render_target_view_desc &) -> rhi_rtv;
+void API DestroyRenderTargetView(rhi_rtv);
+auto API GetTexture(rhi_rtv srv) -> rhi_texture;
 
-    static auto GetBackbufferView() -> rhi_rtv;
-    static void TriggerSwapchainRecreate();
+auto API CreateDepthStencilView(const rhi_depth_stencil_view_desc &desc) -> rhi_dsv;
+void API DestroyDepthStencilView(rhi_dsv textureView);
+auto API GetTexture(rhi_dsv dsv) -> rhi_texture;
 
-    static void SetFrameConstant(rhi_cmdlist cmd, byteview data);
-    static void SetPassConstant(rhi_cmdlist cmd, byteview data);
-    static void SetDrawConstant(rhi_cmdlist cmd, byteview data);
-    static void SetLargeDrawConstant(rhi_cmdlist cmd, byteview data);
-};
+auto API GetBackbufferView() -> rhi_rtv;
+void API TriggerSwapchainRecreate();
+
+void API SetFrameConstant(rhi_cmdlist cmd, byteview data);
+void API SetPassConstant(rhi_cmdlist cmd, byteview data);
+void API SetDrawConstant(rhi_cmdlist cmd, byteview data);
+void API SetLargeDrawConstant(rhi_cmdlist cmd, byteview data);
+
+}; // namespace Rhi
 
 } // namespace nyla

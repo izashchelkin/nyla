@@ -2,14 +2,17 @@
 
 #include <cstdint>
 
+#include "nyla/commons/array.h" // IWYU pragma: keep
 #include "nyla/commons/asset_file.h"
 #include "nyla/commons/debug_text_renderer.h"
 #include "nyla/commons/entrypoint.h"
 #include "nyla/commons/file.h"
+#include "nyla/commons/gamepad.h"
 #include "nyla/commons/gpu_upload.h"
 #include "nyla/commons/input_manager.h"
-#include "nyla/commons/keyboard.h"
+#include "nyla/commons/math.h"
 #include "nyla/commons/mesh_manager.h"
+#include "nyla/commons/minmax.h"
 #include "nyla/commons/platform.h"
 #include "nyla/commons/region_alloc.h"
 #include "nyla/commons/region_alloc_def.h"
@@ -19,7 +22,7 @@
 #include "nyla/commons/texture_manager.h"
 #include "nyla/commons/time.h"
 #include "nyla/commons/tween_manager.h"
-#include "nyla/commons/word.h"
+#include "nyla/commons/vec.h"
 
 namespace nyla
 {
@@ -48,9 +51,9 @@ void UserMain()
 
     region_alloc alloc = RegionAlloc::Create(16_MiB, 0);
 
-    Rhi::Init(alloc, {
-                         .flags = rhi_flags::VSync,
-                     });
+    Rhi::Bootstrap(alloc, {
+                              .flags = rhi_flags::VSync,
+                          });
 
     GpuUpload::Bootstrap();
     TextureManager::Bootstrap();
@@ -58,7 +61,7 @@ void UserMain()
 
     TweenManager::Bootstrap();
 
-    DebugTextRender::Bootstrap(alloc);
+    DebugTextRenderer::Bootstrap(alloc);
     Renderer::Bootstrap(alloc);
 
     byteview assetFile = AssetFileLoad(FileOpen(R"(assets.bin)"_s, FileOpenMode::Read));
@@ -95,6 +98,8 @@ void UserMain()
             game->dtUsAccum = 0;
             game->framesCounted = 0;
         }
+
+        DebugTextRenderer::Fmt(500, 10, "fps=%d"_s, game->fps);
 
         for (;;)
         {
@@ -153,22 +158,6 @@ void UserMain()
             RenderTargets::GetTargets(renderTargets, backbufferInfo.width, backbufferInfo.height, rtv, dsv);
 
             {
-                static const auto reloadAssets = InputManager::NewIdMapped(1, uint32_t(KeyPhysical::F5));
-                if (InputManager::IsPressed(reloadAssets))
-                {
-                    AssetManager::Flush();
-                    AssetManager::Upload(cmd);
-                }
-
-#if 0
-                static const auto moveLeft = inputManager.NewIdMapped(1, uint32_t(KeyPhysical::S));
-                static const auto moveRight = inputManager.NewIdMapped(1, uint32_t(KeyPhysical::F));
-                static const auto moveForward = inputManager.NewIdMapped(1, uint32_t(KeyPhysical::E));
-                static const auto moveBackward = inputManager.NewIdMapped(1, uint32_t(KeyPhysical::D));
-
-                int dx = inputManager.IsPressed(moveRight) - inputManager.IsPressed(moveLeft);
-                int dy = inputManager.IsPressed(moveForward) - inputManager.IsPressed(moveBackward);
-#endif
                 float2 movement{};
 
                 static float yaw = 0;
@@ -176,37 +165,37 @@ void UserMain()
 
                 float verticalInput = 0;
 
-                if (Platform::UpdateGamepad(0))
+                if (UpdateGamepad(0))
                 {
-                    movement = Platform::GetGamepadLeftStick(0);
+                    movement = GetGamepadLeftStick(0);
 
-                    const float2 rotation = Platform::GetGamepadRightStick(0);
+                    const float2 rotation = GetGamepadRightStick(0);
                     yaw += rotation[0] * 0.1f;
                     pitch -= rotation[1] * 0.1f;
 
-                    pitch = std::clamp(pitch, -1.55f, 1.55f);
+                    pitch = Clamp(pitch, -1.55f, 1.55f);
 
-                    if (yaw > 2 * std::numbers::pi_v<float>)
-                        yaw -= 2 * std::numbers::pi_v<float>;
-                    if (yaw < -2 * std::numbers::pi_v<float>)
-                        yaw += 2 * std::numbers::pi_v<float>;
+                    if (yaw > 2 * math::pi)
+                        yaw -= 2 * math::pi;
+                    if (yaw < -2 * math::pi)
+                        yaw += 2 * math::pi;
 
-                    verticalInput = Platform::GetGamepadLeftTrigger(0) - Platform::GetGamepadRightTrigger(0);
+                    verticalInput = GetGamepadLeftTrigger(0) - GetGamepadRightTrigger(0);
                 }
 
-                RhiTexture renderTarget = Rhi::GetTexture(rtv);
-                RhiTextureInfo rtInfo = Rhi::GetTextureInfo(renderTarget);
-                Rhi::CmdTransitionTexture(cmd, renderTarget, RhiTextureState::ColorTarget);
+                rhi_texture renderTarget = Rhi::GetTexture(rtv);
+                rhi_texture_info rtInfo = Rhi::GetTextureInfo(renderTarget);
+                Rhi::CmdTransitionTexture(cmd, renderTarget, rhi_texture_state::ColorTarget);
 
-                Rhi::CmdTransitionTexture(cmd, Rhi::GetTexture(dsv), RhiTextureState::DepthTarget);
+                Rhi::CmdTransitionTexture(cmd, Rhi::GetTexture(dsv), rhi_texture_state::DepthTarget);
 
                 Rhi::PassBegin({
                     .rtv = rtv,
                     .dsv = dsv,
                 });
                 {
-                    Renderer::Mesh({0, 0, 0}, {1, 1, 1}, game.GetAssets().ball, {});
-                    Renderer::Mesh({0, 0, 0}, {1, 1, 1}, game.GetAssets().cube, {});
+                    Renderer::Mesh({0, 0, 0}, {1, 1, 1}, sphereMesh, {});
+                    Renderer::Mesh({0, 0, 0}, {1, 1, 1}, cubeMesh, {});
 
                     const float3 forward{
                         std::cos(pitch) * std::sin(yaw),
@@ -217,8 +206,8 @@ void UserMain()
                     static float3 cameraPos{0.f, 0.f, 5.f};
 
                     const float3 worldUp = {0.0f, 1.0f, 0.0f};
-                    const float3 right = worldUp.Cross(forward).Normalized();
-                    const float3 up = forward.Cross(right);
+                    const float3 right = Vec::Normalized(Vec::Cross(worldUp, forward));
+                    const float3 up = Vec::Normalized(Vec::Cross(forward, right));
                     const float moveSpeed = 10.0f * dt;
 
                     cameraPos += forward * movement[1] * moveSpeed;
@@ -256,40 +245,6 @@ void UserMain()
         if (sleepForMillis)
             Sleep(sleepForMillis);
     }
-}
-
-//
-
-auto PlatformMain(Span<const char *> argv) -> int
-{
-    Platform::Init({
-        .enabledFeatures = PlatformFeature::Gfx | PlatformFeature::KeyboardInput,
-        .open = true,
-    });
-
-    RegionAlloc rootAlloc;
-    rootAlloc.Init(nullptr, 64_GiB, true);
-
-    Engine::Init({
-        .rootAlloc = &rootAlloc,
-    });
-
-    Game game{};
-    game.Init();
-
-    while (!Engine::ShouldExit())
-    {
-        const auto [cmd, dt, fps] = Engine::FrameBegin();
-        DebugTextRenderer::Fmt(500, 10, "fps=%d", fps);
-
-        RhiTextureInfo backbufferInfo = Rhi::GetTextureInfo(Rhi::GetTexture(Rhi::GetBackbufferView()));
-
-        game.Process(cmd, dt);
-
-        Engine::FrameEnd();
-    }
-
-    return 0;
 }
 
 } // namespace nyla

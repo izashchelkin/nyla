@@ -709,7 +709,7 @@ void CmdDrawInternal(VulkanCmdListData &cmdData)
 
 void CreateSwapchain(region_alloc alloc)
 {
-    void *allocMark;
+    void *allocMark = alloc.at;
 
     VkSwapchainKHR oldSwapchain = g_State->m_Swapchain;
 
@@ -1021,7 +1021,7 @@ void WriteDescriptorTables(region_alloc &alloc)
 
 } // namespace
 
-void Rhi::Init(region_alloc &alloc, const rhi_init_desc &rhiDesc)
+void Rhi::Bootstrap(region_alloc &alloc, const rhi_init_desc &rhiDesc)
 {
     void *allocMark = alloc.at;
 

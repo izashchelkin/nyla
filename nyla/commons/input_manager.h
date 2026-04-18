@@ -2,6 +2,8 @@
 
 #include <cstdint>
 
+#include "nyla/commons/macros.h"
+
 namespace nyla
 {
 
@@ -291,13 +293,13 @@ enum class input_id : uint8_t
 namespace InputManager
 {
 
-void Update();
+void API Update();
 
-void Map(uint32_t inputId, input_interface_type type, uint32_t code);
-auto IsPressed(uint32_t input) -> bool;
+void API Map(uint32_t inputId, input_interface_type type, uint32_t code);
+auto API IsPressed(uint32_t input) -> bool;
 
-void HandlePressed(input_interface_type type, uint32_t code, uint64_t time);
-void HandleReleased(input_interface_type type, uint32_t code, uint64_t time);
+void API HandlePressed(input_interface_type type, uint32_t code, uint64_t time);
+void API HandleReleased(input_interface_type type, uint32_t code, uint64_t time);
 
 } // namespace InputManager
 

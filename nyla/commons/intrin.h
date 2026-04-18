@@ -112,18 +112,16 @@ INLINE auto Tan(float f) -> float
     return tanf(f);
 }
 
+INLINE auto ATan(float f) -> float
+{
+    return atanf(f);
+}
+
 INLINE auto Sqrt(float val) -> float
 {
     __m128 v = _mm_set_ss(val);
     v = _mm_sqrt_ss(v);
     return _mm_cvtss_f32(v);
-}
-
-INLINE auto Sqrt(double val) -> double
-{
-    __m128d v = _mm_set_sd(val);
-    v = _mm_sqrt_sd(v, v);
-    return _mm_cvtsd_f64(v);
 }
 
 } // namespace nyla

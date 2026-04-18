@@ -92,6 +92,9 @@ INLINE auto GetGltfAccessorComponentCount(gltf_accessor_type accessorType) -> ui
     case gltf_accessor_type::MAT4:
         return 16;
     }
+
+    TRAP();
+    UNREACHABLE();
 }
 
 struct gltf_accessor

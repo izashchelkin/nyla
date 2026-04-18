@@ -3,3 +3,5 @@
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h> // IWYU pragma: export
+#undef near
+#undef far

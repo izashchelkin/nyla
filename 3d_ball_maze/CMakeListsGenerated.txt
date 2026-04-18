@@ -1,6 +1,5 @@
 target_sources(${TARGET} PRIVATE
     3d_ball_maze.cc
-    game_scene.cc
 )
 target_sources(${TARGET} PUBLIC
     3d_ball_maze.h

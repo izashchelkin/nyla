@@ -42,7 +42,7 @@ template <is_plain T, uint64_t Size> struct alignas(required_align_v<T>) array
     constexpr auto operator+=(const array &rhs) -> array &
     {
         for (uint32_t i = 0; i < Size; ++i)
-            this[i] += rhs[i];
+            (*this)[i] += rhs[i];
         return *this;
     }
 

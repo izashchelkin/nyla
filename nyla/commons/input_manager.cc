@@ -44,32 +44,32 @@ auto FindInput(input_interface_type type, uint32_t code) -> input_state *
 namespace InputManager
 {
 
-void Map(input_id input, input_interface_type type, uint32_t code)
+void API Map(input_id input, input_interface_type type, uint32_t code)
 {
     auto &state = g_State->inputStates[(uint8_t)input];
     state.type = type;
     state.code = code;
 }
 
-void HandlePressed(input_interface_type type, uint32_t code, uint64_t time)
+void API HandlePressed(input_interface_type type, uint32_t code, uint64_t time)
 {
     if (auto state = FindInput(type, code); state)
         state->pressedAt = Max(state->pressedAt, time);
 }
 
-void HandleReleased(input_interface_type type, uint32_t code, uint64_t time)
+void API HandleReleased(input_interface_type type, uint32_t code, uint64_t time)
 {
     if (auto state = FindInput(type, code); state)
         state->released = true;
 }
 
-auto IsPressed(input_id input) -> bool
+auto API IsPressed(input_id input) -> bool
 {
     auto &state = g_State->inputStates[(uint8_t)input];
     return !state.released && state.pressedAt;
 }
 
-void Update()
+void API Update()
 {
     for (auto &state : g_State->inputStates)
     {

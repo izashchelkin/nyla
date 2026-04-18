@@ -83,27 +83,27 @@ INLINE auto Rotate(float radians) -> mat<4, 4, float>
 [[nodiscard]]
 INLINE auto Ortho(float left, float right, float top, float bottom, float near, float far) -> mat<4, 4, float>
 {
-    const float two = 2.f;
-    const float rl = (right - left);
-    const float tb = (top - bottom);
-    const float fn = (far - near);
+    float two = 2.f;
+    float rightMinusLeft = (right - left);
+    float topMinusBottom = (top - bottom);
+    float farMinusNear = (far - near);
 
     return mat<4, 4, float>{
-        two / rl,
+        two / rightMinusLeft,
         0.f,
         0.f,
         0.f,
         0.f,
-        two / tb,
+        two / topMinusBottom,
         0.f,
         0.f,
         0.f,
         0.f,
-        1.f / fn,
+        1.f / farMinusNear,
         0.f,
-        -(right + left) / rl,
-        -(top + bottom) / tb,
-        -near / fn,
+        -(right + left) / rightMinusLeft,
+        -(top + bottom) / topMinusBottom,
+        -near / farMinusNear,
         1.f,
     };
 }
@@ -116,7 +116,7 @@ INLINE auto Perspective(float fovRadians, float aspect, float nearPlane, float f
 
     const float halfFov = fovRadians * .5f;
     const float f = 1.f / Tan(halfFov);
-    const float fn = farPlane - nearPlane;
+    const float farMinusNear = farPlane - nearPlane;
 
     return {
         f / aspect,
@@ -131,12 +131,12 @@ INLINE auto Perspective(float fovRadians, float aspect, float nearPlane, float f
         //
         0.f,
         0.f,
-        farPlane / fn,
+        farPlane / farMinusNear,
         1.f,
         //
         0.f,
         0.f,
-        -(farPlane * nearPlane) / fn,
+        -(farPlane * nearPlane) / farMinusNear,
         0.f,
     };
 }

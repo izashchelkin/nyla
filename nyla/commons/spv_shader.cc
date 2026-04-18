@@ -1490,6 +1490,7 @@ auto API CheckStorageClass(spv_shader &self, uint32_t id, spv_shader_storage_cla
     }
     }
     TRAP();
+    UNREACHABLE();
 }
 
 } // namespace SpvShader

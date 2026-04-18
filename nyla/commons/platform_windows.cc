@@ -81,6 +81,11 @@ auto API GetMonotonicTimeMicros() -> uint64_t
     return TicksTo(GetPerformanceTicks(), 1'000'000ULL);
 }
 
+void API Sleep(uint64_t millis)
+{
+    ::Sleep((DWORD)millis);
+}
+
 auto API ReserveMemPages(uint64_t size) -> void *
 {
     return VirtualAlloc(nullptr, size, MEM_RESERVE, PAGE_NOACCESS);
@@ -255,16 +260,20 @@ auto GetGamepadTrigger(uint8_t rawValue, uint8_t rawDeadzone) -> float
 
 } // namespace
 
-void API GetGamepadLeftStick(uint32_t index, float &outX, float &outY)
+auto API GetGamepadLeftStick(uint32_t index) -> float2
 {
     auto &gamepad = g_Gamepads[index].Gamepad;
-    return GetGamepadStick(gamepad.sThumbLX, gamepad.sThumbLY, XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, outX, outY);
+    float2 ret;
+    GetGamepadStick(gamepad.sThumbLX, gamepad.sThumbLY, XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, ret[0], ret[1]);
+    return ret;
 }
 
-void API GetGamepadRightStick(uint32_t index, float &outX, float &outY)
+auto API GetGamepadRightStick(uint32_t index) -> float2
 {
     auto &gamepad = g_Gamepads[index].Gamepad;
-    return GetGamepadStick(gamepad.sThumbRX, gamepad.sThumbRY, XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE, outX, outY);
+    float2 ret;
+    GetGamepadStick(gamepad.sThumbRX, gamepad.sThumbRY, XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE, ret[0], ret[1]);
+    return ret;
 }
 
 auto API GetGamepadLeftTrigger(uint32_t index) -> float

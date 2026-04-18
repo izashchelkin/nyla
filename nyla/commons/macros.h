@@ -15,7 +15,7 @@
 
 #else
 
-#define INLINE __forceinline
+#define INLINE inline __forceinline
 #define RESTRICT __restrict
 #define NORETURN __declspec(noreturn)
 #define TRAP() __debugbreak()
