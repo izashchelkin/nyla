@@ -1,6 +1,6 @@
 #pragma once
 
-#if defined(__clang__) || defined(__GNUC__)
+#if (defined(__clang__) || defined(__GNUC__)) && !defined(_MSC_VER)
 
 #define INLINE static inline __attribute__((always_inline))
 #define RESTRICT __restrict__

@@ -1,4 +1,6 @@
 #include "nyla/commons/tween_manager.h"
+
+#include "nyla/commons/array.h" // IWYU pragma: keep
 #include "nyla/commons/fmt.h"
 #include "nyla/commons/handle_pool.h"
 #include "nyla/commons/region_alloc.h"

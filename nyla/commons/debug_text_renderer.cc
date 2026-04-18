@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "nyla/commons/array.h" // IWYU pragma: keep
 #include "nyla/commons/inline_vec.h"
 #include "nyla/commons/minmax.h"
 #include "nyla/commons/region_alloc.h"

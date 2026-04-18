@@ -5,13 +5,14 @@
 #include "nyla/commons/array_def.h"
 #include "nyla/commons/concepts.h"
 #include "nyla/commons/fmt.h"
+#include "nyla/commons/macros.h"
 
 namespace nyla
 {
 
 template <is_plain T, uint64_t Size>
 [[nodiscard]]
-auto array<T, Size>::operator[](uint64_t i) -> T &
+INLINE auto array<T, Size>::operator[](uint64_t i) -> T &
 {
     DASSERT(i < Size);
     return data[i];

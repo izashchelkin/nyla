@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "nyla/commons/array.h" // IWYU pragma: keep
 #include "nyla/commons/asset_file.h"
 #include "nyla/commons/gltf.h"
 #include "nyla/commons/gpu_upload.h"

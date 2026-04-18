@@ -1,4 +1,4 @@
-/*
+/*x
 ** Copyright: 2014-2024 The Khronos Group Inc.
 ** License: MIT
 **
@@ -12,7 +12,9 @@
 
 #include <cstdint>
 
+#include "nyla/commons/array.h" // IWYU pragma: keep
 #include "nyla/commons/fmt.h"
+#include "nyla/commons/macros.h"
 #include "nyla/commons/rhi.h"
 #include "nyla/commons/span.h"
 #include "nyla/commons/spv_reader.h"
@@ -1339,7 +1341,7 @@ auto HandleOpVariable(spv_shader &self, span<uint32_t> operands) -> spv_op_proce
 
 } // namespace
 
-void ProcessShader(spv_shader &self, span<uint32_t> data, rhi_shader_stage stage)
+void API ProcessShader(spv_shader &self, span<uint32_t> data, rhi_shader_stage stage)
 {
     SpvReader::ReadHeader(data);
     while (data.size)
@@ -1387,8 +1389,8 @@ void ProcessShader(spv_shader &self, span<uint32_t> data, rhi_shader_stage stage
     }
 }
 
-auto FindIdBySemantic(spv_shader &self, byteview querySemantic, spv_shader_storage_class storageClass, uint32_t *outId)
-    -> bool
+auto API FindIdBySemantic(spv_shader &self, byteview querySemantic, spv_shader_storage_class storageClass,
+                          uint32_t *outId) -> bool
 {
     for (uint32_t i = 0; i < self.semanticDataNames.size; ++i)
     {
@@ -1403,8 +1405,8 @@ auto FindIdBySemantic(spv_shader &self, byteview querySemantic, spv_shader_stora
     return false;
 }
 
-auto FindLocationBySemantic(spv_shader &self, byteview semantic, spv_shader_storage_class storageClass,
-                            uint32_t *outLocation) -> bool
+auto API FindLocationBySemantic(spv_shader &self, byteview semantic, spv_shader_storage_class storageClass,
+                                uint32_t *outLocation) -> bool
 {
     uint32_t id;
     if (!FindIdBySemantic(self, semantic, storageClass, &id))
@@ -1423,7 +1425,7 @@ auto FindLocationBySemantic(spv_shader &self, byteview semantic, spv_shader_stor
     return false;
 }
 
-auto FindSemanticById(spv_shader &self, uint32_t id, byteview *outSemantic) -> bool
+auto API FindSemanticById(spv_shader &self, uint32_t id, byteview *outSemantic) -> bool
 {
     for (uint32_t i = 0; i < self.semanticDataIds.size; ++i)
     {
@@ -1436,8 +1438,8 @@ auto FindSemanticById(spv_shader &self, uint32_t id, byteview *outSemantic) -> b
     return false;
 }
 
-auto RewriteLocationForSemantic(spv_shader &self, span<uint32_t> data, byteview semantic,
-                                spv_shader_storage_class storageClass, uint32_t aLocation) -> bool
+auto API RewriteLocationForSemantic(spv_shader &self, span<uint32_t> data, byteview semantic,
+                                    spv_shader_storage_class storageClass, uint32_t aLocation) -> bool
 {
     uint32_t oldLocation;
     if (!FindLocationBySemantic(self, semantic, storageClass, &oldLocation))
@@ -1474,6 +1476,20 @@ auto RewriteLocationForSemantic(spv_shader &self, span<uint32_t> data, byteview 
     }
 
     return false;
+}
+
+auto API CheckStorageClass(spv_shader &self, uint32_t id, spv_shader_storage_class storageClass) -> bool
+{
+    switch (storageClass)
+    {
+    case spv_shader_storage_class::Output: {
+        return Span::Contains((span<uint32_t>)self.outputVariables, id);
+    }
+    case spv_shader_storage_class::Input: {
+        return Span::Contains((span<uint32_t>)self.inputVariables, id);
+    }
+    }
+    TRAP();
 }
 
 } // namespace SpvShader

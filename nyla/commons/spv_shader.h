@@ -60,20 +60,20 @@ INLINE auto GetSemantics(spv_shader &self) -> span<const inline_string<16>>
     return self.semanticDataNames;
 }
 
-void ProcessShader(spv_shader &self, span<uint32_t> data, rhi_shader_stage stage);
+void API ProcessShader(spv_shader &self, span<uint32_t> data, rhi_shader_stage stage);
 
-auto FindLocationBySemantic(spv_shader &self, byteview semantic, spv_shader_storage_class storageClass,
-                            uint32_t *outLocation) -> bool;
+auto API FindLocationBySemantic(spv_shader &self, byteview semantic, spv_shader_storage_class storageClass,
+                                uint32_t *outLocation) -> bool;
 
-auto FindIdBySemantic(spv_shader &self, byteview querySemantic, spv_shader_storage_class storageClass, uint32_t *outId)
-    -> bool;
+auto API FindIdBySemantic(spv_shader &self, byteview querySemantic, spv_shader_storage_class storageClass,
+                          uint32_t *outId) -> bool;
 
-auto FindSemanticById(spv_shader &self, uint32_t id, byteview *outSemantic) -> bool;
+auto API FindSemanticById(spv_shader &self, uint32_t id, byteview *outSemantic) -> bool;
 
-auto RewriteLocationForSemantic(spv_shader &self, span<uint32_t> data, byteview semantic,
-                                spv_shader_storage_class storageClass, uint32_t aLocation) -> bool;
+auto API RewriteLocationForSemantic(spv_shader &self, span<uint32_t> data, byteview semantic,
+                                    spv_shader_storage_class storageClass, uint32_t aLocation) -> bool;
 
-auto CheckStorageClass(spv_shader &self, uint32_t id, spv_shader_storage_class storageClass) -> bool;
+auto API CheckStorageClass(spv_shader &self, uint32_t id, spv_shader_storage_class storageClass) -> bool;
 
 INLINE auto CheckStorageClass(spv_shader &self, byteview semantic, spv_shader_storage_class storageClass) -> bool
 {

@@ -131,6 +131,16 @@ template <typename T> INLINE auto ByteViewPtr(T *ptr) -> byteview
     return byteview{(uint8_t *)ptr, sizeof(T)};
 }
 
+template <typename T> INLINE auto Contains(const span<T> &self, const T &value) -> bool
+{
+    for (auto &elem : self)
+    {
+        if (elem == value)
+            return true;
+    }
+    return false;
+}
+
 template <typename T> INLINE auto Erase(span<T> &self, T *first, T *last) -> T *
 {
     static_assert(!std::is_const_v<T>);
@@ -154,7 +164,7 @@ template <typename T> INLINE auto Erase(span<T> &self, T *pos) -> T *
     return Erase(self, pos, pos + 1);
 }
 
-template <typename T> INLINE void EraseIfEquals(span<T> &self, T value)
+template <typename T> INLINE void EraseIfEquals(span<T> &self, const T &value)
 {
     for (uint64_t i = 0; i < self.size;)
     {

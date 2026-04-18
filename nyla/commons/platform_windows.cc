@@ -3,13 +3,13 @@
 #include <cstdint>
 #include <immintrin.h>
 
+#include "nyla/commons/array.h" // IWYU pragma: keep
 #include "nyla/commons/gamepad.h"
 #include "nyla/commons/inline_queue.h"
 #include "nyla/commons/intrin.h"
 #include "nyla/commons/keyboard.h"
 #include "nyla/commons/limits.h"
 #include "nyla/commons/macros.h"
-#include "nyla/commons/math.h"
 #include "nyla/commons/mem.h"
 #include "nyla/commons/platform.h"
 #include "nyla/commons/span.h"

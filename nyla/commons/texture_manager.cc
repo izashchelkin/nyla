@@ -3,10 +3,10 @@
 #include <cinttypes>
 #include <cstdint>
 
+#include "nyla/commons/array.h" // IWYU pragma: keep
 #include "nyla/commons/asset_file.h"
 #include "nyla/commons/fmt.h"
 #include "nyla/commons/gpu_upload.h"
-#include "nyla/commons/handle.h"
 #include "nyla/commons/handle_pool.h"
 #include "nyla/commons/macros.h"
 #include "nyla/commons/mem.h"
