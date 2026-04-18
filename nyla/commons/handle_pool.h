@@ -4,7 +4,6 @@
 
 #include "nyla/commons/array_def.h"
 #include "nyla/commons/handle.h"
-#include "nyla/commons/tuple.h"
 
 namespace nyla
 {
@@ -47,10 +46,10 @@ auto Acquire(handle_pool<HandleType, DataType, Capacity> &self, const DataType &
         slot.used = true;
         slot.data = data;
 
-        return HandleType{
-            .gen = slot.gen,
-            .index = i,
-        };
+        HandleType ret;
+        ret.gen = slot.gen;
+        ret.index = i;
+        return ret;
     }
 
     ASSERT(false);
@@ -59,30 +58,31 @@ auto Acquire(handle_pool<HandleType, DataType, Capacity> &self, const DataType &
 
 template <is_handle HandleType, typename DataType, uint64_t Capacity>
 [[nodiscard]]
-auto TryResolveSlot(handle_pool<HandleType, DataType, Capacity> &self, HandleType handle)
-    -> pair<bool, handle_slot<DataType> *>
+auto TryResolveSlot(handle_pool<HandleType, DataType, Capacity> &self, HandleType handle, handle_slot<DataType> *&out)
+    -> bool
 {
     DASSERT(handle.index < Capacity);
 
     if (!handle.gen)
-        return {false, nullptr};
+        return false;
 
-    auto slot = self[handle.index];
+    handle_slot<DataType> &slot = self[handle.index];
     if (!slot.used)
-        return {false, nullptr};
-    if (handle.gen != slot->gen)
-        return {false, nullptr};
+        return false;
+    if (handle.gen != slot.gen)
+        return false;
 
-    return {true, &slot};
+    out = &slot;
+    return true;
 }
 
 template <is_handle HandleType, typename DataType, uint64_t Capacity>
 [[nodiscard]] auto ResolveSlot(handle_pool<HandleType, DataType, Capacity> &self, HandleType handle)
     -> handle_slot<DataType> &
 {
-    auto [ok, slot] = TryResolveSlot(self, handle);
-    ASSERT(ok);
-    return *slot;
+    handle_slot<DataType> *slotPtr;
+    ASSERT(TryResolveSlot(self, handle, slotPtr));
+    return *slotPtr;
 }
 
 template <is_handle HandleType, typename DataType, uint64_t Capacity>
@@ -105,7 +105,7 @@ auto ReleaseData(handle_pool<HandleType, DataType, Capacity> &self, HandleType h
     return slot.data;
 }
 
-template <typename DataType> auto Free(const handle_slot<DataType> &slot) -> DataType
+template <typename DataType> auto Free(handle_slot<DataType> &slot) -> DataType
 {
     slot.used = false;
     return slot.data;

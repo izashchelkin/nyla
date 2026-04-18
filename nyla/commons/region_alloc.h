@@ -5,6 +5,7 @@
 #include "nyla/commons/mem.h"
 #include "nyla/commons/mempage_pool.h"
 #include "nyla/commons/region_alloc_def.h"
+#include <cstdint>
 
 namespace nyla
 {
@@ -53,14 +54,6 @@ INLINE void Reset(region_alloc &self, void *p)
     self.at = (uint8_t *)p;
 }
 
-template <typename T>
-[[nodiscard]]
-INLINE auto Alloc(region_alloc &self) -> T &
-{
-    uint8_t *mem = Alloc(self, sizeof(T), required_align_v<T>);
-    return *((T *)mem);
-}
-
 [[nodiscard]]
 INLINE auto Alloc(region_alloc &self, uint64_t size, uint64_t align) -> uint8_t *
 {
@@ -87,6 +80,14 @@ INLINE auto Alloc(region_alloc &self, uint64_t size, uint64_t align) -> uint8_t 
 
 template <typename T>
 [[nodiscard]]
+INLINE auto Alloc(region_alloc &self) -> T &
+{
+    uint8_t *mem = Alloc(self, sizeof(T), required_align_v<T>);
+    return *((T *)mem);
+}
+
+template <typename T>
+[[nodiscard]]
 INLINE auto AllocArray(region_alloc &self, uint64_t n) -> span<T>
 {
     uint8_t *mem = Alloc(self, sizeof(T) * n, required_align_v<T>);
@@ -97,7 +98,7 @@ template <typename T>
 [[nodiscard]]
 INLINE auto AllocArray(region_alloc &self, span<T> data) -> span<T>
 {
-    span<T> mem = AllocArray(self, data.size);
+    span<T> mem = AllocArray<T>(self, data.size);
     MemCpy(mem.data, data.data, data.size);
     return span<T>{mem.data, data.size};
 }
@@ -106,14 +107,14 @@ template <typename T, uint64_t Capacity>
 [[nodiscard]]
 INLINE auto AllocVec(region_alloc &self) -> inline_vec<T, Capacity> &
 {
-    return *Alloc<inline_vec<T, Capacity>>(self);
+    return Alloc<inline_vec<T, Capacity>>(self);
 }
 
 template <uint64_t Capacity>
 [[nodiscard]]
 INLINE auto AllocString(region_alloc &self) -> inline_string<Capacity> &
 {
-    return *Alloc<inline_string<Capacity>>(self);
+    return Alloc<inline_string<Capacity>>(self);
 }
 
 template <uint64_t Capacity>

@@ -1,3 +1,5 @@
+#if 0
+
 #include <concepts>
 #include <cstdint>
 
@@ -170,3 +172,5 @@ auto API ShouldExit() -> bool
 }
 
 } // namespace nyla
+
+#endif

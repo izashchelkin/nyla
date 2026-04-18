@@ -72,7 +72,7 @@ void API Update(float dt)
 
 void API Cancel(tween tween)
 {
-    if (auto [ok, slotPtr] = HandlePool::TryResolveSlot(manager->tweens, tween); ok)
+    if (handle_slot<tween_data> *slotPtr; HandlePool::TryResolveSlot(manager->tweens, tween, slotPtr))
         HandlePool::Free(*slotPtr);
 }
 
@@ -90,7 +90,7 @@ auto API Lerp(float &value, float endValue, float begin, float end) -> tween
 
 auto API BeginOf(tween tween) -> float
 {
-    if (auto [ok, slotPtr] = HandlePool::TryResolveSlot(manager->tweens, tween); ok)
+    if (handle_slot<tween_data> *slotPtr; HandlePool::TryResolveSlot(manager->tweens, tween, slotPtr))
         return slotPtr->data.begin;
     else
         return 0.f;
@@ -98,7 +98,7 @@ auto API BeginOf(tween tween) -> float
 
 auto API EndOf(tween tween) -> float
 {
-    if (auto [ok, slotPtr] = HandlePool::TryResolveSlot(manager->tweens, tween); ok)
+    if (handle_slot<tween_data> *slotPtr; HandlePool::TryResolveSlot(manager->tweens, tween, slotPtr))
         return slotPtr->data.begin;
     else
         return 0.f;

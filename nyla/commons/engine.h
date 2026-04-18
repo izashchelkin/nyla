@@ -1,5 +1,7 @@
 #pragma once
 
+#if 0
+
 #include <cstdint>
 
 #include "nyla/commons/region_alloc.h"
@@ -35,3 +37,5 @@ auto API GetPerFrameAlloc() -> region_alloc &;
 } // namespace Engine
 
 } // namespace nyla
+
+#endif

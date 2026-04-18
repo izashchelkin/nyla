@@ -44,7 +44,7 @@ template <uint64_t Capacity> void AsciiToUpper(inline_string<Capacity> &self)
 {
     for (uint32_t i = 0; i < self.size; ++i)
     {
-        char &ch = self[i];
+        uint8_t &ch = self[i];
         if (ch >= 'a' && ch <= 'z')
             ch = ch - ('a' - 'A');
         else

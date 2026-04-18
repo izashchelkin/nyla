@@ -81,7 +81,7 @@ template <typename T, uint64_t Capacity> INLINE void Clear(inline_vec<T, Capacit
 template <typename T, uint64_t Capacity> INLINE auto Append(inline_vec<T, Capacity> &self) -> T &
 {
     DASSERT(self.size < Capacity);
-    T *p = self.data + self.size++;
+    T *p = self.data.data + self.size++;
     return *p;
 }
 

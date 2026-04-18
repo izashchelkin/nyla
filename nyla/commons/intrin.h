@@ -61,7 +61,7 @@ INLINE uint32_t BitScanForward64(uint64_t n)
     return (uint32_t)__builtin_ctzll(n);
 #else
     unsigned long index;
-    _BitScanForward64(&index, n);
+    ::_BitScanForward64(&index, n);
     return (uint32_t)index;
 #endif
 }
