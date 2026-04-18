@@ -1,5 +1,7 @@
 #pragma once
 
+#if 0
+
 #include <cstdint>
 
 #include "nyla/commons/handle.h"
@@ -55,3 +57,5 @@ class AssetManager
 };
 
 } // namespace nyla
+
+#endif

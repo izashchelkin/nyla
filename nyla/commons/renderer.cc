@@ -2,7 +2,7 @@
 #include <numbers>
 
 #include "nyla/commons/asset_manager.h"
-#include "nyla/commons/engine0_internal.h"
+#include "nyla/commons/shader.h"
 #include "nyla/commons/handle.h"
 #include "nyla/commons/inline_vec.h"
 #include "nyla/commons/mat.h"
@@ -13,8 +13,6 @@
 
 namespace nyla
 {
-
-using namespace engine0_internal;
 
 namespace
 {

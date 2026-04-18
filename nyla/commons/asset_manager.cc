@@ -1,3 +1,6 @@
+
+#if 0
+
 #include <cstdint>
 
 #include "nyla/commons/align.h"
@@ -130,3 +133,5 @@ auto AssetManager::DeclareStaticMesh(Span<const char> vertexData, Span<const uin
 }
 
 } // namespace nyla
+
+#endif

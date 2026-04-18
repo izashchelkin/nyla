@@ -5,7 +5,7 @@
 #include "nyla/commons/bitenum.h"
 #include "nyla/commons/debug_text_renderer.h"
 #include "nyla/commons/engine.h"
-#include "nyla/commons/gpu_upload_manager.h"
+#include "nyla/commons/gpu_upload.h"
 #include "nyla/commons/input_manager.h"
 #include "nyla/commons/intrin.h"
 #include "nyla/commons/macros.h"

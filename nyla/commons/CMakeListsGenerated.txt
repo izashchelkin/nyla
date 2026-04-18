@@ -1,6 +1,6 @@
 target_sources(${TARGET} PRIVATE
+    asset_file.cc
     asset_manager.cc
-    assetfile.cc
     bdf.cc
     byteparser.cc
     debug_text_renderer.cc
@@ -13,23 +13,27 @@ target_sources(${TARGET} PRIVATE
     json_parser.cc
     json_value.cc
     libmain.cc
+    mat.cc
     mem.cc
     mempage_pool.cc
+    mesh_manager.cc
     region_alloc.cc
     render_targets.cc
     renderer.cc
+    sampler_manager.cc
     shader.cc
     spv_shader.cc
     staging_buffer.cc
     staging.cc
+    texture_manager.cc
     tween_manager.cc
 )
 target_sources(${TARGET} PUBLIC
     align.h
     array_def.h
     array.h
+    asset_file.h
     asset_manager.h
-    assetfile.h
     bdf.h
     bitenum.h
     byteliterals.h
@@ -72,6 +76,7 @@ target_sources(${TARGET} PUBLIC
     math.h
     mem.h
     mempage_pool.h
+    mesh_manager.h
     minmax.h
     platform_audio.h
     platform_dir_watch.h
@@ -81,6 +86,7 @@ target_sources(${TARGET} PUBLIC
     render_targets.h
     renderer.h
     rhi.h
+    sampler_manager.h
     shader.h
     span_def.h
     span.h
@@ -88,6 +94,8 @@ target_sources(${TARGET} PUBLIC
     spv_shader.h
     staging_buffer.h
     staging.h
+    stb_image.h
+    texture_manager.h
     time.h
     tuple.h
     tween_manager.h

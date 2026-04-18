@@ -1,6 +1,7 @@
 #pragma once
 
 #include "nyla/commons/fmt.h"
+#include "nyla/commons/intrin.h"
 #include "nyla/commons/mem.h"
 #include "nyla/commons/vec.h"
 
@@ -9,9 +10,24 @@
 namespace nyla
 {
 
-template <uint64_t N, uint64_t M, typename T> using mat = array<array<T, M>, N>;
+template <uint64_t N, uint64_t M, typename T> struct mat : array<array<T, M>, N>
+{
+    auto operator*(const mat &rhs) -> mat
+    {
+        mat ret{};
+        for (uint64_t row = 0; row < N; ++row)
+        {
+            for (uint64_t col = 0; col < N; ++col)
+            {
+                for (uint64_t k = 0; k < N; ++k)
+                    ret[col][row] += (*this)[k][row] * rhs[col][k];
+            }
+        }
+        return ret;
+    }
+};
 
-using mat4 = mat<4, 4, float>;
+using float4x4 = mat<4, 4, float>;
 
 namespace Mat
 {
@@ -22,6 +38,48 @@ template <uint64_t N, uint64_t M, typename T> INLINE void Identity(mat<N, M, T> 
 
     for (uint32_t i = 0; i < N; ++i)
         out[i][i] = 1;
+}
+
+[[nodiscard]]
+auto API Inverse(const mat<4, 4, float> &m) -> mat<4, 4, float>;
+
+template <typename T, uint32_t N>
+[[nodiscard]]
+INLINE auto Translate(const array<T, N> &v) -> mat<N, N, T>
+{
+    mat<N, N, T> ret;
+    Identity(ret);
+    for (uint64_t i = 0; i < N; ++i)
+        ret[N - 1][i] = v[i];
+    return ret;
+}
+
+template <typename T, uint32_t N>
+[[nodiscard]]
+INLINE auto Scale(const array<T, N> &v) -> mat<N, N, T>
+{
+    mat<N, N, T> ret;
+    Identity(ret);
+    for (uint32_t i = 0; i < N; ++i)
+        ret[i][i] = static_cast<T>(v[i]);
+    return ret;
+}
+
+[[nodiscard]]
+INLINE auto Rotate(float radians) -> mat<4, 4, float>
+{
+    mat<4, 4, float> ret;
+    Identity(ret);
+
+    const float c = Cos(radians);
+    const float s = Sin(radians);
+
+    ret[0][0] = c;
+    ret[0][1] = s;
+    ret[1][0] = -s;
+    ret[1][1] = c;
+
+    return ret;
 }
 
 } // namespace Mat
@@ -75,128 +133,6 @@ template <typename T, uint32_t N> class Mat
     {
         ASSERT(col < N);
         return m_Data[col];
-    }
-
-    // Column-major matrix multiply: this * rhs
-    [[nodiscard]]
-    auto Mult(const Mat &rhs) const -> Mat
-    {
-        Mat ret{}; // zero-init
-        for (uint32_t row = 0; row < N; ++row)
-        {
-            for (uint32_t col = 0; col < N; ++col)
-            {
-                for (uint32_t k = 0; k < N; ++k)
-                    ret[col][row] += m_Data[k][row] * rhs.m_Data[col][k];
-            }
-        }
-        return ret;
-    }
-
-    [[nodiscard]]
-    auto Inversed() const -> Mat
-        requires std::floating_point<T>
-    {
-        Array<Array<T, 2ULL * N>, N> a{};
-
-        for (uint32_t row = 0; row < N; ++row)
-        {
-            for (uint32_t col = 0; col < N; ++col)
-                a[row][col] = m_Data[col][row];
-
-            for (uint32_t col = 0; col < N; ++col)
-                a[row][N + col] = (row == col) ? static_cast<T>(1) : static_cast<T>(0);
-        }
-
-        for (uint32_t col = 0; col < N; ++col)
-        {
-            // Pivot selection
-            uint32_t pivotRow = col;
-            T maxAbs = std::fabs(a[pivotRow][col]);
-            for (uint32_t row = col + 1; row < N; ++row)
-            {
-                T v = std::fabs(a[row][col]);
-                if (v > maxAbs)
-                {
-                    maxAbs = v;
-                    pivotRow = row;
-                }
-            }
-
-            ASSERT(maxAbs > static_cast<T>(1e-8));
-
-            if (pivotRow != col)
-            {
-                for (uint32_t j = 0; j < 2 * N; ++j)
-                    std::swap(a[col][j], a[pivotRow][j]);
-            }
-
-            const T pivot = a[col][col];
-            for (uint32_t j = 0; j < 2 * N; ++j)
-                a[col][j] /= pivot;
-
-            for (uint32_t row = 0; row < N; ++row)
-            {
-                if (row == col)
-                    continue;
-
-                const T factor = a[row][col];
-                if (factor != static_cast<T>(0))
-                {
-                    for (uint32_t j = 0; j < 2 * N; ++j)
-                        a[row][j] -= factor * a[col][j];
-                }
-            }
-        }
-
-        Mat inv{};
-        for (uint32_t row = 0; row < N; ++row)
-        {
-            for (uint32_t col = 0; col < N; ++col)
-                inv.m_Data[col][row] = a[row][N + col];
-        }
-
-        return inv;
-    }
-
-    template <typename K, uint32_t M>
-        requires std::convertible_to<K, T>
-    [[nodiscard]]
-    static auto Translate(const Vec<K, M> &v) -> Mat
-    {
-        Mat ret = Mat::Identity();
-        const auto count = std::min<uint32_t>(N, M);
-        for (uint32_t i = 0; i < count; ++i)
-            ret[N - 1][i] = static_cast<T>(v[i]);
-        return ret;
-    }
-
-    template <typename K, uint32_t M>
-        requires std::convertible_to<K, T>
-    [[nodiscard]]
-    static auto Scale(const Vec<K, M> &v) -> Mat
-    {
-        Mat ret = Mat::Identity();
-        const auto count = std::min<uint32_t>(N, M);
-        for (uint32_t i = 0; i < count; ++i)
-            ret[i][i] = static_cast<T>(v[i]);
-        return ret;
-    }
-
-    [[nodiscard]]
-    static auto Rotate(T radians) -> Mat
-        requires(N == 4 && std::floating_point<T>)
-    {
-        Mat ret = Mat::Identity();
-        const T c = std::cos(radians);
-        const T s = std::sin(radians);
-
-        ret[0][0] = c;
-        ret[0][1] = s;
-        ret[1][0] = -s;
-        ret[1][1] = c;
-
-        return ret;
     }
 
     [[nodiscard]]
