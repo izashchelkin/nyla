@@ -14,7 +14,7 @@ namespace nyla
 namespace Renderer
 {
 
-void API Init();
+void API Bootstrap(region_alloc &alloc);
 
 void API Mesh(float3 pos, float3 scale, mesh Mesh, texture Texture);
 void API CmdFlush(rhi_cmdlist cmd);

@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "nyla/commons/array_def.h"
 #include "nyla/commons/fmt.h"
 #include "nyla/commons/rhi.h"
 #include "nyla/commons/span.h"

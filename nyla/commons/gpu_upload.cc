@@ -78,7 +78,7 @@ void API Bootstrap()
     Rhi::NameBuffer(g_State->m_StaticIndexBuffer, "StaticIndexBuffer"_s);
 }
 
-void API FrameBegin()
+void API Update()
 {
     g_State->m_StagingBufferAt = 0;
 }

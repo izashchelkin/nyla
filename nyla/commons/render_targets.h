@@ -1,5 +1,6 @@
 #pragma once
 
+#include "nyla/commons/inline_vec_def.h"
 #include "nyla/commons/rhi.h"
 
 namespace nyla

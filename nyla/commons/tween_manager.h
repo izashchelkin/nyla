@@ -13,6 +13,8 @@ struct tween : handle
 namespace TweenManager
 {
 
+void API Bootstrap();
+
 auto API Now() -> float;
 void API Update(float dt);
 

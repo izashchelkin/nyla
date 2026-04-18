@@ -1,6 +1,7 @@
 #include "nyla/commons/render_targets.h"
 
 #include "nyla/commons/array.h" // IWYU pragma: keep
+#include "nyla/commons/inline_vec.h"
 #include "nyla/commons/rhi.h"
 
 namespace nyla

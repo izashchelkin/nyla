@@ -21,7 +21,7 @@ void API Bootstrap();
 
 void API Update(region_alloc &alloc, rhi_cmdlist cmd, byteview assetFile);
 
-auto API DeclareTexture(byteview assetFileData, uint64_t guidGltf, uint64_t guidBin) -> mesh;
+auto API DeclareMesh(byteview assetFileData, uint64_t guidGltf, uint64_t guidBin) -> mesh;
 
 void API CmdBindMesh(rhi_cmdlist cmd, mesh Mesh);
 void API CmdDrawMesh(rhi_cmdlist cmd, mesh Mesh);

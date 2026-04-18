@@ -1021,9 +1021,9 @@ void WriteDescriptorTables(region_alloc &alloc)
 
 } // namespace
 
-void Rhi::Init(region_alloc &scratch, const rhi_init_desc &rhiDesc)
+void Rhi::Init(region_alloc &alloc, const rhi_init_desc &rhiDesc)
 {
-    void *scratchResetMark = scratch.at;
+    void *allocMark = alloc.at;
 
     {
         g_Alloc = RegionAlloc::Create(1_MiB, 0);
@@ -1045,7 +1045,7 @@ void Rhi::Init(region_alloc &scratch, const rhi_init_desc &rhiDesc)
             .apiVersion = VK_API_VERSION_1_4,
         };
 
-        auto &enabledInstanceExtensions = RegionAlloc::AllocVec<const char *, 5>(scratch);
+        auto &enabledInstanceExtensions = RegionAlloc::AllocVec<const char *, 5>(alloc);
         InlineVec::Append(enabledInstanceExtensions, VK_KHR_SURFACE_EXTENSION_NAME);
 #if defined(__linux__)
         InlineVec::Append(enabledInstanceExtensions, VK_KHR_XCB_SURFACE_EXTENSION_NAME);
@@ -1053,14 +1053,14 @@ void Rhi::Init(region_alloc &scratch, const rhi_init_desc &rhiDesc)
         InlineVec::Append(enabledInstanceExtensions, VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
 #endif
 
-        auto &instanceLayers = RegionAlloc::AllocVec<const char *, 2>(scratch);
+        auto &instanceLayers = RegionAlloc::AllocVec<const char *, 2>(alloc);
         if (kRhiValidations)
         {
             InlineVec::Append(instanceLayers, "VK_LAYER_KHRONOS_validation");
         }
 
-        auto &validationEnabledFeatures = RegionAlloc::AllocVec<VkValidationFeatureEnableEXT, 4>(scratch);
-        auto &validationDisabledFeatures = RegionAlloc::AllocVec<VkValidationFeatureDisableEXT, 4>(scratch);
+        auto &validationEnabledFeatures = RegionAlloc::AllocVec<VkValidationFeatureEnableEXT, 4>(alloc);
+        auto &validationDisabledFeatures = RegionAlloc::AllocVec<VkValidationFeatureDisableEXT, 4>(alloc);
         VkValidationFeaturesEXT validationFeatures = {
             .sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT,
             .enabledValidationFeatureCount = (uint32_t)validationEnabledFeatures.size,
@@ -1085,12 +1085,12 @@ void Rhi::Init(region_alloc &scratch, const rhi_init_desc &rhiDesc)
         uint32_t layerCount;
         vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
 
-        auto &layers = RegionAlloc::AllocVec<VkLayerProperties, 256>(scratch);
+        auto &layers = RegionAlloc::AllocVec<VkLayerProperties, 256>(alloc);
         InlineVec::Resize(layers, layerCount);
         vkEnumerateInstanceLayerProperties(&layerCount, InlineVec::DataPtr(layers));
 
         {
-            auto &instanceExtensions = RegionAlloc::AllocVec<VkExtensionProperties, 256>(scratch);
+            auto &instanceExtensions = RegionAlloc::AllocVec<VkExtensionProperties, 256>(alloc);
             uint32_t instanceExtensionsCount;
             vkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionsCount, nullptr);
 
@@ -1114,7 +1114,7 @@ void Rhi::Init(region_alloc &scratch, const rhi_init_desc &rhiDesc)
             const auto &layer = layers[i];
             LOG("    %s", layer.layerName);
 
-            auto &layerExtensions = RegionAlloc::AllocVec<VkExtensionProperties, 256>(scratch);
+            auto &layerExtensions = RegionAlloc::AllocVec<VkExtensionProperties, 256>(alloc);
             uint32_t layerExtensionProperties;
             vkEnumerateInstanceExtensionProperties(layer.layerName, &layerExtensionProperties, nullptr);
 
@@ -1174,11 +1174,11 @@ void Rhi::Init(region_alloc &scratch, const rhi_init_desc &rhiDesc)
         uint32_t numPhysDevices = 0;
         VK_CHECK(vkEnumeratePhysicalDevices(g_State->m_Instance, &numPhysDevices, nullptr));
 
-        auto &physDevs = RegionAlloc::AllocVec<VkPhysicalDevice, 16>(scratch);
+        auto &physDevs = RegionAlloc::AllocVec<VkPhysicalDevice, 16>(alloc);
         InlineVec::Resize(physDevs, numPhysDevices);
         VK_CHECK(vkEnumeratePhysicalDevices(g_State->m_Instance, &numPhysDevices, InlineVec::DataPtr(physDevs)));
 
-        auto &deviceExtensions = RegionAlloc::AllocVec<const char *, 256>(scratch);
+        auto &deviceExtensions = RegionAlloc::AllocVec<const char *, 256>(alloc);
         InlineVec::Append(deviceExtensions, VK_KHR_SWAPCHAIN_EXTENSION_NAME);
         InlineVec::Append(deviceExtensions, VK_EXT_PRESENT_MODE_FIFO_LATEST_READY_EXTENSION_NAME);
         InlineVec::Append(deviceExtensions, VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME);
@@ -1192,7 +1192,7 @@ void Rhi::Init(region_alloc &scratch, const rhi_init_desc &rhiDesc)
         {
             uint32_t extensionCount = 0;
             vkEnumerateDeviceExtensionProperties(physDev, nullptr, &extensionCount, nullptr);
-            auto &extensions = RegionAlloc::AllocVec<VkExtensionProperties, 256>(scratch);
+            auto &extensions = RegionAlloc::AllocVec<VkExtensionProperties, 256>(alloc);
             InlineVec::Resize(extensions, 256);
             vkEnumerateDeviceExtensionProperties(physDev, nullptr, &extensionCount, InlineVec::DataPtr(extensions));
 
@@ -1227,7 +1227,7 @@ void Rhi::Init(region_alloc &scratch, const rhi_init_desc &rhiDesc)
 
             uint32_t queueFamilyPropCount = 0;
             vkGetPhysicalDeviceQueueFamilyProperties(physDev, &queueFamilyPropCount, nullptr);
-            auto &queueFamilyProperties = RegionAlloc::AllocVec<VkQueueFamilyProperties, 256>(scratch);
+            auto &queueFamilyProperties = RegionAlloc::AllocVec<VkQueueFamilyProperties, 256>(alloc);
             InlineVec::Resize(queueFamilyProperties, queueFamilyPropCount);
             vkGetPhysicalDeviceQueueFamilyProperties(physDev, &queueFamilyPropCount,
                                                      InlineVec::DataPtr(queueFamilyProperties));
@@ -1286,7 +1286,7 @@ void Rhi::Init(region_alloc &scratch, const rhi_init_desc &rhiDesc)
         ASSERT(g_State->m_PhysDev);
 
         const float queuePriority = 1.0f;
-        auto &queueCreateInfos = RegionAlloc::AllocVec<VkDeviceQueueCreateInfo, 2>(scratch);
+        auto &queueCreateInfos = RegionAlloc::AllocVec<VkDeviceQueueCreateInfo, 2>(alloc);
         if (g_State->m_TransferQueue.queueFamilyIndex == kInvalidIndex)
         {
             InlineVec::Append(queueCreateInfos, VkDeviceQueueCreateInfo{
@@ -1433,11 +1433,9 @@ void Rhi::Init(region_alloc &scratch, const rhi_init_desc &rhiDesc)
         };
         vkCreateWin32SurfaceKHR(g_State->m_Instance, &surfaceCreateInfo, g_State->vkAlloc, &g_State->m_Surface);
 #endif
-
-        RegionAlloc::Reset(scratch, scratchResetMark);
     }
 
-    CreateSwapchain(scratch);
+    CreateSwapchain(alloc);
 
     //
 
@@ -1543,7 +1541,7 @@ void Rhi::Init(region_alloc &scratch, const rhi_init_desc &rhiDesc)
             },
         };
 
-        auto &descriptorWrites = RegionAlloc::AllocVec<VkWriteDescriptorSet, Array::Size(bufferInfos)>(scratch);
+        auto &descriptorWrites = RegionAlloc::AllocVec<VkWriteDescriptorSet, Array::Size(bufferInfos)>(alloc);
         for (uint32_t i = 0; i < Array::Size(bufferInfos); ++i)
         {
             const VkDescriptorBufferInfo &bufferInfo = bufferInfos[i];
@@ -1620,6 +1618,8 @@ void Rhi::Init(region_alloc &scratch, const rhi_init_desc &rhiDesc)
 
         initDescriptorTable(g_State->m_SamplersDescriptorTable, descriptorSetLayoutCreateInfo);
     }
+
+    RegionAlloc::Reset(alloc, allocMark);
 }
 
 auto Rhi::CreateBuffer(const rhi_buffer_desc &desc) -> rhi_buffer

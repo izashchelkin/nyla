@@ -73,15 +73,13 @@ add_subdirectory(3d_ball_maze)
 
 file(GLOB_RECURSE NYLA_ALL_CXX_FILES
     CONFIGURE_DEPENDS
-    "${PROJECT_SOURCE_DIR}/*.cc"
-    "${PROJECT_SOURCE_DIR}/*.cpp"
-    "${PROJECT_SOURCE_DIR}/*.cxx"
-    "${PROJECT_SOURCE_DIR}/*.h"
-    "${PROJECT_SOURCE_DIR}/*.hpp"
-    "${PROJECT_SOURCE_DIR}/*.hh"
-    "${PROJECT_SOURCE_DIR}/*.hxx"
+    "${PROJECT_SOURCE_DIR}/nyla/*.cc"
+    "${PROJECT_SOURCE_DIR}/nyla/*.h"
+    "${PROJECT_SOURCE_DIR}/nyla/*.hlsl"
 
-    "${PROJECT_SOURCE_DIR}/*.hlsl"
+    "${PROJECT_SOURCE_DIR}/3d_ball_maze/*.cc"
+    "${PROJECT_SOURCE_DIR}/3d_ball_maze/*.h"
+    "${PROJECT_SOURCE_DIR}/3d_ball_maze/*.hlsl"
 )
 
 add_custom_target(format

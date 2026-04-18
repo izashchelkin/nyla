@@ -175,7 +175,7 @@ void API Update(region_alloc &alloc, rhi_cmdlist cmd, byteview assetFile)
     }
 }
 
-auto API DeclareTexture(byteview assetFileData, uint64_t guidGltf, uint64_t guidBin) -> mesh
+auto API DeclareMesh(byteview assetFileData, uint64_t guidGltf, uint64_t guidBin) -> mesh
 {
     return HandlePool::Acquire(manager->meshes, mesh_metadata{
                                                     .guidGltf = guidGltf,

@@ -60,7 +60,7 @@ struct PlatformEvent
     };
 };
 
-auto API Sleep(uint64_t millis);
+void API Sleep(uint64_t millis);
 auto API Spawn(const char *const cmd, uint64_t count) -> bool;
 void API WinOpen();
 auto API WinGetSize() -> PlatformWindowSize;

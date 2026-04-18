@@ -12,7 +12,7 @@ namespace GpuUpload
 
 void API Bootstrap();
 
-void API FrameBegin();
+void API Update();
 
 auto API CmdCopyBuffer(rhi_cmdlist cmd, rhi_buffer dst, uint64_t dstOffset, uint64_t copySize) -> char *;
 auto API CmdCopyTexture(rhi_cmdlist cmd, rhi_texture dst, uint64_t size) -> char *;
