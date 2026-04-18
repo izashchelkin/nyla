@@ -2105,7 +2105,7 @@ auto Rhi::CreateShader(const rhi_shader_desc &desc) -> rhi_shader
     auto alloc = RegionAlloc::Create(16_MiB, 0);
 
     span<uint32_t> spv = RegionAlloc::AllocArray<uint32_t>(alloc, desc.code);
-    MemCpy(spv.data, desc.code.data, desc.code.size);
+    MemCpy(spv.data, desc.code.data, Span::SizeBytes(desc.code));
 
     const rhi_shader handle = HandlePool::Acquire(g_State->m_Shaders, VulkanShaderData{.spv = spv});
     VulkanShaderData &shaderData = HandlePool::ResolveData(g_State->m_Shaders, handle);

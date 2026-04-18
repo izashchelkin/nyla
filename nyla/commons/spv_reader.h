@@ -47,7 +47,7 @@ INLINE auto ReadWord(span<uint32_t> &data) -> uint32_t &
 INLINE auto ReadString(span<uint32_t> &data) -> byteview
 {
     uint8_t *ptr = (uint8_t *)data.data;
-    uint64_t byteLen = CStrLen(ptr, data.size) + 1;
+    uint64_t byteLen = CStrLen(ptr, Span::SizeBytes(data)) + 1;
 
     uint64_t wordLen = CeilDiv(byteLen, 4);
     data = Span::SubSpan(data, wordLen);
@@ -83,7 +83,7 @@ INLINE auto ParseWordCount(uint32_t word) -> uint16_t
 INLINE auto ReadHeader(span<uint32_t> &data) -> spv_shader_header
 {
     ASSERT(data.size >= 5);
-    ASSERT(data[0] == kMagicNumber);
+    ASSERT(ReadWord(data) == kMagicNumber);
 
     uint32_t version = ReadWord(data);
     uint32_t generator = ReadWord(data);
