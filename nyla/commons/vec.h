@@ -57,9 +57,9 @@ template <typename T>
 constexpr auto Cross(const array<T, 3> &lhs, const array<T, 3> &rhs) -> array<T, 3>
 {
     return {
-        lhs[1] * rhs.m_Data[2] - lhs[2] * rhs[1],
-        lhs[2] * rhs.m_Data[0] - lhs[0] * rhs[2],
-        lhs[0] * rhs.m_Data[1] - lhs[1] * rhs[0],
+        lhs[1] * rhs[2] - lhs[2] * rhs[1],
+        lhs[2] * rhs[0] - lhs[0] * rhs[2],
+        lhs[0] * rhs[1] - lhs[1] * rhs[0],
     };
 }
 

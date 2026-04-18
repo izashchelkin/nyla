@@ -1,13 +1,9 @@
 #ifndef NYLA_FMT_H
 #define NYLA_FMT_H
 
+#include <cmath>
 #include <cstdint>
 #include <type_traits>
-
-#if defined(__clang__) || defined(__GNUC__)
-#else
-#include <cmath>
-#endif
 
 #include <immintrin.h>
 
@@ -103,42 +99,31 @@ INLINE uint64_t UDiv128(uint64_t hi, uint64_t lo, uint64_t divisor, uint64_t &re
 
 INLINE auto Cos(float f) -> float
 {
-#if defined(__clang__) || defined(__GNUC__)
-    return __builtin_cosf(f);
-#else
     return cosf(f);
-#endif
 }
 
 INLINE auto Sin(float f) -> float
 {
-#if defined(__clang__) || defined(__GNUC__)
-    return __builtin_sinf(f);
-#else
     return sinf(f);
-#endif
+}
+
+INLINE auto Tan(float f) -> float
+{
+    return tanf(f);
 }
 
 INLINE auto Sqrt(float val) -> float
 {
-#if defined(__clang__) || defined(__GNUC__)
-    return __builtin_sqrtf(val);
-#else
     __m128 v = _mm_set_ss(val);
     v = _mm_sqrt_ss(v);
     return _mm_cvtss_f32(v);
-#endif
 }
 
 INLINE auto Sqrt(double val) -> double
 {
-#if defined(__clang__) || defined(__GNUC__)
-    return __builtin_sqrt(val);
-#else
     __m128d v = _mm_set_sd(val);
     v = _mm_sqrt_sd(v, v);
     return _mm_cvtsd_f64(v);
-#endif
 }
 
 } // namespace nyla
