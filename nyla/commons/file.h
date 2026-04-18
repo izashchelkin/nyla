@@ -26,7 +26,14 @@ void API FileClose(file_handle file);
 auto API FileRead(file_handle file, uint32_t size, uint8_t *out) -> uint32_t;
 auto API FileWrite(file_handle file, uint32_t size, const uint8_t *in) -> uint32_t;
 
-void API FileSeek(file_handle file, int64_t at);
+enum class file_seek_mode
+{
+    Begin,
+    Current,
+    End
+};
+
+void API FileSeek(file_handle file, int64_t at, file_seek_mode mode);
 auto API FileTell(file_handle file) -> uint64_t;
 
 auto API GetStdin() -> file_handle;

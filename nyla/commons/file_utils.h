@@ -27,7 +27,10 @@ INLINE auto TryFileReadFully(region_alloc &alloc, file_handle file, span<uint8_t
     if (!FileValid(file))
         return false;
 
+    FileSeek(file, 0, file_seek_mode::End);
     uint64_t remaining = FileTell(file);
+    FileSeek(file, 0, file_seek_mode::Begin);
+
     out = RegionAlloc::AllocArray<uint8_t>(alloc, remaining);
 
     uint64_t read = 0;

@@ -4,6 +4,7 @@
 #include <immintrin.h>
 
 #include "nyla/commons/array.h" // IWYU pragma: keep
+#include "nyla/commons/file.h"
 #include "nyla/commons/gamepad.h"
 #include "nyla/commons/inline_queue.h"
 #include "nyla/commons/intrin.h"
@@ -530,13 +531,13 @@ auto WindowsPlatform::ScanCodeToKeyPhysical(uint8_t scanCode, bool extended) -> 
     }
 }
 
-auto FileValid(file_handle file) -> bool
+auto API FileValid(file_handle file) -> bool
 {
     auto hFile = reinterpret_cast<HANDLE>(file);
     return hFile != nullptr && hFile != INVALID_HANDLE_VALUE;
 }
 
-auto FileOpen(byteview path, FileOpenMode mode) -> file_handle
+auto API FileOpen(byteview path, FileOpenMode mode) -> file_handle
 {
     DWORD dwDesiredAccess = 0;
     DWORD dwCreationDisposition = 0;
@@ -579,7 +580,7 @@ auto FileOpen(byteview path, FileOpenMode mode) -> file_handle
     return reinterpret_cast<void *>(hFile);
 }
 
-void FileClose(file_handle file)
+void API FileClose(file_handle file)
 {
     if (!FileValid(file))
         return;
@@ -588,7 +589,7 @@ void FileClose(file_handle file)
     CloseHandle(hFile);
 }
 
-auto FileRead(file_handle file, uint32_t size, uint8_t *out) -> uint32_t
+auto API FileRead(file_handle file, uint32_t size, uint8_t *out) -> uint32_t
 {
     auto hFile = reinterpret_cast<HANDLE>(file);
     DWORD bytesRead = 0;
@@ -616,21 +617,34 @@ auto FileWrite(file_handle file, uint32_t size, const uint8_t *in) -> uint32_t
     return bytesWritten;
 }
 
-void FileSeek(file_handle file, int64_t at)
+void API FileSeek(file_handle file, int64_t at, file_seek_mode mode)
 {
     auto hFile = reinterpret_cast<HANDLE>(file);
 
     LARGE_INTEGER distanceToMove;
     distanceToMove.QuadPart = at;
 
+    DWORD moveMethod;
+    switch (mode)
+    {
+    case file_seek_mode::Begin:
+        moveMethod = FILE_BEGIN;
+        break;
+    case file_seek_mode::Current:
+        moveMethod = FILE_CURRENT;
+        break;
+    case file_seek_mode::End:
+        moveMethod = FILE_END;
+        break;
+    }
+
     SetFilePointerEx(hFile,          // hFile
                      distanceToMove, // lDistanceToMove
                      nullptr,        // lpDistanceToMoveHigh
-                     FILE_BEGIN      // dwMoveMethod
-    );
+                     moveMethod);
 }
 
-auto FileTell(file_handle file) -> uint64_t
+auto API FileTell(file_handle file) -> uint64_t
 {
     auto hFile = reinterpret_cast<HANDLE>(file);
 
