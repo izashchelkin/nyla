@@ -1,4 +1,3 @@
-add_subdirectory(3d_ball_maze)
 add_subdirectory(asteroids)
 add_subdirectory(breakout)
 add_subdirectory(guidemo)

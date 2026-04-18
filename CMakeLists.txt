@@ -69,18 +69,19 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
 add_subdirectory(nyla)
+add_subdirectory(3d_ball_maze)
 
 file(GLOB_RECURSE NYLA_ALL_CXX_FILES
     CONFIGURE_DEPENDS
-    "${PROJECT_SOURCE_DIR}/nyla/*.cc"
-    "${PROJECT_SOURCE_DIR}/nyla/*.cpp"
-    "${PROJECT_SOURCE_DIR}/nyla/*.cxx"
-    "${PROJECT_SOURCE_DIR}/nyla/*.h"
-    "${PROJECT_SOURCE_DIR}/nyla/*.hpp"
-    "${PROJECT_SOURCE_DIR}/nyla/*.hh"
-    "${PROJECT_SOURCE_DIR}/nyla/*.hxx"
+    "${PROJECT_SOURCE_DIR}/*.cc"
+    "${PROJECT_SOURCE_DIR}/*.cpp"
+    "${PROJECT_SOURCE_DIR}/*.cxx"
+    "${PROJECT_SOURCE_DIR}/*.h"
+    "${PROJECT_SOURCE_DIR}/*.hpp"
+    "${PROJECT_SOURCE_DIR}/*.hh"
+    "${PROJECT_SOURCE_DIR}/*.hxx"
 
-    "${PROJECT_SOURCE_DIR}/nyla/*.hlsl"
+    "${PROJECT_SOURCE_DIR}/*.hlsl"
 )
 
 add_custom_target(format
