@@ -141,7 +141,7 @@ struct rhi_texture : handle
 {
 };
 
-struct rhi_stv : handle
+struct rhi_srv : handle
 {
 };
 
@@ -236,7 +236,7 @@ struct rhi_vertex_binding_desc
 struct rhi_vertex_attribute_desc
 {
     uint32_t binding;
-    inline_string<16> semantic;
+    byteview semantic;
     rhi_vertex_format format;
     uint32_t offset;
 };
@@ -382,9 +382,9 @@ class Rhi
     static void CmdCopyTexture(rhi_cmdlist cmd, rhi_texture dst, rhi_buffer src, uint32_t srcOffset, uint32_t size);
     static void CmdCopyTexture(rhi_cmdlist cmd, rhi_texture dst, rhi_texture src);
 
-    static auto CreateSampledTextureView(const rhi_texture_view_desc &) -> rhi_stv;
-    static void DestroySampledTextureView(rhi_stv);
-    static auto GetTexture(rhi_stv srv) -> rhi_texture;
+    static auto CreateSampledTextureView(const rhi_texture_view_desc &) -> rhi_srv;
+    static void DestroySampledTextureView(rhi_srv);
+    static auto GetTexture(rhi_srv srv) -> rhi_texture;
 
     static auto CreateRenderTargetView(const rhi_render_target_view_desc &) -> rhi_rtv;
     static void DestroyRenderTargetView(rhi_rtv);

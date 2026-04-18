@@ -6,6 +6,7 @@
 #include "nyla/commons/asset_file.h"
 #include "nyla/commons/fmt.h"
 #include "nyla/commons/gpu_upload.h"
+#include "nyla/commons/handle.h"
 #include "nyla/commons/handle_pool.h"
 #include "nyla/commons/macros.h"
 #include "nyla/commons/mem.h"
@@ -34,7 +35,7 @@ struct texture_metadata
     uint64_t guid;
     texture_state state;
     rhi_texture texture;
-    rhi_stv textureView;
+    rhi_srv textureView;
     uint32_t width;
     uint32_t height;
     uint32_t channels;
@@ -86,7 +87,7 @@ void API Update(rhi_cmdlist cmd, byteview assetFile)
         });
         metadata.texture = texture;
 
-        const rhi_stv textureView = Rhi::CreateSampledTextureView(rhi_texture_view_desc{
+        const rhi_srv textureView = Rhi::CreateSampledTextureView(rhi_texture_view_desc{
             .texture = texture,
         });
         metadata.textureView = textureView;
@@ -112,6 +113,14 @@ auto API DeclareTexture(byteview assetFileData, uint64_t guid) -> texture
                                                       .guid = guid,
                                                       .state = texture_state::NotUploaded,
                                                   });
+}
+
+auto API GetSRV(texture Texture) -> rhi_srv
+{
+    if (Texture)
+        return HandlePool::ResolveData(manager->textures, Texture).textureView;
+    else
+        return {};
 }
 
 } // namespace TextureManager

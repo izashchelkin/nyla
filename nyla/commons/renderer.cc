@@ -1,14 +1,18 @@
-#include <cstdint>
-#include <numbers>
-
-#include "nyla/commons/asset_manager.h"
-#include "nyla/commons/shader.h"
-#include "nyla/commons/handle.h"
-#include "nyla/commons/inline_vec.h"
-#include "nyla/commons/mat.h"
 #include "nyla/commons/renderer.h"
+
+#include <cstdint>
+
+#include "nyla/commons/inline_vec.h"
+#include "nyla/commons/inline_vec_def.h"
+#include "nyla/commons/mat.h"
+#include "nyla/commons/math.h"
+#include "nyla/commons/region_alloc.h"
+#include "nyla/commons/region_alloc_def.h"
 #include "nyla/commons/rhi.h"
+#include "nyla/commons/sampler_manager.h"
+#include "nyla/commons/shader.h"
 #include "nyla/commons/span.h"
+#include "nyla/commons/texture_manager.h"
 #include "nyla/commons/vec.h"
 
 namespace nyla
@@ -17,50 +21,108 @@ namespace nyla
 namespace
 {
 
-float4x4 m_View = float4x4::Identity();
-float4x4 m_Proj = float4x4::Identity();
-
-RhiGraphicsPipeline m_Pipeline;
-
-struct Scene // Per Frame
+struct scene // Per Frame
 {
     float4x4 vp;
     float4x4 invVp;
 };
 
-struct Entity
+struct entity
 {
     float4x4 model;
     uint32_t srvTextureIndex;
     uint32_t samplerIndex;
 };
 
-struct DrawCall
+struct draw_call
 {
-    Entity entity;
-    AssetManager::Mesh mesh;
+    entity Entity;
+    mesh Mesh;
 };
 
-InlineVec<DrawCall, 256> m_DrawQueue;
+struct renderer_state
+{
+    float4x4 View;
+    float4x4 Proj;
+    rhi_graphics_pipeline Pipeline;
+    inline_vec<draw_call, 256> DrawQueue;
+};
+renderer_state *renderer;
 
 } // namespace
 
-void Renderer::SetView(float4x4 m)
+namespace Renderer
 {
-    m_View = m;
+
+void API Bootstrap(region_alloc &alloc)
+{
+    auto renderer = RegionAlloc::Alloc<renderer_state>(RegionAlloc::g_BootstrapAlloc);
+
+    rhi_shader vs = GetShader(alloc, "renderer.vs"_s, rhi_shader_stage::Vertex);
+    rhi_shader ps = GetShader(alloc, "renderer.ps"_s, rhi_shader_stage::Pixel);
+
+    array<rhi_vertex_attribute_desc, 3> vertexAttributes{
+        rhi_vertex_attribute_desc{
+            .binding = 0,
+            .semantic = "POSITION0"_s,
+            .format = rhi_vertex_format::R32G32B32Float,
+            .offset = 0,
+        },
+        rhi_vertex_attribute_desc{
+            .binding = 0,
+            .semantic = "NORMAL0"_s,
+            .format = rhi_vertex_format::R32G32B32Float,
+            .offset = 12,
+        },
+        rhi_vertex_attribute_desc{
+            .binding = 0,
+            .semantic = "TEXCOORD0"_s,
+            .format = rhi_vertex_format::R32G32Float,
+            .offset = 24,
+        },
+    };
+
+    rhi_vertex_binding_desc vertexBinding{
+        .binding = 0,
+        .stride = 32,
+        .inputRate = rhi_input_rate::PerVertex,
+    };
+
+    rhi_texture_format colorFormat = rhi_texture_format::R8G8B8A8_sRGB;
+
+    const rhi_graphics_pipeline_desc pipelineDesc{
+        .debugName = "Renderer"_s,
+        .vs = vs,
+        .ps = ps,
+        .vertexBindings = {&vertexBinding, 1},
+        .vertexAttributes = vertexAttributes,
+        .colorTargetFormats = {&colorFormat, 1},
+        .depthFormat = rhi_texture_format::D32_Float_S8_UINT,
+        .depthWriteEnabled = true,
+        .depthTestEnabled = true,
+        .cullMode = rhi_cull_mode::Back,
+        .frontFace = rhi_front_face::CCW,
+    };
+
+    renderer.Pipeline = Rhi::CreateGraphicsPipeline(alloc, pipelineDesc);
 }
 
-void Renderer::SetLookAtView(float3 eye, float3 center, float3 up)
+void API SetView(float4x4 m)
 {
-    m_View = float4x4::LookAt(eye, center, up);
+    renderer->View = m;
 }
 
-void Renderer::SetProjection(float4x4 m)
+void API SetLookAtView(float3 eye, float3 center, float3 up)
 {
-    m_Proj = m;
+    renderer->View = Mat::LookAt(eye, center, up);
 }
 
-void Renderer::SetOrthoProjection(uint32_t width, uint32_t height, float metersOnScreen)
+void API SetProjection(float4x4 m)
+{
+    renderer->Proj = m;
+}
+
+void API SetOrthoProjection(uint32_t width, uint32_t height, float metersOnScreen)
 {
     float worldW;
     float worldH;
@@ -71,94 +133,68 @@ void Renderer::SetOrthoProjection(uint32_t width, uint32_t height, float metersO
     worldH = base;
     worldW = base * aspect;
 
-    m_Proj = float4x4::Ortho(-worldW * .5f, worldW * .5f, worldH * .5f, -worldH * .5f, 0.f, 1.f);
+    renderer->Proj = Mat::Ortho(-worldW * .5f, worldW * .5f, worldH * .5f, -worldH * .5f, 0.f, 1.f);
 }
 
-void Renderer::SetPerspectiveProjection(uint32_t width, uint32_t height, float fovDegrees, float nearPlane,
-                                        float farPlane)
+void API SetPerspectiveProjection(uint32_t width, uint32_t height, float fovDegrees, float nearPlane, float farPlane)
 {
     const float aspect = (float)width / (float)height;
-    const float fovRadians = fovDegrees * (std::numbers::pi_v<float> / 180.0f);
+    const float fovRadians = fovDegrees * (math::pi / 180.0f);
 
-    m_Proj = float4x4::Perspective(fovRadians, aspect, nearPlane, farPlane);
+    renderer->Proj = Mat::Perspective(fovRadians, aspect, nearPlane, farPlane);
 }
 
-void Renderer::Init()
+void API Mesh(float3 pos, float3 scale, mesh Mesh, texture Texture)
 {
-    const RhiShader vs = GetShader("renderer.vs", RhiShaderStage::Vertex);
-    const RhiShader ps = GetShader("renderer.ps", RhiShaderStage::Pixel);
-
-    auto *renderer = new Renderer{};
-
-    const RhiGraphicsPipelineDesc pipelineDesc{
-        .debugName = "Renderer"_s,
-        .vs = vs,
-        .ps = ps,
-        .vertexBindings = AssetManager::GetMeshVertexBindings(),
-        .vertexAttributes = AssetManager::GetMeshVertexAttributes(),
-        .colorTargetFormats = AssetManager::GetMeshPipelineColorTargetFormats(),
-        .depthFormat = RhiTextureFormat::D32_Float_S8_UINT,
-        .depthWriteEnabled = true,
-        .depthTestEnabled = true,
-        .cullMode = RhiCullMode::Back,
-        .frontFace = RhiFrontFace::CCW,
-    };
-
-    m_Pipeline = Rhi::CreateGraphicsPipeline(pipelineDesc);
-}
-
-void Renderer::Mesh(float3 pos, float3 scale, AssetManager::Mesh mesh, AssetManager::Texture texture)
-{
-    RhiSampledTextureView srv;
-    if (HandleIsSet(texture))
+    if (!Texture)
     {
-        if (!AssetManager::GetRhiSampledTextureView(texture, srv))
-            return;
-    }
-    else
-    {
-        if (!AssetManager::GetRhiSampledTextureView(mesh, srv))
+        Texture = MeshManager::GetTexture(Mesh);
+        if (!Texture)
             return;
     }
 
-    DrawCall &drawCall = m_DrawQueue.PushBack(DrawCall{});
-    drawCall.mesh = mesh;
+    rhi_srv srv = TextureManager::GetSRV(Texture);
+    if (!srv)
+        return;
 
-    Entity &entity = drawCall.entity;
+    draw_call &drawCall = InlineVec::Append(renderer->DrawQueue, draw_call{.Mesh = Mesh});
+    entity &entity = drawCall.Entity;
 
-    entity.model = float4x4::Identity();
-    entity.model = entity.model.Mult(float4x4::Translate(float4{pos[0], pos[1], pos[2], 1}));
-    entity.model = entity.model.Mult(float4x4::Scale(float4{scale[0], scale[1], scale[2], 1}));
+    Mat::Identity(entity.model);
+    entity.model = entity.model * Mat::Translate(float4{pos[0], pos[1], pos[2], 1.f});
+    entity.model = entity.model * Mat::Scale(float4{scale[0], scale[1], scale[2], 1.f});
 
     entity.srvTextureIndex = srv.index;
 
-    entity.samplerIndex = uint32_t(AssetManager::SamplerType::NearestClamp);
+    entity.samplerIndex = uint32_t(sampler_type::NearestClamp);
 }
 
-void Renderer::CmdFlush(RhiCmdList cmd)
+void API CmdFlush(rhi_cmdlist cmd)
 {
-    Rhi::CmdBindGraphicsPipeline(cmd, m_Pipeline);
+    Rhi::CmdBindGraphicsPipeline(cmd, renderer->Pipeline);
 
-    float4x4 vp = m_Proj.Mult(m_View);
-    float4x4 invVp = vp.Inversed();
-    Scene scene = {
+    float4x4 vp = renderer->Proj * renderer->View;
+    float4x4 invVp = Mat::Inverse(vp);
+    scene scene = {
         .vp = vp,
         .invVp = invVp,
     };
 
-    Rhi::SetPassConstant(cmd, ByteViewPtr(&scene));
+    Rhi::SetPassConstant(cmd, Span::ByteViewPtr(&scene));
 
     const uint32_t frameIndex = Rhi::GetFrameIndex();
 
-    for (const auto &drawCall : m_DrawQueue)
+    for (const auto &drawCall : renderer->DrawQueue)
     {
-        const auto &entity = drawCall.entity;
-        Rhi::SetDrawConstant(cmd, ByteViewPtr(&entity));
+        const auto &entity = drawCall.Entity;
+        Rhi::SetDrawConstant(cmd, Span::ByteViewPtr(&entity));
 
-        AssetManager::CmdBindMesh(cmd, drawCall.mesh);
-        AssetManager::CmdDrawMesh(cmd, drawCall.mesh);
+        MeshManager::CmdBindMesh(cmd, drawCall.Mesh);
+        MeshManager::CmdDrawMesh(cmd, drawCall.Mesh);
     }
-    m_DrawQueue.Clear();
+    InlineVec::Clear(renderer->DrawQueue);
 }
+
+} // namespace Renderer
 
 } // namespace nyla

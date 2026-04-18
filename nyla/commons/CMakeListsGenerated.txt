@@ -23,7 +23,6 @@ target_sources(${TARGET} PRIVATE
     sampler_manager.cc
     shader.cc
     spv_shader.cc
-    staging_buffer.cc
     staging.cc
     texture_manager.cc
     tween_manager.cc
@@ -92,7 +91,6 @@ target_sources(${TARGET} PUBLIC
     span.h
     spv_reader.h
     spv_shader.h
-    staging_buffer.h
     staging.h
     stb_image.h
     texture_manager.h

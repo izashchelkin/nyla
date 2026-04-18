@@ -43,25 +43,23 @@ template <uint64_t N, uint64_t M, typename T> INLINE void Identity(mat<N, M, T> 
 [[nodiscard]]
 auto API Inverse(const mat<4, 4, float> &m) -> mat<4, 4, float>;
 
-template <typename T, uint32_t N>
 [[nodiscard]]
-INLINE auto Translate(const array<T, N> &v) -> mat<N, N, T>
+INLINE auto Translate(const array<float, 4> &v) -> mat<4, 4, float>
 {
-    mat<N, N, T> ret;
+    mat<4, 4, float> ret;
     Identity(ret);
-    for (uint64_t i = 0; i < N; ++i)
-        ret[N - 1][i] = v[i];
+    for (uint64_t i = 0; i < 4; ++i)
+        ret[3][i] = v[i];
     return ret;
 }
 
-template <typename T, uint32_t N>
 [[nodiscard]]
-INLINE auto Scale(const array<T, N> &v) -> mat<N, N, T>
+INLINE auto Scale(const array<float, 4> &v) -> mat<4, 4, float>
 {
-    mat<N, N, T> ret;
+    mat<4, 4, float> ret;
     Identity(ret);
-    for (uint32_t i = 0; i < N; ++i)
-        ret[i][i] = static_cast<T>(v[i]);
+    for (uint32_t i = 0; i < 4; ++i)
+        ret[i][i] = v[i];
     return ret;
 }
 

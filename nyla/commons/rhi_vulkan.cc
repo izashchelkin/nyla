@@ -507,7 +507,7 @@ struct rhi_state
     handle_pool<rhi_dsv, VulkanTextureViewData, 8> m_DepthStencilViews;
     handle_pool<rhi_graphics_pipeline, VulkanPipelineData, 16> m_GraphicsPipelines;
     handle_pool<rhi_rtv, VulkanTextureViewData, 8> m_RenderTargetViews;
-    handle_pool<rhi_stv, VulkanTextureViewData, 128> m_SampledTextureViews;
+    handle_pool<rhi_srv, VulkanTextureViewData, 128> m_SampledTextureViews;
     handle_pool<rhi_sampler, VulkanSamplerData, 16> m_Samplers;
     handle_pool<rhi_shader, VulkanShaderData, 16> m_Shaders;
     handle_pool<rhi_texture, VulkanTextureData, 128> m_Textures;
@@ -2279,7 +2279,7 @@ auto Rhi::CreateTexture(const rhi_texture_desc &desc) -> rhi_texture
     return HandlePool::Acquire(g_State->m_Textures, textureData);
 }
 
-auto Rhi::CreateSampledTextureView(const rhi_texture_view_desc &desc) -> rhi_stv
+auto Rhi::CreateSampledTextureView(const rhi_texture_view_desc &desc) -> rhi_srv
 {
     VulkanTextureData &textureData = HandlePool::ResolveData(g_State->m_Textures, desc.texture);
 
@@ -2313,7 +2313,7 @@ auto Rhi::CreateSampledTextureView(const rhi_texture_view_desc &desc) -> rhi_stv
 
     VK_CHECK(vkCreateImageView(g_State->m_Dev, &imageViewCreateInfo, g_State->vkAlloc, &textureViewData.imageView));
 
-    const rhi_stv view = HandlePool::Acquire(g_State->m_SampledTextureViews, textureViewData);
+    const rhi_srv view = HandlePool::Acquire(g_State->m_SampledTextureViews, textureViewData);
     return view;
 }
 
@@ -2392,7 +2392,7 @@ auto Rhi::CreateDepthStencilView(const rhi_depth_stencil_view_desc &desc) -> rhi
     return dsv;
 }
 
-auto Rhi::GetTexture(rhi_stv srv) -> rhi_texture
+auto Rhi::GetTexture(rhi_srv srv) -> rhi_texture
 {
     return HandlePool::ResolveData(g_State->m_SampledTextureViews, srv).texture;
 }
@@ -2470,7 +2470,7 @@ void Rhi::DestroyTexture(rhi_texture texture)
     vkFreeMemory(g_State->m_Dev, textureData.memory, g_State->vkAlloc);
 }
 
-void Rhi::DestroySampledTextureView(rhi_stv textureView)
+void Rhi::DestroySampledTextureView(rhi_srv textureView)
 {
     const VulkanTextureViewData &textureViewData = HandlePool::ResolveData(g_State->m_SampledTextureViews, textureView);
     ASSERT(textureViewData.imageView);

@@ -200,6 +200,14 @@ void API CmdDrawMesh(rhi_cmdlist cmd, mesh Mesh)
     Rhi::CmdDrawIndexed(cmd, meshData.indexCount, 0, 1, 0, 0);
 }
 
+auto API GetTexture(mesh Mesh) -> texture
+{
+    if (Mesh)
+        return HandlePool::ResolveData(manager->meshes, Mesh).texture;
+    else
+        return {};
+}
+
 } // namespace MeshManager
 
 } // namespace nyla

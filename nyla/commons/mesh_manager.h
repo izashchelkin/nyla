@@ -5,6 +5,7 @@
 #include "nyla/commons/region_alloc_def.h"
 #include "nyla/commons/rhi.h"
 #include "nyla/commons/span_def.h"
+#include "nyla/commons/texture_manager.h"
 
 namespace nyla
 {
@@ -24,6 +25,8 @@ auto API DeclareTexture(byteview assetFileData, uint64_t guidGltf, uint64_t guid
 
 void API CmdBindMesh(rhi_cmdlist cmd, mesh Mesh);
 void API CmdDrawMesh(rhi_cmdlist cmd, mesh Mesh);
+
+auto API GetTexture(mesh Mesh) -> texture;
 
 } // namespace MeshManager
 

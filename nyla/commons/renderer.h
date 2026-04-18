@@ -1,31 +1,31 @@
 #pragma once
 
-#include "nyla/commons/asset_manager.h"
-#include "nyla/commons/mat.h"
-#include "nyla/commons/rhi.h"
-#include "nyla/commons/vec.h"
 #include <cstdint>
+
+#include "nyla/commons/mat.h"
+#include "nyla/commons/mesh_manager.h"
+#include "nyla/commons/rhi.h"
+#include "nyla/commons/texture_manager.h"
+#include "nyla/commons/vec.h"
 
 namespace nyla
 {
 
-class Renderer
+namespace Renderer
 {
-  public:
-    static void Init();
 
-    static void Mesh(float3 pos, float3 scale, AssetManager::Mesh mesh, AssetManager::Texture texture);
-    static void CmdFlush(RhiCmdList cmd);
+void API Init();
 
-    static void SetView(float4x4 m);
-    static void SetLookAtView(float3 eye, float3 center, float3 up);
+void API Mesh(float3 pos, float3 scale, mesh Mesh, texture Texture);
+void API CmdFlush(rhi_cmdlist cmd);
 
-    static void SetProjection(float4x4 m);
-    static void SetOrthoProjection(uint32_t width, uint32_t height, float metersOnScreen);
-    static void SetPerspectiveProjection(uint32_t width, uint32_t height, float fovDegrees, float nearPlane,
-                                         float farPlane);
+void API SetView(float4x4 m);
+void API SetLookAtView(float3 eye, float3 center, float3 up);
 
-  private:
-};
+void API SetProjection(float4x4 m);
+void API SetOrthoProjection(uint32_t width, uint32_t height, float metersOnScreen);
+void API SetPerspectiveProjection(uint32_t width, uint32_t height, float fovDegrees, float nearPlane, float farPlane);
+
+} // namespace Renderer
 
 } // namespace nyla

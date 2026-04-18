@@ -13,7 +13,7 @@
 #include "nyla/commons/region_alloc.h"
 #include "nyla/commons/renderer.h"
 #include "nyla/commons/rhi.h"
-#include "nyla/commons/staging_buffer.h"
+#include "nyla/commons/time.h"
 #include "nyla/commons/tween_manager.h"
 
 namespace nyla
@@ -22,7 +22,7 @@ namespace nyla
 namespace
 {
 
-struct engine
+struct engine_state
 {
     region_alloc perFrameAlloc;
 
@@ -33,7 +33,7 @@ struct engine
     uint32_t fps;
     bool shouldExit;
 };
-engine *g_Engine;
+engine_state *engine;
 
 } // namespace
 
@@ -42,16 +42,16 @@ namespace Engine
 
 void API Init(const EngineInitDesc &desc)
 {
-    g_Engine = &RegionAlloc::Alloc<engine>(RegionAlloc::g_BootstrapAlloc);
-    g_Engine->perFrameAlloc = RegionAlloc::Create(64_MiB, 0);
+    engine = &RegionAlloc::Alloc<engine_state>(RegionAlloc::g_BootstrapAlloc);
+    engine->perFrameAlloc = RegionAlloc::Create(64_MiB, 0);
 
-    g_Engine->lastFrameStartUs = Platform::GetMonotonicTimeMicros();
+    engine->lastFrameStartUs = GetMonotonicTimeMicros();
 
     uint32_t maxFps = 144;
     if (desc.maxFps > 0)
         maxFps = desc.maxFps;
 
-    g_Engine->targetFrameDurationUs = static_cast<uint64_t>(1'000'000.0 / maxFps);
+    engine->targetFrameDurationUs = static_cast<uint64_t>(1'000'000.0 / maxFps);
 
     rhi_flags flags = None<rhi_flags>();
     if (desc.vsync)
@@ -71,48 +71,49 @@ auto API FrameBegin() -> EngineFrameBeginResult
 {
     rhi_cmdlist cmd = Rhi::FrameBegin();
 
-    const uint64_t frameStart = Platform::GetMonotonicTimeMicros();
+    const uint64_t frameStart = GetMonotonicTimeMicros();
 
-    const uint64_t dtUs = frameStart - g_Engine->lastFrameStartUs;
-    g_Engine->dtUsAccum += dtUs;
-    ++g_Engine->framesCounted;
+    const uint64_t dtUs = frameStart - engine->lastFrameStartUs;
+    engine->dtUsAccum += dtUs;
+    ++engine->framesCounted;
 
     const float dt = static_cast<float>(dtUs) * 1e-6f;
-    g_Engine->lastFrameStartUs = frameStart;
+    engine->lastFrameStartUs = frameStart;
 
-    if (g_Engine->dtUsAccum >= 500'000ull)
+    if (engine->dtUsAccum >= 500'000ull)
     {
-        const double seconds = static_cast<double>(g_Engine->dtUsAccum) / 1'000'000.0;
-        const double fpsF64 = g_Engine->framesCounted / seconds;
+        const double seconds = static_cast<double>(engine->dtUsAccum) / 1'000'000.0;
+        const double fpsF64 = engine->framesCounted / seconds;
 
-        g_Engine->fps = LRound(fpsF64);
-        g_Engine->dtUsAccum = 0;
-        g_Engine->framesCounted = 0;
+        engine->fps = LRound(fpsF64);
+        engine->dtUsAccum = 0;
+        engine->framesCounted = 0;
     }
 
     for (;;)
     {
         PlatformEvent event{};
-        if (!Platform::WinPollEvent(event))
+        if (!WinPollEvent(event))
             break;
 
         switch (event.type)
         {
+
         case PlatformEventType::KeyDown: {
-            m_InputManager.HandlePressed(1, uint32_t(event.key), frameStart);
+            InputManager::HandlePressed(input_interface_type::Keyboard, uint32_t(event.key), frameStart);
             break;
         }
         case PlatformEventType::KeyUp: {
-            m_InputManager.HandleReleased(1, uint32_t(event.key), frameStart);
+            InputManager::HandleReleased(input_interface_type::Keyboard, uint32_t(event.key), frameStart);
             break;
         }
 
         case PlatformEventType::MousePress: {
-            m_InputManager.HandlePressed(2, event.mouse.code, frameStart);
+            InputManager::HandlePressed(input_interface_type::Mouse, event.mouse.code, frameStart);
             break;
         }
         case PlatformEventType::MouseRelease: {
-            m_InputManager.HandleReleased(2, event.mouse.code, frameStart);
+            InputManager::HandleReleased(input_interface_type::Mouse, event.mouse.code, frameStart);
             break;
         }
 
@@ -151,21 +152,21 @@ auto API FrameEnd() -> void
     Rhi::FrameEnd();
 
     uint64_t frameEndUs = Platform::GetMonotonicTimeMicros();
-    uint64_t frameDurationUs = frameEndUs - g_Engine->lastFrameStartUs;
+    uint64_t frameDurationUs = frameEndUs - engine->lastFrameStartUs;
 
-    uint64_t sleepForMillis = (g_Engine->targetFrameDurationUs - frameDurationUs) / 1000;
+    uint64_t sleepForMillis = (engine->targetFrameDurationUs - frameDurationUs) / 1000;
     if (sleepForMillis)
         Platform::Sleep(sleepForMillis);
 }
 
 auto API GetPerFrameAlloc() -> region_alloc &
 {
-    return g_Engine->perFrameAlloc;
+    return engine->perFrameAlloc;
 }
 
 auto API ShouldExit() -> bool
 {
-    return g_Engine->shouldExit;
+    return engine->shouldExit;
 }
 
 } // namespace nyla
