@@ -66,6 +66,33 @@ INLINE uint32_t BitScanForward64(uint64_t n)
 #endif
 }
 
+INLINE uint16_t ByteSwap16(uint16_t val)
+{
+#if defined(__clang__) || defined(__GNUC__)
+    return __builtin_bswap16(val);
+#else
+    return _byteswap_ushort(val);
+#endif
+}
+
+INLINE uint32_t ByteSwap32(uint32_t val)
+{
+#if defined(__clang__) || defined(__GNUC__)
+    return __builtin_bswap32(val);
+#else
+    return _byteswap_ulong(val);
+#endif
+}
+
+INLINE uint64_t ByteSwap64(uint64_t val)
+{
+#if defined(__clang__) || defined(__GNUC__)
+    return __builtin_bswap64(val);
+#else
+    return _byteswap_uint64(val);
+#endif
+}
+
 INLINE int64_t LRound(double x)
 {
 #if defined(__clang__) || defined(__GNUC__)

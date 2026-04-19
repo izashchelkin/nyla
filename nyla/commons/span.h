@@ -142,39 +142,34 @@ template <typename T> INLINE auto Contains(const span<T> &self, const T &value) 
     return false;
 }
 
-template <typename T> INLINE auto Erase(span<T> &self, T *first, T *last) -> T *
+template <typename T> INLINE auto Erase(span<T> self, T *from, T *to) -> span<T>
 {
     static_assert(!std::is_const_v<T>);
 
-    if (first == last)
-        return first;
+    DASSERT(from >= self.begin() && from < self.end());
+    DASSERT(to >= self.begin() && to < self.end());
+    DASSERT(to >= from);
 
-    uint64_t numRemoved = last - first;
-    uint64_t numToMove = self.end() - last;
+    if (from == to)
+        return self;
+
+    uint64_t numRemoved = to - from;
+    uint64_t numToMove = self.end() - to;
 
     if (numToMove > 0)
-        MemMove(first, last, numToMove * sizeof(T));
+        MemMove(from, to, numToMove * sizeof(T));
 
-    self.size -= numRemoved;
-    return first;
+    return {self.data, self.size - numRemoved};
 }
 
-template <typename T> INLINE auto Erase(span<T> &self, T *pos) -> T *
+template <typename T> INLINE auto Erase(span<T> self, span<T> section) -> span<T>
 {
-    DASSERT(pos >= self.begin() && pos < self.end());
+    return Erase(self, section.begin(), section.end());
+}
+
+template <typename T> INLINE auto Erase(span<T> self, T *pos) -> span<T>
+{
     return Erase(self, pos, pos + 1);
-}
-
-template <typename T> INLINE void EraseIfEquals(span<T> &self, const T &value)
-{
-    for (uint64_t i = 0; i < self.size;)
-    {
-        T *ptr = self.data + i;
-        if (*ptr == value)
-            Erase(self, ptr);
-        else
-            ++i;
-    }
 }
 
 } // namespace Span

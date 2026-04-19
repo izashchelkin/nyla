@@ -33,7 +33,8 @@ namespace SpvReader
 constexpr inline uint32_t kMagicNumber = 0x07230203;
 constexpr inline uint32_t kOpCodeMask = 0xFFFF;
 constexpr inline uint32_t kWordCountShift = 16;
-constexpr inline uint32_t kNop = 1 << kWordCountShift;
+
+// TODO: passing mutable span is kind of ugly - should we use byteparser.h?
 
 [[nodiscard]]
 INLINE auto ReadWord(span<uint32_t> &data) -> uint32_t &
@@ -52,7 +53,7 @@ INLINE auto ReadString(span<uint32_t> &data) -> byteview
     uint64_t wordLen = CeilDiv(byteLen, 4);
     data = Span::SubSpan(data, wordLen);
 
-    return byteview{ptr, byteLen};
+    return byteview{ptr, byteLen - 1};
 }
 
 [[nodiscard]]
@@ -86,10 +87,15 @@ INLINE auto ReadHeader(span<uint32_t> &data) -> spv_shader_header
     ASSERT(ReadWord(data) == kMagicNumber);
 
     uint32_t version = ReadWord(data);
+    DASSERT(version == 67072);
+
     uint32_t generator = ReadWord(data);
+    DASSERT(generator == 917504);
+
     uint32_t bound = ReadWord(data);
+
     uint32_t reserved = ReadWord(data);
-    ASSERT(reserved == 0);
+    DASSERT(reserved == 0);
 
     return spv_shader_header{
         .version = version,
@@ -102,13 +108,11 @@ INLINE auto ReadHeader(span<uint32_t> &data) -> spv_shader_header
 INLINE auto ReadOpWithOperands(span<uint32_t> &data) -> span<uint32_t>
 {
     uint32_t wordCount = ParseWordCount(Span::Front(data));
-    data = Span::SubSpan(data, wordCount);
-    return span{data.data, wordCount};
-}
+    ASSERT(wordCount != 0);
 
-INLINE void MakeNop(span<uint32_t> &data)
-{
-    MemSet(data.data, ParseWordCount(Span::Front(data)), kNop);
+    span ret = span{data.data, wordCount};
+    data = Span::SubSpan(data, wordCount);
+    return ret;
 }
 
 } // namespace SpvReader

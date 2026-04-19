@@ -10,33 +10,6 @@
 namespace nyla
 {
 
-INLINE uint16_t ByteSwap16(uint16_t val)
-{
-#if defined(_MSC_VER)
-    return _byteswap_ushort(val);
-#else
-    return __builtin_bswap16(val);
-#endif
-}
-
-INLINE uint32_t ByteSwap32(uint32_t val)
-{
-#if defined(_MSC_VER)
-    return _byteswap_ulong(val);
-#else
-    return __builtin_bswap32(val);
-#endif
-}
-
-INLINE uint64_t ByteSwap64(uint64_t val)
-{
-#if defined(_MSC_VER)
-    return _byteswap_uint64(val);
-#else
-    return __builtin_bswap64(val);
-#endif
-}
-
 INLINE auto IsNumber(uint8_t ch) -> bool
 {
     return ch >= '0' && ch <= '9';
