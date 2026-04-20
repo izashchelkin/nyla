@@ -313,7 +313,7 @@ auto API X11ConvertKeyPhysicalIntoXkbName(KeyPhysical key) -> byteview
 
     default:
         TRAP();
-        UNREACHABLE();h
+        UNREACHABLE();
     }
 }
 
