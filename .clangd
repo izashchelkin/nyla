@@ -1,9 +1,9 @@
 Style:
   QuotedHeaders: ["nyla/.*"]
 
-CompileFlags:
-  Add: [-std=c++23, -fms-extensions, -fms-compatibility]
-  CompilationDatabase: "build/clangd-db"
+#CompileFlags:
+#   Add: [-std=c++23, -fms-extensions, -fms-compatibility]
+#   CompilationDatabase: "build/clangd-db"
 
 # Index:
 #   Background: Skip

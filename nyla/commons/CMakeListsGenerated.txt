@@ -17,6 +17,7 @@ target_sources(${TARGET} PRIVATE
     mem.cc
     mempage_pool.cc
     mesh_manager.cc
+    platform_linux_x11.cc
     region_alloc.cc
     render_targets.cc
     renderer.cc
@@ -89,6 +90,7 @@ target_sources(${TARGET} PUBLIC
     span_def.h
     span.h
     spv_reader.h
+    spv_shader_enums.h
     spv_shader.h
     staging.h
     stb_image.h

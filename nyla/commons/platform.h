@@ -61,7 +61,7 @@ struct PlatformEvent
 };
 
 void API Sleep(uint64_t millis);
-auto API Spawn(const char *const cmd, uint64_t count) -> bool;
+auto API Spawn(span<const char *const> cmd) -> bool;
 void API WinOpen();
 auto API WinGetSize() -> PlatformWindowSize;
 auto API WinPollEvent(PlatformEvent &outEvent) -> bool;

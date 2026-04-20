@@ -13,13 +13,13 @@ namespace nyla
 
 template <is_plain T> INLINE void FileWrite(file_handle file, const T &data)
 {
-    ASSERT(FileWrite(file, sizeof(data), reinterpret_cast<const char *>(&data)) == sizeof(data));
+    ASSERT(FileWrite(file, sizeof(data), reinterpret_cast<const uint8_t *>(&data)) == sizeof(data));
 }
 
 template <is_plain T> INLINE void FileWriteSpan(file_handle file, span<T> data)
 {
     uint64_t expectedSize = Span::SizeBytes(data);
-    ASSERT(FileWrite(file, expectedSize, reinterpret_cast<const char *>(&data[0])) == expectedSize);
+    ASSERT(FileWrite(file, expectedSize, reinterpret_cast<const uint8_t *>(&data[0])) == expectedSize);
 }
 
 INLINE auto TryFileReadFully(region_alloc &alloc, file_handle file, span<uint8_t> &out) -> bool

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "nyla/commons/bitenum.h"
-#include "nyla/commons/byteliterals.h"
 #include "nyla/commons/macros.h"
 #include "nyla/commons/span_def.h"
 
@@ -9,8 +8,6 @@ namespace nyla
 {
 
 using file_handle = void *;
-
-constexpr inline uint64_t kPageSize = 4_KiB;
 
 enum class FileOpenMode
 {

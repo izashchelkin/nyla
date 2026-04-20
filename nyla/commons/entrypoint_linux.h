@@ -22,7 +22,10 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#pragma once
+
 #include "nyla/commons/entrypoint.h"
+#include "nyla/commons/libmain.h"
 
 #if 1
 

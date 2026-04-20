@@ -17,55 +17,55 @@ Checks: >
 
   readability-identifier-naming,
 
-CheckOptions:
-  # - key: readability-identifier-naming.ClassCase
-  #   value: CamelCase
-  # - key: readability-identifier-naming.StructCase
-  #   value: CamelCase
-  # - key: readability-identifier-naming.EnumCase
-  #   value: CamelCase
-  # # - key: readability-identifier-naming.EnumConstantCase
-  # #   value: CamelCase
-  #
-  # - key: readability-identifier-naming.FunctionCase
-  #   value: CamelCase
-  # - key: readability-identifier-naming.MethodCase
-  #   value: CamelCase
-  # - key: readability-identifier-naming.NamespaceCase
-  #   value: lower_case
-  #
-  # - key: readability-identifier-naming.VariableCase
-  #   value: camelBack
-  # - key: readability-identifier-naming.ParameterCase
-  #   value: camelBack
-  #
-  # - key: readability-identifier-naming.PublicMemberCase
-  #   value: camelBack
-  #
-  # - key: readability-identifier-naming.PrivateMemberCase
-  #   value: CamelCase
-  # - key: readability-identifier-naming.PrivateMemberPrefix
-  #   value: m_
-  #
-  # - key: readability-identifier-naming.GlobalConstantCase
-  #   value: CamelCase
-  # - key: readability-identifier-naming.GlobalConstantPrefix
-  #   value: k
-  #
-  # - key: readability-identifier-naming.GlobalVariableCase
-  #   value: CamelCase
-  # - key: readability-identifier-naming.GlobalVariablePrefix
-  #   value: g_
-  #
-  # - key: readability-identifier-naming.ConstexprVariableCase
-  #   value: CamelCase
-  # - key: readability-identifier-naming.ConstexprVariablePrefix
-  #   value: k
- 
-  # - key: readability-identifier-naming.MethodIgnoredRegexp
-  #   value: '^(data|size|begin|end|cbegin|cend|empty|max_size|resize|clear|push_back|pop_back|emplace_back|front|back|erase)$'
-  # - key: readability-identifier-naming.MethodIgnoredRegexp
-  #   value: '^(begin|end|cbegin|cend)$'
+# CheckOptions:
+# - key: readability-identifier-naming.ClassCase
+#   value: CamelCase
+# - key: readability-identifier-naming.StructCase
+#   value: CamelCase
+# - key: readability-identifier-naming.EnumCase
+#   value: CamelCase
+# # - key: readability-identifier-naming.EnumConstantCase
+# #   value: CamelCase
+#
+# - key: readability-identifier-naming.FunctionCase
+#   value: CamelCase
+# - key: readability-identifier-naming.MethodCase
+#   value: CamelCase
+# - key: readability-identifier-naming.NamespaceCase
+#   value: lower_case
+#
+# - key: readability-identifier-naming.VariableCase
+#   value: camelBack
+# - key: readability-identifier-naming.ParameterCase
+#   value: camelBack
+#
+# - key: readability-identifier-naming.PublicMemberCase
+#   value: camelBack
+#
+# - key: readability-identifier-naming.PrivateMemberCase
+#   value: CamelCase
+# - key: readability-identifier-naming.PrivateMemberPrefix
+#   value: m_
+#
+# - key: readability-identifier-naming.GlobalConstantCase
+#   value: CamelCase
+# - key: readability-identifier-naming.GlobalConstantPrefix
+#   value: k
+#
+# - key: readability-identifier-naming.GlobalVariableCase
+#   value: CamelCase
+# - key: readability-identifier-naming.GlobalVariablePrefix
+#   value: g_
+#
+# - key: readability-identifier-naming.ConstexprVariableCase
+#   value: CamelCase
+# - key: readability-identifier-naming.ConstexprVariablePrefix
+#   value: k
+
+# - key: readability-identifier-naming.MethodIgnoredRegexp
+#   value: '^(data|size|begin|end|cbegin|cend|empty|max_size|resize|clear|push_back|pop_back|emplace_back|front|back|erase)$'
+# - key: readability-identifier-naming.MethodIgnoredRegexp
+#   value: '^(begin|end|cbegin|cend)$'
 
 HeaderFilterRegex: 'nyla/nyla/.*'
 FormatStyle: none

@@ -1426,7 +1426,7 @@ void Rhi::Bootstrap(region_alloc &alloc, const rhi_init_desc &rhiDesc)
         const VkXcbSurfaceCreateInfoKHR surfaceCreateInfo{
             .sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR,
             .connection = xcb_connect(nullptr, nullptr),
-            .window = LinuxX11Platform::WinGetHandle(),
+            .window = X11WinGetHandle(),
         };
         VK_CHECK(vkCreateXcbSurfaceKHR(g_State->m_Instance, &surfaceCreateInfo, g_State->vkAlloc, &g_State->m_Surface));
 #else

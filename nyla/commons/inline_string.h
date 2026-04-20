@@ -29,7 +29,8 @@ template <uint64_t Capacity> INLINE void RemoveSuffix(inline_string<Capacity> &s
     self.data + self.size = '\0';
 }
 
-template <uint64_t Capacity> [[nodiscard]] INLINE bool TryRemoveSuffix(inline_string<Capacity> &self, byteview suffix)
+template <uint64_t Capacity>
+[[nodiscard]] INLINE auto TryRemoveSuffix(inline_string<Capacity> &self, byteview suffix) -> bool
 {
     if (MemEndsWith(self.data, self.size, suffix.data, suffix.size))
     {

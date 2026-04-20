@@ -18,6 +18,18 @@ if (WIN32)
         PRIVATE
             XInput
     )
+else()
+
+target_link_libraries(${TARGET}
+    PUBLIC
+        xcb
+        xcb-util
+        xcb-xkb
+        xkbcommon
+        xkbcommon-x11
+        xcb-xinput
+)
+
 endif()
 
 include(CMakeListsGenerated.txt)

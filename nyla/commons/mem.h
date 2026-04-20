@@ -4,11 +4,14 @@
 #include <cstring>
 #include <type_traits>
 
+#include "nyla/commons/byteliterals.h"
 #include "nyla/commons/intrin.h" // IWYU pragma: keep
 #include "nyla/commons/macros.h"
 
 namespace nyla
 {
+
+constexpr inline uint64_t kPageSize = 4_KiB;
 
 auto API ReserveMemPages(uint64_t size) -> void *;
 void API CommitMemPages(void *page, uint64_t size);
