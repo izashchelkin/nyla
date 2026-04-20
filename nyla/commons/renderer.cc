@@ -89,7 +89,7 @@ void API Bootstrap(region_alloc &alloc)
         .inputRate = rhi_input_rate::PerVertex,
     };
 
-    rhi_texture_format colorFormat = rhi_texture_format::R8G8B8A8_sRGB;
+    rhi_texture_format colorFormat = rhi_texture_format::B8G8R8A8_sRGB;
 
     const rhi_graphics_pipeline_desc pipelineDesc{
         .debugName = "Renderer"_s,

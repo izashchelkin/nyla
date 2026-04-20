@@ -1,6 +1,7 @@
 #include "3d_ball_maze/3d_ball_maze.h"
 
 #include <cstdint>
+#include <locale>
 
 #include "nyla/commons/array.h" // IWYU pragma: keep
 #include "nyla/commons/asset_file.h"
@@ -49,6 +50,7 @@ game_state *game;
 void UserMain()
 {
     game = &RegionAlloc::Alloc<game_state>(RegionAlloc::g_BootstrapAlloc);
+    game->targetFrameDurationUs = 1'000'000 / 144;
 
     region_alloc alloc = RegionAlloc::Create(16_MiB, 0);
 
@@ -244,9 +246,12 @@ void UserMain()
         uint64_t frameEndUs = GetMonotonicTimeMicros();
         uint64_t frameDurationUs = frameEndUs - game->lastFrameStartUs;
 
-        uint64_t sleepForMillis = (game->targetFrameDurationUs - frameDurationUs) / 1000;
-        if (sleepForMillis)
-            Sleep(sleepForMillis);
+        if (game->targetFrameDurationUs > frameDurationUs)
+        {
+            uint64_t sleepForMillis = (game->targetFrameDurationUs - frameDurationUs) / 1000;
+            if (sleepForMillis)
+                Sleep(sleepForMillis);
+        }
     }
 }
 

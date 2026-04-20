@@ -50,7 +50,7 @@ void API Bootstrap(region_alloc &alloc)
     const rhi_shader vs = GetShader(alloc, "fullscreen.vs"_s, rhi_shader_stage::Vertex);
     const rhi_shader ps = GetShader(alloc, "debug_text_renderer.ps"_s, rhi_shader_stage::Pixel);
 
-    rhi_texture_format colorFormat = rhi_texture_format::R8G8B8A8_sRGB;
+    rhi_texture_format colorFormat = rhi_texture_format::B8G8R8A8_sRGB;
     const rhi_graphics_pipeline_desc pipelineDesc{
         .debugName = "DebugTextRender"_s,
         .vs = vs,

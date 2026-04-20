@@ -69,7 +69,7 @@ void API Update(rhi_cmdlist cmd, byteview assetFile)
         if (metadata.state != texture_state::NotUploaded)
             continue;
 
-        LOG("Uploading texture '" SV_FMT "'", metadata.guid);
+        LOG("Uploading texture '%" PRIu64 "'", metadata.guid);
 
         byteview rawBytes = AssetFileGetData(assetFile, metadata.guid);
 

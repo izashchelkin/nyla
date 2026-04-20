@@ -1,5 +1,6 @@
 #include "nyla/commons/mesh_manager.h"
 
+#include <cinttypes>
 #include <cstdint>
 
 #include "nyla/commons/array.h" // IWYU pragma: keep
@@ -67,7 +68,7 @@ void API Update(region_alloc &alloc, rhi_cmdlist cmd, byteview assetFile)
         if (metadata.state != mesh_state::NotUploaded)
             continue;
 
-        LOG("Uploading mesh '" SV_FMT "' '" SV_FMT "'", metadata.guidGltf, metadata.guidBin);
+        LOG("Uploading mesh '%" PRIu64 "' '%" PRIu64 "'", metadata.guidGltf, metadata.guidBin);
         RegionAlloc::Reset(alloc, allocMark);
 
         gltf_parser parser{};
