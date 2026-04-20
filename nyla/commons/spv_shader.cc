@@ -13,6 +13,7 @@
 #include <cstdint>
 
 #include "nyla/commons/array.h" // IWYU pragma: keep
+#include "nyla/commons/byteparser.h"
 #include "nyla/commons/fmt.h"
 #include "nyla/commons/macros.h"
 #include "nyla/commons/rhi.h"
@@ -44,7 +45,10 @@ auto HandleOpNop(spv_shader &self, span<uint32_t> operands) -> spv_op_process_re
 
 auto HandleOpEntryPoint(spv_shader &self, span<uint32_t> operands) -> spv_op_process_result
 {
-    auto executionModel = (spv_execution_model)SpvReader::ReadWord(operands);
+    spv_reader reader{};
+    ByteParser::Init(reader, operands.data, Span::SizeBytes(operands));
+
+    auto executionModel = (spv_execution_model)ByteParser::Read32(reader);
     switch (executionModel)
     {
     case spv_execution_model::Vertex: {
@@ -68,7 +72,10 @@ auto HandleOpEntryPoint(spv_shader &self, span<uint32_t> operands) -> spv_op_pro
 
 auto HandleOpExtension(spv_shader &self, span<uint32_t> operands) -> spv_op_process_result
 {
-    byteview name = SpvReader::ReadString(operands);
+    spv_reader reader{};
+    ByteParser::Init(reader, operands.data, Span::SizeBytes(operands));
+
+    byteview name = SpvReader::ReadString(reader);
     if (Span::Eq(name, "SPV_GOOGLE_hlsl_functionality1"_s))
         return spv_op_process_result::Remove;
     if (Span::Eq(name, "SPV_GOOGLE_user_type"_s))
@@ -79,12 +86,15 @@ auto HandleOpExtension(spv_shader &self, span<uint32_t> operands) -> spv_op_proc
 
 auto HandleOpDecorate(spv_shader &self, span<uint32_t> operands) -> spv_op_process_result
 {
-    uint32_t targetId = SpvReader::ReadWord(operands);
+    spv_reader reader{};
+    ByteParser::Init(reader, operands.data, Span::SizeBytes(operands));
 
-    switch ((spv_decoration)SpvReader::ReadWord(operands))
+    uint32_t targetId = ByteParser::Read32(reader);
+
+    switch ((spv_decoration)ByteParser::Read32(reader))
     {
     case spv_decoration::Location: {
-        const uint32_t location = SpvReader::ReadWord(operands);
+        const uint32_t location = ByteParser::Read32(reader);
         InlineVec::Append(self.locations, spv_shader::location_data{
                                               .id = targetId,
                                               .location = location,
@@ -93,7 +103,7 @@ auto HandleOpDecorate(spv_shader &self, span<uint32_t> operands) -> spv_op_proce
     }
 
     case spv_decoration::BuiltIn: {
-        const uint32_t builtin = SpvReader::ReadWord(operands);
+        const uint32_t builtin = ByteParser::Read32(reader);
         InlineVec::Append(self.builtins, spv_shader::builtin_data{
                                              .id = targetId,
                                              .builtin = builtin,
@@ -109,15 +119,18 @@ auto HandleOpDecorate(spv_shader &self, span<uint32_t> operands) -> spv_op_proce
 
 auto HandleOpDecorateString(spv_shader &self, span<uint32_t> operands) -> spv_op_process_result
 {
-    uint32_t targetId = SpvReader::ReadWord(operands);
+    spv_reader reader{};
+    ByteParser::Init(reader, operands.data, Span::SizeBytes(operands));
 
-    switch ((spv_decoration)SpvReader::ReadWord(operands))
+    uint32_t targetId = ByteParser::Read32(reader);
+
+    switch ((spv_decoration)ByteParser::Read32(reader))
     {
     case spv_decoration::UserSemantic: {
         InlineVec::Append(self.semanticDataIds, targetId);
 
         inline_string<16> &name = InlineVec::Append(self.semanticDataNames);
-        byteview src = SpvReader::ReadString(operands);
+        byteview src = SpvReader::ReadString(reader);
         InlineVec::Resize(name, src.size);
         MemCpy(name.data.data, src.data, src.size);
 
@@ -135,10 +148,13 @@ auto HandleOpDecorateString(spv_shader &self, span<uint32_t> operands) -> spv_op
 
 auto HandleOpVariable(spv_shader &self, span<uint32_t> operands) -> spv_op_process_result
 {
-    uint32_t resultType = SpvReader::ReadWord(operands);
-    uint32_t resultId = SpvReader::ReadWord(operands);
+    spv_reader reader{};
+    ByteParser::Init(reader, operands.data, Span::SizeBytes(operands));
 
-    switch ((spv_storage_class)SpvReader::ReadWord(operands))
+    uint32_t resultType = ByteParser::Read32(reader);
+    uint32_t resultId = ByteParser::Read32(reader);
+
+    switch ((spv_storage_class)ByteParser::Read32(reader))
     {
     case spv_storage_class::Input: {
         InlineVec::Append(self.inputVariables, resultId);
@@ -155,16 +171,19 @@ auto HandleOpVariable(spv_shader &self, span<uint32_t> operands) -> spv_op_proce
 
 } // namespace
 
-auto API ProcessShader(spv_shader &self, span<uint32_t> data, rhi_shader_stage stage) -> span<uint32_t>
+auto API ProcessShader(spv_shader &self, span<uint32_t> data) -> span<uint32_t>
 {
-    span<uint32_t> ret = data;
+    spv_reader reader{};
+    ByteParser::Init(reader, data.data, Span::SizeBytes(data));
 
-    SpvReader::ReadHeader(data);
-    while (data.size)
+    SpvReader::ReadHeader(reader);
+
+    while (ByteParser::BytesLeft(reader))
     {
-        span<uint32_t> opWithOperands = SpvReader::ReadOpWithOperands(data);
-        uint32_t op = SpvReader::ParseOp(Span::Front(opWithOperands));
-        span<uint32_t> operands = Span::SubSpan(opWithOperands, 1);
+        uint32_t word = *(uint32_t *)reader.at;
+        spv_op op = (spv_op)(word & 0xFFFF);
+        uint16_t wordCount = word >> 16;
+        span<uint32_t> operands{(uint32_t *)reader.at + 1, (uint64_t)wordCount - 1};
 
         spv_op_process_result result = spv_op_process_result::Ok;
         switch ((spv_op)op)
@@ -192,6 +211,7 @@ auto API ProcessShader(spv_shader &self, span<uint32_t> data, rhi_shader_stage s
         switch (result)
         {
         case spv_op_process_result::Ok: {
+            ByteParser::Advance(reader, wordCount * 4);
             break;
         }
         case spv_op_process_result::InvalidState: {
@@ -199,14 +219,14 @@ auto API ProcessShader(spv_shader &self, span<uint32_t> data, rhi_shader_stage s
             break;
         }
         case spv_op_process_result::Remove: {
-            ret = Span::Erase(ret, opWithOperands);
-            data = Span::Erase(data, opWithOperands);
+            data = Span::Erase(data, (uint32_t *)reader.at, (uint32_t *)reader.at + wordCount);
+            reader.end -= wordCount * 4;
             break;
         }
         }
     }
 
-    return ret;
+    return data;
 }
 
 auto API FindIdBySemantic(spv_shader &self, byteview querySemantic, spv_shader_storage_class storageClass,
@@ -268,31 +288,36 @@ auto API RewriteLocationForSemantic(spv_shader &self, span<uint32_t> data, bytev
     if (oldLocation == aLocation)
         return true;
 
-    SpvReader::ReadHeader(data);
+    spv_reader reader{};
+    ByteParser::Init(reader, data.data, Span::SizeBytes(data));
+
+    SpvReader::ReadHeader(reader);
 
     while (data.size)
     {
-        span<uint32_t> opWithOperands = SpvReader::ReadOpWithOperands(data);
-        uint32_t op = SpvReader::ParseOp(Span::Front(opWithOperands));
+        uint32_t word = *(uint32_t *)reader.at;
+        spv_op op = (spv_op)(word & 0xFFFF);
+        uint16_t wordCount = word >> 16;
+        span<uint32_t> operands{(uint32_t *)reader.at + 1, (uint64_t)wordCount - 1};
 
         if ((spv_op)op != spv_op::Decorate)
             continue;
 
-        span<uint32_t> operands = Span::SubSpan(opWithOperands, 1);
+        uint32_t id = ByteParser::Read32(reader);
 
-        uint32_t id = SpvReader::ReadWord(data);
-
-        if ((spv_decoration)SpvReader::ReadWord(data) != spv_decoration::Location)
+        if ((spv_decoration)ByteParser::Read32(reader) != spv_decoration::Location)
             continue;
         if (!CheckStorageClass(self, id, storageClass))
             continue;
 
-        uint32_t &location = SpvReader::ReadWord(data);
+        uint32_t &location = *(uint32_t *)reader.at;
         if (location == oldLocation)
         {
             location = aLocation;
             return true;
         }
+
+        ByteParser::Read32(reader);
     }
 
     return false;

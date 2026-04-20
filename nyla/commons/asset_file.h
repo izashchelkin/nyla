@@ -23,8 +23,8 @@ struct AssetFileIndexEntry
     uint64_t dataSize;
     uint64_t timestamp;
     uint64_t guid;
-    uint64_t crc32;
-    uint64_t pathLength;
+    uint32_t crc32;
+    uint32_t pathLength;
 };
 
 auto API AssetFileLoad(file_handle file) -> byteview;

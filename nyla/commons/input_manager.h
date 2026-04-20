@@ -14,6 +14,23 @@ enum class input_interface_type : uint8_t
     Gamepad,
 };
 
+enum class input_id : uint8_t;
+
+namespace InputManager
+{
+
+void API Bootstrap();
+
+void API Update();
+
+void API Map(input_id input, input_interface_type type, uint32_t code);
+auto API IsPressed(input_id input) -> bool;
+
+void API HandlePressed(input_interface_type type, uint32_t code, uint64_t time);
+void API HandleReleased(input_interface_type type, uint32_t code, uint64_t time);
+
+} // namespace InputManager
+
 enum class input_id : uint8_t
 {
     None = 0,
@@ -289,18 +306,5 @@ enum class input_id : uint8_t
     Custom14,
     Custom15,
 };
-
-namespace InputManager
-{
-
-void API Update();
-
-void API Map(uint32_t inputId, input_interface_type type, uint32_t code);
-auto API IsPressed(uint32_t input) -> bool;
-
-void API HandlePressed(input_interface_type type, uint32_t code, uint64_t time);
-void API HandleReleased(input_interface_type type, uint32_t code, uint64_t time);
-
-} // namespace InputManager
 
 } // namespace nyla

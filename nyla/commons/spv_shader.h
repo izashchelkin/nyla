@@ -60,7 +60,7 @@ INLINE auto GetSemantics(spv_shader &self) -> span<const inline_string<16>>
     return self.semanticDataNames;
 }
 
-auto API ProcessShader(spv_shader &self, span<uint32_t> data, rhi_shader_stage stage) -> span<uint32_t>;
+auto API ProcessShader(spv_shader &self, span<uint32_t> data) -> span<uint32_t>;
 
 auto API FindLocationBySemantic(spv_shader &self, byteview semantic, spv_shader_storage_class storageClass,
                                 uint32_t *outLocation) -> bool;

@@ -57,7 +57,7 @@ namespace Renderer
 
 void API Bootstrap(region_alloc &alloc)
 {
-    auto renderer = RegionAlloc::Alloc<renderer_state>(RegionAlloc::g_BootstrapAlloc);
+    renderer = &RegionAlloc::Alloc<renderer_state>(RegionAlloc::g_BootstrapAlloc);
 
     rhi_shader vs = GetShader(alloc, "renderer.vs"_s, rhi_shader_stage::Vertex);
     rhi_shader ps = GetShader(alloc, "renderer.ps"_s, rhi_shader_stage::Pixel);
@@ -105,7 +105,7 @@ void API Bootstrap(region_alloc &alloc)
         .frontFace = rhi_front_face::CCW,
     };
 
-    renderer.Pipeline = Rhi::CreateGraphicsPipeline(alloc, pipelineDesc);
+    renderer->Pipeline = Rhi::CreateGraphicsPipeline(alloc, pipelineDesc);
 }
 
 void API SetView(float4x4 m)

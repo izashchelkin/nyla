@@ -33,7 +33,7 @@ template <is_plain T, uint64_t Size> struct alignas(required_align_v<T>) array
     {
         for (uint32_t i = 0; i < Size; ++i)
         {
-            if (this[i] != rhs[i])
+            if ((*this)[i] != rhs[i])
                 return false;
         }
         return true;
@@ -70,7 +70,7 @@ template <is_plain T, uint64_t Size> struct alignas(required_align_v<T>) array
     constexpr auto operator*=(auto scalar) -> array &
     {
         for (uint32_t i = 0; i < Size; ++i)
-            this[i] *= static_cast<T>(scalar);
+            (*this)[i] *= static_cast<T>(scalar);
         return *this;
     }
 
@@ -84,7 +84,7 @@ template <is_plain T, uint64_t Size> struct alignas(required_align_v<T>) array
     constexpr auto operator/=(auto scalar) -> array &
     {
         for (uint32_t i = 0; i < Size; ++i)
-            this[i] /= static_cast<T>(scalar);
+            (*this)[i] /= static_cast<T>(scalar);
         return *this;
     }
 

@@ -7,7 +7,7 @@
 namespace nyla
 {
 
-constexpr inline auto ParseHexChar(char ch) -> uint8_t
+constexpr inline auto ParseHexChar(uint8_t ch) -> uint8_t
 {
     switch (ch)
     {
@@ -72,7 +72,7 @@ constexpr inline auto ParseHexChar(char ch) -> uint8_t
     }
 }
 
-constexpr inline auto ParseHexByte(char ch1, char ch2) -> uint8_t
+constexpr inline auto ParseHexByte(uint8_t ch1, uint8_t ch2) -> uint8_t
 {
     uint8_t ret = 0;
     ret |= ParseHexChar(ch1) << 4;
@@ -80,7 +80,7 @@ constexpr inline auto ParseHexByte(char ch1, char ch2) -> uint8_t
     return ret;
 }
 
-constexpr inline auto ParseHexByte(const char *ch) -> uint8_t
+constexpr inline auto ParseHexByte(const uint8_t *ch) -> uint8_t
 {
     return ParseHexByte(*ch, *(ch + 1));
 }

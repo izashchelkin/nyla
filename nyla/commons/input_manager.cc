@@ -5,6 +5,7 @@
 #include "nyla/commons/array.h"      // IWYU pragma: keep
 #include "nyla/commons/inline_vec.h" // IWYU pragma: keep
 #include "nyla/commons/minmax.h"
+#include "nyla/commons/region_alloc.h"
 
 namespace nyla
 {
@@ -20,17 +21,17 @@ struct input_state
     bool released;
 };
 
-struct input_manager_state
+struct input_manager
 {
     inline_vec<input_state, 0xFF> inputStates;
 };
-input_manager_state *g_State;
+input_manager *manager;
 
 //
 
 auto FindInput(input_interface_type type, uint32_t code) -> input_state *
 {
-    for (auto it = g_State->inputStates.begin(), end = g_State->inputStates.end(); it != end; ++it)
+    for (auto it = manager->inputStates.begin(), end = manager->inputStates.end(); it != end; ++it)
     {
         if (it->type == type && it->code == code)
             return it;
@@ -44,9 +45,14 @@ auto FindInput(input_interface_type type, uint32_t code) -> input_state *
 namespace InputManager
 {
 
+void API Bootstrap()
+{
+    manager = &RegionAlloc::Alloc<input_manager>(RegionAlloc::g_BootstrapAlloc);
+}
+
 void API Map(input_id input, input_interface_type type, uint32_t code)
 {
-    auto &state = g_State->inputStates[(uint8_t)input];
+    auto &state = manager->inputStates[(uint8_t)input];
     state.type = type;
     state.code = code;
 }
@@ -65,13 +71,13 @@ void API HandleReleased(input_interface_type type, uint32_t code, uint64_t time)
 
 auto API IsPressed(input_id input) -> bool
 {
-    auto &state = g_State->inputStates[(uint8_t)input];
+    auto &state = manager->inputStates[(uint8_t)input];
     return !state.released && state.pressedAt;
 }
 
 void API Update()
 {
-    for (auto &state : g_State->inputStates)
+    for (auto &state : manager->inputStates)
     {
         if (state.released)
         {

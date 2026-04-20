@@ -4,7 +4,6 @@
 #include <cstdint>
 
 #include "nyla/commons/macros.h"
-#include "nyla/commons/mem.h"
 
 namespace nyla
 {
@@ -16,7 +15,7 @@ struct handle
 
     operator bool()
     {
-        return !MemEq(this, 0, sizeof(handle));
+        return gen && index;
     }
 };
 

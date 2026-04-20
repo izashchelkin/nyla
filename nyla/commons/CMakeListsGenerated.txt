@@ -2,7 +2,6 @@ target_sources(${TARGET} PRIVATE
     asset_file.cc
     asset_manager.cc
     bdf.cc
-    byteparser.cc
     debug_text_renderer.cc
     engine.cc
     fmt.cc
@@ -17,7 +16,6 @@ target_sources(${TARGET} PRIVATE
     mem.cc
     mempage_pool.cc
     mesh_manager.cc
-    platform_linux_x11.cc
     region_alloc.cc
     render_targets.cc
     renderer.cc
@@ -69,7 +67,6 @@ target_sources(${TARGET} PUBLIC
     lerp.h
     libmain.h
     limits.h
-    linux_abi.h
     macros.h
     mat.h
     math.h
@@ -94,6 +91,7 @@ target_sources(${TARGET} PUBLIC
     spv_shader.h
     staging.h
     stb_image.h
+    stringparser.h
     texture_manager.h
     time.h
     tuple.h
@@ -113,8 +111,10 @@ if (WIN32)
 else()
     target_sources(${TARGET} PRIVATE
         platform_linux.cc
+        platform_x11_linux.cc
     )
     target_sources(${TARGET} PUBLIC
+        abi_linux.h
         entrypoint_linux.h
         platform_linux.h
     )

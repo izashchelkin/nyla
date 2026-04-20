@@ -10,21 +10,6 @@
 namespace nyla
 {
 
-INLINE auto IsNumber(uint8_t ch) -> bool
-{
-    return ch >= '0' && ch <= '9';
-}
-
-INLINE auto IsAlpha(uint8_t ch) -> bool
-{
-    return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch < 'Z');
-}
-
-INLINE auto IsWhitespace(uint8_t ch) -> bool
-{
-    return ch == ' ' || ch == '\n' || ch == '\t';
-}
-
 struct byte_parser
 {
     const uint8_t *begin;
@@ -35,11 +20,11 @@ struct byte_parser
 namespace ByteParser
 {
 
-INLINE void Init(byte_parser &self, const uint8_t *base, uint64_t size)
+INLINE void Init(byte_parser &self, const void *base, uint64_t size)
 {
-    self.begin = base;
-    self.at = base;
-    self.end = base + size;
+    self.begin = (uint8_t *)base;
+    self.at = (uint8_t *)base;
+    self.end = (uint8_t *)base + size;
 }
 
 INLINE auto BytesLeft(const byte_parser &self) -> uint64_t
@@ -135,6 +120,14 @@ INLINE auto Read64BE(byte_parser &self) -> uint64_t
     return ByteSwap64(Read64(self));
 }
 
+INLINE auto PeekCStr(byte_parser &self) -> byteview
+{
+    uint64_t len = CStrLen(self.at, self.end - self.at);
+    byteview ret{self.at, len};
+    self.at += len;
+    return ret;
+}
+
 //
 
 INLINE void SkipUntil(byte_parser &self, uint8_t ch)
@@ -147,12 +140,6 @@ INLINE void NextLine(byte_parser &self)
 {
     while (Read(self) != '\n')
         ;
-}
-
-INLINE void SkipWhitespace(byte_parser &self)
-{
-    while (IsWhitespace(Peek(self)))
-        Advance(self);
 }
 
 INLINE auto StartsWith(byte_parser &self, byteview prefix) -> bool
@@ -171,23 +158,6 @@ INLINE auto StartsWithAdvance(byte_parser &self, byteview prefix) -> bool
     {
         return false;
     }
-}
-
-enum ParseNumberResult
-{
-    Double,
-    Long,
-};
-
-auto ParseDecimal(byte_parser &self, double &outDouble, int64_t &outLong) -> ParseNumberResult;
-
-INLINE auto ParseLong(byte_parser &self) -> int64_t
-{
-    double d;
-    int64_t l;
-    const ParseNumberResult res = ParseDecimal(self, d, l);
-    ASSERT(res == ParseNumberResult::Long);
-    return l;
 }
 
 }; // namespace ByteParser

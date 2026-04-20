@@ -1,21 +1,10 @@
-/*
-** Copyright: 2014-2024 The Khronos Group Inc.
-** License: MIT
-**
-** MODIFICATIONS TO THIS FILE MAY MEAN IT NO LONGER ACCURATELY REFLECTS
-** KHRONOS STANDARDS. THE UNMODIFIED, NORMATIVE VERSIONS OF KHRONOS
-** SPECIFICATIONS AND HEADER INFORMATION ARE LOCATED AT
-** https://www.khronos.org/registry/
-*/
-
 #pragma once
 
 #include <cstdint>
 
+#include "nyla/commons/align.h"
+#include "nyla/commons/byteparser.h"
 #include "nyla/commons/fmt.h"
-#include "nyla/commons/math.h"
-#include "nyla/commons/mem.h"
-#include "nyla/commons/span.h"
 
 namespace nyla
 {
@@ -27,34 +16,12 @@ struct spv_shader_header
     uint32_t bound;
 };
 
+struct spv_reader : byte_parser
+{
+};
+
 namespace SpvReader
 {
-
-constexpr inline uint32_t kMagicNumber = 0x07230203;
-constexpr inline uint32_t kOpCodeMask = 0xFFFF;
-constexpr inline uint32_t kWordCountShift = 16;
-
-// TODO: passing mutable span is kind of ugly - should we use byteparser.h?
-
-[[nodiscard]]
-INLINE auto ReadWord(span<uint32_t> &data) -> uint32_t &
-{
-    uint32_t &ret = Span::Front(data);
-    data = Span::SubSpan(data, 1);
-    return ret;
-}
-
-[[nodiscard]]
-INLINE auto ReadString(span<uint32_t> &data) -> byteview
-{
-    uint8_t *ptr = (uint8_t *)data.data;
-    uint64_t byteLen = CStrLen(ptr, Span::SizeBytes(data)) + 1;
-
-    uint64_t wordLen = CeilDiv(byteLen, 4);
-    data = Span::SubSpan(data, wordLen);
-
-    return byteview{ptr, byteLen - 1};
-}
 
 [[nodiscard]]
 INLINE auto VersionMajor(uint32_t version) -> uint8_t
@@ -68,33 +35,19 @@ INLINE auto VersionMinor(uint32_t version) -> uint8_t
     return (version >> 8) & 0xFF;
 }
 
-[[nodiscard]]
-INLINE auto ParseOp(uint32_t word) -> uint16_t
+INLINE auto ReadHeader(spv_reader &self) -> spv_shader_header
 {
-    return word & kOpCodeMask;
-}
+    ASSERT(ByteParser::Read32(self) == 0x07230203);
 
-[[nodiscard]]
-INLINE auto ParseWordCount(uint32_t word) -> uint16_t
-{
-    return word >> kWordCountShift;
-}
-
-// [[nodiscard]]
-INLINE auto ReadHeader(span<uint32_t> &data) -> spv_shader_header
-{
-    ASSERT(data.size >= 5);
-    ASSERT(ReadWord(data) == kMagicNumber);
-
-    uint32_t version = ReadWord(data);
+    uint32_t version = ByteParser::Read32(self);
     DASSERT(version == 67072);
 
-    uint32_t generator = ReadWord(data);
+    uint32_t generator = ByteParser::Read32(self);
     DASSERT(generator == 917504);
 
-    uint32_t bound = ReadWord(data);
+    uint32_t bound = ByteParser::Read32(self);
 
-    uint32_t reserved = ReadWord(data);
+    uint32_t reserved = ByteParser::Read32(self);
     DASSERT(reserved == 0);
 
     return spv_shader_header{
@@ -105,14 +58,11 @@ INLINE auto ReadHeader(span<uint32_t> &data) -> spv_shader_header
 }
 
 [[nodiscard]]
-INLINE auto ReadOpWithOperands(span<uint32_t> &data) -> span<uint32_t>
+INLINE auto ReadString(spv_reader &self) -> byteview
 {
-    uint32_t wordCount = ParseWordCount(Span::Front(data));
-    ASSERT(wordCount != 0);
-
-    span ret = span{data.data, wordCount};
-    data = Span::SubSpan(data, wordCount);
-    return ret;
+    byteview str = ByteParser::PeekCStr(self);
+    ByteParser::Advance(self, AlignedUp(self.at, 4) - self.at);
+    return str;
 }
 
 } // namespace SpvReader

@@ -10,7 +10,7 @@
 #include "nyla/commons/gamepad.h"
 #include "nyla/commons/gpu_upload.h"
 #include "nyla/commons/input_manager.h"
-#include "nyla/commons/macros.h"
+#include "nyla/commons/macros.h" // IWYU pragma: keep
 #include "nyla/commons/math.h"
 #include "nyla/commons/mesh_manager.h"
 #include "nyla/commons/minmax.h"
@@ -57,6 +57,7 @@ void UserMain()
                               .flags = rhi_flags::VSync,
                           });
 
+    InputManager::Bootstrap();
     GpuUpload::Bootstrap();
     TextureManager::Bootstrap();
     MeshManager::Bootstrap();

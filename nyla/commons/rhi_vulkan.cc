@@ -2554,11 +2554,11 @@ auto Rhi::CreateGraphicsPipeline(region_alloc &alloc, const rhi_graphics_pipelin
     auto &vertexShaderData = HandlePool::ResolveData(g_State->m_Shaders, desc.vs);
     auto &pixelShaderData = HandlePool::ResolveData(g_State->m_Shaders, desc.ps);
 
-    spv_shader vsMan{};
-    vertexShaderData.spv = SpvShader::ProcessShader(vsMan, vertexShaderData.spv, rhi_shader_stage::Vertex);
+    spv_shader vsMan{.stage = rhi_shader_stage::Vertex};
+    vertexShaderData.spv = SpvShader::ProcessShader(vsMan, vertexShaderData.spv);
 
-    spv_shader psMan{};
-    pixelShaderData.spv = SpvShader::ProcessShader(psMan, pixelShaderData.spv, rhi_shader_stage::Pixel);
+    spv_shader psMan{.stage = rhi_shader_stage::Pixel};
+    pixelShaderData.spv = SpvShader::ProcessShader(psMan, pixelShaderData.spv);
 
     VulkanPipelineData pipelineData = {
         .bindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,

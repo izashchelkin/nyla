@@ -5,6 +5,7 @@
 #include "nyla/commons/bitenum.h"
 #include "nyla/commons/handle.h"
 #include "nyla/commons/region_alloc_def.h"
+#include "nyla/commons/span_def.h"
 
 namespace nyla
 {

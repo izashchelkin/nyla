@@ -4,6 +4,7 @@
 #include "nyla/commons/fmt.h"
 #include "nyla/commons/json_parser.h"
 #include "nyla/commons/json_value.h"
+#include "nyla/commons/stringparser.h"
 
 namespace nyla
 {
@@ -75,13 +76,13 @@ auto ParseNumber(json_parser &self) -> json_value *
     int64_t longVal;
 
     json_value val;
-    switch (ByteParser::ParseDecimal(self, doubleVal, longVal))
+    switch (StringParser::ParseDecimal(self, doubleVal, longVal))
     {
-    case ByteParser::ParseNumberResult::Double: {
+    case StringParser::ParseNumberResult::Double: {
         JsonValue::SetValue(val, doubleVal);
         break;
     }
-    case ByteParser::ParseNumberResult::Long: {
+    case StringParser::ParseNumberResult::Long: {
         JsonValue::SetValue(val, longVal);
         break;
     }
@@ -95,10 +96,10 @@ auto ParseString(json_parser &self) -> json_value *
     const uint8_t *base = self.at;
     uint64_t count = 0;
 
-    char prevch = 0;
+    uint8_t prevch = 0;
     while (ByteParser::HasNext(self))
     {
-        const char ch = ByteParser::Read(self);
+        const uint8_t ch = ByteParser::Read(self);
         if (ch == '"' /*  && prevch != '\\' */)
             break;
 
@@ -130,8 +131,8 @@ auto ParseArray(json_parser &self) -> json_value *
 
         json_value *elem = ParseNext(self);
 
-        ByteParser::SkipWhitespace(self);
-        const char ch = ByteParser::Read(self);
+        StringParser::SkipWhitespace(self);
+        const uint8_t ch = ByteParser::Read(self);
         if (ch == ']')
             break;
 
@@ -164,13 +165,13 @@ auto ParseObject(json_parser &self) -> json_value *
         json_value *key = ParseNext(self);
         ASSERT(key->tag == json_tag::String);
 
-        ByteParser::SkipWhitespace(self);
+        StringParser::SkipWhitespace(self);
         ASSERT(ByteParser::Read(self) == ':');
 
         json_value *val = ParseNext(self);
 
-        ByteParser::SkipWhitespace(self);
-        const char ch = ByteParser::Read(self);
+        StringParser::SkipWhitespace(self);
+        const uint8_t ch = ByteParser::Read(self);
         if (ch == '}')
             break;
 
@@ -189,9 +190,9 @@ auto ParseObject(json_parser &self) -> json_value *
 
 auto ParseNext(json_parser &self) -> json_value *
 {
-    ByteParser::SkipWhitespace(self);
+    StringParser::SkipWhitespace(self);
 
-    char ch = ByteParser::Peek(self);
+    uint8_t ch = ByteParser::Peek(self);
     if (IsNumber(ch) || ch == '-')
         return ParseNumber(self);
     if (IsAlpha(ch))
