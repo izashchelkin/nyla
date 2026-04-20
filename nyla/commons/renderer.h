@@ -16,7 +16,7 @@ namespace Renderer
 
 void API Bootstrap(region_alloc &alloc);
 
-void API Mesh(float3 pos, float3 scale, mesh Mesh, texture Texture);
+void API Mesh(float3 pos, float3 scale, mesh_handle Mesh, texture_handle Texture);
 void API CmdFlush(rhi_cmdlist cmd);
 
 void API SetView(float4x4 m);

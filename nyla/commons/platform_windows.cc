@@ -106,14 +106,14 @@ auto API WinPollEvent(PlatformEvent &outEvent) -> bool
 {
     for (;;)
     {
-        if (InlineQueue::IsEmpty(g_EventsQueue))
+        if (!InlineQueue::IsEmpty(g_EventsQueue))
             break;
         if (g_Flags & kFlagRepaint)
-            return true;
+            break;
         if (g_Flags & kFlagWinResize)
-            return true;
+            break;
         if (g_Flags & kFlagQuit)
-            return true;
+            break;
 
         MSG msg{};
         if (!PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))

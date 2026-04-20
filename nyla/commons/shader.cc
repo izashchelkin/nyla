@@ -21,7 +21,7 @@ auto API GetShader(region_alloc &alloc, byteview name, rhi_shader_stage stage) -
     file_handle file = FileOpen(path, FileOpenMode::Read);
     span<uint8_t> data = FileReadFully(alloc, file);
 
-    // TODO: this makes an unnecessary copy!
+    // TODO: this makes an unnecessary copy! <- belongs together with the lifetime todo
     rhi_shader shader = Rhi::CreateShader(rhi_shader_desc{
         .stage = stage,
         .code = Span::Cast<uint32_t>(data),

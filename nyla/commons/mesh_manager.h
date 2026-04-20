@@ -10,7 +10,7 @@
 namespace nyla
 {
 
-struct mesh : handle
+struct mesh_handle : handle
 {
 };
 
@@ -21,12 +21,12 @@ void API Bootstrap();
 
 void API Update(region_alloc &alloc, rhi_cmdlist cmd, byteview assetFile);
 
-auto API DeclareMesh(byteview assetFileData, uint64_t guidGltf, uint64_t guidBin) -> mesh;
+auto API DeclareMesh(byteview assetFileData, uint64_t guidGltf, uint64_t guidBin) -> mesh_handle;
 
-void API CmdBindMesh(rhi_cmdlist cmd, mesh Mesh);
-void API CmdDrawMesh(rhi_cmdlist cmd, mesh Mesh);
+void API CmdBindMesh(rhi_cmdlist cmd, mesh_handle Mesh);
+void API CmdDrawMesh(rhi_cmdlist cmd, mesh_handle Mesh);
 
-auto API GetTexture(mesh Mesh) -> texture;
+auto API GetTexture(mesh_handle Mesh) -> texture_handle;
 
 } // namespace MeshManager
 

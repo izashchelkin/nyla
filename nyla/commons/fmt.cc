@@ -16,6 +16,8 @@ namespace nyla
 namespace
 {
 
+static array<uint8_t, 4096> buf; // TODO: return to this when multithreading
+
 auto U64ToBuffer(uint8_t *buf, uint64_t val) -> uint32_t
 {
     if (val == 0)
@@ -50,7 +52,7 @@ auto S64ToBuffer(uint8_t *buf, int64_t val) -> uint32_t
     return U64ToBuffer(buf, (uint64_t)val);
 }
 
-void _WriteFmt(auto &&consumer, byteview fmt, va_list args)
+void WriteFmt(auto &&consumer, byteview fmt, va_list args)
 {
     byte_parser parser;
     ByteParser::Init(parser, fmt.data, fmt.size);
@@ -167,11 +169,11 @@ void _WriteFmt(auto &&consumer, byteview fmt, va_list args)
     }
 }
 
-void _BufferWriteFmt(auto &&consumer, span<uint8_t> buffer, byteview fmt, va_list args)
+void BufferWriteFmt(auto &&consumer, span<uint8_t> buffer, byteview fmt, va_list args)
 {
     uint64_t bufferUsed = 0;
 
-    _WriteFmt(
+    WriteFmt(
         [&](const uint8_t *data, uint32_t dataSize) -> void {
             if (dataSize == 0)
                 return;
@@ -209,11 +211,13 @@ void _BufferWriteFmt(auto &&consumer, span<uint8_t> buffer, byteview fmt, va_lis
         consumer(buffer.data, bufferUsed);
 }
 
-auto _StringWriteFmt(span<uint8_t> out, byteview fmt, va_list args) -> uint64_t
+} // namespace
+
+auto API StringWriteFmt(span<uint8_t> out, byteview fmt, va_list args) -> uint64_t
 {
     uint64_t written = 0;
 
-    _WriteFmt(
+    WriteFmt(
         [&](const uint8_t *data, uint64_t dataSize) -> void {
             ASSERT(written + dataSize <= out.size);
             MemCpy(out.data + written, data, dataSize);
@@ -224,25 +228,22 @@ auto _StringWriteFmt(span<uint8_t> out, byteview fmt, va_list args) -> uint64_t
     return written;
 }
 
-void _FileWriteFmt(file_handle handle, span<uint8_t> buffer, byteview fmt, va_list args)
+void API FileWriteFmt(file_handle handle, span<uint8_t> buffer, byteview fmt, va_list args)
 {
-    _BufferWriteFmt([handle](const uint8_t *data, uint64_t size) -> void { FileWrite(handle, (uint32_t)size, data); },
-                    buffer, fmt, args);
+    BufferWriteFmt([handle](const uint8_t *data, uint64_t size) -> void { FileWrite(handle, (uint32_t)size, data); },
+                   buffer, fmt, args);
 }
 
-void _FileWriteFmt(file_handle handle, byteview fmt, va_list args)
+void API FileWriteFmt(file_handle handle, byteview fmt, va_list args)
 {
-    static array<uint8_t, 1024> buffer; // TODO:
-    _FileWriteFmt(handle, buffer, fmt, args);
+    FileWriteFmt(handle, buf, fmt, args);
 }
-
-} // namespace
 
 void API FileWriteFmt(file_handle handle, span<uint8_t> buffer, byteview fmt, ...)
 {
     va_list(args);
     va_start(args, fmt);
-    _FileWriteFmt(handle, buffer, fmt, args);
+    FileWriteFmt(handle, buffer, fmt, args);
     va_end(args);
 }
 
@@ -250,7 +251,7 @@ void API FileWriteFmt(file_handle handle, byteview fmt, ...)
 {
     va_list(args);
     va_start(args, fmt);
-    _FileWriteFmt(handle, fmt, args);
+    FileWriteFmt(handle, fmt, args);
     va_end(args);
 }
 
@@ -258,9 +259,23 @@ auto API StringWriteFmt(span<uint8_t> out, byteview fmt, ...) -> uint64_t
 {
     va_list(args);
     va_start(args, fmt);
-    uint64_t written = _StringWriteFmt(out, fmt, args);
+    uint64_t written = StringWriteFmt(out, fmt, args);
     va_end(args);
     return written;
+}
+
+auto API StringWriteFmt(byteview fmt, va_list args) -> byteview
+{
+    return {buf.data, StringWriteFmt(buf, fmt, args)};
+}
+
+auto API StringWriteFmt(byteview fmt, ...) -> byteview
+{
+    va_list(args);
+    va_start(args, fmt);
+    byteview ret = {buf.data, StringWriteFmt(buf, fmt, args)};
+    va_end(args);
+    return ret;
 }
 
 } // namespace nyla

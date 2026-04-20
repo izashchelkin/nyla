@@ -7,7 +7,7 @@
 namespace nyla
 {
 
-struct texture : handle
+struct texture_handle : handle
 {
 };
 
@@ -18,9 +18,9 @@ void API Bootstrap();
 
 void API Update(rhi_cmdlist cmd, byteview assetFile);
 
-auto API DeclareTexture(byteview assetFileData, uint64_t guid) -> texture;
+auto API DeclareTexture(byteview assetFileData, uint64_t guid) -> texture_handle;
 
-auto API GetSRV(texture Texture) -> rhi_srv;
+auto API GetSRV(texture_handle Texture) -> rhi_srv;
 
 } // namespace TextureManager
 

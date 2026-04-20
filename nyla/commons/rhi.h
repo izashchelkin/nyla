@@ -347,8 +347,6 @@ auto API GetLastCheckpointData(rhi_queue_type queueType) -> uint64_t;
 auto API FrameBegin(region_alloc &scratch) -> rhi_cmdlist;
 void API FrameEnd(region_alloc &scratch);
 
-auto API FrameGetCmdList() -> rhi_cmdlist;
-
 void API PassBegin(rhi_pass_desc);
 void API PassEnd();
 

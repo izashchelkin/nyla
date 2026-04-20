@@ -13,6 +13,7 @@
 #include "nyla/commons/input_manager.h"
 #include "nyla/commons/macros.h" // IWYU pragma: keep
 #include "nyla/commons/math.h"
+#include "nyla/commons/mem.h"
 #include "nyla/commons/mesh_manager.h"
 #include "nyla/commons/minmax.h"
 #include "nyla/commons/platform.h"
@@ -21,6 +22,7 @@
 #include "nyla/commons/render_targets.h"
 #include "nyla/commons/renderer.h"
 #include "nyla/commons/rhi.h"
+#include "nyla/commons/sampler_manager.h"
 #include "nyla/commons/texture_manager.h"
 #include "nyla/commons/time.h"
 #include "nyla/commons/tween_manager.h"
@@ -50,6 +52,7 @@ game_state *game;
 void UserMain()
 {
     game = &RegionAlloc::Alloc<game_state>(RegionAlloc::g_BootstrapAlloc);
+    MemZero(game);
     game->targetFrameDurationUs = 1'000'000 / 144;
 
     region_alloc alloc = RegionAlloc::Create(16_MiB, 0);
@@ -61,6 +64,7 @@ void UserMain()
 
     InputManager::Bootstrap();
     GpuUpload::Bootstrap();
+    SamplerManager::Bootstrap();
     TextureManager::Bootstrap();
     MeshManager::Bootstrap();
 
@@ -71,8 +75,8 @@ void UserMain()
 
     byteview assetFile = AssetFileLoad(FileOpen(R"(assets.bin)"_s, FileOpenMode::Read));
 
-    mesh cubeMesh = MeshManager::DeclareMesh(assetFile, kCubeGltfGuid, kCubeBinGuid);
-    mesh sphereMesh = MeshManager::DeclareMesh(assetFile, kSphereGltfGuid, kSphereBinGuid);
+    mesh_handle cubeMesh = MeshManager::DeclareMesh(assetFile, kCubeGltfGuid, kCubeBinGuid);
+    mesh_handle sphereMesh = MeshManager::DeclareMesh(assetFile, kSphereGltfGuid, kSphereBinGuid);
 
     render_targets renderTargets{
         .ColorFormat = rhi_texture_format::B8G8R8A8_sRGB,
@@ -94,7 +98,7 @@ void UserMain()
         const float dt = static_cast<float>(dtUs) * 1e-6f;
         game->lastFrameStartUs = frameStart;
 
-        if (game->dtUsAccum >= 500'000ull)
+        if (game->dtUsAccum >= (uint64_t)500'000)
         {
             const double seconds = static_cast<double>(game->dtUsAccum) / 1'000'000.0;
             const double fpsF64 = game->framesCounted / seconds;
@@ -104,7 +108,7 @@ void UserMain()
             game->framesCounted = 0;
         }
 
-        DebugTextRenderer::Fmt(500, 10, "fps=%d"_s, game->fps);
+        DebugTextRenderer::Fmt(500, 10, "fps=%d"_s, uint32_t(game->fps));
 
         for (;;)
         {
@@ -145,14 +149,19 @@ void UserMain()
             case PlatformEventType::Repaint:
             case PlatformEventType::None:
                 break;
+
+            default: {
+                TRAP();
+                break;
+            }
             }
         }
 
+        GpuUpload::Update();
         InputManager::Update();
         TweenManager::Update(dt);
-        GpuUpload::Update();
-        TextureManager::Update(cmd, assetFile);
         MeshManager::Update(alloc, cmd, assetFile);
+        TextureManager::Update(cmd, assetFile);
 
         {
             rhi_texture backbuffer = Rhi::GetTexture(Rhi::GetBackbufferView());

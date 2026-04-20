@@ -30,7 +30,7 @@
 #endif
 // clang-format on
 
-#define VK_GET_INSTANCE_PROC_ADDR(name) reinterpret_cast<PFN_##name>(vkGetInstanceProcAddr(g_State->m_Instance, #name))
+#define VK_GET_INSTANCE_PROC_ADDR(name) reinterpret_cast<PFN_##name>(vkGetInstanceProcAddr(rhi->instance, #name))
 #define VK_CHECK(res) VkCheckImpl(res)
 
 namespace nyla
@@ -158,7 +158,7 @@ auto ConvertBufferUsageIntoVkBufferUsageFlags(rhi_buffer_usage usage) -> VkBuffe
 
 auto ConvertMemoryUsageIntoVkMemoryPropertyFlags(rhi_memory_usage usage) -> VkMemoryPropertyFlags
 {
-    // TODO: not all GPUs support HOST_COHERENT, HOST_CACHED
+    // ODO: not all GPUs support HOST_COHERENT, HOST_CACHED
 
     switch (usage)
     {
@@ -503,56 +503,55 @@ struct DescriptorTable
 
 struct rhi_state
 {
-    handle_pool<rhi_buffer, VulkanBufferData, 16> m_Buffers;
-    handle_pool<rhi_buffer, VulkanBufferViewData, 16> m_CBVs;
-    handle_pool<rhi_cmdlist, VulkanCmdListData, 16> m_CmdLists;
-    handle_pool<rhi_dsv, VulkanTextureViewData, 8> m_DepthStencilViews;
-    handle_pool<rhi_graphics_pipeline, VulkanPipelineData, 16> m_GraphicsPipelines;
-    handle_pool<rhi_rtv, VulkanTextureViewData, 8> m_RenderTargetViews;
-    handle_pool<rhi_srv, VulkanTextureViewData, 128> m_SampledTextureViews;
-    handle_pool<rhi_sampler, VulkanSamplerData, 16> m_Samplers;
-    handle_pool<rhi_shader, VulkanShaderData, 16> m_Shaders;
-    handle_pool<rhi_texture, VulkanTextureData, 128> m_Textures;
+    handle_pool<rhi_buffer, VulkanBufferData, 16> buffers;
+    handle_pool<rhi_buffer, VulkanBufferViewData, 16> cbvs;
+    handle_pool<rhi_cmdlist, VulkanCmdListData, 16> cmdlists;
+    handle_pool<rhi_dsv, VulkanTextureViewData, 8> dsvs;
+    handle_pool<rhi_graphics_pipeline, VulkanPipelineData, 16> graphicsPipelines;
+    handle_pool<rhi_rtv, VulkanTextureViewData, 8> rtvs;
+    handle_pool<rhi_srv, VulkanTextureViewData, 128> stvs;
+    handle_pool<rhi_sampler, VulkanSamplerData, 16> samplers;
+    handle_pool<rhi_shader, VulkanShaderData, 16> shaders;
+    handle_pool<rhi_texture, VulkanTextureData, 128> textures;
 
     VkAllocationCallbacks *vkAlloc;
 
-    rhi_flags m_Flags;
-    rhi_limits m_Limits;
+    rhi_flags flags;
+    rhi_limits limits;
 
-    VkInstance m_Instance;
-    VkDevice m_Dev;
-    VkPhysicalDevice m_PhysDev;
-    VkPhysicalDeviceProperties m_PhysDevProps;
-    VkPhysicalDeviceMemoryProperties m_PhysDevMemProps;
-    VkDescriptorPool m_DescriptorPool;
+    VkInstance instance;
+    VkDevice dev;
+    VkPhysicalDevice physDev;
+    VkPhysicalDeviceProperties physDevProps;
+    VkPhysicalDeviceMemoryProperties physDevMemProps;
+    VkDescriptorPool descriptorPool;
 
-    DescriptorTable m_ConstantsDescriptorTable;
-    rhi_buffer m_ConstantsUniformBuffer;
-    DescriptorTable m_TexturesDescriptorTable;
-    DescriptorTable m_SamplersDescriptorTable;
+    DescriptorTable constantsDescriptorTable;
+    rhi_buffer constantsUniformBuffer;
+    DescriptorTable texturesDescriptorTable;
+    DescriptorTable SamplersDescriptorTable;
 
-    VkSurfaceKHR m_Surface;
-    VkSwapchainKHR m_Swapchain;
-    bool m_SwapchainUsable;
-    bool m_RecreateSwapchain;
+    VkSurfaceKHR surface;
+    VkSwapchainKHR swapchain;
+    bool swapchainUsable;
+    bool recreateSwapchain;
 
-    inline_vec<rhi_rtv, kRhiMaxNumSwapchainTextures> m_SwapchainRTVs{};
-    uint32_t m_SwapchainTextureIndex;
+    inline_vec<rhi_rtv, kRhiMaxNumSwapchainTextures> swapchainRTVs;
+    uint32_t swapchainTextureIndex;
 
-    array<VkSemaphore, kRhiMaxNumSwapchainTextures> m_RenderFinishedSemaphores;
-    array<VkSemaphore, kRhiMaxNumFramesInFlight> m_SwapchainAcquireSemaphores;
+    array<VkSemaphore, kRhiMaxNumSwapchainTextures> renderFinishedSemaphores;
+    array<VkSemaphore, kRhiMaxNumFramesInFlight> swapchainAcquireSemaphores;
 
-    DeviceQueue m_GraphicsQueue;
-    uint32_t m_FrameIndex;
-    array<rhi_cmdlist, kRhiMaxNumFramesInFlight> m_GraphicsQueueCmd;
-    array<uint64_t, kRhiMaxNumFramesInFlight> m_GraphicsQueueCmdDone;
+    DeviceQueue graphicsQueue;
+    uint32_t frameIndex;
+    array<rhi_cmdlist, kRhiMaxNumFramesInFlight> graphicsQueueCmd;
+    array<uint64_t, kRhiMaxNumFramesInFlight> graphicsQueueCmdDone;
 
-    DeviceQueue m_TransferQueue;
-    rhi_cmdlist m_TransferQueueCmd;
-    uint64_t m_TransferQueueCmdDone;
+    DeviceQueue transferQueue;
+    rhi_cmdlist transferQueueCmd;
+    uint64_t transferQueueCmdDone;
 };
-rhi_state *g_State;
-region_alloc g_Alloc;
+rhi_state *rhi;
 
 //
 
@@ -566,12 +565,12 @@ void VulkanNameHandle(VkObjectType type, uint64_t handle, byteview name)
     };
 
     static auto fn = VK_GET_INSTANCE_PROC_ADDR(vkSetDebugUtilsObjectNameEXT);
-    fn(g_State->m_Dev, &nameInfo);
+    fn(rhi->dev, &nameInfo);
 }
 
 auto CbvOffset(uint32_t offset) -> uint32_t
 {
-    return AlignedUp(offset, g_State->m_PhysDevProps.limits.minUniformBufferOffsetAlignment);
+    return AlignedUp(offset, rhi->physDevProps.limits.minUniformBufferOffsetAlignment);
 }
 
 auto FindMemoryTypeIndex(VkMemoryRequirements memRequirements, VkMemoryPropertyFlags properties) -> uint32_t
@@ -580,7 +579,7 @@ auto FindMemoryTypeIndex(VkMemoryRequirements memRequirements, VkMemoryPropertyF
 
     static const VkPhysicalDeviceMemoryProperties memPropertities = [] -> VkPhysicalDeviceMemoryProperties {
         VkPhysicalDeviceMemoryProperties memPropertities;
-        vkGetPhysicalDeviceMemoryProperties(g_State->m_PhysDev, &memPropertities);
+        vkGetPhysicalDeviceMemoryProperties(rhi->physDev, &memPropertities);
         return memPropertities;
     }();
 
@@ -682,19 +681,19 @@ auto GetDeviceQueue(rhi_queue_type queueType) -> DeviceQueue &
     switch (queueType)
     {
     case rhi_queue_type::Graphics:
-        return g_State->m_GraphicsQueue;
+        return rhi->graphicsQueue;
     case rhi_queue_type::Transfer:
-        return g_State->m_TransferQueue;
+        return rhi->transferQueue;
     }
     ASSERT(false);
-    return g_State->m_GraphicsQueue;
+    return rhi->graphicsQueue;
 }
 
 void CmdDrawInternal(VulkanCmdListData &cmdData)
 {
     VkCommandBuffer cmdbuf = cmdData.cmdbuf;
     const VulkanPipelineData &pipelineData =
-        HandlePool::ResolveData(g_State->m_GraphicsPipelines, cmdData.boundGraphicsPipeline);
+        HandlePool::ResolveData(rhi->graphicsPipelines, cmdData.boundGraphicsPipeline);
 
     const array<uint32_t, 4> offsets{
         cmdData.frameConstantHead,
@@ -704,26 +703,26 @@ void CmdDrawInternal(VulkanCmdListData &cmdData)
     };
 
     vkCmdBindDescriptorSets(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineData.layout, 0, 1,
-                            &g_State->m_ConstantsDescriptorTable.set, Array::Size(offsets), offsets.data);
+                            &rhi->constantsDescriptorTable.set, Array::Size(offsets), offsets.data);
 
-    cmdData.drawConstantHead += CbvOffset(g_State->m_Limits.drawConstantSize);
-    cmdData.largeDrawConstantHead += CbvOffset(g_State->m_Limits.largeDrawConstantSize);
+    cmdData.drawConstantHead += CbvOffset(rhi->limits.drawConstantSize);
+    cmdData.largeDrawConstantHead += CbvOffset(rhi->limits.largeDrawConstantSize);
 }
 
 void CreateSwapchain(region_alloc alloc)
 {
     void *allocMark = alloc.at;
 
-    VkSwapchainKHR oldSwapchain = g_State->m_Swapchain;
+    VkSwapchainKHR oldSwapchain = rhi->swapchain;
 
     static bool logPresentModes = true;
     VkPresentModeKHR presentMode = [&] -> VkPresentModeKHR {
         auto &presentModes = RegionAlloc::AllocVec<VkPresentModeKHR, 16>(alloc);
         uint32_t presentModeCount = 0;
-        vkGetPhysicalDeviceSurfacePresentModesKHR(g_State->m_PhysDev, g_State->m_Surface, &presentModeCount, nullptr);
+        vkGetPhysicalDeviceSurfacePresentModesKHR(rhi->physDev, rhi->surface, &presentModeCount, nullptr);
 
         InlineVec::Resize(presentModes, presentModeCount);
-        vkGetPhysicalDeviceSurfacePresentModesKHR(g_State->m_PhysDev, g_State->m_Surface, &presentModeCount,
+        vkGetPhysicalDeviceSurfacePresentModesKHR(rhi->physDev, rhi->surface, &presentModeCount,
                                                   InlineVec::DataPtr(presentModes));
 
         VkPresentModeKHR bestMode = VK_PRESENT_MODE_FIFO_KHR;
@@ -737,11 +736,11 @@ void CreateSwapchain(region_alloc alloc)
             {
 
             case VK_PRESENT_MODE_FIFO_LATEST_READY_KHR: {
-                better = !Any(g_State->m_Flags & rhi_flags::VSync);
+                better = !Any(rhi->flags & rhi_flags::VSync);
                 break;
             }
             case VK_PRESENT_MODE_IMMEDIATE_KHR: {
-                better = !Any(g_State->m_Flags & rhi_flags::VSync) && bestMode != VK_PRESENT_MODE_FIFO_LATEST_READY_KHR;
+                better = !Any(rhi->flags & rhi_flags::VSync) && bestMode != VK_PRESENT_MODE_FIFO_LATEST_READY_KHR;
                 break;
             }
 
@@ -766,16 +765,15 @@ void CreateSwapchain(region_alloc alloc)
     }();
 
     VkSurfaceCapabilitiesKHR surfaceCapabilities;
-    VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(g_State->m_PhysDev, g_State->m_Surface, &surfaceCapabilities));
+    VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(rhi->physDev, rhi->surface, &surfaceCapabilities));
 
     auto surfaceFormat = [&] -> VkSurfaceFormatKHR {
         uint32_t surfaceFormatCount;
-        VK_CHECK(
-            vkGetPhysicalDeviceSurfaceFormatsKHR(g_State->m_PhysDev, g_State->m_Surface, &surfaceFormatCount, nullptr));
+        VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(rhi->physDev, rhi->surface, &surfaceFormatCount, nullptr));
 
         auto &surfaceFormats = RegionAlloc::AllocVec<VkSurfaceFormatKHR, 16>(alloc);
         InlineVec::Resize(surfaceFormats, surfaceFormatCount);
-        vkGetPhysicalDeviceSurfaceFormatsKHR(g_State->m_PhysDev, g_State->m_Surface, &surfaceFormatCount,
+        vkGetPhysicalDeviceSurfaceFormatsKHR(rhi->physDev, rhi->surface, &surfaceFormatCount,
                                              InlineVec::DataPtr(surfaceFormats));
 
         auto it = std::ranges::find_if(surfaceFormats, [](VkSurfaceFormatKHR surfaceFormat) -> bool {
@@ -806,7 +804,7 @@ void CreateSwapchain(region_alloc alloc)
 
     const VkSwapchainCreateInfoKHR createInfo{
         .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-        .surface = g_State->m_Surface,
+        .surface = rhi->surface,
         .minImageCount = swapchainMinImageCount,
         .imageFormat = surfaceFormat.format,
         .imageColorSpace = surfaceFormat.colorSpace,
@@ -818,31 +816,31 @@ void CreateSwapchain(region_alloc alloc)
         .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
         .presentMode = presentMode,
         .clipped = VK_TRUE,
-        .oldSwapchain = g_State->m_Swapchain,
+        .oldSwapchain = rhi->swapchain,
     };
-    VK_CHECK(vkCreateSwapchainKHR(g_State->m_Dev, &createInfo, nullptr, &g_State->m_Swapchain));
+    VK_CHECK(vkCreateSwapchainKHR(rhi->dev, &createInfo, nullptr, &rhi->swapchain));
 
     uint32_t swapchainTexturesCount;
-    vkGetSwapchainImagesKHR(g_State->m_Dev, g_State->m_Swapchain, &swapchainTexturesCount, nullptr);
+    vkGetSwapchainImagesKHR(rhi->dev, rhi->swapchain, &swapchainTexturesCount, nullptr);
 
     ASSERT(swapchainTexturesCount <= kRhiMaxNumSwapchainTextures);
     array<VkImage, kRhiMaxNumSwapchainTextures> swapchainImages;
 
-    vkGetSwapchainImagesKHR(g_State->m_Dev, g_State->m_Swapchain, &swapchainTexturesCount, swapchainImages.data);
+    vkGetSwapchainImagesKHR(rhi->dev, rhi->swapchain, &swapchainTexturesCount, swapchainImages.data);
 
     for (size_t i = 0; i < swapchainMinImageCount; ++i)
     {
         rhi_texture texture;
         rhi_rtv rtv;
 
-        if (g_State->m_SwapchainRTVs.size > i)
+        if (rhi->swapchainRTVs.size > i)
         {
-            rtv = g_State->m_SwapchainRTVs[i];
-            VulkanTextureViewData &rtvData = HandlePool::ResolveData(g_State->m_RenderTargetViews, rtv);
+            rtv = rhi->swapchainRTVs[i];
+            VulkanTextureViewData &rtvData = HandlePool::ResolveData(rhi->rtvs, rtv);
             rtvData.format = surfaceFormat.format;
 
             texture = rtvData.texture;
-            VulkanTextureData &textureData = HandlePool::ResolveData(g_State->m_Textures, texture);
+            VulkanTextureData &textureData = HandlePool::ResolveData(rhi->textures, texture);
             textureData.image = swapchainImages[i];
             textureData.state = rhi_texture_state::Present;
             textureData.layout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -850,7 +848,7 @@ void CreateSwapchain(region_alloc alloc)
             textureData.extent = VkExtent3D{surfaceExtent.width, surfaceExtent.height, 1};
             textureData.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 
-            vkDestroyImageView(g_State->m_Dev, rtvData.imageView, g_State->vkAlloc);
+            vkDestroyImageView(rhi->dev, rtvData.imageView, rhi->vkAlloc);
 
             const VkImageViewCreateInfo imageViewCreateInfo{
                 .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -866,7 +864,7 @@ void CreateSwapchain(region_alloc alloc)
                         .layerCount = 1,
                     },
             };
-            vkCreateImageView(g_State->m_Dev, &imageViewCreateInfo, g_State->vkAlloc, &rtvData.imageView);
+            vkCreateImageView(rhi->dev, &imageViewCreateInfo, rhi->vkAlloc, &rtvData.imageView);
         }
         else
         {
@@ -879,18 +877,18 @@ void CreateSwapchain(region_alloc alloc)
                 .extent = VkExtent3D{surfaceExtent.width, surfaceExtent.height, 1},
             };
 
-            texture = HandlePool::Acquire(g_State->m_Textures, textureData);
+            texture = HandlePool::Acquire(rhi->textures, textureData);
 
             rtv = Rhi::CreateRenderTargetView(rhi_render_target_view_desc{
                 .texture = texture,
             });
 
-            InlineVec::Append(g_State->m_SwapchainRTVs, rtv);
+            InlineVec::Append(rhi->swapchainRTVs, rtv);
         }
     }
 
     if (oldSwapchain)
-        vkDestroySwapchainKHR(g_State->m_Dev, oldSwapchain, g_State->vkAlloc);
+        vkDestroySwapchainKHR(rhi->dev, oldSwapchain, rhi->vkAlloc);
 
     RegionAlloc::Reset(alloc, allocMark);
 }
@@ -909,7 +907,7 @@ auto CreateTimeline(uint64_t initialValue) -> VkSemaphore
     };
 
     VkSemaphore semaphore;
-    vkCreateSemaphore(g_State->m_Dev, &semaphoreCreateInfo, nullptr, &semaphore);
+    vkCreateSemaphore(rhi->dev, &semaphoreCreateInfo, nullptr, &semaphore);
     return semaphore;
 }
 
@@ -924,7 +922,7 @@ void WaitTimeline(VkSemaphore timeline, uint64_t waitValue)
         .pValues = &waitValue,
     };
 
-    VK_CHECK(vkWaitSemaphores(g_State->m_Dev, &waitInfo, 1e9));
+    VK_CHECK(vkWaitSemaphores(rhi->dev, &waitInfo, 1e9));
 
 #if 0
     {
@@ -956,22 +954,21 @@ void WriteDescriptorTables(region_alloc &alloc)
     auto &descriptorBufferInfos = RegionAlloc::AllocVec<VkDescriptorBufferInfo, kMaxDescriptorUpdates>(alloc);
 
     { // TEXTURES
-        for (uint32_t i = 0; i < HandlePool::Capacity(g_State->m_SampledTextureViews); ++i)
+        for (uint32_t i = 0; i < HandlePool::Capacity(rhi->stvs); ++i)
         {
-            auto &slot = g_State->m_SampledTextureViews[i];
+            auto &slot = rhi->stvs[i];
             if (!slot.used)
                 continue;
             if (slot.data.descriptorWritten)
                 continue;
 
             const VulkanTextureViewData &textureViewData = slot.data;
-            const VulkanTextureData &textureData =
-                HandlePool::ResolveData(g_State->m_Textures, textureViewData.texture);
+            const VulkanTextureData &textureData = HandlePool::ResolveData(rhi->textures, textureViewData.texture);
 
             VkWriteDescriptorSet &vulkanSetWrite =
                 InlineVec::Append(descriptorWrites, VkWriteDescriptorSet{
                                                         .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                                                        .dstSet = g_State->m_TexturesDescriptorTable.set,
+                                                        .dstSet = rhi->texturesDescriptorTable.set,
                                                         .dstBinding = 0,
                                                         .dstArrayElement = i,
                                                         .descriptorCount = 1,
@@ -989,9 +986,9 @@ void WriteDescriptorTables(region_alloc &alloc)
     }
 
     { // SAMPLERS
-        for (uint32_t i = 0; i < HandlePool::Capacity(g_State->m_Samplers); ++i)
+        for (uint32_t i = 0; i < HandlePool::Capacity(rhi->samplers); ++i)
         {
-            auto &slot = g_State->m_Samplers[i];
+            auto &slot = rhi->samplers[i];
             if (!slot.used)
                 continue;
             if (slot.data.descriptorWritten)
@@ -1002,7 +999,7 @@ void WriteDescriptorTables(region_alloc &alloc)
             VkWriteDescriptorSet &vulkanSetWrite =
                 InlineVec::Append(descriptorWrites, VkWriteDescriptorSet{
                                                         .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                                                        .dstSet = g_State->m_SamplersDescriptorTable.set,
+                                                        .dstSet = rhi->SamplersDescriptorTable.set,
                                                         .dstBinding = 0,
                                                         .dstArrayElement = i,
                                                         .descriptorCount = 1,
@@ -1017,7 +1014,7 @@ void WriteDescriptorTables(region_alloc &alloc)
         }
     }
 
-    vkUpdateDescriptorSets(g_State->m_Dev, descriptorWrites.size, InlineVec::DataPtr(descriptorWrites), 0, nullptr);
+    vkUpdateDescriptorSets(rhi->dev, descriptorWrites.size, InlineVec::DataPtr(descriptorWrites), 0, nullptr);
 
     RegionAlloc::Reset(alloc, allocMark);
 }
@@ -1029,15 +1026,15 @@ void Rhi::Bootstrap(region_alloc &alloc, const rhi_init_desc &rhiDesc)
     void *allocMark = alloc.at;
 
     {
-        g_Alloc = RegionAlloc::Create(1_MiB, 0);
-        g_State = &RegionAlloc::Alloc<rhi_state>(g_Alloc);
+        rhi = &RegionAlloc::Alloc<rhi_state>(RegionAlloc::g_BootstrapAlloc);
+        rhi->recreateSwapchain = true;
 
         constexpr uint32_t kInvalidIndex = std::numeric_limits<uint32_t>::max();
 
         ASSERT(rhiDesc.limits.numFramesInFlight <= kRhiMaxNumFramesInFlight);
 
-        g_State->m_Flags = rhiDesc.flags;
-        g_State->m_Limits = rhiDesc.limits;
+        rhi->flags = rhiDesc.flags;
+        rhi->limits = rhiDesc.limits;
 
         const VkApplicationInfo appInfo{
             .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
@@ -1165,21 +1162,20 @@ void Rhi::Bootstrap(region_alloc &alloc, const rhi_init_desc &rhiDesc)
             .enabledExtensionCount = static_cast<uint32_t>(enabledInstanceExtensions.size),
             .ppEnabledExtensionNames = InlineVec::DataPtr(enabledInstanceExtensions),
         };
-        VK_CHECK(vkCreateInstance(&instanceCreateInfo, nullptr, &g_State->m_Instance));
+        VK_CHECK(vkCreateInstance(&instanceCreateInfo, nullptr, &rhi->instance));
 
         if constexpr (kRhiValidations)
         {
             auto createDebugUtilsMessenger = VK_GET_INSTANCE_PROC_ADDR(vkCreateDebugUtilsMessengerEXT);
-            VK_CHECK(
-                createDebugUtilsMessenger(g_State->m_Instance, &debugMessengerCreateInfo, nullptr, &debugMessenger));
+            VK_CHECK(createDebugUtilsMessenger(rhi->instance, &debugMessengerCreateInfo, nullptr, &debugMessenger));
         }
 
         uint32_t numPhysDevices = 0;
-        VK_CHECK(vkEnumeratePhysicalDevices(g_State->m_Instance, &numPhysDevices, nullptr));
+        VK_CHECK(vkEnumeratePhysicalDevices(rhi->instance, &numPhysDevices, nullptr));
 
         auto &physDevs = RegionAlloc::AllocVec<VkPhysicalDevice, 16>(alloc);
         InlineVec::Resize(physDevs, numPhysDevices);
-        VK_CHECK(vkEnumeratePhysicalDevices(g_State->m_Instance, &numPhysDevices, InlineVec::DataPtr(physDevs)));
+        VK_CHECK(vkEnumeratePhysicalDevices(rhi->instance, &numPhysDevices, InlineVec::DataPtr(physDevs)));
 
         auto &deviceExtensions = RegionAlloc::AllocVec<const char *, 256>(alloc);
         InlineVec::Append(deviceExtensions, VK_KHR_SWAPCHAIN_EXTENSION_NAME);
@@ -1278,24 +1274,24 @@ void Rhi::Bootstrap(region_alloc &alloc, const rhi_init_desc &rhiDesc)
             }
 
             // TODO: pick best device
-            g_State->m_PhysDev = physDev;
-            g_State->m_PhysDevProps = props;
-            g_State->m_PhysDevMemProps = memProps;
-            g_State->m_GraphicsQueue.queueFamilyIndex = graphicsQueueIndex;
-            g_State->m_TransferQueue.queueFamilyIndex = transferQueueIndex;
+            rhi->physDev = physDev;
+            rhi->physDevProps = props;
+            rhi->physDevMemProps = memProps;
+            rhi->graphicsQueue.queueFamilyIndex = graphicsQueueIndex;
+            rhi->transferQueue.queueFamilyIndex = transferQueueIndex;
 
             break;
         }
 
-        ASSERT(g_State->m_PhysDev);
+        ASSERT(rhi->physDev);
 
         const float queuePriority = 1.0f;
         auto &queueCreateInfos = RegionAlloc::AllocVec<VkDeviceQueueCreateInfo, 2>(alloc);
-        if (g_State->m_TransferQueue.queueFamilyIndex == kInvalidIndex)
+        if (rhi->transferQueue.queueFamilyIndex == kInvalidIndex)
         {
             InlineVec::Append(queueCreateInfos, VkDeviceQueueCreateInfo{
                                                     .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-                                                    .queueFamilyIndex = g_State->m_GraphicsQueue.queueFamilyIndex,
+                                                    .queueFamilyIndex = rhi->graphicsQueue.queueFamilyIndex,
                                                     .queueCount = 1,
                                                     .pQueuePriorities = &queuePriority,
                                                 });
@@ -1304,14 +1300,14 @@ void Rhi::Bootstrap(region_alloc &alloc, const rhi_init_desc &rhiDesc)
         {
             InlineVec::Append(queueCreateInfos, VkDeviceQueueCreateInfo{
                                                     .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-                                                    .queueFamilyIndex = g_State->m_GraphicsQueue.queueFamilyIndex,
+                                                    .queueFamilyIndex = rhi->graphicsQueue.queueFamilyIndex,
                                                     .queueCount = 1,
                                                     .pQueuePriorities = &queuePriority,
                                                 });
 
             InlineVec::Append(queueCreateInfos, VkDeviceQueueCreateInfo{
                                                     .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-                                                    .queueFamilyIndex = g_State->m_TransferQueue.queueFamilyIndex,
+                                                    .queueFamilyIndex = rhi->transferQueue.queueFamilyIndex,
                                                     .queueCount = 1,
                                                     .pQueuePriorities = &queuePriority,
                                                 });
@@ -1373,19 +1369,18 @@ void Rhi::Bootstrap(region_alloc &alloc, const rhi_init_desc &rhiDesc)
             .enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size),
             .ppEnabledExtensionNames = InlineVec::DataPtr(deviceExtensions),
         };
-        VK_CHECK(vkCreateDevice(g_State->m_PhysDev, &deviceCreateInfo, nullptr, &g_State->m_Dev));
+        VK_CHECK(vkCreateDevice(rhi->physDev, &deviceCreateInfo, nullptr, &rhi->dev));
 
-        vkGetDeviceQueue(g_State->m_Dev, g_State->m_GraphicsQueue.queueFamilyIndex, 0, &g_State->m_GraphicsQueue.queue);
+        vkGetDeviceQueue(rhi->dev, rhi->graphicsQueue.queueFamilyIndex, 0, &rhi->graphicsQueue.queue);
 
-        if (g_State->m_TransferQueue.queueFamilyIndex == kInvalidIndex)
+        if (rhi->transferQueue.queueFamilyIndex == kInvalidIndex)
         {
-            g_State->m_TransferQueue.queueFamilyIndex = g_State->m_GraphicsQueue.queueFamilyIndex;
-            g_State->m_TransferQueue.queue = g_State->m_GraphicsQueue.queue;
+            rhi->transferQueue.queueFamilyIndex = rhi->graphicsQueue.queueFamilyIndex;
+            rhi->transferQueue.queue = rhi->graphicsQueue.queue;
         }
         else
         {
-            vkGetDeviceQueue(g_State->m_Dev, g_State->m_TransferQueue.queueFamilyIndex, 0,
-                             &g_State->m_TransferQueue.queue);
+            vkGetDeviceQueue(rhi->dev, rhi->transferQueue.queueFamilyIndex, 0, &rhi->transferQueue.queue);
         }
 
         auto initQueue = [](DeviceQueue &queue, rhi_queue_type queueType, span<rhi_cmdlist> cmd) -> void {
@@ -1394,7 +1389,7 @@ void Rhi::Bootstrap(region_alloc &alloc, const rhi_init_desc &rhiDesc)
                 .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
                 .queueFamilyIndex = queue.queueFamilyIndex,
             };
-            VK_CHECK(vkCreateCommandPool(g_State->m_Dev, &commandPoolCreateInfo, nullptr, &queue.cmdPool));
+            VK_CHECK(vkCreateCommandPool(rhi->dev, &commandPoolCreateInfo, nullptr, &queue.cmdPool));
 
             queue.timeline = CreateTimeline(0);
             queue.timelineNext = 1;
@@ -1404,22 +1399,22 @@ void Rhi::Bootstrap(region_alloc &alloc, const rhi_init_desc &rhiDesc)
                 i = CreateCmdList(queueType);
             }
         };
-        initQueue(g_State->m_GraphicsQueue, rhi_queue_type::Graphics,
-                  span{g_State->m_GraphicsQueueCmd.data, g_State->m_Limits.numFramesInFlight});
-        initQueue(g_State->m_TransferQueue, rhi_queue_type::Transfer, span{&g_State->m_TransferQueueCmd, 1});
+        initQueue(rhi->graphicsQueue, rhi_queue_type::Graphics,
+                  span{rhi->graphicsQueueCmd.data, rhi->limits.numFramesInFlight});
+        initQueue(rhi->transferQueue, rhi_queue_type::Transfer, span{&rhi->transferQueueCmd, 1});
 
         const VkSemaphoreCreateInfo semaphoreCreateInfo{
             .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
         };
-        for (size_t i = 0; i < g_State->m_Limits.numFramesInFlight; ++i)
+        for (size_t i = 0; i < rhi->limits.numFramesInFlight; ++i)
         {
-            VK_CHECK(vkCreateSemaphore(g_State->m_Dev, &semaphoreCreateInfo, nullptr,
-                                       g_State->m_SwapchainAcquireSemaphores.data + i));
+            VK_CHECK(
+                vkCreateSemaphore(rhi->dev, &semaphoreCreateInfo, nullptr, rhi->swapchainAcquireSemaphores.data + i));
         }
         for (size_t i = 0; i < kRhiMaxNumSwapchainTextures; ++i)
         {
-            VK_CHECK(vkCreateSemaphore(g_State->m_Dev, &semaphoreCreateInfo, nullptr,
-                                       g_State->m_RenderFinishedSemaphores.data + i));
+            VK_CHECK(
+                vkCreateSemaphore(rhi->dev, &semaphoreCreateInfo, nullptr, rhi->renderFinishedSemaphores.data + i));
         }
 
 #if defined(__linux__)
@@ -1435,7 +1430,7 @@ void Rhi::Bootstrap(region_alloc &alloc, const rhi_init_desc &rhiDesc)
             .hinstance = WindowsPlatform::GetHInstance(),
             .hwnd = WindowsPlatform::WinGetHandle(),
         };
-        vkCreateWin32SurfaceKHR(g_State->m_Instance, &surfaceCreateInfo, g_State->vkAlloc, &g_State->m_Surface);
+        vkCreateWin32SurfaceKHR(rhi->instance, &surfaceCreateInfo, rhi->vkAlloc, &rhi->surface);
 #endif
     }
 
@@ -1457,20 +1452,20 @@ void Rhi::Bootstrap(region_alloc &alloc, const rhi_init_desc &rhiDesc)
         .poolSizeCount = (uint32_t)Array::Size(descriptorPoolSizes),
         .pPoolSizes = descriptorPoolSizes.data,
     };
-    vkCreateDescriptorPool(g_State->m_Dev, &descriptorPoolCreateInfo, nullptr, &g_State->m_DescriptorPool);
+    vkCreateDescriptorPool(rhi->dev, &descriptorPoolCreateInfo, nullptr, &rhi->descriptorPool);
 
     auto initDescriptorTable = [](DescriptorTable &table,
                                   const VkDescriptorSetLayoutCreateInfo &layoutCreateInfo) -> void {
-        VK_CHECK(vkCreateDescriptorSetLayout(g_State->m_Dev, &layoutCreateInfo, g_State->vkAlloc, &table.layout));
+        VK_CHECK(vkCreateDescriptorSetLayout(rhi->dev, &layoutCreateInfo, rhi->vkAlloc, &table.layout));
 
         const VkDescriptorSetAllocateInfo descriptorSetAllocInfo{
             .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-            .descriptorPool = g_State->m_DescriptorPool,
+            .descriptorPool = rhi->descriptorPool,
             .descriptorSetCount = 1,
             .pSetLayouts = &table.layout,
         };
 
-        VK_CHECK(vkAllocateDescriptorSets(g_State->m_Dev, &descriptorSetAllocInfo, &table.set));
+        VK_CHECK(vkAllocateDescriptorSets(rhi->dev, &descriptorSetAllocInfo, &table.set));
     };
 
     { // Constants
@@ -1508,40 +1503,38 @@ void Rhi::Bootstrap(region_alloc &alloc, const rhi_init_desc &rhiDesc)
             .pBindings = descriptorLayoutBindings.data,
         };
 
-        initDescriptorTable(g_State->m_ConstantsDescriptorTable, descriptorSetLayoutCreateInfo);
+        initDescriptorTable(rhi->constantsDescriptorTable, descriptorSetLayoutCreateInfo);
 
         const uint64_t bufferSize =
-            g_State->m_Limits.numFramesInFlight *
-            (CbvOffset(g_State->m_Limits.frameConstantSize) +
-             g_State->m_Limits.maxPassCount * CbvOffset(g_State->m_Limits.passConstantSize) +
-             g_State->m_Limits.maxDrawCount * CbvOffset(g_State->m_Limits.drawConstantSize) +
-             g_State->m_Limits.maxDrawCount * CbvOffset(g_State->m_Limits.largeDrawConstantSize));
+            rhi->limits.numFramesInFlight * (CbvOffset(rhi->limits.frameConstantSize) +
+                                             rhi->limits.maxPassCount * CbvOffset(rhi->limits.passConstantSize) +
+                                             rhi->limits.maxDrawCount * CbvOffset(rhi->limits.drawConstantSize) +
+                                             rhi->limits.maxDrawCount * CbvOffset(rhi->limits.largeDrawConstantSize));
         LOG("Constants Buffer Size: %" PRIu64 "mb", CeilDiv(bufferSize, 1 << 20));
 
-        g_State->m_ConstantsUniformBuffer = CreateBuffer(rhi_buffer_desc{
+        rhi->constantsUniformBuffer = CreateBuffer(rhi_buffer_desc{
             .size = bufferSize,
             .bufferUsage = rhi_buffer_usage::Uniform,
             .memoryUsage = rhi_memory_usage::CpuToGpu,
         });
-        const VkBuffer &vulkanBuffer =
-            HandlePool::ResolveData(g_State->m_Buffers, g_State->m_ConstantsUniformBuffer).buffer;
+        const VkBuffer &vulkanBuffer = HandlePool::ResolveData(rhi->buffers, rhi->constantsUniformBuffer).buffer;
 
         const array<VkDescriptorBufferInfo, 4> bufferInfos{
             VkDescriptorBufferInfo{
                 .buffer = vulkanBuffer,
-                .range = CbvOffset(g_State->m_Limits.frameConstantSize),
+                .range = CbvOffset(rhi->limits.frameConstantSize),
             },
             VkDescriptorBufferInfo{
                 .buffer = vulkanBuffer,
-                .range = CbvOffset(g_State->m_Limits.passConstantSize),
+                .range = CbvOffset(rhi->limits.passConstantSize),
             },
             VkDescriptorBufferInfo{
                 .buffer = vulkanBuffer,
-                .range = CbvOffset(g_State->m_Limits.drawConstantSize),
+                .range = CbvOffset(rhi->limits.drawConstantSize),
             },
             VkDescriptorBufferInfo{
                 .buffer = vulkanBuffer,
-                .range = CbvOffset(g_State->m_Limits.largeDrawConstantSize),
+                .range = CbvOffset(rhi->limits.largeDrawConstantSize),
             },
         };
 
@@ -1553,7 +1546,7 @@ void Rhi::Bootstrap(region_alloc &alloc, const rhi_init_desc &rhiDesc)
             {
                 InlineVec::Append(descriptorWrites, VkWriteDescriptorSet{
                                                         .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                                                        .dstSet = g_State->m_ConstantsDescriptorTable.set,
+                                                        .dstSet = rhi->constantsDescriptorTable.set,
                                                         .dstBinding = i,
                                                         .descriptorCount = 1,
                                                         .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
@@ -1562,7 +1555,7 @@ void Rhi::Bootstrap(region_alloc &alloc, const rhi_init_desc &rhiDesc)
             }
         }
 
-        vkUpdateDescriptorSets(g_State->m_Dev, descriptorWrites.size, InlineVec::DataPtr(descriptorWrites), 0, nullptr);
+        vkUpdateDescriptorSets(rhi->dev, descriptorWrites.size, InlineVec::DataPtr(descriptorWrites), 0, nullptr);
     }
 
     { // Textures
@@ -1579,7 +1572,7 @@ void Rhi::Bootstrap(region_alloc &alloc, const rhi_init_desc &rhiDesc)
         const VkDescriptorSetLayoutBinding descriptorLayoutBinding{
             .binding = 0,
             .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-            .descriptorCount = g_State->m_Limits.numTextureViews,
+            .descriptorCount = rhi->limits.numTextureViews,
             .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
         };
 
@@ -1591,7 +1584,7 @@ void Rhi::Bootstrap(region_alloc &alloc, const rhi_init_desc &rhiDesc)
             .pBindings = &descriptorLayoutBinding,
         };
 
-        initDescriptorTable(g_State->m_TexturesDescriptorTable, descriptorSetLayoutCreateInfo);
+        initDescriptorTable(rhi->texturesDescriptorTable, descriptorSetLayoutCreateInfo);
     }
 
     { // Samplers
@@ -1608,7 +1601,7 @@ void Rhi::Bootstrap(region_alloc &alloc, const rhi_init_desc &rhiDesc)
         const VkDescriptorSetLayoutBinding descriptorLayoutBinding{
             .binding = 0,
             .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
-            .descriptorCount = g_State->m_Limits.numSamplers,
+            .descriptorCount = rhi->limits.numSamplers,
             .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
         };
 
@@ -1620,7 +1613,7 @@ void Rhi::Bootstrap(region_alloc &alloc, const rhi_init_desc &rhiDesc)
             .pBindings = &descriptorLayoutBinding,
         };
 
-        initDescriptorTable(g_State->m_SamplersDescriptorTable, descriptorSetLayoutCreateInfo);
+        initDescriptorTable(rhi->SamplersDescriptorTable, descriptorSetLayoutCreateInfo);
     }
 
     RegionAlloc::Reset(alloc, allocMark);
@@ -1639,10 +1632,10 @@ auto Rhi::CreateBuffer(const rhi_buffer_desc &desc) -> rhi_buffer
         .usage = ConvertBufferUsageIntoVkBufferUsageFlags(desc.bufferUsage),
         .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
     };
-    VK_CHECK(vkCreateBuffer(g_State->m_Dev, &bufferCreateInfo, nullptr, &bufferData.buffer));
+    VK_CHECK(vkCreateBuffer(rhi->dev, &bufferCreateInfo, nullptr, &bufferData.buffer));
 
     VkMemoryRequirements memRequirements;
-    vkGetBufferMemoryRequirements(g_State->m_Dev, bufferData.buffer, &memRequirements);
+    vkGetBufferMemoryRequirements(rhi->dev, bufferData.buffer, &memRequirements);
 
     const uint32_t memoryTypeIndex =
         FindMemoryTypeIndex(memRequirements, ConvertMemoryUsageIntoVkMemoryPropertyFlags(desc.memoryUsage));
@@ -1652,41 +1645,41 @@ auto Rhi::CreateBuffer(const rhi_buffer_desc &desc) -> rhi_buffer
         .memoryTypeIndex = memoryTypeIndex,
     };
 
-    VK_CHECK(vkAllocateMemory(g_State->m_Dev, &memoryAllocInfo, nullptr, &bufferData.memory));
-    VK_CHECK(vkBindBufferMemory(g_State->m_Dev, bufferData.buffer, bufferData.memory, 0));
+    VK_CHECK(vkAllocateMemory(rhi->dev, &memoryAllocInfo, nullptr, &bufferData.memory));
+    VK_CHECK(vkBindBufferMemory(rhi->dev, bufferData.buffer, bufferData.memory, 0));
 
-    return HandlePool::Acquire(g_State->m_Buffers, bufferData);
+    return HandlePool::Acquire(rhi->buffers, bufferData);
 }
 
 void Rhi::NameBuffer(rhi_buffer buf, byteview name)
 {
-    const VulkanBufferData &bufferData = HandlePool::ResolveData(g_State->m_Buffers, buf);
+    const VulkanBufferData &bufferData = HandlePool::ResolveData(rhi->buffers, buf);
     VulkanNameHandle(VK_OBJECT_TYPE_BUFFER, (uint64_t)bufferData.buffer, name);
 }
 
 void Rhi::DestroyBuffer(rhi_buffer buffer)
 {
-    VulkanBufferData bufferData = HandlePool::ResolveData(g_State->m_Buffers, buffer);
+    VulkanBufferData bufferData = HandlePool::ResolveData(rhi->buffers, buffer);
 
     if (bufferData.mapped)
     {
-        vkUnmapMemory(g_State->m_Dev, bufferData.memory);
+        vkUnmapMemory(rhi->dev, bufferData.memory);
     }
-    vkDestroyBuffer(g_State->m_Dev, bufferData.buffer, nullptr);
-    vkFreeMemory(g_State->m_Dev, bufferData.memory, nullptr);
+    vkDestroyBuffer(rhi->dev, bufferData.buffer, nullptr);
+    vkFreeMemory(rhi->dev, bufferData.memory, nullptr);
 }
 
 auto Rhi::GetBufferSize(rhi_buffer buffer) -> uint64_t
 {
-    return HandlePool::ResolveData(g_State->m_Buffers, buffer).size;
+    return HandlePool::ResolveData(rhi->buffers, buffer).size;
 }
 
 auto Rhi::MapBuffer(rhi_buffer buffer) -> char *
 {
-    const VulkanBufferData &bufferData = HandlePool::ResolveData(g_State->m_Buffers, buffer);
+    const VulkanBufferData &bufferData = HandlePool::ResolveData(rhi->buffers, buffer);
     if (!bufferData.mapped)
     {
-        vkMapMemory(g_State->m_Dev, bufferData.memory, 0, VK_WHOLE_SIZE, 0, (void **)&bufferData.mapped);
+        vkMapMemory(rhi->dev, bufferData.memory, 0, VK_WHOLE_SIZE, 0, (void **)&bufferData.mapped);
     }
 
     return bufferData.mapped;
@@ -1694,10 +1687,10 @@ auto Rhi::MapBuffer(rhi_buffer buffer) -> char *
 
 void Rhi::UnmapBuffer(rhi_buffer buffer)
 {
-    VulkanBufferData &bufferData = HandlePool::ResolveData(g_State->m_Buffers, buffer);
+    VulkanBufferData &bufferData = HandlePool::ResolveData(rhi->buffers, buffer);
     if (bufferData.mapped)
     {
-        vkUnmapMemory(g_State->m_Dev, bufferData.memory);
+        vkUnmapMemory(rhi->dev, bufferData.memory);
         bufferData.mapped = nullptr;
     }
 }
@@ -1705,10 +1698,10 @@ void Rhi::UnmapBuffer(rhi_buffer buffer)
 void Rhi::CmdCopyBuffer(rhi_cmdlist cmd, rhi_buffer dst, uint32_t dstOffset, rhi_buffer src, uint32_t srcOffset,
                         uint32_t size)
 {
-    const VkCommandBuffer &cmdbuf = HandlePool::ResolveData(g_State->m_CmdLists, cmd).cmdbuf;
+    const VkCommandBuffer &cmdbuf = HandlePool::ResolveData(rhi->cmdlists, cmd).cmdbuf;
 
-    VulkanBufferData &dstBufferData = HandlePool::ResolveData(g_State->m_Buffers, dst);
-    VulkanBufferData &srcBufferData = HandlePool::ResolveData(g_State->m_Buffers, src);
+    VulkanBufferData &dstBufferData = HandlePool::ResolveData(rhi->buffers, dst);
+    VulkanBufferData &srcBufferData = HandlePool::ResolveData(rhi->buffers, src);
 
     EnsureHostWritesVisible(cmdbuf, srcBufferData);
 
@@ -1722,8 +1715,8 @@ void Rhi::CmdCopyBuffer(rhi_cmdlist cmd, rhi_buffer dst, uint32_t dstOffset, rhi
 
 void Rhi::CmdTransitionBuffer(rhi_cmdlist cmd, rhi_buffer buffer, rhi_buffer_state newState)
 {
-    const VkCommandBuffer &cmdbuf = HandlePool::ResolveData(g_State->m_CmdLists, cmd).cmdbuf;
-    VulkanBufferData &bufferData = HandlePool::ResolveData(g_State->m_Buffers, buffer);
+    const VkCommandBuffer &cmdbuf = HandlePool::ResolveData(rhi->cmdlists, cmd).cmdbuf;
+    VulkanBufferData &bufferData = HandlePool::ResolveData(rhi->buffers, buffer);
 
     VulkanBufferStateSyncInfo oldSync = VulkanBufferStateGetSyncInfo(bufferData.state);
     VulkanBufferStateSyncInfo newSync = VulkanBufferStateGetSyncInfo(newState);
@@ -1751,8 +1744,8 @@ void Rhi::CmdTransitionBuffer(rhi_cmdlist cmd, rhi_buffer buffer, rhi_buffer_sta
 
 void Rhi::CmdUavBarrierBuffer(rhi_cmdlist cmd, rhi_buffer buffer)
 {
-    const VkCommandBuffer &cmdbuf = HandlePool::ResolveData(g_State->m_CmdLists, cmd).cmdbuf;
-    VulkanBufferData &bufferData = HandlePool::ResolveData(g_State->m_Buffers, buffer);
+    const VkCommandBuffer &cmdbuf = HandlePool::ResolveData(rhi->cmdlists, cmd).cmdbuf;
+    VulkanBufferData &bufferData = HandlePool::ResolveData(rhi->buffers, buffer);
 
     const VkBufferMemoryBarrier2 barrier{
         .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
@@ -1778,7 +1771,7 @@ void Rhi::CmdUavBarrierBuffer(rhi_cmdlist cmd, rhi_buffer buffer)
 
 void Rhi::BufferMarkWritten(rhi_buffer buffer, uint32_t offset, uint32_t size)
 {
-    VulkanBufferData &bufferData = HandlePool::ResolveData(g_State->m_Buffers, buffer);
+    VulkanBufferData &bufferData = HandlePool::ResolveData(rhi->buffers, buffer);
 
     if (bufferData.dirty)
     {
@@ -1795,12 +1788,12 @@ void Rhi::BufferMarkWritten(rhi_buffer buffer, uint32_t offset, uint32_t size)
 
 auto Rhi::GetMinUniformBufferOffsetAlignment() -> uint32_t
 {
-    return g_State->m_PhysDevProps.limits.minUniformBufferOffsetAlignment;
+    return rhi->physDevProps.limits.minUniformBufferOffsetAlignment;
 }
 
 auto Rhi::GetOptimalBufferCopyOffsetAlignment() -> uint32_t
 {
-    return g_State->m_PhysDevProps.limits.optimalBufferCopyOffsetAlignment;
+    return rhi->physDevProps.limits.optimalBufferCopyOffsetAlignment;
 }
 
 auto Rhi::CreateCmdList(rhi_queue_type queueType) -> rhi_cmdlist
@@ -1814,50 +1807,50 @@ auto Rhi::CreateCmdList(rhi_queue_type queueType) -> rhi_cmdlist
     };
 
     VkCommandBuffer commandBuffer;
-    VK_CHECK(vkAllocateCommandBuffers(g_State->m_Dev, &allocInfo, &commandBuffer));
+    VK_CHECK(vkAllocateCommandBuffers(rhi->dev, &allocInfo, &commandBuffer));
 
     VulkanCmdListData cmdData{
         .cmdbuf = commandBuffer,
         .queueType = queueType,
     };
 
-    rhi_cmdlist cmd = HandlePool::Acquire(g_State->m_CmdLists, cmdData);
+    rhi_cmdlist cmd = HandlePool::Acquire(rhi->cmdlists, cmdData);
     return cmd;
 }
 
 void Rhi::ResetCmdList(rhi_cmdlist cmd)
 {
-    VulkanCmdListData &cmdData = HandlePool::ResolveData(g_State->m_CmdLists, cmd);
+    VulkanCmdListData &cmdData = HandlePool::ResolveData(rhi->cmdlists, cmd);
     VkCommandBuffer cmdbuf = cmdData.cmdbuf;
 
     VK_CHECK(vkResetCommandBuffer(cmdbuf, 0));
 
     cmdData.frameConstantHead =
-        GetFrameIndex() * (CbvOffset(g_State->m_Limits.frameConstantSize) +
-                           g_State->m_Limits.maxPassCount * CbvOffset(g_State->m_Limits.passConstantSize) +
-                           g_State->m_Limits.maxDrawCount * CbvOffset(g_State->m_Limits.drawConstantSize) +
-                           g_State->m_Limits.maxDrawCount * CbvOffset(g_State->m_Limits.largeDrawConstantSize));
+        GetFrameIndex() *
+        (CbvOffset(rhi->limits.frameConstantSize) + rhi->limits.maxPassCount * CbvOffset(rhi->limits.passConstantSize) +
+         rhi->limits.maxDrawCount * CbvOffset(rhi->limits.drawConstantSize) +
+         rhi->limits.maxDrawCount * CbvOffset(rhi->limits.largeDrawConstantSize));
 
-    cmdData.passConstantHead = cmdData.frameConstantHead + g_State->m_Limits.frameConstantSize;
+    cmdData.passConstantHead = cmdData.frameConstantHead + rhi->limits.frameConstantSize;
 
     cmdData.drawConstantHead =
-        cmdData.passConstantHead + (g_State->m_Limits.maxPassCount * CbvOffset(g_State->m_Limits.passConstantSize));
+        cmdData.passConstantHead + (rhi->limits.maxPassCount * CbvOffset(rhi->limits.passConstantSize));
 
     cmdData.largeDrawConstantHead =
-        cmdData.drawConstantHead + (g_State->m_Limits.maxDrawCount * CbvOffset(g_State->m_Limits.drawConstantSize));
+        cmdData.drawConstantHead + (rhi->limits.maxDrawCount * CbvOffset(rhi->limits.drawConstantSize));
 }
 
 void Rhi::NameCmdList(rhi_cmdlist cmd, byteview name)
 {
-    const VulkanCmdListData &cmdData = HandlePool::ResolveData(g_State->m_CmdLists, cmd);
+    const VulkanCmdListData &cmdData = HandlePool::ResolveData(rhi->cmdlists, cmd);
     VulkanNameHandle(VK_OBJECT_TYPE_COMMAND_BUFFER, (uint64_t)cmdData.cmdbuf, name);
 }
 
 void Rhi::DestroyCmdList(rhi_cmdlist cmd)
 {
-    VulkanCmdListData cmdData = HandlePool::ReleaseData(g_State->m_CmdLists, cmd);
+    VulkanCmdListData cmdData = HandlePool::ReleaseData(rhi->cmdlists, cmd);
     VkCommandPool cmdPool = GetDeviceQueue(cmdData.queueType).cmdPool;
-    vkFreeCommandBuffers(g_State->m_Dev, cmdPool, 1, &cmdData.cmdbuf);
+    vkFreeCommandBuffers(rhi->dev, cmdPool, 1, &cmdData.cmdbuf);
 }
 
 auto Rhi::CmdSetCheckpoint(rhi_cmdlist cmd, uint64_t data) -> uint64_t
@@ -1867,7 +1860,7 @@ auto Rhi::CmdSetCheckpoint(rhi_cmdlist cmd, uint64_t data) -> uint64_t
         return data;
     }
 
-    const VulkanCmdListData &cmdData = HandlePool::ResolveData(g_State->m_CmdLists, cmd);
+    const VulkanCmdListData &cmdData = HandlePool::ResolveData(rhi->cmdlists, cmd);
 
     static auto fn = VK_GET_INSTANCE_PROC_ADDR(vkCmdSetCheckpointNV);
     fn(cmdData.cmdbuf, reinterpret_cast<void *>(data));
@@ -1897,57 +1890,56 @@ auto Rhi::FrameBegin(region_alloc &alloc) -> rhi_cmdlist
 {
     void *allocMark = alloc.at;
 
-    if (g_State->m_RecreateSwapchain)
+    if (rhi->recreateSwapchain)
     {
-        vkDeviceWaitIdle(g_State->m_Dev);
+        vkDeviceWaitIdle(rhi->dev);
         CreateSwapchain(alloc);
-        g_State->m_SwapchainUsable = true;
-        g_State->m_RecreateSwapchain = false;
+        rhi->swapchainUsable = true;
+        rhi->recreateSwapchain = false;
     }
     else
     {
-        WaitTimeline(g_State->m_GraphicsQueue.timeline, g_State->m_GraphicsQueueCmdDone[g_State->m_FrameIndex]);
+        WaitTimeline(rhi->graphicsQueue.timeline, rhi->graphicsQueueCmdDone[rhi->frameIndex]);
     }
 
-    if (g_State->m_SwapchainUsable)
+    if (rhi->swapchainUsable)
     {
-        const VkResult acquireResult =
-            vkAcquireNextImageKHR(g_State->m_Dev, g_State->m_Swapchain, Limits<uint64_t>::Max(),
-                                  g_State->m_SwapchainAcquireSemaphores[g_State->m_FrameIndex], VK_NULL_HANDLE,
-                                  &g_State->m_SwapchainTextureIndex);
+        const VkResult acquireResult = vkAcquireNextImageKHR(rhi->dev, rhi->swapchain, Limits<uint64_t>::Max(),
+                                                             rhi->swapchainAcquireSemaphores[rhi->frameIndex],
+                                                             VK_NULL_HANDLE, &rhi->swapchainTextureIndex);
 
         switch (acquireResult)
         {
         case VK_ERROR_OUT_OF_DATE_KHR: {
-            g_State->m_SwapchainUsable = false;
-            g_State->m_RecreateSwapchain = true;
+            rhi->swapchainUsable = false;
+            rhi->recreateSwapchain = true;
             break;
         }
 
         case VK_SUBOPTIMAL_KHR: {
-            g_State->m_SwapchainUsable = true;
-            g_State->m_RecreateSwapchain = true;
+            rhi->swapchainUsable = true;
+            rhi->recreateSwapchain = true;
             break;
         }
 
         default: {
             VK_CHECK(acquireResult);
-            g_State->m_RecreateSwapchain = false;
-            g_State->m_SwapchainUsable = true;
+            rhi->recreateSwapchain = false;
+            rhi->swapchainUsable = true;
             break;
         }
         }
     }
 
-    if (!g_State->m_SwapchainUsable)
+    if (!rhi->swapchainUsable)
     {
-        vkDeviceWaitIdle(g_State->m_Dev);
+        vkDeviceWaitIdle(rhi->dev);
     }
 
-    const rhi_cmdlist cmd = g_State->m_GraphicsQueueCmd[g_State->m_FrameIndex];
+    const rhi_cmdlist cmd = rhi->graphicsQueueCmd[rhi->frameIndex];
     ResetCmdList(cmd);
 
-    const VulkanCmdListData &cmdData = HandlePool::ResolveData(g_State->m_CmdLists, cmd);
+    const VulkanCmdListData &cmdData = HandlePool::ResolveData(rhi->cmdlists, cmd);
     VkCommandBuffer cmdbuf = cmdData.cmdbuf;
 
     const VkCommandBufferBeginInfo commandBufferBeginInfo{
@@ -1963,9 +1955,9 @@ void Rhi::FrameEnd(region_alloc &alloc)
 {
     void *allocMark = alloc.at;
 
-    rhi_cmdlist cmd = g_State->m_GraphicsQueueCmd[g_State->m_FrameIndex];
+    rhi_cmdlist cmd = rhi->graphicsQueueCmd[rhi->frameIndex];
 
-    const VkCommandBuffer &cmdbuf = HandlePool::ResolveData(g_State->m_CmdLists, cmd).cmdbuf;
+    const VkCommandBuffer &cmdbuf = HandlePool::ResolveData(rhi->cmdlists, cmd).cmdbuf;
 
     VK_CHECK(vkEndCommandBuffer(cmdbuf));
 
@@ -1975,23 +1967,23 @@ void Rhi::FrameEnd(region_alloc &alloc)
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
     };
 
-    const VkSemaphore acquireSemaphore = g_State->m_SwapchainAcquireSemaphores[g_State->m_FrameIndex];
-    const VkSemaphore renderFinishedSemaphore = g_State->m_RenderFinishedSemaphores[g_State->m_SwapchainTextureIndex];
+    const VkSemaphore acquireSemaphore = rhi->swapchainAcquireSemaphores[rhi->frameIndex];
+    const VkSemaphore renderFinishedSemaphore = rhi->renderFinishedSemaphores[rhi->swapchainTextureIndex];
 
     const array<VkSemaphore, 2> signalSemaphores{
-        g_State->m_GraphicsQueue.timeline,
+        rhi->graphicsQueue.timeline,
         renderFinishedSemaphore,
     };
 
-    g_State->m_GraphicsQueueCmdDone[g_State->m_FrameIndex] = g_State->m_GraphicsQueue.timelineNext++;
+    rhi->graphicsQueueCmdDone[rhi->frameIndex] = rhi->graphicsQueue.timelineNext++;
 
     const VkTimelineSemaphoreSubmitInfo timelineSubmitInfo{
         .sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
         .signalSemaphoreValueCount = Array::Size(signalSemaphores),
-        .pSignalSemaphoreValues = &g_State->m_GraphicsQueueCmdDone[g_State->m_FrameIndex],
+        .pSignalSemaphoreValues = &rhi->graphicsQueueCmdDone[rhi->frameIndex],
     };
 
-    if (g_State->m_SwapchainUsable)
+    if (rhi->swapchainUsable) // TODO: very unsafe if we share the same cmdlist with uploads!!!
     {
         const VkSubmitInfo submitInfo{
             .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
@@ -2004,36 +1996,31 @@ void Rhi::FrameEnd(region_alloc &alloc)
             .signalSemaphoreCount = Array::Size(signalSemaphores),
             .pSignalSemaphores = signalSemaphores.data,
         };
-        VK_CHECK(vkQueueSubmit(g_State->m_GraphicsQueue.queue, 1, &submitInfo, VK_NULL_HANDLE));
+        VK_CHECK(vkQueueSubmit(rhi->graphicsQueue.queue, 1, &submitInfo, VK_NULL_HANDLE));
 
         const VkPresentInfoKHR presentInfo{
             .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
             .waitSemaphoreCount = 1,
             .pWaitSemaphores = &renderFinishedSemaphore,
             .swapchainCount = 1,
-            .pSwapchains = &g_State->m_Swapchain,
-            .pImageIndices = &g_State->m_SwapchainTextureIndex,
+            .pSwapchains = &rhi->swapchain,
+            .pImageIndices = &rhi->swapchainTextureIndex,
         };
 
-        const VkResult presentResult = vkQueuePresentKHR(g_State->m_GraphicsQueue.queue, &presentInfo);
+        const VkResult presentResult = vkQueuePresentKHR(rhi->graphicsQueue.queue, &presentInfo);
     }
 
-    g_State->m_FrameIndex = (g_State->m_FrameIndex + 1) % g_State->m_Limits.numFramesInFlight;
+    rhi->frameIndex = (rhi->frameIndex + 1) % rhi->limits.numFramesInFlight;
     RegionAlloc::Reset(alloc, allocMark);
-}
-
-auto Rhi::FrameGetCmdList() -> rhi_cmdlist
-{ // TODO: get rid of this
-    return g_State->m_GraphicsQueueCmd[g_State->m_FrameIndex];
 }
 
 void Rhi::PassBegin(rhi_pass_desc desc)
 {
-    rhi_cmdlist cmd = g_State->m_GraphicsQueueCmd[g_State->m_FrameIndex];
-    const VkCommandBuffer &cmdbuf = HandlePool::ResolveData(g_State->m_CmdLists, cmd).cmdbuf;
+    rhi_cmdlist cmd = rhi->graphicsQueueCmd[rhi->frameIndex];
+    const VkCommandBuffer &cmdbuf = HandlePool::ResolveData(rhi->cmdlists, cmd).cmdbuf;
 
-    const VulkanTextureViewData &rtvData = HandlePool::ResolveData(g_State->m_RenderTargetViews, desc.rtv);
-    const VulkanTextureData &renderTargetData = HandlePool::ResolveData(g_State->m_Textures, rtvData.texture);
+    const VulkanTextureViewData &rtvData = HandlePool::ResolveData(rhi->rtvs, desc.rtv);
+    const VulkanTextureData &renderTargetData = HandlePool::ResolveData(rhi->textures, rtvData.texture);
 
     const VkRenderingAttachmentInfo colorAttachmentInfo{
         .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
@@ -2056,8 +2043,8 @@ void Rhi::PassBegin(rhi_pass_desc desc)
 
     if (desc.dsv)
     {
-        const VulkanTextureViewData &dsvData = HandlePool::ResolveData(g_State->m_DepthStencilViews, desc.dsv);
-        const VulkanTextureData &depthStencilData = HandlePool::ResolveData(g_State->m_Textures, dsvData.texture);
+        const VulkanTextureViewData &dsvData = HandlePool::ResolveData(rhi->dsvs, desc.dsv);
+        const VulkanTextureData &depthStencilData = HandlePool::ResolveData(rhi->textures, dsvData.texture);
 
         depthAttachmentInfo = {
             .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
@@ -2091,31 +2078,32 @@ void Rhi::PassBegin(rhi_pass_desc desc)
 
 void Rhi::PassEnd()
 {
-    rhi_cmdlist cmd = g_State->m_GraphicsQueueCmd[g_State->m_FrameIndex];
-    VulkanCmdListData &cmdData = HandlePool::ResolveData(g_State->m_CmdLists, cmd);
+    rhi_cmdlist cmd = rhi->graphicsQueueCmd[rhi->frameIndex];
+    VulkanCmdListData &cmdData = HandlePool::ResolveData(rhi->cmdlists, cmd);
     VkCommandBuffer cmdbuf = cmdData.cmdbuf;
     vkCmdEndRendering(cmdbuf);
 
-    cmdData.passConstantHead += CbvOffset(g_State->m_Limits.passConstantSize);
+    cmdData.passConstantHead += CbvOffset(rhi->limits.passConstantSize);
 }
 
 auto Rhi::CreateShader(const rhi_shader_desc &desc) -> rhi_shader
 {
-    // TODO: correct lifetime
+    // TODO: correct lifetime. probably doesn't matter until we have more shaders and need a more complicated shader
+    // system
     auto alloc = RegionAlloc::Create(16_MiB, 0);
 
     span<uint32_t> spv = RegionAlloc::AllocArray<uint32_t>(alloc, desc.code);
     MemCpy(spv.data, desc.code.data, Span::SizeBytes(desc.code));
 
-    const rhi_shader handle = HandlePool::Acquire(g_State->m_Shaders, VulkanShaderData{.spv = spv});
-    VulkanShaderData &shaderData = HandlePool::ResolveData(g_State->m_Shaders, handle);
+    const rhi_shader handle = HandlePool::Acquire(rhi->shaders, VulkanShaderData{.spv = spv});
+    VulkanShaderData &shaderData = HandlePool::ResolveData(rhi->shaders, handle);
 
     return handle;
 }
 
 void Rhi::DestroyShader(rhi_shader shader)
 {
-    HandlePool::ReleaseData(g_State->m_Shaders, shader);
+    HandlePool::ReleaseData(rhi->shaders, shader);
 
 #if 0
     VkShaderModule shaderModule = g_State->m_Shaders.ReleaseData(shader);
@@ -2125,32 +2113,32 @@ void Rhi::DestroyShader(rhi_shader shader)
 
 void Rhi::DestroyGraphicsPipeline(rhi_graphics_pipeline pipeline)
 {
-    auto pipelineData = HandlePool::ReleaseData(g_State->m_GraphicsPipelines, pipeline);
-    vkDeviceWaitIdle(g_State->m_Dev);
+    auto pipelineData = HandlePool::ReleaseData(rhi->graphicsPipelines, pipeline);
+    vkDeviceWaitIdle(rhi->dev);
 
     if (pipelineData.layout)
     {
-        vkDestroyPipelineLayout(g_State->m_Dev, pipelineData.layout, nullptr);
+        vkDestroyPipelineLayout(rhi->dev, pipelineData.layout, nullptr);
     }
     if (pipelineData.pipeline)
     {
-        vkDestroyPipeline(g_State->m_Dev, pipelineData.pipeline, nullptr);
+        vkDestroyPipeline(rhi->dev, pipelineData.pipeline, nullptr);
     }
 }
 
 void Rhi::CmdBindGraphicsPipeline(rhi_cmdlist cmd, rhi_graphics_pipeline pipeline)
 {
-    VulkanCmdListData &cmdData = HandlePool::ResolveData(g_State->m_CmdLists, cmd);
+    VulkanCmdListData &cmdData = HandlePool::ResolveData(rhi->cmdlists, cmd);
     VkCommandBuffer cmdbuf = cmdData.cmdbuf;
 
-    const VulkanPipelineData &pipelineData = HandlePool::ResolveData(g_State->m_GraphicsPipelines, pipeline);
+    const VulkanPipelineData &pipelineData = HandlePool::ResolveData(rhi->graphicsPipelines, pipeline);
 
     vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineData.pipeline);
     cmdData.boundGraphicsPipeline = pipeline;
 
     array<VkDescriptorSet, 2> descriptorSets{
-        g_State->m_TexturesDescriptorTable.set,
-        g_State->m_SamplersDescriptorTable.set,
+        rhi->texturesDescriptorTable.set,
+        rhi->SamplersDescriptorTable.set,
     };
 
     vkCmdBindDescriptorSets(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineData.layout, 1,
@@ -2159,9 +2147,9 @@ void Rhi::CmdBindGraphicsPipeline(rhi_cmdlist cmd, rhi_graphics_pipeline pipelin
 
 void Rhi::CmdPushGraphicsConstants(rhi_cmdlist cmd, uint32_t offset, rhi_shader_stage stage, byteview data)
 {
-    const VulkanCmdListData &cmdData = HandlePool::ResolveData(g_State->m_CmdLists, cmd);
+    const VulkanCmdListData &cmdData = HandlePool::ResolveData(rhi->cmdlists, cmd);
     const VulkanPipelineData &pipelineData =
-        HandlePool::ResolveData(g_State->m_GraphicsPipelines, cmdData.boundGraphicsPipeline);
+        HandlePool::ResolveData(rhi->graphicsPipelines, cmdData.boundGraphicsPipeline);
 
     vkCmdPushConstants(cmdData.cmdbuf, pipelineData.layout, ConvertShaderStageIntoVkShaderStageFlags(stage), offset,
                        data.size, data.data);
@@ -2177,26 +2165,26 @@ void Rhi::CmdBindVertexBuffers(rhi_cmdlist cmd, uint32_t firstBinding, span<cons
     array<VkDeviceSize, 4> vkOffsets;
     for (uint32_t i = 0; i < buffers.size; ++i)
     {
-        vkBufs[i] = HandlePool::ResolveData(g_State->m_Buffers, buffers[i]).buffer;
+        vkBufs[i] = HandlePool::ResolveData(rhi->buffers, buffers[i]).buffer;
         vkOffsets[i] = offsets[i];
     }
 
-    const VulkanCmdListData &cmdData = HandlePool::ResolveData(g_State->m_CmdLists, cmd);
+    const VulkanCmdListData &cmdData = HandlePool::ResolveData(rhi->cmdlists, cmd);
     vkCmdBindVertexBuffers(cmdData.cmdbuf, firstBinding, buffers.size, vkBufs.data, vkOffsets.data);
 }
 
 void Rhi::CmdBindIndexBuffer(rhi_cmdlist cmd, rhi_buffer buffer, uint64_t offset)
 {
-    const VulkanBufferData &bufferData = HandlePool::ResolveData(g_State->m_Buffers, buffer);
+    const VulkanBufferData &bufferData = HandlePool::ResolveData(rhi->buffers, buffer);
 
-    const VulkanCmdListData &cmdData = HandlePool::ResolveData(g_State->m_CmdLists, cmd);
+    const VulkanCmdListData &cmdData = HandlePool::ResolveData(rhi->cmdlists, cmd);
     vkCmdBindIndexBuffer(cmdData.cmdbuf, bufferData.buffer, offset, VkIndexType::VK_INDEX_TYPE_UINT16);
 }
 
 void Rhi::CmdDraw(rhi_cmdlist cmd, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
                   uint32_t firstInstance)
 {
-    VulkanCmdListData &cmdData = HandlePool::ResolveData(g_State->m_CmdLists, cmd);
+    VulkanCmdListData &cmdData = HandlePool::ResolveData(rhi->cmdlists, cmd);
     CmdDrawInternal(cmdData);
     vkCmdDraw(cmdData.cmdbuf, vertexCount, instanceCount, firstVertex, firstInstance);
 }
@@ -2204,7 +2192,7 @@ void Rhi::CmdDraw(rhi_cmdlist cmd, uint32_t vertexCount, uint32_t instanceCount,
 void Rhi::CmdDrawIndexed(rhi_cmdlist cmd, uint32_t indexCount, int32_t vertexOffset, uint32_t instanceCount,
                          uint32_t firstIndex, uint32_t firstInstance)
 {
-    VulkanCmdListData &cmdData = HandlePool::ResolveData(g_State->m_CmdLists, cmd);
+    VulkanCmdListData &cmdData = HandlePool::ResolveData(rhi->cmdlists, cmd);
     CmdDrawInternal(cmdData);
     vkCmdDrawIndexed(cmdData.cmdbuf, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
 }
@@ -2227,20 +2215,20 @@ auto Rhi::CreateSampler(const rhi_sampler_desc &desc) -> rhi_sampler
     };
 
     VulkanSamplerData samplerData{};
-    VK_CHECK(vkCreateSampler(g_State->m_Dev, &createInfo, g_State->vkAlloc, &samplerData.sampler));
+    VK_CHECK(vkCreateSampler(rhi->dev, &createInfo, rhi->vkAlloc, &samplerData.sampler));
 
-    return HandlePool::Acquire(g_State->m_Samplers, samplerData);
+    return HandlePool::Acquire(rhi->samplers, samplerData);
 }
 
 void Rhi::DestroySampler(rhi_sampler sampler)
 {
-    VulkanSamplerData samplerData = HandlePool::ReleaseData(g_State->m_Samplers, sampler);
-    vkDestroySampler(g_State->m_Dev, samplerData.sampler, g_State->vkAlloc);
+    VulkanSamplerData samplerData = HandlePool::ReleaseData(rhi->samplers, sampler);
+    vkDestroySampler(rhi->dev, samplerData.sampler, rhi->vkAlloc);
 }
 
 auto Rhi::GetBackbufferView() -> rhi_rtv
 {
-    return g_State->m_SwapchainRTVs[g_State->m_SwapchainTextureIndex];
+    return rhi->swapchainRTVs[rhi->swapchainTextureIndex];
 }
 
 auto Rhi::CreateTexture(const rhi_texture_desc &desc) -> rhi_texture
@@ -2266,25 +2254,25 @@ auto Rhi::CreateTexture(const rhi_texture_desc &desc) -> rhi_texture
         .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
         .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
     };
-    VK_CHECK(vkCreateImage(g_State->m_Dev, &imageCreateInfo, g_State->vkAlloc, &textureData.image));
+    VK_CHECK(vkCreateImage(rhi->dev, &imageCreateInfo, rhi->vkAlloc, &textureData.image));
 
     VkMemoryRequirements memoryRequirements;
-    vkGetImageMemoryRequirements(g_State->m_Dev, textureData.image, &memoryRequirements);
+    vkGetImageMemoryRequirements(rhi->dev, textureData.image, &memoryRequirements);
 
     const VkMemoryAllocateInfo memoryAllocInfo{
         .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
         .allocationSize = memoryRequirements.size,
         .memoryTypeIndex = FindMemoryTypeIndex(memoryRequirements, memoryPropertyFlags),
     };
-    vkAllocateMemory(g_State->m_Dev, &memoryAllocInfo, g_State->vkAlloc, &textureData.memory);
-    vkBindImageMemory(g_State->m_Dev, textureData.image, textureData.memory, 0);
+    vkAllocateMemory(rhi->dev, &memoryAllocInfo, rhi->vkAlloc, &textureData.memory);
+    vkBindImageMemory(rhi->dev, textureData.image, textureData.memory, 0);
 
-    return HandlePool::Acquire(g_State->m_Textures, textureData);
+    return HandlePool::Acquire(rhi->textures, textureData);
 }
 
 auto Rhi::CreateSampledTextureView(const rhi_texture_view_desc &desc) -> rhi_srv
 {
-    VulkanTextureData &textureData = HandlePool::ResolveData(g_State->m_Textures, desc.texture);
+    VulkanTextureData &textureData = HandlePool::ResolveData(rhi->textures, desc.texture);
 
     VulkanTextureViewData textureViewData{
         .texture = desc.texture,
@@ -2314,15 +2302,15 @@ auto Rhi::CreateSampledTextureView(const rhi_texture_view_desc &desc) -> rhi_srv
         .subresourceRange = textureViewData.subresourceRange,
     };
 
-    VK_CHECK(vkCreateImageView(g_State->m_Dev, &imageViewCreateInfo, g_State->vkAlloc, &textureViewData.imageView));
+    VK_CHECK(vkCreateImageView(rhi->dev, &imageViewCreateInfo, rhi->vkAlloc, &textureViewData.imageView));
 
-    const rhi_srv view = HandlePool::Acquire(g_State->m_SampledTextureViews, textureViewData);
+    const rhi_srv view = HandlePool::Acquire(rhi->stvs, textureViewData);
     return view;
 }
 
 auto Rhi::CreateRenderTargetView(const rhi_render_target_view_desc &desc) -> rhi_rtv
 {
-    VulkanTextureData &textureData = HandlePool::ResolveData(g_State->m_Textures, desc.texture);
+    VulkanTextureData &textureData = HandlePool::ResolveData(rhi->textures, desc.texture);
 
     VulkanTextureViewData renderTargetViewData{
         .texture = desc.texture,
@@ -2352,15 +2340,14 @@ auto Rhi::CreateRenderTargetView(const rhi_render_target_view_desc &desc) -> rhi
         .subresourceRange = renderTargetViewData.subresourceRange,
     };
 
-    VK_CHECK(
-        vkCreateImageView(g_State->m_Dev, &imageViewCreateInfo, g_State->vkAlloc, &renderTargetViewData.imageView));
-    const rhi_rtv rtv = HandlePool::Acquire(g_State->m_RenderTargetViews, renderTargetViewData);
+    VK_CHECK(vkCreateImageView(rhi->dev, &imageViewCreateInfo, rhi->vkAlloc, &renderTargetViewData.imageView));
+    const rhi_rtv rtv = HandlePool::Acquire(rhi->rtvs, renderTargetViewData);
     return rtv;
 }
 
 auto Rhi::CreateDepthStencilView(const rhi_depth_stencil_view_desc &desc) -> rhi_dsv
 {
-    VulkanTextureData &textureData = HandlePool::ResolveData(g_State->m_Textures, desc.texture);
+    VulkanTextureData &textureData = HandlePool::ResolveData(rhi->textures, desc.texture);
 
     VulkanTextureViewData dsvData{
         .texture = desc.texture,
@@ -2390,29 +2377,29 @@ auto Rhi::CreateDepthStencilView(const rhi_depth_stencil_view_desc &desc) -> rhi
         .subresourceRange = dsvData.subresourceRange,
     };
 
-    VK_CHECK(vkCreateImageView(g_State->m_Dev, &imageViewCreateInfo, g_State->vkAlloc, &dsvData.imageView));
-    const rhi_dsv dsv = HandlePool::Acquire(g_State->m_DepthStencilViews, dsvData);
+    VK_CHECK(vkCreateImageView(rhi->dev, &imageViewCreateInfo, rhi->vkAlloc, &dsvData.imageView));
+    const rhi_dsv dsv = HandlePool::Acquire(rhi->dsvs, dsvData);
     return dsv;
 }
 
 auto Rhi::GetTexture(rhi_srv srv) -> rhi_texture
 {
-    return HandlePool::ResolveData(g_State->m_SampledTextureViews, srv).texture;
+    return HandlePool::ResolveData(rhi->stvs, srv).texture;
 }
 
 auto Rhi::GetTexture(rhi_rtv rtv) -> rhi_texture
 {
-    return HandlePool::ResolveData(g_State->m_RenderTargetViews, rtv).texture;
+    return HandlePool::ResolveData(rhi->rtvs, rtv).texture;
 }
 
 auto Rhi::GetTexture(rhi_dsv dsv) -> rhi_texture
 {
-    return HandlePool::ResolveData(g_State->m_DepthStencilViews, dsv).texture;
+    return HandlePool::ResolveData(rhi->dsvs, dsv).texture;
 }
 
 auto Rhi::GetTextureInfo(rhi_texture texture) -> rhi_texture_info
 {
-    const VulkanTextureData &textureData = HandlePool::ResolveData(g_State->m_Textures, texture);
+    const VulkanTextureData &textureData = HandlePool::ResolveData(rhi->textures, texture);
     return {
         .width = textureData.extent.width,
         .height = textureData.extent.height,
@@ -2422,9 +2409,9 @@ auto Rhi::GetTextureInfo(rhi_texture texture) -> rhi_texture_info
 
 void Rhi::CmdTransitionTexture(rhi_cmdlist cmd, rhi_texture texture, rhi_texture_state newState)
 {
-    const VkCommandBuffer &cmdbuf = HandlePool::ResolveData(g_State->m_CmdLists, cmd).cmdbuf;
+    const VkCommandBuffer &cmdbuf = HandlePool::ResolveData(rhi->cmdlists, cmd).cmdbuf;
 
-    VulkanTextureData &textureData = HandlePool::ResolveData(g_State->m_Textures, texture);
+    VulkanTextureData &textureData = HandlePool::ResolveData(rhi->textures, texture);
 
     const VulkanTextureStateSyncInfo newSyncInfo = VulkanTextureStateGetSyncInfo(newState);
     if (newSyncInfo.layout == textureData.layout)
@@ -2464,45 +2451,45 @@ void Rhi::CmdTransitionTexture(rhi_cmdlist cmd, rhi_texture texture, rhi_texture
 
 void Rhi::DestroyTexture(rhi_texture texture)
 {
-    VulkanTextureData textureData = HandlePool::ResolveData(g_State->m_Textures, texture);
+    VulkanTextureData textureData = HandlePool::ResolveData(rhi->textures, texture);
 
     ASSERT(textureData.image);
-    vkDestroyImage(g_State->m_Dev, textureData.image, g_State->vkAlloc);
+    vkDestroyImage(rhi->dev, textureData.image, rhi->vkAlloc);
 
     ASSERT(textureData.memory);
-    vkFreeMemory(g_State->m_Dev, textureData.memory, g_State->vkAlloc);
+    vkFreeMemory(rhi->dev, textureData.memory, rhi->vkAlloc);
 }
 
 void Rhi::DestroySampledTextureView(rhi_srv textureView)
 {
-    const VulkanTextureViewData &textureViewData = HandlePool::ResolveData(g_State->m_SampledTextureViews, textureView);
+    const VulkanTextureViewData &textureViewData = HandlePool::ResolveData(rhi->stvs, textureView);
     ASSERT(textureViewData.imageView);
 
-    vkDestroyImageView(g_State->m_Dev, textureViewData.imageView, g_State->vkAlloc);
+    vkDestroyImageView(rhi->dev, textureViewData.imageView, rhi->vkAlloc);
 }
 
 void Rhi::DestroyRenderTargetView(rhi_rtv textureView)
 {
-    const VulkanTextureViewData &textureViewData = HandlePool::ResolveData(g_State->m_RenderTargetViews, textureView);
+    const VulkanTextureViewData &textureViewData = HandlePool::ResolveData(rhi->rtvs, textureView);
     ASSERT(textureViewData.imageView);
 
-    vkDestroyImageView(g_State->m_Dev, textureViewData.imageView, g_State->vkAlloc);
+    vkDestroyImageView(rhi->dev, textureViewData.imageView, rhi->vkAlloc);
 }
 
 void Rhi::DestroyDepthStencilView(rhi_dsv textureView)
 {
-    const VulkanTextureViewData &textureViewData = HandlePool::ResolveData(g_State->m_DepthStencilViews, textureView);
+    const VulkanTextureViewData &textureViewData = HandlePool::ResolveData(rhi->dsvs, textureView);
     ASSERT(textureViewData.imageView);
 
-    vkDestroyImageView(g_State->m_Dev, textureViewData.imageView, g_State->vkAlloc);
+    vkDestroyImageView(rhi->dev, textureViewData.imageView, rhi->vkAlloc);
 }
 
 void Rhi::CmdCopyTexture(rhi_cmdlist cmd, rhi_texture dst, rhi_buffer src, uint32_t srcOffset, uint32_t size)
 {
-    const VkCommandBuffer &cmdbuf = HandlePool::ResolveData(g_State->m_CmdLists, cmd).cmdbuf;
+    const VkCommandBuffer &cmdbuf = HandlePool::ResolveData(rhi->cmdlists, cmd).cmdbuf;
 
-    VulkanTextureData &dstTextureData = HandlePool::ResolveData(g_State->m_Textures, dst);
-    VulkanBufferData &srcBufferData = HandlePool::ResolveData(g_State->m_Buffers, src);
+    VulkanTextureData &dstTextureData = HandlePool::ResolveData(rhi->textures, dst);
+    VulkanBufferData &srcBufferData = HandlePool::ResolveData(rhi->buffers, src);
 
     EnsureHostWritesVisible(cmdbuf, srcBufferData);
 
@@ -2524,10 +2511,10 @@ void Rhi::CmdCopyTexture(rhi_cmdlist cmd, rhi_texture dst, rhi_buffer src, uint3
 
 void Rhi::CmdCopyTexture(rhi_cmdlist cmd, rhi_texture dst, rhi_texture src)
 {
-    const VkCommandBuffer &cmdbuf = HandlePool::ResolveData(g_State->m_CmdLists, cmd).cmdbuf;
+    const VkCommandBuffer &cmdbuf = HandlePool::ResolveData(rhi->cmdlists, cmd).cmdbuf;
 
-    VulkanTextureData &dstTextureData = HandlePool::ResolveData(g_State->m_Textures, dst);
-    VulkanTextureData &srcTextureData = HandlePool::ResolveData(g_State->m_Textures, src);
+    VulkanTextureData &dstTextureData = HandlePool::ResolveData(rhi->textures, dst);
+    VulkanTextureData &srcTextureData = HandlePool::ResolveData(rhi->textures, src);
 
     const VkImageCopy region{
         .srcSubresource =
@@ -2551,8 +2538,8 @@ auto Rhi::CreateGraphicsPipeline(region_alloc &alloc, const rhi_graphics_pipelin
 {
     void *allocMark = alloc.at;
 
-    auto &vertexShaderData = HandlePool::ResolveData(g_State->m_Shaders, desc.vs);
-    auto &pixelShaderData = HandlePool::ResolveData(g_State->m_Shaders, desc.ps);
+    auto &vertexShaderData = HandlePool::ResolveData(rhi->shaders, desc.vs);
+    auto &pixelShaderData = HandlePool::ResolveData(rhi->shaders, desc.ps);
 
     spv_shader vsMan{.stage = rhi_shader_stage::Vertex};
     vertexShaderData.spv = SpvShader::ProcessShader(vsMan, vertexShaderData.spv);
@@ -2615,7 +2602,7 @@ auto Rhi::CreateGraphicsPipeline(region_alloc &alloc, const rhi_graphics_pipelin
         };
 
         VkShaderModule shaderModule;
-        VK_CHECK(vkCreateShaderModule(g_State->m_Dev, &createInfo, nullptr, &shaderModule));
+        VK_CHECK(vkCreateShaderModule(rhi->dev, &createInfo, nullptr, &shaderModule));
 
         return shaderModule;
     };
@@ -2734,9 +2721,9 @@ auto Rhi::CreateGraphicsPipeline(region_alloc &alloc, const rhi_graphics_pipelin
 #endif
 
     const array<VkDescriptorSetLayout, 3> descriptorSetLayouts = {
-        g_State->m_ConstantsDescriptorTable.layout,
-        g_State->m_TexturesDescriptorTable.layout,
-        g_State->m_SamplersDescriptorTable.layout,
+        rhi->constantsDescriptorTable.layout,
+        rhi->texturesDescriptorTable.layout,
+        rhi->SamplersDescriptorTable.layout,
     };
 
     const VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{
@@ -2749,7 +2736,7 @@ auto Rhi::CreateGraphicsPipeline(region_alloc &alloc, const rhi_graphics_pipelin
 #endif
     };
 
-    vkCreatePipelineLayout(g_State->m_Dev, &pipelineLayoutCreateInfo, nullptr, &pipelineData.layout);
+    vkCreatePipelineLayout(rhi->dev, &pipelineLayoutCreateInfo, nullptr, &pipelineData.layout);
 
     const VkPipelineDepthStencilStateCreateInfo depthStencilState{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
@@ -2783,83 +2770,82 @@ auto Rhi::CreateGraphicsPipeline(region_alloc &alloc, const rhi_graphics_pipelin
         .basePipelineIndex = -1,
     };
 
-    VK_CHECK(vkCreateGraphicsPipelines(g_State->m_Dev, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr,
-                                       &pipelineData.pipeline));
+    VK_CHECK(
+        vkCreateGraphicsPipelines(rhi->dev, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &pipelineData.pipeline));
 
     RegionAlloc::Reset(alloc, allocMark);
-    return HandlePool::Acquire(g_State->m_GraphicsPipelines, pipelineData);
+    return HandlePool::Acquire(rhi->graphicsPipelines, pipelineData);
 }
 
 void Rhi::NameGraphicsPipeline(rhi_graphics_pipeline pipeline, byteview name)
 {
-    const VulkanPipelineData &pipelineData = HandlePool::ResolveData(g_State->m_GraphicsPipelines, pipeline);
+    const VulkanPipelineData &pipelineData = HandlePool::ResolveData(rhi->graphicsPipelines, pipeline);
     VulkanNameHandle(VK_OBJECT_TYPE_PIPELINE, (uint64_t)pipelineData.pipeline, name);
 }
 
 void Rhi::SetFrameConstant(rhi_cmdlist cmd, byteview data)
 {
-    ASSERT(data.size <= g_State->m_Limits.frameConstantSize);
+    ASSERT(data.size <= rhi->limits.frameConstantSize);
 
-    const VulkanCmdListData &cmdData = HandlePool::ResolveData(g_State->m_CmdLists, cmd);
+    const VulkanCmdListData &cmdData = HandlePool::ResolveData(rhi->cmdlists, cmd);
 
-    char *mem = MapBuffer(g_State->m_ConstantsUniformBuffer);
+    char *mem = MapBuffer(rhi->constantsUniformBuffer);
     MemCpy(mem + cmdData.frameConstantHead, data.data, data.size);
 }
 
 void Rhi::SetPassConstant(rhi_cmdlist cmd, byteview data)
 {
-    ASSERT(data.size <= g_State->m_Limits.passConstantSize);
+    ASSERT(data.size <= rhi->limits.passConstantSize);
 
-    const VulkanCmdListData &cmdData = HandlePool::ResolveData(g_State->m_CmdLists, cmd);
+    const VulkanCmdListData &cmdData = HandlePool::ResolveData(rhi->cmdlists, cmd);
 
-    char *mem = MapBuffer(g_State->m_ConstantsUniformBuffer);
+    char *mem = MapBuffer(rhi->constantsUniformBuffer);
     MemCpy(mem + cmdData.passConstantHead, data.data, data.size);
 }
 
 void Rhi::SetDrawConstant(rhi_cmdlist cmd, byteview data)
 {
-    ASSERT(data.size <= g_State->m_Limits.drawConstantSize);
+    ASSERT(data.size <= rhi->limits.drawConstantSize);
 
-    const VulkanCmdListData &cmdData = HandlePool::ResolveData(g_State->m_CmdLists, cmd);
+    const VulkanCmdListData &cmdData = HandlePool::ResolveData(rhi->cmdlists, cmd);
 
-    char *mem = MapBuffer(g_State->m_ConstantsUniformBuffer);
+    char *mem = MapBuffer(rhi->constantsUniformBuffer);
     MemCpy(mem + cmdData.drawConstantHead, data.data, data.size);
 }
 
 void Rhi::SetLargeDrawConstant(rhi_cmdlist cmd, byteview data)
 {
-    ASSERT(data.size <= g_State->m_Limits.largeDrawConstantSize);
+    ASSERT(data.size <= rhi->limits.largeDrawConstantSize);
 
-    const VulkanCmdListData &cmdData = HandlePool::ResolveData(g_State->m_CmdLists, cmd);
+    const VulkanCmdListData &cmdData = HandlePool::ResolveData(rhi->cmdlists, cmd);
 
-    char *mem = MapBuffer(g_State->m_ConstantsUniformBuffer);
+    char *mem = MapBuffer(rhi->constantsUniformBuffer);
     MemCpy(mem + cmdData.largeDrawConstantHead, data.data, data.size);
 
     if constexpr (false)
     {
-        const VulkanBufferData &bufferData =
-            HandlePool::ResolveData(g_State->m_Buffers, g_State->m_ConstantsUniformBuffer);
+        const VulkanBufferData &bufferData = HandlePool::ResolveData(rhi->buffers, rhi->constantsUniformBuffer);
         const VkMappedMemoryRange range{
             .sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,
             .memory = bufferData.memory,
         };
-        vkInvalidateMappedMemoryRanges(g_State->m_Dev, 1, &range);
+        vkInvalidateMappedMemoryRanges(rhi->dev, 1, &range);
     }
 }
 
 void Rhi::TriggerSwapchainRecreate()
 {
-    g_State->m_RecreateSwapchain = true;
+    rhi->recreateSwapchain = true;
 }
 
 auto Rhi::GetFrameIndex() -> uint32_t
 {
-    return g_State->m_FrameIndex;
+    return rhi->frameIndex;
 }
 
 auto Rhi::GetNumFramesInFlight() -> uint32_t
 {
-    return g_State->m_Limits.numFramesInFlight;
+    return rhi->limits.numFramesInFlight;
 }
 
 } // namespace nyla

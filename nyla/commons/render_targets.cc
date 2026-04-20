@@ -10,6 +10,8 @@ namespace nyla
 namespace RenderTargets
 {
 
+// TODO: we have to recrate render targets on backbuffer resize!
+
 void API GetTargets(render_targets &self, uint32_t width, uint32_t height, rhi_rtv &outRtv, rhi_dsv &outDsv)
 {
     uint32_t frameIndex = Rhi::GetFrameIndex();

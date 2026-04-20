@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdarg>
 #define LOG(fmt, ...) FileWriteFmt(GetStderr(), fmt "\n"_s, ##__VA_ARGS__)
 
 #define SV_FMT "%.*s"
@@ -33,8 +34,16 @@
 namespace nyla
 {
 
+void API FileWriteFmt(file_handle handle, span<uint8_t> buffer, byteview fmt, va_list args);
 void API FileWriteFmt(file_handle handle, span<uint8_t> buffer, byteview fmt, ...);
+
+void API FileWriteFmt(file_handle handle, byteview fmt, va_list args);
 void API FileWriteFmt(file_handle handle, byteview fmt, ...);
+
+auto API StringWriteFmt(span<uint8_t> out, byteview fmt, va_list args) -> uint64_t;
 auto API StringWriteFmt(span<uint8_t> out, byteview fmt, ...) -> uint64_t;
+
+auto API StringWriteFmt(byteview fmt, va_list args) -> byteview;
+auto API StringWriteFmt(byteview fmt, ...) -> byteview;
 
 } // namespace nyla

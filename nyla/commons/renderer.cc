@@ -38,7 +38,7 @@ struct entity
 struct draw_call
 {
     entity Entity;
-    mesh Mesh;
+    mesh_handle Mesh;
 };
 
 struct renderer_state
@@ -145,7 +145,7 @@ void API SetPerspectiveProjection(uint32_t width, uint32_t height, float fovDegr
     renderer->Proj = Mat::Perspective(fovRadians, aspect, nearPlane, farPlane);
 }
 
-void API Mesh(float3 pos, float3 scale, mesh Mesh, texture Texture)
+void API Mesh(float3 pos, float3 scale, mesh_handle Mesh, texture_handle Texture)
 {
     if (!Texture)
     {

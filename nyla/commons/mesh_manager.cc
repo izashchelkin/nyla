@@ -36,12 +36,12 @@ struct mesh_metadata
     uint64_t vertexBufferOffset;
     uint64_t indexBufferOffset;
     uint32_t indexCount;
-    texture texture;
+    texture_handle texture;
 };
 
 struct mesh_manager
 {
-    handle_pool<mesh, mesh_metadata, 128> meshes;
+    handle_pool<mesh_handle, mesh_metadata, 128> meshes;
 };
 mesh_manager *manager;
 
@@ -79,9 +79,10 @@ void API Update(region_alloc &alloc, rhi_cmdlist cmd, byteview assetFile)
 
         ASSERT(parser.images.size == 1);
 
-        { // TODO:
+        { // TODO: probably deal with this at packing stage - add custom attributes into gltf? or resolve via path <-
+          // this is ugly
             gltf_image image = Span::Front(parser.images);
-            metadata.texture = TextureManager::DeclareTexture(assetFile, QWord("DUMMY??"));
+            metadata.texture = TextureManager::DeclareTexture(assetFile, 0x7974C3986C0A4EAB);
         }
 
         for (const auto &mesh : parser.meshes)
@@ -162,7 +163,7 @@ void API Update(region_alloc &alloc, rhi_cmdlist cmd, byteview assetFile)
                         void *const dst = uploadMemory + static_cast<uint64_t>(i * stride + offset);
                         const void *const src =
                             byteBufferViewData + static_cast<uint64_t>(i * GetGltfAccessorSize(accessor));
-                        memcpy(dst, src, GetGltfAccessorSize(accessor));
+                        MemCpy(dst, src, GetGltfAccessorSize(accessor));
                     };
 
                     copyAttribute(pos, posOffset, posBufferView.data);
@@ -176,7 +177,7 @@ void API Update(region_alloc &alloc, rhi_cmdlist cmd, byteview assetFile)
     }
 }
 
-auto API DeclareMesh(byteview assetFileData, uint64_t guidGltf, uint64_t guidBin) -> mesh
+auto API DeclareMesh(byteview assetFileData, uint64_t guidGltf, uint64_t guidBin) -> mesh_handle
 {
     return HandlePool::Acquire(manager->meshes, mesh_metadata{
                                                     .guidGltf = guidGltf,
@@ -185,7 +186,7 @@ auto API DeclareMesh(byteview assetFileData, uint64_t guidGltf, uint64_t guidBin
                                                 });
 }
 
-void API CmdBindMesh(rhi_cmdlist cmd, mesh Mesh)
+void API CmdBindMesh(rhi_cmdlist cmd, mesh_handle Mesh)
 {
     const auto &meshData = HandlePool::ResolveData(manager->meshes, Mesh);
     ASSERT(meshData.state == mesh_state::Uploaded);
@@ -194,7 +195,7 @@ void API CmdBindMesh(rhi_cmdlist cmd, mesh Mesh)
     GpuUpload::CmdBindStaticMeshIndexBuffer(cmd, meshData.indexBufferOffset);
 }
 
-void API CmdDrawMesh(rhi_cmdlist cmd, mesh Mesh)
+void API CmdDrawMesh(rhi_cmdlist cmd, mesh_handle Mesh)
 {
     const auto &meshData = HandlePool::ResolveData(manager->meshes, Mesh);
     ASSERT(meshData.state == mesh_state::Uploaded);
@@ -202,7 +203,7 @@ void API CmdDrawMesh(rhi_cmdlist cmd, mesh Mesh)
     Rhi::CmdDrawIndexed(cmd, meshData.indexCount, 0, 1, 0, 0);
 }
 
-auto API GetTexture(mesh Mesh) -> texture
+auto API GetTexture(mesh_handle Mesh) -> texture_handle
 {
     if (Mesh)
         return HandlePool::ResolveData(manager->meshes, Mesh).texture;

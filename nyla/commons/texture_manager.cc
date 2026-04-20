@@ -15,7 +15,15 @@
 #include "nyla/commons/span_def.h"
 
 #define STB_IMAGE_IMPLEMENTATION
-#define STBI_ONLY_PNG
+// #define STBI_NO_JPEG
+// #define STBI_NO_PNG
+#define STBI_NO_BMP
+#define STBI_NO_PSD
+#define STBI_NO_TGA
+#define STBI_NO_GIF
+#define STBI_NO_HDR
+#define STBI_NO_PIC
+#define STBI_NO_PNM
 #include "nyla/commons/stb_image.h"
 
 namespace nyla
@@ -43,7 +51,7 @@ struct texture_metadata
 
 struct texture_manager
 {
-    handle_pool<texture, texture_metadata, 128> textures;
+    handle_pool<texture_handle, texture_metadata, 128> textures;
 };
 
 texture_manager *manager;
@@ -75,8 +83,10 @@ void API Update(rhi_cmdlist cmd, byteview assetFile)
 
         uint8_t *pixelData = stbi_load_from_memory(rawBytes.data, rawBytes.size, (int *)&metadata.width,
                                                    (int *)&metadata.height, (int *)&metadata.channels, 4);
-        ASSERT(pixelData, "stbi_load failed for '" PRIu64 "': %s", metadata.guid, stbi_failure_reason());
-        ASSERT(metadata.channels == 4, "Unexpected channels: %d", metadata.channels);
+        ASSERT(pixelData, "stbi_load failed for '%" PRIu64 "': %s", metadata.guid, stbi_failure_reason());
+
+        metadata.channels = 4;
+        // ASSERT(metadata.channels == 4, "Unexpected channels: %d", metadata.channels);
 
         const rhi_texture texture = Rhi::CreateTexture(rhi_texture_desc{
             .width = metadata.width,
@@ -101,13 +111,13 @@ void API Update(rhi_cmdlist cmd, byteview assetFile)
 
         free(pixelData);
 
-        // TODO: this is suboptimal
+        // TODO: this is suboptimal - move to where it's used
         Rhi::CmdTransitionTexture(cmd, texture, rhi_texture_state::ShaderRead);
         metadata.state = texture_state::Uploaded;
     }
 }
 
-auto API DeclareTexture(byteview assetFileData, uint64_t guid) -> texture
+auto API DeclareTexture(byteview assetFileData, uint64_t guid) -> texture_handle
 {
     return HandlePool::Acquire(manager->textures, texture_metadata{
                                                       .guid = guid,
@@ -115,7 +125,7 @@ auto API DeclareTexture(byteview assetFileData, uint64_t guid) -> texture
                                                   });
 }
 
-auto API GetSRV(texture Texture) -> rhi_srv
+auto API GetSRV(texture_handle Texture) -> rhi_srv
 {
     if (Texture)
         return HandlePool::ResolveData(manager->textures, Texture).textureView;
