@@ -1423,7 +1423,7 @@ void Rhi::Bootstrap(region_alloc &alloc, const rhi_init_desc &rhiDesc)
             .connection = xcb_connect(nullptr, nullptr),
             .window = X11WinGetHandle(),
         };
-        VK_CHECK(vkCreateXcbSurfaceKHR(g_State->m_Instance, &surfaceCreateInfo, g_State->vkAlloc, &g_State->m_Surface));
+        VK_CHECK(vkCreateXcbSurfaceKHR(rhi->instance, &surfaceCreateInfo, rhi->vkAlloc, &rhi->surface));
 #else
         const VkWin32SurfaceCreateInfoKHR surfaceCreateInfo{
             .sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,

@@ -23,6 +23,7 @@ else()
 target_link_libraries(${TARGET}
     PUBLIC
         xcb
+        xcb-errors
         xcb-util
         xcb-xkb
         xkbcommon

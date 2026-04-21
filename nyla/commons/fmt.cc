@@ -1,5 +1,6 @@
 #include "nyla/commons/fmt.h"
 
+#include <cinttypes>
 #include <cstdarg>
 #include <cstdint>
 
@@ -99,15 +100,33 @@ void WriteFmt(auto &&consumer, byteview fmt, va_list args)
 
             case 'l': {
                 uint8_t ch2 = ByteParser::ReadOrDefault(parser, '\0');
-                uint8_t ch3 = ByteParser::ReadOrDefault(parser, '\0');
 
-                switch ((uint16_t)(ch2 | (ch3 << 8)))
+                switch (ch2)
                 {
-                case Word("lu"): {
+                case 'u': {
                     uint8_t buf[32];
-                    uint64_t len = U64ToBuffer(buf, va_arg(args, uint64_t));
+                    uint64_t len = U64ToBuffer(buf, va_arg(args, unsigned long));
                     consumer(buf, len);
                     break;
+                }
+
+                case 'l': {
+                    uint8_t ch3 = ByteParser::ReadOrDefault(parser, '\0');
+
+                    switch (ch3)
+                    {
+                    case 'u': {
+                        uint8_t buf[32];
+                        uint64_t len = U64ToBuffer(buf, va_arg(args, unsigned long long));
+                        consumer(buf, len);
+                        break;
+                    }
+
+                    default: {
+                        TRAP();
+                        UNREACHABLE();
+                    }
+                    }
                 }
 
                 default: {

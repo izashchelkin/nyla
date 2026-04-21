@@ -2,6 +2,7 @@
 #include "nyla/commons/file.h"
 #include "nyla/commons/mem.h"
 #include "nyla/commons/platform.h"
+#include "nyla/commons/region_alloc.h"
 
 #include <cstdint>
 #include <cstdio>
@@ -15,6 +16,7 @@
 #include <unistd.h>
 #include <xcb/xcb.h>
 #include <xcb/xcb_aux.h>
+#include <xcb/xcb_errors.h>
 #include <xcb/xinput.h>
 #include <xcb/xproto.h>
 #include <xkbcommon/xkbcommon-x11.h>
@@ -34,6 +36,7 @@
 #undef explicit
 
 #include "nyla/commons/fmt.h"
+#include "nyla/commons/region_alloc.h"
 #include "nyla/commons/span.h"
 
 namespace nyla
@@ -435,9 +438,14 @@ failure:
 
 //
 
-void PlatformBootstrap()
+void PlatformInit0()
 {
     ASSERT(sysconf(_SC_PAGESIZE) == kPageSize);
+}
+
+void PlatformInit1()
+{
+    platform = &RegionAlloc::Alloc<platform_state>(RegionAlloc::g_BootstrapAlloc);
 
     {
         platform->x11.conn = xcb_connect(nullptr, &platform->x11.screenIndex);
@@ -450,6 +458,10 @@ void PlatformBootstrap()
 #define X(varname, atomname) platform->x11.atoms.varname = X11InternAtom(#atomname##_s, false);
         NYLA_X11_ATOMS(X)
 #undef X
+    }
+
+    {
+        xcb_errors_context_new(X11GetConn(), &platform->x11.errorsContext);
     }
 
     {
@@ -498,21 +510,25 @@ void PlatformBootstrap()
     {
         const xcb_query_extension_reply_t *ext = xcb_get_extension_data(X11GetConn(), &xcb_input_id);
         if (!ext || !ext->present)
-            ASSERT(false && "could nolt set up XI2 extension");
+            ASSERT(false && "could not set up XI2 extension");
 
         struct
         {
             xcb_input_event_mask_t eventMask;
             uint32_t maskBits;
-        } mask;
+        } mask{};
 
         mask.eventMask.deviceid = XCB_INPUT_DEVICE_ALL_MASTER;
-        mask.eventMask.mask_len = 2;
+        mask.eventMask.mask_len = 1;
         mask.maskBits = XCB_INPUT_XI_EVENT_MASK_RAW_MOTION | XCB_INPUT_XI_EVENT_MASK_RAW_BUTTON_PRESS;
 
-        if (xcb_request_check(X11GetConn(),
-                              xcb_input_xi_select_events_checked(X11GetConn(), X11GetRoot(), 1, &mask.eventMask)))
+        if (xcb_generic_error_t *error = xcb_request_check(
+                X11GetConn(), xcb_input_xi_select_events_checked(X11GetConn(), X11GetRoot(), 1, &mask.eventMask));
+            error)
+        {
+            LOG("error: %s", xcb_errors_get_name_for_error(platform->x11.errorsContext, error->error_code, nullptr));
             ASSERT(false && "could not setup XI2 extension");
+        }
 
         platform->x11.extensionXInput2MajorOpCode = ext->major_opcode;
     }

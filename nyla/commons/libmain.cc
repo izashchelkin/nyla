@@ -10,12 +10,13 @@
 namespace nyla
 {
 
-void PlatformBootstrap();
+void PlatformInit0(); // nothing is inited yet including memory allocators
+void PlatformInit1(); // memory alloactors are available
 void PlatformTearDown();
 
 void API LibMain(void (*userMain)())
 {
-    PlatformBootstrap();
+    PlatformInit0();
 
     uint8_t *addressSpaceBase = (uint8_t *)ReserveMemPages(MemPagePool::kPoolSize);
     RegionAlloc::g_BootstrapAlloc = {};
@@ -25,6 +26,7 @@ void API LibMain(void (*userMain)())
 
     MemPagePool::Bootstrap();
 
+    PlatformInit1();
     userMain();
     PlatformTearDown();
 }

@@ -4,6 +4,7 @@
 
 #include <sys/mman.h>
 #include <xcb/xcb.h>
+#include <xcb/xcb_errors.h>
 #include <xcb/xproto.h>
 #include <xkbcommon/xkbcommon-x11.h>
 
@@ -61,6 +62,8 @@ struct platform_state
         x11_atoms atoms;
 
         array<xcb_keycode_t, static_cast<uint32_t>(KeyPhysical::Count)> keyCodes;
+
+        xcb_errors_context_t *errorsContext;
     } x11;
 };
 extern platform_state *platform;

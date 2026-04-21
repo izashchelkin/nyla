@@ -730,11 +730,14 @@ void ParseStdArgs(byteview *args, uint32_t maxArgs)
     ASSERT(!inQuotes);
 }
 
-void PlatformBootstrap()
+void PlatformInit0()
 {
     GetNativeSystemInfo(&g_SysInfo);
     ASSERT(g_SysInfo.dwPageSize == kPageSize);
+}
 
+void PlatformInit1()
+{
 #ifndef NDEBUG
     ASSERT(AllocConsole());
 
