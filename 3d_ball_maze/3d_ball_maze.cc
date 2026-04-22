@@ -1,7 +1,4 @@
-#include "3d_ball_maze/3d_ball_maze.h"
-
 #include <cstdint>
-#include <locale>
 
 #include "nyla/commons/array.h" // IWYU pragma: keep
 #include "nyla/commons/asset_file.h"
@@ -31,11 +28,17 @@
 namespace nyla
 {
 
+namespace
+{
+
 const uint64_t kCubeGltfGuid = 0x1077DCB383E4F409;
 const uint64_t kCubeBinGuid = 0x7C9E66305CB656C0;
 
 const uint64_t kSphereGltfGuid = 0x831167E33B4E1011;
 const uint64_t kSphereBinGuid = 0xDE33DC595E98C184;
+
+const uint64_t kRectGltfGuid = 0x328C6225041A814B;
+const uint64_t kRectBinGuid = 0x07EB6974550BDCD0;
 
 struct game_state
 {
@@ -48,6 +51,8 @@ struct game_state
     bool shouldExit;
 };
 game_state *game;
+
+} // namespace
 
 void UserMain()
 {
@@ -67,7 +72,6 @@ void UserMain()
     SamplerManager::Bootstrap();
     TextureManager::Bootstrap();
     MeshManager::Bootstrap();
-
     TweenManager::Bootstrap();
 
     DebugTextRenderer::Bootstrap(alloc);
@@ -77,6 +81,7 @@ void UserMain()
 
     mesh_handle cubeMesh = MeshManager::DeclareMesh(assetFile, kCubeGltfGuid, kCubeBinGuid);
     mesh_handle sphereMesh = MeshManager::DeclareMesh(assetFile, kSphereGltfGuid, kSphereBinGuid);
+    mesh_handle rectMesh = MeshManager::DeclareMesh(assetFile, kRectGltfGuid, kRectBinGuid);
 
     render_targets renderTargets{
         .ColorFormat = rhi_texture_format::B8G8R8A8_sRGB,
@@ -143,7 +148,7 @@ void UserMain()
             }
 
             case PlatformEventType::Quit: {
-                std::exit(0);
+                Exit(0);
             }
 
             case PlatformEventType::Repaint:
@@ -169,9 +174,10 @@ void UserMain()
 
             rhi_rtv rtv;
             rhi_dsv dsv;
-            RenderTargets::GetTargets(renderTargets, backbufferInfo.width, backbufferInfo.height, rtv, dsv);
+            RenderTargets::GetTargets(renderTargets, backbufferInfo.width, backbufferInfo.height, &rtv, &dsv);
 
             {
+                // game input
                 float2 movement{};
 
                 static float yaw = 0;
@@ -212,9 +218,9 @@ void UserMain()
                     Renderer::Mesh({0, 0, 0}, {1, 1, 1}, cubeMesh, {});
 
                     const float3 forward{
-                        std::cos(pitch) * std::sin(yaw),
-                        std::sin(pitch),
-                        std::cos(pitch) * std::cos(yaw),
+                        Cos(pitch) * Sin(yaw),
+                        Sin(pitch),
+                        Cos(pitch) * Cos(yaw),
                     };
 
                     static float3 cameraPos{0.f, 0.f, 5.f};

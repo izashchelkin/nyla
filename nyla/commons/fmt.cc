@@ -1,6 +1,5 @@
 #include "nyla/commons/fmt.h"
 
-#include <cinttypes>
 #include <cstdarg>
 #include <cstdint>
 
@@ -127,6 +126,8 @@ void WriteFmt(auto &&consumer, byteview fmt, va_list args)
                         UNREACHABLE();
                     }
                     }
+
+                    break;
                 }
 
                 default: {

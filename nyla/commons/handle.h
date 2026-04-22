@@ -15,7 +15,7 @@ struct handle
 
     operator bool()
     {
-        return gen && index;
+        return gen;
     }
 };
 

@@ -20,7 +20,7 @@ struct render_targets
 namespace RenderTargets
 {
 
-void API GetTargets(render_targets &self, uint32_t width, uint32_t height, rhi_rtv &outRtv, rhi_dsv &outDsv);
+void API GetTargets(render_targets &self, uint32_t width, uint32_t height, rhi_rtv *outRtv, rhi_dsv *outDsv);
 
 };
 

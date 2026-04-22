@@ -29,21 +29,29 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
-add_subdirectory(nyla)
-add_subdirectory(3d_ball_maze)
-
 file(GLOB_RECURSE NYLA_ALL_CXX_FILES
     CONFIGURE_DEPENDS
-    "${PROJECT_SOURCE_DIR}/nyla/*.cc"
-    "${PROJECT_SOURCE_DIR}/nyla/*.h"
-    "${PROJECT_SOURCE_DIR}/nyla/*.hlsl"
+        "${PROJECT_SOURCE_DIR}/nyla/*.cc"
+        "${PROJECT_SOURCE_DIR}/nyla/*.h"
+        "${PROJECT_SOURCE_DIR}/nyla/*.hlsl"
 
-    "${PROJECT_SOURCE_DIR}/3d_ball_maze/*.cc"
-    "${PROJECT_SOURCE_DIR}/3d_ball_maze/*.h"
-    "${PROJECT_SOURCE_DIR}/3d_ball_maze/*.hlsl"
+        "${PROJECT_SOURCE_DIR}/3d_ball_maze/*.cc"
+        "${PROJECT_SOURCE_DIR}/3d_ball_maze/*.h"
+        "${PROJECT_SOURCE_DIR}/3d_ball_maze/*.hlsl"
+
+        "${PROJECT_SOURCE_DIR}/breakout/*.cc"
+        "${PROJECT_SOURCE_DIR}/breakout/*.h"
+        "${PROJECT_SOURCE_DIR}/breakout/*.hlsl"
 )
 
 add_custom_target(format
     COMMAND clang-format -i ${NYLA_ALL_CXX_FILES}
     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 )
+
+
+
+add_subdirectory(nyla)
+
+add_subdirectory(3d_ball_maze)
+add_subdirectory(breakout)

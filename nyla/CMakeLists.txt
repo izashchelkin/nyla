@@ -2,8 +2,6 @@
 
 add_subdirectory(commons)
 
-add_subdirectory(asset)
-
 add_subdirectory(audio)
 add_subdirectory(formats)
 add_subdirectory(tools)

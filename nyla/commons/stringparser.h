@@ -1,6 +1,7 @@
 #pragma once
 
 #include "nyla/commons/byteparser.h"
+#include <cstdint>
 
 namespace nyla
 {
@@ -45,6 +46,8 @@ enum ParseNumberResult
     Long,
 };
 
+INLINE auto ParseLong(byte_parser &self) -> int64_t;
+
 inline auto ParseDecimal(byte_parser &self, double &outDouble, int64_t &outLong) -> ParseNumberResult
 {
     int32_t sign = 1;
@@ -74,11 +77,21 @@ inline auto ParseDecimal(byte_parser &self, double &outDouble, int64_t &outLong)
             fraction += ByteParser::Read(self) - '0';
         }
 
+        int64_t powerOfTen = 0;
+
+        if (ByteParser::BytesLeft(self) > 0 && ByteParser::Peek(self) == 'e')
+        {
+            ByteParser::Advance(self);
+            powerOfTen = ParseLong(self);
+        }
+
         auto f = static_cast<double>(fraction);
         for (uint32_t i = 0; i < fractionCount; ++i)
             f /= 10.0;
 
         f += static_cast<double>(integer);
+
+        f *= Pow(10, (float)powerOfTen);
 
         outDouble = static_cast<double>(sign * f);
         return ParseNumberResult::Double;

@@ -1,4 +1,4 @@
-set(TARGET 3d_ball_maze)
+set(TARGET breakout)
 
 if (WIN32)
     add_executable(${TARGET} WIN32)

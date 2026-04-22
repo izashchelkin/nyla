@@ -3,6 +3,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <type_traits>
 
 #include <immintrin.h>
@@ -42,7 +43,7 @@ INLINE void WriteU(void *ptr, const T &val)
 #endif
 }
 
-INLINE uint32_t BitScanForward32(uint32_t n)
+INLINE auto BitScanForward32(uint32_t n) -> uint32_t
 {
     DASSERT(n != 0);
 #if defined(__clang__) || defined(__GNUC__)
@@ -54,7 +55,7 @@ INLINE uint32_t BitScanForward32(uint32_t n)
 #endif
 }
 
-INLINE uint32_t BitScanForward64(uint64_t n)
+INLINE auto BitScanForward64(uint64_t n) -> uint64_t
 {
     DASSERT(n != 0);
 #if defined(__clang__) || defined(__GNUC__)
@@ -66,7 +67,7 @@ INLINE uint32_t BitScanForward64(uint64_t n)
 #endif
 }
 
-INLINE uint16_t ByteSwap16(uint16_t val)
+INLINE auto ByteSwap16(uint16_t val) -> uint16_t
 {
 #if defined(__clang__) || defined(__GNUC__)
     return __builtin_bswap16(val);
@@ -75,7 +76,7 @@ INLINE uint16_t ByteSwap16(uint16_t val)
 #endif
 }
 
-INLINE uint32_t ByteSwap32(uint32_t val)
+INLINE auto ByteSwap32(uint32_t val) -> uint32_t
 {
 #if defined(__clang__) || defined(__GNUC__)
     return __builtin_bswap32(val);
@@ -84,7 +85,7 @@ INLINE uint32_t ByteSwap32(uint32_t val)
 #endif
 }
 
-INLINE uint64_t ByteSwap64(uint64_t val)
+INLINE auto ByteSwap64(uint64_t val) -> uint64_t
 {
 #if defined(__clang__) || defined(__GNUC__)
     return __builtin_bswap64(val);
@@ -93,7 +94,7 @@ INLINE uint64_t ByteSwap64(uint64_t val)
 #endif
 }
 
-INLINE int64_t LRound(double x)
+INLINE auto LRound(double x) -> int64_t
 {
 #if defined(__clang__) || defined(__GNUC__)
     return __builtin_lround(x);
@@ -102,7 +103,7 @@ INLINE int64_t LRound(double x)
 #endif
 }
 
-INLINE uint64_t UMul128(uint64_t a, uint64_t b, uint64_t &hi)
+INLINE auto UMul128(uint64_t a, uint64_t b, uint64_t &hi) -> uint64_t
 {
 #if defined(__clang__) || defined(__GNUC__)
     unsigned __int128 res = (unsigned __int128)a * b;
@@ -113,7 +114,7 @@ INLINE uint64_t UMul128(uint64_t a, uint64_t b, uint64_t &hi)
 #endif
 }
 
-INLINE uint64_t UDiv128(uint64_t hi, uint64_t lo, uint64_t divisor, uint64_t &reminder)
+INLINE auto UDiv128(uint64_t hi, uint64_t lo, uint64_t divisor, uint64_t &reminder) -> uint64_t
 {
 #if defined(__clang__) || defined(__GNUC__)
     unsigned __int128 dividend = ((unsigned __int128)hi << 64) | lo;
@@ -124,14 +125,20 @@ INLINE uint64_t UDiv128(uint64_t hi, uint64_t lo, uint64_t divisor, uint64_t &re
 #endif
 }
 
+INLINE auto Sin(float f) -> float
+{
+    return sinf(f);
+}
+
 INLINE auto Cos(float f) -> float
 {
     return cosf(f);
 }
 
-INLINE auto Sin(float f) -> float
+INLINE auto SinCos(float f, float &outSin, float &outCos)
 {
-    return sinf(f);
+    outSin = ::sin(f);
+    outCos = ::cos(f);
 }
 
 INLINE auto Tan(float f) -> float
@@ -149,6 +156,16 @@ INLINE auto Sqrt(float val) -> float
     __m128 v = _mm_set_ss(val);
     v = _mm_sqrt_ss(v);
     return _mm_cvtss_f32(v);
+}
+
+INLINE auto Pow(float x, float y) -> float
+{
+    return ::powf(x, y);
+}
+
+INLINE auto Exit(int code)
+{
+    ::quick_exit(code);
 }
 
 } // namespace nyla

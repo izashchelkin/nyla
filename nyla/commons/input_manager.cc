@@ -23,7 +23,7 @@ struct input_state
 
 struct input_manager
 {
-    inline_vec<input_state, 0xFF> inputStates;
+    array<input_state, 0xFF> inputStates;
 };
 input_manager *manager;
 

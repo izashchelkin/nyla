@@ -5,6 +5,7 @@
 #include "nyla/commons/array.h" // IWYU pragma: keep
 #include "nyla/commons/inline_vec.h"
 #include "nyla/commons/inline_vec_def.h"
+#include "nyla/commons/macros.h"
 #include "nyla/commons/mat.h"
 #include "nyla/commons/math.h"
 #include "nyla/commons/region_alloc.h"
