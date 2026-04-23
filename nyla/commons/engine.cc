@@ -3,7 +3,6 @@
 #include <concepts>
 #include <cstdint>
 
-#include "nyla/commons/asset_manager.h"
 #include "nyla/commons/bitenum.h"
 #include "nyla/commons/debug_text_renderer.h"
 #include "nyla/commons/engine.h"

@@ -2,7 +2,6 @@
 
 #include <cstdint>
 
-#include "nyla/commons/asset_manager.h"
 #include "nyla/commons/rhi.h"
 
 namespace nyla
