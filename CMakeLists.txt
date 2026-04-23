@@ -42,6 +42,10 @@ file(GLOB_RECURSE NYLA_ALL_CXX_FILES
         "${PROJECT_SOURCE_DIR}/breakout/*.cc"
         "${PROJECT_SOURCE_DIR}/breakout/*.h"
         "${PROJECT_SOURCE_DIR}/breakout/*.hlsl"
+
+        "${PROJECT_SOURCE_DIR}/wm/*.cc"
+        "${PROJECT_SOURCE_DIR}/wm/*.h"
+        "${PROJECT_SOURCE_DIR}/wm/*.hlsl"
 )
 
 add_custom_target(format
@@ -55,3 +59,4 @@ add_subdirectory(nyla)
 
 add_subdirectory(3d_ball_maze)
 add_subdirectory(breakout)
+add_subdirectory(wm)

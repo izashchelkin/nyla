@@ -4,7 +4,11 @@
 
 #include <sys/mman.h>
 #include <xcb/xcb.h>
+#include <xcb/xcb_atom.h>
+#include <xcb/xcb_aux.h>
 #include <xcb/xcb_errors.h>
+#include <xcb/xcb_event.h>
+#include <xcb/xcb_util.h>
 #include <xcb/xproto.h>
 #include <xkbcommon/xkbcommon-x11.h>
 
