@@ -11,7 +11,10 @@
 namespace nyla
 {
 
-auto NextGlyph(bdf_parser &self, region_alloc &alloc, bdf_glyph &out) -> bool
+namespace BdfParser
+{
+
+auto API NextGlyph(bdf_parser &self, region_alloc &alloc, bdf_glyph &out) -> bool
 {
     auto allocMark = alloc.at;
 
@@ -80,5 +83,7 @@ auto NextGlyph(bdf_parser &self, region_alloc &alloc, bdf_glyph &out) -> bool
         return true;
     }
 }
+
+} // namespace BdfParser
 
 } // namespace nyla

@@ -5,6 +5,7 @@
 #include <type_traits>
 
 #include "nyla/commons/byteliterals.h"
+#include "nyla/commons/concepts.h"
 #include "nyla/commons/intrin.h" // IWYU pragma: keep
 #include "nyla/commons/macros.h"
 
@@ -90,15 +91,6 @@ INLINE void MemMove(void *dest, const void *src, uint64_t size)
 #endif
 }
 
-template <typename T>
-INLINE void Swap(T &lhs, T &rhs)
-    requires(std::is_trivially_constructible<T>())
-{
-    T tmp = lhs;
-    lhs = rhs;
-    rhs = tmp;
-}
-
 #if 1
 [[nodiscard]]
 auto INLINE MemEq(const void *p1, const void *p2, uint64_t len) -> bool
@@ -142,5 +134,12 @@ INLINE auto CStrLen(const void *str, uint64_t maxLen) -> uint64_t
 [[nodiscard]]
 API auto CStrLen(const void *str, uint64_t maxLen) -> uint64_t;
 #endif
+
+template <is_plain T> INLINE void Swap(T &lhs, T &rhs)
+{
+    T tmp;
+    lhs = rhs;
+    rhs = tmp;
+}
 
 } // namespace nyla

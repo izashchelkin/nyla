@@ -110,7 +110,6 @@ auto IsInside(float pos, float size, float2 boundary) -> bool
 void UserMain()
 {
     game = &RegionAlloc::Alloc<game_state>(RegionAlloc::g_BootstrapAlloc);
-    MemZero(game);
     game->targetFrameDurationUs = 1'000'000 / 144;
 
     region_alloc alloc = RegionAlloc::Create(16_MiB, 0);
@@ -126,7 +125,6 @@ void UserMain()
     TextureManager::Bootstrap();
     MeshManager::Bootstrap();
     TweenManager::Bootstrap();
-
     DebugTextRenderer::Bootstrap(alloc);
     Renderer::Bootstrap(alloc);
 

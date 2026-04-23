@@ -24,7 +24,7 @@ struct bdf_parser : byte_parser
 namespace BdfParser
 {
 
-auto NextGlyph(bdf_parser &self, region_alloc &alloc, bdf_glyph &out) -> bool;
+auto API NextGlyph(bdf_parser &self, region_alloc &alloc, bdf_glyph &out) -> bool;
 
 }
 
