@@ -1,3 +1,5 @@
 target_sources(${TARGET} PRIVATE
     3d_ball_maze.cc
 )
+target_sources(${TARGET} PUBLIC
+)

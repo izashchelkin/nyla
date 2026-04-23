@@ -25,6 +25,7 @@ target_sources(${TARGET} PRIVATE
     staging.cc
     texture_manager.cc
     tween_manager.cc
+    wave.cc
 )
 target_sources(${TARGET} PUBLIC
     align.h
@@ -97,6 +98,7 @@ target_sources(${TARGET} PUBLIC
     tuple.h
     tween_manager.h
     vec.h
+    wave.h
     word.h
 )
 if (WIN32)

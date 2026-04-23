@@ -1,7 +1,8 @@
 #pragma once
 
 #include <cstdint>
-#include <span>
+
+#include "nyla/commons/span_def.h"
 
 namespace nyla
 {
@@ -30,7 +31,7 @@ struct WaveFmtChunk
 struct ParseWavFileResult
 {
     WaveFmtChunk *fmt;
-    Span<const std::byte> data;
+    byteview data;
 
     auto GetSampleRate()
     {
@@ -43,6 +44,6 @@ struct ParseWavFileResult
     }
 };
 
-auto ParseWavFile(Span<const std::byte> bytes) -> ParseWavFileResult;
+auto ParseWavFile(byteview bytes) -> ParseWavFileResult;
 
 } // namespace nyla

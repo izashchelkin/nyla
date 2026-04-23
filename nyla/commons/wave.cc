@@ -1,8 +1,9 @@
-#include "nyla/audio/wave.h"
+#include "nyla/commons/wave.h"
 
 #include <cstdint>
-#include <cstring>
-#include <span>
+
+#include "nyla/commons/mem.h"
+#include "nyla/commons/span_def.h"
 
 namespace nyla
 {
@@ -34,22 +35,22 @@ constexpr auto Word32(const char str[4]) -> uint32_t
 
 } // namespace
 
-auto ParseWavFile(Span<const std::byte> bytes) -> ParseWavFileResult
+auto ParseWavFile(byteview bytes) -> ParseWavFileResult
 {
     ParseWavFileResult result{};
 
-    const std::byte *p = bytes.Data();
+    const uint8_t *p = bytes.data;
 
     {
         WaveMasterChunk masterChunk{};
-        memcpy(&masterChunk, p, sizeof(masterChunk));
+        MemCpy(&masterChunk, p, sizeof(masterChunk));
         p += sizeof(masterChunk);
 
         ASSERT(masterChunk.chunkId == Word32("RIFF"));
         ASSERT(masterChunk.waveId == Word32("WAVE"));
     }
 
-    while (p != bytes.Data() + bytes.Size())
+    while (p != bytes.data + bytes.size)
     {
         WaveChunkHeader header{};
         memcpy(&header, p, sizeof(header));

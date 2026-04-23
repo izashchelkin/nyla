@@ -1,3 +1,8 @@
 target_sources(${TARGET} PRIVATE
     breakout.cc
+    main.cc
+    old_breakout.cc
+)
+target_sources(${TARGET} PUBLIC
+    old_breakout.h
 )
