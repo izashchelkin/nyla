@@ -137,7 +137,7 @@ API auto CStrLen(const void *str, uint64_t maxLen) -> uint64_t;
 
 template <is_plain T> INLINE void Swap(T &lhs, T &rhs)
 {
-    T tmp;
+    T tmp = lhs;
     lhs = rhs;
     rhs = tmp;
 }

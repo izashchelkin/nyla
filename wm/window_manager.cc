@@ -291,23 +291,6 @@ void RemoveWindow(xcb_window_t clientWindow)
     --wm->windowCount;
 }
 
-// ─── Vec helpers ─────────────────────────────────────────────────────────────
-
-template <typename T, uint64_t Cap> auto VecFind(inline_vec<T, Cap> &vec, const T &val) -> T *
-{
-    for (auto &elem : vec)
-        if (elem == val)
-            return &elem;
-    return nullptr;
-}
-
-template <typename T, uint64_t Cap> void VecErase(inline_vec<T, Cap> &vec, T *pos)
-{
-    span<T> s{vec.data.data, vec.size};
-    s = Span::Erase(s, pos);
-    vec.size = s.size;
-}
-
 // ─── Stack helpers ────────────────────────────────────────────────────────────
 
 auto GetActiveStack() -> window_stack &
@@ -496,11 +479,11 @@ void AdoptPendingTransients(xcb_window_t parentWindow)
         for (uint32_t istack = 0; istack < 9; ++istack)
         {
             window_stack &s = wm->stacks[istack];
-            xcb_window_t *pos = VecFind(s.windows, childWindow);
+            xcb_window_t *pos = InlineVec::Find(s.windows, childWindow);
             if (!pos)
                 continue;
 
-            VecErase(s.windows, pos);
+            InlineVec::Erase(s.windows, pos);
             if (s.activeWindow == childWindow)
             {
                 s.activeWindow = s.windows.size > 0 ? s.windows[0] : 0;
@@ -609,9 +592,9 @@ void UnmanageClient(xcb_window_t clientWindow)
         window_index_entry *parentIdx = FindIndex(idx->parent);
         if (parentIdx)
         {
-            xcb_window_t *pos = VecFind(parentIdx->dataEntry->subwindows, clientWindow);
+            xcb_window_t *pos = InlineVec::Find(parentIdx->dataEntry->subwindows, clientWindow);
             if (pos)
-                VecErase(parentIdx->dataEntry->subwindows, pos);
+                InlineVec::Erase(parentIdx->dataEntry->subwindows, pos);
         }
     }
     else
@@ -640,7 +623,7 @@ void UnmanageClient(xcb_window_t clientWindow)
     {
         window_stack &stack = wm->stacks[istack];
         xcb_window_t lookFor = transientFor ? transientFor : clientWindow;
-        xcb_window_t *winPos = VecFind(stack.windows, lookFor);
+        xcb_window_t *winPos = InlineVec::Find(stack.windows, lookFor);
         if (!winPos)
             continue;
 
@@ -649,7 +632,7 @@ void UnmanageClient(xcb_window_t clientWindow)
         {
             wm->follow = false;
             stack.flags &= ~window_stack::FlagZoom;
-            VecErase(stack.windows, winPos);
+            InlineVec::Erase(stack.windows, winPos);
         }
 
         if (stack.activeWindow == clientWindow)
@@ -689,9 +672,9 @@ void MoveStack(xcb_timestamp_t time, auto computeIdx)
             newStack.flags &= ~window_stack::FlagZoom;
             oldStack.flags &= ~window_stack::FlagZoom;
 
-            xcb_window_t *pos = VecFind(oldStack.windows, oldStack.activeWindow);
+            xcb_window_t *pos = InlineVec::Find(oldStack.windows, oldStack.activeWindow);
             ASSERT(pos);
-            VecErase(oldStack.windows, pos);
+            InlineVec::Erase(oldStack.windows, pos);
 
             oldStack.activeWindow = oldStack.windows.size > 0 ? oldStack.windows[0] : 0;
             Activate(newStack, newStack.activeWindow, time);
@@ -730,7 +713,7 @@ void MoveLocal(xcb_timestamp_t time, auto computeIdx, bool clearZoom)
 
     if (stack.activeWindow)
     {
-        xcb_window_t *pos = VecFind(stack.windows, stack.activeWindow);
+        xcb_window_t *pos = InlineVec::Find(stack.windows, stack.activeWindow);
         if (!pos)
             return;
 

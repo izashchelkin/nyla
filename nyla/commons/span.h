@@ -147,7 +147,7 @@ template <typename T> INLINE auto Erase(span<T> self, T *from, T *to) -> span<T>
     static_assert(!std::is_const_v<T>);
 
     DASSERT(from >= self.begin() && from < self.end());
-    DASSERT(to >= self.begin() && to < self.end());
+    DASSERT(to >= self.begin() && to <= self.end());
     DASSERT(to >= from);
 
     if (from == to)

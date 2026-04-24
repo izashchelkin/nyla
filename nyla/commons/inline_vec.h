@@ -110,6 +110,22 @@ template <typename T, uint64_t Capacity> INLINE auto PopBack(inline_vec<T, Capac
     return ret;
 }
 
+template <typename T, uint64_t Capacity>
+[[nodiscard]]
+INLINE auto Find(inline_vec<T, Capacity> &self, const T &val) -> T *
+{
+    for (auto &elem : self)
+        if (elem == val)
+            return &elem;
+    return nullptr;
+}
+
+template <typename T, uint64_t Capacity> INLINE void Erase(inline_vec<T, Capacity> &self, T *pos)
+{
+    span<T> s = Span::Erase(span<T>{self.data.data, self.size}, pos);
+    self.size = s.size;
+}
+
 }; // namespace InlineVec
 
 } // namespace nyla
