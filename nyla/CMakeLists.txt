@@ -2,7 +2,3 @@
 
 add_subdirectory(commons)
 add_subdirectory(tools)
-
-if (UNIX AND NOT APPLE)
-    add_subdirectory(dbus)
-endif()

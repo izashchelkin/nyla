@@ -50,6 +50,14 @@ file(GLOB_RECURSE NYLA_ALL_CXX_FILES
         "${PROJECT_SOURCE_DIR}/wm/*.cc"
         "${PROJECT_SOURCE_DIR}/wm/*.h"
         "${PROJECT_SOURCE_DIR}/wm/*.hlsl"
+
+        "${PROJECT_SOURCE_DIR}/wm_overlay/*.cc"
+        "${PROJECT_SOURCE_DIR}/wm_overlay/*.h"
+        "${PROJECT_SOURCE_DIR}/wm_overlay/*.hlsl"
+
+        "${PROJECT_SOURCE_DIR}/screen_inhibitor/*.cc"
+        "${PROJECT_SOURCE_DIR}/screen_inhibitor/*.h"
+        "${PROJECT_SOURCE_DIR}/screen_inhibitor/*.hlsl"
 )
 
 add_custom_target(format
@@ -65,3 +73,5 @@ add_subdirectory(3d_ball_maze)
 add_subdirectory(breakout)
 add_subdirectory(terminal)
 add_subdirectory(wm)
+add_subdirectory(wm_overlay)
+add_subdirectory(screen_inhibitor)

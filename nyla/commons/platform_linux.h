@@ -1,14 +1,20 @@
 #pragma once
 
+#include <cerrno>
+#include <cmath>
 #include <cstdint>
 
 #include <sys/mman.h>
+#include <sys/poll.h>
+#include <sys/signal.h>
+
 #include <xcb/xcb.h>
 #include <xcb/xcb_atom.h>
 #include <xcb/xcb_aux.h>
 #include <xcb/xcb_errors.h>
 #include <xcb/xcb_event.h>
 #include <xcb/xcb_util.h>
+#include <xcb/xinput.h>
 #include <xcb/xproto.h>
 #include <xkbcommon/xkbcommon-x11.h>
 
