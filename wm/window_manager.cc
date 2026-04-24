@@ -328,7 +328,7 @@ void ConfigureClientIfNeeded(xcb_window_t clientWindow, window_index_entry &idx,
                              const Rect &newRect, uint32_t newBorderWidth)
 {
     uint16_t mask = 0;
-    inline_vec<uint32_t, 5> values;
+    inline_vec<uint32_t, 5> values{};
     bool anythingChanged = false;
     bool sizeChanged = false;
 
@@ -939,7 +939,7 @@ void WmProcess(bool &isRunning)
             }
             else
             {
-                inline_vec<uint32_t, 7> values;
+                inline_vec<uint32_t, 7> values{};
                 uint16_t mask = cr->value_mask;
                 if (mask & XCB_CONFIG_WINDOW_X)
                     InlineVec::Append(values, (uint32_t)cr->x);

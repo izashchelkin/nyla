@@ -1,4 +1,5 @@
 #include "nyla/commons/platform_linux.h"
+#include "nyla/commons/array.h"
 #include "nyla/commons/file.h"
 #include "nyla/commons/mem.h"
 #include "nyla/commons/platform.h"

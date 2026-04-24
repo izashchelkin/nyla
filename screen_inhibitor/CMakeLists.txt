@@ -11,6 +11,5 @@ pkg_check_modules(DBUS REQUIRED dbus-1)
 
 target_link_libraries(${TARGET} PRIVATE nyla::commons ${DBUS_LIBRARIES} xcb-screensaver)
 target_include_directories(${TARGET} PRIVATE ${DBUS_INCLUDE_DIRS})
-target_compile_definitions(${TARGET} PRIVATE DLL_IMPORT)
 
 include(CMakeListsGenerated.txt)

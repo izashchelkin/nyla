@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 4.0)
 project(nyla LANGUAGES CXX)
 enable_testing()
 
+option(BUILD_SHARED_LIBS "Build shared libraries" ON)
+
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

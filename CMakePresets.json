@@ -48,7 +48,8 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-        "CMAKE_CXX_COMPILER": "clang++"
+        "CMAKE_CXX_COMPILER": "clang++",
+        "BUILD_SHARED_LIBS": "ON"
       }
     },
     {
@@ -58,7 +59,19 @@
       "binaryDir": "${sourceDir}/build/linux-release",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_CXX_COMPILER": "clang++"
+        "CMAKE_CXX_COMPILER": "clang++",
+        "BUILD_SHARED_LIBS": "ON"
+      }
+    },
+    {
+      "name": "linux-static-release",
+      "displayName": "Linux (Ninja Release, Static)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/linux-static-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "BUILD_SHARED_LIBS": "OFF"
       }
     }
   ],
@@ -76,6 +89,10 @@
     {
       "name": "linux-release",
       "configurePreset": "linux-release"
+    },
+    {
+      "name": "linux-static-release",
+      "configurePreset": "linux-static-release"
     }
   ]
 }

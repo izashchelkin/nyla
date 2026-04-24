@@ -1,7 +1,7 @@
 bash scripts/build_wm.sh
 
 mv ~/wm ~/wmold
-cp ./build/linux-debug/nyla/apps/wm/wm ~
+cp ./build/linux-debug/bin/wm ~
 
 mv ~/wm_overlay ~/wm_overlay_old
-cp ./build/linux-release/nyla/apps/wm/wm_overlay ~
+cp ./build/linux-release/bin/wm_overlay ~

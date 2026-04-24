@@ -16,11 +16,9 @@ namespace nyla
 
 void UserMain()
 {
-    const xcb_window_t window = X11CreateWin(X11GetScreen()->width_in_pixels,
-                                              X11GetScreen()->height_in_pixels,
-                                              true, XCB_EVENT_MASK_EXPOSURE);
-    xcb_configure_window(X11GetConn(), window, XCB_CONFIG_WINDOW_STACK_MODE,
-                         (uint32_t[]){XCB_STACK_MODE_BELOW});
+    const xcb_window_t window =
+        X11CreateWin(X11GetScreen()->width_in_pixels, X11GetScreen()->height_in_pixels, true, XCB_EVENT_MASK_EXPOSURE);
+    xcb_configure_window(X11GetConn(), window, XCB_CONFIG_WINDOW_STACK_MODE, (uint32_t[]){XCB_STACK_MODE_BELOW});
     X11Flush();
 
     X11SetWindow(window);
@@ -28,21 +26,22 @@ void UserMain()
     region_alloc alloc = RegionAlloc::Create(4_MiB, 0);
 
     Rhi::Bootstrap(alloc, {
-        .flags = rhi_flags::VSync,
-        .limits = {
-            .numTextures = 0,
-            .numTextureViews = 0,
-            .numBuffers = 0,
-            .numSamplers = 0,
-            .numFramesInFlight = 1,
-            .maxDrawCount = 1,
-            .maxPassCount = 1,
-            .frameConstantSize = 0,
-            .passConstantSize = 0,
-            .drawConstantSize = 0,
-            .largeDrawConstantSize = 320,
-        },
-    });
+                              .flags = rhi_flags::VSync,
+                              .limits =
+                                  {
+                                      .numTextures = 0,
+                                      .numTextureViews = 0,
+                                      .numBuffers = 0,
+                                      .numSamplers = 0,
+                                      .numFramesInFlight = 1,
+                                      .maxDrawCount = 1,
+                                      .maxPassCount = 1,
+                                      .frameConstantSize = 0,
+                                      .passConstantSize = 0,
+                                      .drawConstantSize = 0,
+                                      .largeDrawConstantSize = 320,
+                                  },
+                          });
 
     DebugTextRenderer::Bootstrap(alloc);
 
@@ -100,8 +99,7 @@ void UserMain()
 
         time_t t = time(nullptr);
         struct tm *tm = localtime(&t);
-        DebugTextRenderer::Fmt(1, 1, "%02d:%02d:%02d %02d.%02d.%04d"_s,
-                               tm->tm_hour, tm->tm_min, tm->tm_sec,
+        DebugTextRenderer::Fmt(1, 1, "%02d:%02d:%02d %02d.%02d.%04d"_s, tm->tm_hour, tm->tm_min, tm->tm_sec,
                                tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900);
 
         rhi_texture backbuffer = Rhi::GetTexture(Rhi::GetBackbufferView());

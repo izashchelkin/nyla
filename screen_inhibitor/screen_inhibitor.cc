@@ -4,9 +4,9 @@
 #include <dbus/dbus.h>
 #include <xcb/screensaver.h>
 
+#include "nyla/commons/array.h"
 #include "nyla/commons/entrypoint.h"
 #include "nyla/commons/fmt.h"
-#include "nyla/commons/array.h"
 #include "nyla/commons/inline_vec.h"
 #include "nyla/commons/mem.h"
 #include "nyla/commons/platform_linux.h"
@@ -20,25 +20,24 @@ namespace
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 
-static constexpr const char *kIntrospectXml =
-    "<node>"
-    " <interface name='org.freedesktop.ScreenSaver'>"
-    "  <method name='Inhibit'>"
-    "   <arg name='application' type='s' direction='in'/>"
-    "   <arg name='reason' type='s' direction='in'/>"
-    "   <arg name='cookie' type='u' direction='out'/>"
-    "  </method>"
-    "  <method name='UnInhibit'>"
-    "   <arg name='cookie' type='u' direction='in'/>"
-    "  </method>"
-    "  <method name='SimulateUserActivity'/>"
-    " </interface>"
-    " <interface name='org.freedesktop.DBus.Introspectable'>"
-    "  <method name='Introspect'>"
-    "   <arg name='xml' type='s' direction='out'/>"
-    "  </method>"
-    " </interface>"
-    "</node>";
+static constexpr const char *kIntrospectXml = "<node>"
+                                              " <interface name='org.freedesktop.ScreenSaver'>"
+                                              "  <method name='Inhibit'>"
+                                              "   <arg name='application' type='s' direction='in'/>"
+                                              "   <arg name='reason' type='s' direction='in'/>"
+                                              "   <arg name='cookie' type='u' direction='out'/>"
+                                              "  </method>"
+                                              "  <method name='UnInhibit'>"
+                                              "   <arg name='cookie' type='u' direction='in'/>"
+                                              "  </method>"
+                                              "  <method name='SimulateUserActivity'/>"
+                                              " </interface>"
+                                              " <interface name='org.freedesktop.DBus.Introspectable'>"
+                                              "  <method name='Introspect'>"
+                                              "   <arg name='xml' type='s' direction='out'/>"
+                                              "  </method>"
+                                              " </interface>"
+                                              "</node>";
 
 struct inhibit_entry
 {
@@ -118,11 +117,8 @@ static void HandleMessage(DBusMessage *msg)
 
         DBusError err;
         dbus_error_init(&err);
-        dbus_message_get_args(msg, &err,
-                              DBUS_TYPE_STRING, &name,
-                              DBUS_TYPE_STRING, &oldOwner,
-                              DBUS_TYPE_STRING, &newOwner,
-                              DBUS_TYPE_INVALID);
+        dbus_message_get_args(msg, &err, DBUS_TYPE_STRING, &name, DBUS_TYPE_STRING, &oldOwner, DBUS_TYPE_STRING,
+                              &newOwner, DBUS_TYPE_INVALID);
         bool argsOk = !dbus_error_is_set(&err);
         dbus_error_free(&err);
 
@@ -166,10 +162,7 @@ static void HandleMessage(DBusMessage *msg)
 
         DBusError err;
         dbus_error_init(&err);
-        if (!dbus_message_get_args(msg, &err,
-                                   DBUS_TYPE_STRING, &appName,
-                                   DBUS_TYPE_STRING, &reason,
-                                   DBUS_TYPE_INVALID))
+        if (!dbus_message_get_args(msg, &err, DBUS_TYPE_STRING, &appName, DBUS_TYPE_STRING, &reason, DBUS_TYPE_INVALID))
         {
             ReplyError(msg, DBUS_ERROR_INVALID_ARGS, err.message);
             dbus_error_free(&err);
@@ -206,9 +199,7 @@ static void HandleMessage(DBusMessage *msg)
 
         DBusError err;
         dbus_error_init(&err);
-        if (!dbus_message_get_args(msg, &err,
-                                   DBUS_TYPE_UINT32, &cookie,
-                                   DBUS_TYPE_INVALID))
+        if (!dbus_message_get_args(msg, &err, DBUS_TYPE_UINT32, &cookie, DBUS_TYPE_INVALID))
         {
             ReplyError(msg, DBUS_ERROR_INVALID_ARGS, err.message);
             dbus_error_free(&err);
@@ -271,8 +262,8 @@ void UserMain()
 
     {
         dbus_error_init(&err);
-        int ret = dbus_bus_request_name(inhibitor->dbusConn, "org.freedesktop.ScreenSaver",
-                                        DBUS_NAME_FLAG_DO_NOT_QUEUE, &err);
+        int ret = dbus_bus_request_name(inhibitor->dbusConn, "org.freedesktop.ScreenSaver", DBUS_NAME_FLAG_DO_NOT_QUEUE,
+                                        &err);
         ASSERT(!dbus_error_is_set(&err) &&
                (ret == DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER || ret == DBUS_REQUEST_NAME_REPLY_ALREADY_OWNER));
         dbus_error_free(&err);

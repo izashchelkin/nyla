@@ -1,8 +1,13 @@
 set(TARGET nyla_commons)
-add_library(${TARGET} SHARED)
+add_library(${TARGET})
 add_library(nyla::commons ALIAS ${TARGET})
 
-target_compile_definitions(${TARGET} PRIVATE DLL_EXPORT)
+if(BUILD_SHARED_LIBS)
+    target_compile_definitions(${TARGET}
+        PRIVATE DLL_EXPORT
+        INTERFACE DLL_IMPORT
+    )
+endif()
 
 find_package(Vulkan)
 
