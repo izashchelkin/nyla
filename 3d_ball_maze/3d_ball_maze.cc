@@ -1,7 +1,7 @@
 #include <cstdint>
 
 #include "nyla/commons/array.h" // IWYU pragma: keep
-#include "nyla/commons/asset_file.h"
+#include "nyla/commons/asset_manager.h"
 #include "nyla/commons/debug_text_renderer.h"
 #include "nyla/commons/entrypoint.h"
 #include "nyla/commons/file.h"
@@ -73,15 +73,13 @@ void UserMain()
     TextureManager::Bootstrap();
     MeshManager::Bootstrap();
     TweenManager::Bootstrap();
-
     DebugTextRenderer::Bootstrap(alloc);
     Renderer::Bootstrap(alloc);
+    AssetManager::Bootstrap(FileOpen(R"(assets.bin)"_s, FileOpenMode::Read));
 
-    byteview assetFile = AssetFileLoad(FileOpen(R"(assets.bin)"_s, FileOpenMode::Read));
-
-    mesh_handle cubeMesh = MeshManager::DeclareMesh(assetFile, kCubeGltfGuid, kCubeBinGuid);
-    mesh_handle sphereMesh = MeshManager::DeclareMesh(assetFile, kSphereGltfGuid, kSphereBinGuid);
-    mesh_handle rectMesh = MeshManager::DeclareMesh(assetFile, kRectGltfGuid, kRectBinGuid);
+    mesh_handle cubeMesh = MeshManager::DeclareMesh(kCubeGltfGuid, kCubeBinGuid);
+    mesh_handle sphereMesh = MeshManager::DeclareMesh(kSphereGltfGuid, kSphereBinGuid);
+    mesh_handle rectMesh = MeshManager::DeclareMesh(kRectGltfGuid, kRectBinGuid);
 
     render_targets renderTargets{
         .ColorFormat = rhi_texture_format::B8G8R8A8_sRGB,
@@ -165,8 +163,8 @@ void UserMain()
         GpuUpload::Update();
         InputManager::Update();
         TweenManager::Update(dt);
-        MeshManager::Update(alloc, cmd, assetFile);
-        TextureManager::Update(cmd, assetFile);
+        MeshManager::Update(alloc, cmd);
+        TextureManager::Update(cmd);
 
         {
             rhi_texture backbuffer = Rhi::GetTexture(Rhi::GetBackbufferView());

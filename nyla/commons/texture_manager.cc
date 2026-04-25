@@ -4,7 +4,7 @@
 #include <cstdint>
 
 #include "nyla/commons/array.h" // IWYU pragma: keep
-#include "nyla/commons/asset_file.h"
+#include "nyla/commons/asset_manager.h"
 #include "nyla/commons/fmt.h"
 #include "nyla/commons/gpu_upload.h"
 #include "nyla/commons/handle_pool.h"
@@ -42,6 +42,7 @@ struct texture_metadata
 {
     uint64_t guid;
     texture_state state;
+    rhi_texture_format textureFormat;
     rhi_texture texture;
     rhi_srv textureView;
     uint32_t width;
@@ -66,7 +67,7 @@ void API Bootstrap()
     manager = &RegionAlloc::Alloc<texture_manager>(RegionAlloc::g_BootstrapAlloc);
 }
 
-void API Update(rhi_cmdlist cmd, byteview assetFile)
+void API Update(rhi_cmdlist cmd)
 {
     for (auto &slot : manager->textures)
     {
@@ -79,7 +80,7 @@ void API Update(rhi_cmdlist cmd, byteview assetFile)
 
         LOG("Uploading texture '%" PRIu64 "'", metadata.guid);
 
-        byteview rawBytes = AssetFileGetData(assetFile, metadata.guid);
+        byteview rawBytes = AssetManager::Get(metadata.guid);
 
         uint8_t *pixelData = stbi_load_from_memory(rawBytes.data, rawBytes.size, (int *)&metadata.width,
                                                    (int *)&metadata.height, (int *)&metadata.channels, 4);
@@ -117,7 +118,7 @@ void API Update(rhi_cmdlist cmd, byteview assetFile)
     }
 }
 
-auto API DeclareTexture(byteview assetFileData, uint64_t guid) -> texture_handle
+auto API DeclareTexture(uint64_t guid) -> texture_handle
 {
     return HandlePool::Acquire(manager->textures, texture_metadata{
                                                       .guid = guid,

@@ -1,10 +1,9 @@
-// Thank you Jake
 // https://gist.github.com/jake-stewart/0a8ea46159a7da2c808e5be2177e1783
 
 #include <cstdint>
 
 #include "nyla/commons/array.h" // IWYU pragma: keep
-#include "nyla/commons/asset_file.h"
+#include "nyla/commons/asset_manager.h"
 #include "nyla/commons/bdf.h"
 #include "nyla/commons/color.h"
 #include "nyla/commons/debug_text_renderer.h"
@@ -42,6 +41,31 @@ namespace nyla
 
 namespace
 {
+
+const uint64_t kCubeGltfGuid = 0x1077DCB383E4F409;
+const uint64_t kCubeBinGuid = 0x7C9E66305CB656C0;
+
+const uint64_t kSphereGltfGuid = 0x831167E33B4E1011;
+const uint64_t kSphereBinGuid = 0xDE33DC595E98C184;
+
+const uint64_t kRectGltfGuid = 0x328C6225041A814B;
+const uint64_t kRectBinGuid = 0x07EB6974550BDCD0;
+
+const uint64_t kBackgroundGuid = 0x1C3EBA857F103740;
+const uint64_t kBallSmallBlueGuid = 0xB0851B6A9FDC5EC3;
+const uint64_t kBrick1Guid = 0x536DFA7327C4D3E0;
+const uint64_t kBrick2Guid = 0x3111A93E450AEFCF;
+const uint64_t kBrick3Guid = 0x361985575F1F6033;
+const uint64_t kBrick4Guid = 0x71D9101DC62A152D;
+const uint64_t kBrick5Guid = 0x1E86F2389D300F95;
+const uint64_t kBrick6Guid = 0x645A2B0CB91DBFDD;
+const uint64_t kBrick7Guid = 0xB516416E99DC16A6;
+const uint64_t kBrick8Guid = 0xC6AEED02BCC31788;
+const uint64_t kBrick9Guid = 0x12DAADBE8487CBB7;
+const uint64_t kBrickUnbreakableGuid = 0xDFF1B727573A893D;
+const uint64_t kFrameGuid = 0xFB8F0BA1D020EB59;
+const uint64_t kPlayerGuid = 0x45B048CC6E76F0AE;
+const uint64_t kPlayerFlashGuid = 0x7BA51AB5A7863015;
 
 struct terminal
 {
@@ -229,6 +253,14 @@ void UserMain()
     TweenManager::Bootstrap();
     DebugTextRenderer::Bootstrap(alloc);
     Renderer::Bootstrap(alloc);
+    AssetManager::Bootstrap(FileOpen(R"(assets.bin)"_s, FileOpenMode::Read));
+
+    byteview bdfData = AssetManager::Get(0x30B510FE27A113FB);
+    bdf_parser bdfParser{};
+    ByteParser::Init(bdfParser, bdfData.data, bdfData.size);
+    byteview fontAtlas = BuildFontAtlas(bdfParser, alloc);
+    AssetManager::Set(0x1, fontAtlas);
+    texture_handle fontAtlasTex = TextureManager::DeclareTexture(0x1);
 
     {
         constexpr bool kHarmonious = false;
@@ -275,14 +307,147 @@ void UserMain()
         }
     }
 
-    byteview assetFile = AssetFileLoad(FileOpen(R"(assets.bin)"_s, FileOpenMode::Read));
+    mesh_handle cubeMesh = MeshManager::DeclareMesh(kCubeGltfGuid, kCubeBinGuid);
+    mesh_handle sphereMesh = MeshManager::DeclareMesh(kSphereGltfGuid, kSphereBinGuid);
+    mesh_handle rectMesh = MeshManager::DeclareMesh(kRectGltfGuid, kRectBinGuid);
 
-    byteview data = AssetFileGetData(assetFile, 0x30B510FE27A113FB);
+    render_targets renderTargets{
+        .ColorFormat = rhi_texture_format::B8G8R8A8_sRGB,
+        .DepthStencilFormat = rhi_texture_format::D32_Float_S8_UINT,
+    };
 
-    bdf_parser bdfParser;
-    ByteParser::Init(bdfParser, data.data, data.size);
+    for (;;)
+    {
+        RegionAlloc::Reset(alloc);
 
-    BuildFontAtlas(bdfParser, alloc);
+        rhi_cmdlist cmd = Rhi::FrameBegin(alloc);
+
+        const uint64_t frameStart = GetMonotonicTimeMicros();
+
+        const uint64_t dtUs = frameStart - term->lastFrameStartUs;
+        term->dtUsAccum += dtUs;
+        ++term->framesCounted;
+
+        const float dt = static_cast<float>(dtUs) * 1e-6f;
+        term->lastFrameStartUs = frameStart;
+
+        if (term->dtUsAccum >= (uint64_t)500'000)
+        {
+            const double seconds = static_cast<double>(term->dtUsAccum) / 1'000'000.0;
+            const double fpsF64 = term->framesCounted / seconds;
+
+            term->fps = LRound(fpsF64);
+            term->dtUsAccum = 0;
+            term->framesCounted = 0;
+        }
+
+        DebugTextRenderer::Fmt(500, 10, "fps=%d"_s, uint32_t(term->fps));
+
+        for (;;)
+        {
+            PlatformEvent event{};
+            if (!WinPollEvent(event))
+                break;
+
+            switch (event.type)
+            {
+
+            case PlatformEventType::KeyDown: {
+                InputManager::HandlePressed(input_interface_type::Keyboard, uint32_t(event.key), frameStart);
+                break;
+            }
+            case PlatformEventType::KeyUp: {
+                InputManager::HandleReleased(input_interface_type::Keyboard, uint32_t(event.key), frameStart);
+                break;
+            }
+
+            case PlatformEventType::MousePress: {
+                InputManager::HandlePressed(input_interface_type::Mouse, event.mouse.code, frameStart);
+                break;
+            }
+            case PlatformEventType::MouseRelease: {
+                InputManager::HandleReleased(input_interface_type::Mouse, event.mouse.code, frameStart);
+                break;
+            }
+
+            case PlatformEventType::WinResize: {
+                Rhi::TriggerSwapchainRecreate();
+                break;
+            }
+
+            case PlatformEventType::Quit: {
+                Exit(0);
+            }
+
+            case PlatformEventType::Repaint:
+            case PlatformEventType::None:
+                break;
+
+            default: {
+                TRAP();
+                break;
+            }
+            }
+        }
+
+        GpuUpload::Update();
+        InputManager::Update();
+        TweenManager::Update(dt);
+        MeshManager::Update(alloc, cmd);
+        TextureManager::Update(cmd);
+
+        {
+            rhi_texture backbuffer = Rhi::GetTexture(Rhi::GetBackbufferView());
+            rhi_texture_info backbufferInfo = Rhi::GetTextureInfo(backbuffer);
+
+            rhi_rtv rtv;
+            RenderTargets::GetTargets(renderTargets, backbufferInfo.width, backbufferInfo.height, &rtv, nullptr);
+
+            {
+                rhi_texture renderTarget = Rhi::GetTexture(rtv);
+                rhi_texture_info rtInfo = Rhi::GetTextureInfo(renderTarget);
+                Rhi::CmdTransitionTexture(cmd, renderTarget, rhi_texture_state::ColorTarget);
+
+                Rhi::PassBegin({
+                    .rtv = rtv,
+                });
+                {
+                    Renderer::Mesh({0, 0, 0}, {100, 70, 0}, rectMesh, fontAtlasTex);
+
+                    Renderer::SetOrthoProjection(rtInfo.width, rtInfo.height, 64);
+
+                    float4x4 view;
+                    Mat::Identity(view);
+                    Renderer::SetView(view);
+
+                    Renderer::CmdFlush(cmd);
+                    DebugTextRenderer::CmdFlush(cmd);
+                }
+                Rhi::PassEnd();
+            }
+
+            rhi_texture renderTarget = Rhi::GetTexture(rtv);
+
+            Rhi::CmdTransitionTexture(cmd, renderTarget, rhi_texture_state::TransferSrc);
+            Rhi::CmdTransitionTexture(cmd, backbuffer, rhi_texture_state::TransferDst);
+
+            Rhi::CmdCopyTexture(cmd, backbuffer, renderTarget);
+
+            Rhi::CmdTransitionTexture(cmd, backbuffer, rhi_texture_state::Present);
+        }
+
+        Rhi::FrameEnd(alloc);
+
+        uint64_t frameEndUs = GetMonotonicTimeMicros();
+        uint64_t frameDurationUs = frameEndUs - term->lastFrameStartUs;
+
+        if (term->targetFrameDurationUs > frameDurationUs)
+        {
+            uint64_t sleepForMillis = (term->targetFrameDurationUs - frameDurationUs) / 1000;
+            if (sleepForMillis)
+                Sleep(sleepForMillis);
+        }
+    }
 }
 
 } // namespace nyla

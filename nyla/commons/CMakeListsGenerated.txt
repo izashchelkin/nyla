@@ -1,5 +1,5 @@
 target_sources(${TARGET} PRIVATE
-    asset_file.cc
+    asset_manager.cc
     bdf.cc
     debug_text_renderer.cc
     engine.cc
@@ -30,7 +30,7 @@ target_sources(${TARGET} PUBLIC
     align.h
     array_def.h
     array.h
-    asset_file.h
+    asset_manager.h
     bdf.h
     bitenum.h
     byteliterals.h

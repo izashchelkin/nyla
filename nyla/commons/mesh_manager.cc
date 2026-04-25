@@ -4,7 +4,7 @@
 #include <cstdint>
 
 #include "nyla/commons/array.h" // IWYU pragma: keep
-#include "nyla/commons/asset_file.h"
+#include "nyla/commons/asset_manager.h"
 #include "nyla/commons/gltf.h"
 #include "nyla/commons/gpu_upload.h"
 #include "nyla/commons/handle_pool.h"
@@ -55,7 +55,7 @@ void API Bootstrap()
     manager = &RegionAlloc::Alloc<mesh_manager>(RegionAlloc::g_BootstrapAlloc);
 }
 
-void API Update(region_alloc &alloc, rhi_cmdlist cmd, byteview assetFile)
+void API Update(region_alloc &alloc, rhi_cmdlist cmd)
 {
     void *allocMark = alloc.at;
 
@@ -72,8 +72,8 @@ void API Update(region_alloc &alloc, rhi_cmdlist cmd, byteview assetFile)
         RegionAlloc::Reset(alloc, allocMark);
 
         gltf_parser parser{};
-        parser.jsonChunk = AssetFileGetData(assetFile, metadata.guidGltf);
-        parser.binChunk = AssetFileGetData(assetFile, metadata.guidBin);
+        parser.jsonChunk = AssetManager::Get(metadata.guidGltf);
+        parser.binChunk = AssetManager::Get(metadata.guidBin);
 
         ASSERT(GltfParser::Parse(parser, alloc));
 
@@ -82,7 +82,7 @@ void API Update(region_alloc &alloc, rhi_cmdlist cmd, byteview assetFile)
         { // TODO: probably deal with this at packing stage - add custom attributes into gltf? or resolve via path <-
           // this is ugly
             gltf_image image = Span::Front(parser.images);
-            metadata.texture = TextureManager::DeclareTexture(assetFile, 0x7974C3986C0A4EAB);
+            metadata.texture = TextureManager::DeclareTexture(0x7974C3986C0A4EAB);
         }
 
         for (const auto &mesh : parser.meshes)
@@ -177,7 +177,7 @@ void API Update(region_alloc &alloc, rhi_cmdlist cmd, byteview assetFile)
     }
 }
 
-auto API DeclareMesh(byteview assetFileData, uint64_t guidGltf, uint64_t guidBin) -> mesh_handle
+auto API DeclareMesh(uint64_t guidGltf, uint64_t guidBin) -> mesh_handle
 {
     return HandlePool::Acquire(manager->meshes, mesh_metadata{
                                                     .guidGltf = guidGltf,

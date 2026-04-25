@@ -1,7 +1,7 @@
 #include <cstdint>
 
 #include "nyla/commons/array.h" // IWYU pragma: keep
-#include "nyla/commons/asset_file.h"
+#include "nyla/commons/asset_manager.h"
 #include "nyla/commons/color.h"
 #include "nyla/commons/debug_text_renderer.h"
 #include "nyla/commons/entrypoint.h"
@@ -127,23 +127,22 @@ void UserMain()
     TweenManager::Bootstrap();
     DebugTextRenderer::Bootstrap(alloc);
     Renderer::Bootstrap(alloc);
+    AssetManager::Bootstrap(FileOpen(R"(assets.bin)"_s, FileOpenMode::Read));
 
-    byteview assetFile = AssetFileLoad(FileOpen(R"(assets.bin)"_s, FileOpenMode::Read));
+    mesh_handle cubeMesh = MeshManager::DeclareMesh(kCubeGltfGuid, kCubeBinGuid);
+    mesh_handle sphereMesh = MeshManager::DeclareMesh(kSphereGltfGuid, kSphereBinGuid);
+    mesh_handle rectMesh = MeshManager::DeclareMesh(kRectGltfGuid, kRectBinGuid);
 
-    mesh_handle cubeMesh = MeshManager::DeclareMesh(assetFile, kCubeGltfGuid, kCubeBinGuid);
-    mesh_handle sphereMesh = MeshManager::DeclareMesh(assetFile, kSphereGltfGuid, kSphereBinGuid);
-    mesh_handle rectMesh = MeshManager::DeclareMesh(assetFile, kRectGltfGuid, kRectBinGuid);
-
-    texture_handle backgroundTex = TextureManager::DeclareTexture(assetFile, kBackgroundGuid);
-    texture_handle ballTex = TextureManager::DeclareTexture(assetFile, kBallSmallBlueGuid);
-    texture_handle frameTex = TextureManager::DeclareTexture(assetFile, kFrameGuid);
-    texture_handle playerTex = TextureManager::DeclareTexture(assetFile, kPlayerGuid);
-    texture_handle playerFlashTex = TextureManager::DeclareTexture(assetFile, kPlayerFlashGuid);
-    texture_handle brickUnbreakableTex = TextureManager::DeclareTexture(assetFile, kBrickUnbreakableGuid);
+    texture_handle backgroundTex = TextureManager::DeclareTexture(kBackgroundGuid);
+    texture_handle ballTex = TextureManager::DeclareTexture(kBallSmallBlueGuid);
+    texture_handle frameTex = TextureManager::DeclareTexture(kFrameGuid);
+    texture_handle playerTex = TextureManager::DeclareTexture(kPlayerGuid);
+    texture_handle playerFlashTex = TextureManager::DeclareTexture(kPlayerFlashGuid);
+    texture_handle brickUnbreakableTex = TextureManager::DeclareTexture(kBrickUnbreakableGuid);
 
     array<texture_handle, 9> brickTextures;
     for (int i = 0; i < 9; ++i)
-        brickTextures[i] = TextureManager::DeclareTexture(assetFile, kBricks[i]);
+        brickTextures[i] = TextureManager::DeclareTexture(kBricks[i]);
 
     render_targets renderTargets{
         .ColorFormat = rhi_texture_format::B8G8R8A8_sRGB,
@@ -271,8 +270,8 @@ void UserMain()
         GpuUpload::Update();
         InputManager::Update();
         TweenManager::Update(dt);
-        MeshManager::Update(alloc, cmd, assetFile);
-        TextureManager::Update(cmd, assetFile);
+        MeshManager::Update(alloc, cmd);
+        TextureManager::Update(cmd);
 
         {
             rhi_texture backbuffer = Rhi::GetTexture(Rhi::GetBackbufferView());

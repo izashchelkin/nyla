@@ -16,9 +16,9 @@ namespace TextureManager
 
 void API Bootstrap();
 
-void API Update(rhi_cmdlist cmd, byteview assetFile);
+void API Update(rhi_cmdlist cmd);
 
-auto API DeclareTexture(byteview assetFileData, uint64_t guid) -> texture_handle;
+auto API DeclareTexture(uint64_t guid) -> texture_handle;
 
 auto API GetSRV(texture_handle Texture) -> rhi_srv;
 
