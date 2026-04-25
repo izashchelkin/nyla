@@ -22,6 +22,7 @@ if (WIN32)
     target_link_libraries(${TARGET}
         PRIVATE
             XInput
+            BCrypt 
     )
 else()
 

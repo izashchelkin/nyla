@@ -17,6 +17,7 @@
 #include "nyla/commons/mat.h"
 #include "nyla/commons/math.h"
 #include "nyla/commons/mem.h"
+#include "nyla/commons/mempage_pool.h"
 #include "nyla/commons/mesh_manager.h"
 #include "nyla/commons/minmax.h"
 #include "nyla/commons/platform.h"
@@ -38,12 +39,23 @@ namespace nyla
 
 void UserMain()
 {
-    file_handle walker = FileWalkBegin("R(assets)"_s);
-    for (file_metadata metadata; FileWalkNext(walker, metadata);)
+    auto alloc = RegionAlloc::Create(MemPagePool::kChunkSize, 0);
+
+    file_metadata fileMetadata;
+    file_walker *fileWalker = FileWalk::FindFirst(alloc, R"(assets\*)"_s, fileMetadata);
+    if (fileWalker)
     {
-        LOG("file: " SV_FMT, SV_ARG(metadata.name));
+        do
+        {
+            if (Any(fileMetadata.attributes & file_attribute::Directory))
+                LOG("dir: " SV_FMT, SV_ARG(fileMetadata.name));
+            else
+                LOG("file: " SV_FMT, SV_ARG(fileMetadata.name));
+
+        } while (FileWalk::FindNext(*fileWalker, fileMetadata));
+
+        FileWalk::Close(*fileWalker);
     }
-    FileWalkEnd(walker);
 
     GenRandom64();
 }

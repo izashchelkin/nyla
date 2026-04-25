@@ -3,6 +3,7 @@ target_sources(${TARGET} PRIVATE
     bdf.cc
     debug_text_renderer.cc
     engine.cc
+    file.cc
     fmt.cc
     gltf.cc
     glyph_renderer.cc
@@ -32,6 +33,7 @@ target_sources(${TARGET} PUBLIC
     array.h
     asset_manager.h
     bdf.h
+    binary_search.h
     bitenum.h
     byteliterals.h
     byteparser.h
