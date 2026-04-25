@@ -47,6 +47,13 @@ void UserMain()
     {
         do
         {
+            if (Span::Eq(fileMetadata.name, "."_s))
+                continue;
+            if (Span::Eq(fileMetadata.name, ".."_s))
+                continue;
+            if (Any(fileMetadata.attributes & file_attribute::Hidden))
+                continue;
+
             if (Any(fileMetadata.attributes & file_attribute::Directory))
                 LOG("dir: " SV_FMT, SV_ARG(fileMetadata.name));
             else
