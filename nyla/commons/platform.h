@@ -9,7 +9,7 @@
 namespace nyla
 {
 
-void ParseStdArgs(byteview *args, uint32_t maxArgs);
+void API ParseStdArgs(byteview *args, uint32_t maxArgs);
 
 enum class KeyPhysical;
 
@@ -60,6 +60,7 @@ struct PlatformEvent
     };
 };
 
+auto API GenRandom64() -> uint64_t;
 void API Sleep(uint64_t millis);
 auto API Spawn(span<const char *const> cmd) -> bool;
 void API WinOpen();

@@ -60,6 +60,10 @@ file(GLOB_RECURSE NYLA_ALL_CXX_FILES
         "${PROJECT_SOURCE_DIR}/screen_inhibitor/*.cc"
         "${PROJECT_SOURCE_DIR}/screen_inhibitor/*.h"
         "${PROJECT_SOURCE_DIR}/screen_inhibitor/*.hlsl"
+
+        "${PROJECT_SOURCE_DIR}/asset_packer/*.cc"
+        "${PROJECT_SOURCE_DIR}/asset_packer/*.h"
+        "${PROJECT_SOURCE_DIR}/asset_packer/*.hlsl"
 )
 
 add_custom_target(format
@@ -71,6 +75,7 @@ add_custom_target(format
 
 add_subdirectory(nyla)
 
+add_subdirectory(asset_packer)
 add_subdirectory(3d_ball_maze)
 add_subdirectory(breakout)
 add_subdirectory(terminal)

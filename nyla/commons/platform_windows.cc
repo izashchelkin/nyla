@@ -72,6 +72,13 @@ auto TicksTo(uint64_t ticks, uint64_t scale) -> uint64_t
 
 } // namespace
 
+auto API GenRandom64() -> uint64_t
+{
+    uint64_t buf;
+    BCryptGenRandom(BCRYPT_MD5_ALG_HANDLE, (uint8_t *)&buf, sizeof(buf), 0);
+    return buf;
+}
+
 auto API GetMonotonicTimeMillis() -> uint64_t
 {
     return TicksTo(GetPerformanceTicks(), 1'000ULL);
@@ -603,7 +610,7 @@ auto API FileRead(file_handle file, uint32_t size, uint8_t *out) -> uint32_t
     return bytesRead;
 }
 
-auto FileWrite(file_handle file, uint32_t size, const uint8_t *in) -> uint32_t
+auto API FileWrite(file_handle file, uint32_t size, const uint8_t *in) -> uint32_t
 {
     auto hFile = reinterpret_cast<HANDLE>(file);
     DWORD bytesWritten = 0;
@@ -662,22 +669,36 @@ auto API FileTell(file_handle file) -> uint64_t
     }
 }
 
-auto GetStdin() -> file_handle
+auto API FileWalkBegin(byteview path) -> file_handle
+{
+    WIN32_FIND_DATAA findData{};
+    FindFirstFileA(Span::CStr(path), &findData);
+}
+
+auto API FileWalkNext(file_handle, file_metadata &) -> bool
+{
+}
+
+void API FileWalkEnd(file_handle)
+{
+}
+
+auto API GetStdin() -> file_handle
 {
     return GetStdHandle(STD_INPUT_HANDLE);
 }
 
-auto GetStdout() -> file_handle
+auto API GetStdout() -> file_handle
 {
     return GetStdHandle(STD_OUTPUT_HANDLE);
 }
 
-auto GetStderr() -> file_handle
+auto API GetStderr() -> file_handle
 {
     return GetStdHandle(STD_ERROR_HANDLE);
 }
 
-void ParseStdArgs(byteview *args, uint32_t maxArgs)
+void API ParseStdArgs(byteview *args, uint32_t maxArgs)
 {
     uint8_t *cmdLine = (uint8_t *)GetCommandLineA();
     uint64_t cmdLineLen = CStrLen(cmdLine, 256);

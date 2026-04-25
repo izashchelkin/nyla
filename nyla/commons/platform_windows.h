@@ -7,6 +7,7 @@
 #include <windows.h>
 
 #include <Xinput.h>
+#include <bcrypt.h>
 
 #include "nyla/commons/keyboard.h"
 

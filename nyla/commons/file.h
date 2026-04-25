@@ -23,6 +23,15 @@ void API FileClose(file_handle file);
 auto API FileRead(file_handle file, uint32_t size, uint8_t *out) -> uint32_t;
 auto API FileWrite(file_handle file, uint32_t size, const uint8_t *in) -> uint32_t;
 
+struct file_metadata
+{
+    byteview name;
+};
+
+auto API FileWalkBegin(byteview) -> file_handle;
+auto API FileWalkNext(file_handle, file_metadata &) -> bool;
+void API FileWalkEnd(file_handle);
+
 enum class file_seek_mode
 {
     Begin,
