@@ -13,6 +13,8 @@
 namespace nyla
 {
 
+// TODO: we need hex printing
+
 namespace
 {
 

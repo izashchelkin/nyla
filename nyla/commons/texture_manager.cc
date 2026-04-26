@@ -14,18 +14,6 @@
 #include "nyla/commons/rhi.h"
 #include "nyla/commons/span_def.h"
 
-#define STB_IMAGE_IMPLEMENTATION
-// #define STBI_NO_JPEG
-// #define STBI_NO_PNG
-#define STBI_NO_BMP
-#define STBI_NO_PSD
-#define STBI_NO_TGA
-#define STBI_NO_GIF
-#define STBI_NO_HDR
-#define STBI_NO_PIC
-#define STBI_NO_PNM
-#include "nyla/commons/stb_image.h"
-
 namespace nyla
 {
 
@@ -82,9 +70,13 @@ void API Update(rhi_cmdlist cmd)
 
         byteview rawBytes = AssetManager::Get(metadata.guid);
 
+#if 0
         uint8_t *pixelData = stbi_load_from_memory(rawBytes.data, rawBytes.size, (int *)&metadata.width,
                                                    (int *)&metadata.height, (int *)&metadata.channels, 4);
         ASSERT(pixelData, "stbi_load failed for '%" PRIu64 "': %s", metadata.guid, stbi_failure_reason());
+#else
+        uint8_t *pixelData = nullptr;
+#endif
 
         metadata.channels = 4;
         // ASSERT(metadata.channels == 4, "Unexpected channels: %d", metadata.channels);

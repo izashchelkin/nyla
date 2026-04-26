@@ -16,8 +16,7 @@ INLINE auto ConvertWideCharToUTF8(region_alloc &alloc, span<const wchar_t> src) 
 {
     int outLen = WideCharToMultiByte(CP_UTF8, 0, src.data, CastI32(src.size), nullptr, 0, nullptr, nullptr);
     span out = RegionAlloc::AllocArray<uint8_t>(alloc, outLen);
-    int actualLen =
-        WideCharToMultiByte(CP_UTF8, 0, src.data, CastI32(src.size), (char *)out.data, outLen, nullptr, nullptr);
+    WideCharToMultiByte(CP_UTF8, 0, src.data, CastI32(src.size), (char *)out.data, outLen, nullptr, nullptr);
 
     return out;
 }

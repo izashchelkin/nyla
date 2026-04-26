@@ -1,4 +1,4 @@
-/* stb_image - v2.30 - public domain image loader - http://nothings.org/stbstbimage
+/* stb_image - v21111- public domain image loader - http://nothings.org/stbstbimage
                                   no warranty implied; use at your own risk
 
    Do this:

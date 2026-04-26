@@ -52,14 +52,8 @@ auto API FileOpen(byteview path, FileOpenMode mode) -> file_handle
         dwCreationDisposition = CREATE_ALWAYS;
     }
 
-    auto hFile = CreateFileA(Span::CStr(path), // lpFileName
-                             dwDesiredAccess,
-                             FILE_SHARE_READ, // dwShareMode
-                             nullptr,         // lpSecurityAttributes
-                             dwCreationDisposition,
-                             FILE_ATTRIBUTE_NORMAL, // dwFlagsAndAttributes
-                             nullptr                // hTemplateFile
-    );
+    auto hFile = CreateFileA(Span::CStr(path), dwDesiredAccess, FILE_SHARE_READ, nullptr, dwCreationDisposition,
+                             FILE_ATTRIBUTE_NORMAL, nullptr);
 
     if (hFile && hFile != INVALID_HANDLE_VALUE)
     {
@@ -87,12 +81,7 @@ auto API FileRead(file_handle file, uint32_t size, uint8_t *out) -> uint32_t
     auto hFile = reinterpret_cast<HANDLE>(file);
     DWORD bytesRead = 0;
 
-    ReadFile(hFile,      // hFile
-             out,        // lpBuffer
-             size,       // nNumberOfBytesToRead
-             &bytesRead, // lpNumberOfBytesRead
-             nullptr     // lpOverlapped
-    );
+    ReadFile(hFile, out, size, &bytesRead, nullptr);
     return bytesRead;
 }
 
@@ -101,12 +90,7 @@ auto API FileWrite(file_handle file, uint32_t size, const uint8_t *in) -> uint32
     auto hFile = reinterpret_cast<HANDLE>(file);
     DWORD bytesWritten = 0;
 
-    WriteFile(hFile,         // hFile
-              in,            // lpBuffer
-              size,          // nNumberOfBytesToWrite
-              &bytesWritten, // lpNumberOfBytesWritten
-              nullptr        // lpOverlapped
-    );
+    WriteFile(hFile, in, size, &bytesWritten, nullptr);
     return bytesWritten;
 }
 
@@ -131,10 +115,7 @@ void API FileSeek(file_handle file, int64_t at, file_seek_mode mode)
         break;
     }
 
-    SetFilePointerEx(hFile,          // hFile
-                     distanceToMove, // lDistanceToMove
-                     nullptr,        // lpDistanceToMoveHigh
-                     moveMethod);
+    SetFilePointerEx(hFile, distanceToMove, nullptr, moveMethod);
 }
 
 auto API FileTell(file_handle file) -> uint64_t
@@ -145,14 +126,15 @@ auto API FileTell(file_handle file) -> uint64_t
     LARGE_INTEGER newFilePointer{};
 
     if (SetFilePointerEx(hFile, distanceToMove, &newFilePointer, FILE_CURRENT))
-    {
         return newFilePointer.QuadPart;
-    }
-    else
-    { // failed
-        ASSERT(false);
-        return 0ULL;
-    }
+
+    ASSERT(false);
+    return 0ULL;
+}
+
+void API FileSetEnd(file_handle file)
+{
+    ASSERT(SetEndOfFile(file));
 }
 
 struct dir_iter

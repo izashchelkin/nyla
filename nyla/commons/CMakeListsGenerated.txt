@@ -30,6 +30,7 @@ target_sources(${TARGET} PUBLIC
     align.h
     array_def.h
     array.h
+    asset_file_format.h
     asset_manager.h
     bdf.h
     binary_search.h
@@ -77,6 +78,7 @@ target_sources(${TARGET} PUBLIC
     platform_audio.h
     platform_dir_watch.h
     platform.h
+    random.h
     region_alloc_def.h
     region_alloc.h
     render_targets.h
@@ -90,7 +92,6 @@ target_sources(${TARGET} PUBLIC
     spv_shader_enums.h
     spv_shader.h
     staging.h
-    stb_image.h
     stringparser.h
     texture_manager.h
     time.h

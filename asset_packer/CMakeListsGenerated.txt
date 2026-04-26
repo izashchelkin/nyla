@@ -2,4 +2,5 @@ target_sources(${TARGET} PRIVATE
     asset_packer.cc
 )
 target_sources(${TARGET} PUBLIC
+    stb_image.h
 )

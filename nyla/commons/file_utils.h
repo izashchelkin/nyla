@@ -11,9 +11,26 @@
 namespace nyla
 {
 
+template <is_plain T> INLINE void FileWrite(byteview path, const T &data)
+{
+    file_handle file = FileOpen(path, FileOpenMode::Write);
+    ASSERT(FileValid(file));
+    ASSERT(FileWrite(file, sizeof(data), reinterpret_cast<const uint8_t *>(&data)) == sizeof(data));
+    FileClose(file);
+}
+
 template <is_plain T> INLINE void FileWrite(file_handle file, const T &data)
 {
     ASSERT(FileWrite(file, sizeof(data), reinterpret_cast<const uint8_t *>(&data)) == sizeof(data));
+}
+
+template <is_plain T> INLINE void FileWriteSpan(byteview path, span<T> data)
+{
+    file_handle file = FileOpen(path, FileOpenMode::Write);
+    ASSERT(FileValid(file));
+    uint64_t expectedSize = Span::SizeBytes(data);
+    ASSERT(FileWrite(file, expectedSize, reinterpret_cast<const uint8_t *>(&data[0])) == expectedSize);
+    FileClose(file);
 }
 
 template <is_plain T> INLINE void FileWriteSpan(file_handle file, span<T> data)

@@ -35,6 +35,7 @@ enum class file_seek_mode
 
 void API FileSeek(file_handle file, int64_t at, file_seek_mode mode);
 auto API FileTell(file_handle file) -> uint64_t;
+void API FileSetEnd(file_handle file);
 
 auto API GetStdin() -> file_handle;
 auto API GetStdout() -> file_handle;

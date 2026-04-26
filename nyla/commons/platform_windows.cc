@@ -76,7 +76,7 @@ auto TicksTo(uint64_t ticks, uint64_t scale) -> uint64_t
 auto API GenRandom64() -> uint64_t
 {
     uint64_t buf;
-    BCryptGenRandom(BCRYPT_MD5_ALG_HANDLE, (uint8_t *)&buf, sizeof(buf), 0);
+    BCryptGenRandom(nullptr, (uint8_t *)&buf, sizeof(buf), BCRYPT_USE_SYSTEM_PREFERRED_RNG);
     return buf;
 }
 
