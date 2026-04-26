@@ -53,10 +53,26 @@ INLINE auto DataPtr(inline_vec<T, Capacity> &self) -> T *
 
 template <typename T, uint64_t Capacity>
 [[nodiscard]]
+INLINE auto Front(inline_vec<T, Capacity> &self) -> T &
+{
+    DASSERT(self.size);
+    return self[0];
+}
+
+template <typename T, uint64_t Capacity>
+[[nodiscard]]
 INLINE auto Front(const inline_vec<T, Capacity> &self) -> const T &
 {
     DASSERT(self.size);
     return self[0];
+}
+
+template <typename T, uint64_t Capacity>
+[[nodiscard]]
+INLINE auto Back(inline_vec<T, Capacity> &self) -> T &
+{
+    DASSERT(self.size);
+    return self[self.size - 1];
 }
 
 template <typename T, uint64_t Capacity>
@@ -94,13 +110,11 @@ INLINE auto Append(inline_vec<T, Capacity> &self, const D &data) -> T &
     return ret;
 }
 
-template <typename T, uint64_t Capacity> INLINE auto Append(inline_vec<T, Capacity> &self, span<const T> data) -> T &
+template <typename T, uint64_t Capacity> INLINE void Append(inline_vec<T, Capacity> &self, span<const T> data)
 {
     DASSERT(self.size + data.size < Capacity);
-    T &ret = Back(self);
-    MemCpy(&ret, data.data, Span::SizeBytes(data));
+    MemCpy(self.data.data + self.size, data.data, Span::SizeBytes(data));
     self.size += data.size;
-    return ret;
 }
 
 template <typename T, uint64_t Capacity> INLINE auto PopBack(inline_vec<T, Capacity> &self) -> T
@@ -115,8 +129,10 @@ template <typename T, uint64_t Capacity>
 INLINE auto Find(inline_vec<T, Capacity> &self, const T &val) -> T *
 {
     for (auto &elem : self)
+    {
         if (elem == val)
             return &elem;
+    }
     return nullptr;
 }
 

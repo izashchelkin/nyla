@@ -3,7 +3,6 @@ target_sources(${TARGET} PRIVATE
     bdf.cc
     debug_text_renderer.cc
     engine.cc
-    file.cc
     fmt.cc
     gltf.cc
     glyph_renderer.cc
@@ -103,12 +102,14 @@ target_sources(${TARGET} PUBLIC
 )
 if (WIN32)
     target_sources(${TARGET} PRIVATE
+        file_windows.cc
         platform_windows.cc
     )
     target_sources(${TARGET} PUBLIC
         entrypoint_windows.h
         headers_windows.h
         platform_windows.h
+        wchar_conversions_windows.h
     )
 else()
     target_sources(${TARGET} PRIVATE

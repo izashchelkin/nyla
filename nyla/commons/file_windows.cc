@@ -1,10 +1,11 @@
-#include "nyla/commons/platform_windows.h"
+#include "nyla/commons/file.h"
 
 #include <cstdint>
 #include <immintrin.h>
 
 #include "nyla/commons/array.h" // IWYU pragma: keep
-#include "nyla/commons/file.h"
+#include "nyla/commons/cast.h"
+#include "nyla/commons/fmt.h"
 #include "nyla/commons/gamepad.h"
 #include "nyla/commons/inline_queue.h"
 #include "nyla/commons/intrin.h"
@@ -13,9 +14,12 @@
 #include "nyla/commons/macros.h"
 #include "nyla/commons/mem.h"
 #include "nyla/commons/platform.h"
+#include "nyla/commons/platform_windows.h"
 #include "nyla/commons/region_alloc.h"
+#include "nyla/commons/region_alloc_def.h"
 #include "nyla/commons/span.h"
 #include "nyla/commons/time.h"
+#include "nyla/commons/wchar_conversions_windows.h"
 
 namespace nyla
 {
@@ -151,71 +155,90 @@ auto API FileTell(file_handle file) -> uint64_t
     }
 }
 
-struct file_walker
+struct dir_iter
 {
-    HANDLE handle;
-    WIN32_FIND_DATAA data;
+    HANDLE hDir;
+    span<uint8_t> buffer;
+    FILE_ID_EXTD_DIR_INFO *fileInfo;
 };
 
-namespace FileWalk
+namespace DirIter
 {
 
-namespace
-{
-
-void SetFileMetadata(WIN32_FIND_DATAA &in, file_metadata &out)
-{
-    MemZero(&out);
-    out.name = byteview{(uint8_t *)in.cFileName, CStrLen(in.cFileName, MAX_PATH)};
-    out.size = ((uint64_t)in.nFileSizeHigh << 32) | in.nFileSizeLow;
-    out.creationTime = *(uint64_t *)&in.ftCreationTime;
-    out.lastAccessTime = *(uint64_t *)&in.ftLastAccessTime;
-    out.lastWriteTime = *(uint64_t *)&in.ftLastWriteTime;
-
-    if (in.dwFileAttributes & FILE_ATTRIBUTE_READONLY)
-        out.attributes |= file_attribute::Readonly;
-    if (in.dwFileAttributes & FILE_ATTRIBUTE_HIDDEN)
-        out.attributes |= file_attribute::Hidden;
-    if (in.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
-        out.attributes |= file_attribute::Directory;
-}
-
-}; // namespace
-
-auto API FindFirst(region_alloc &alloc, byteview path, file_metadata &outMetadata) -> file_walker *
+auto API Create(region_alloc &alloc, byteview path) -> dir_iter *
 {
     void *allocMark = alloc.at;
-    file_walker &self = RegionAlloc::Alloc<file_walker>(alloc);
-    self.handle = FindFirstFileA(Span::CStr(path), &self.data);
+    auto &self = RegionAlloc::Alloc<dir_iter>(alloc);
 
-    if (self.handle == INVALID_HANDLE_VALUE)
+    self.hDir =
+        CreateFileA(Span::CStr(path), FILE_LIST_DIRECTORY, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                    nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+    if (self.hDir == INVALID_HANDLE_VALUE)
     {
         RegionAlloc::Reset(alloc, allocMark);
         return nullptr;
     }
-    else
+
+    self.buffer = RegionAlloc::AllocArray<uint8_t>(alloc, (uint64_t)64 * 1024);
+
+    if (!GetFileInformationByHandleEx(self.hDir, FileIdExtdDirectoryRestartInfo, self.buffer.data, self.buffer.size))
     {
-        SetFileMetadata(self.data, outMetadata);
-        return &self;
+        Destroy(self);
+
+        RegionAlloc::Reset(alloc, allocMark);
+        return nullptr;
     }
+
+    self.fileInfo = (FILE_ID_EXTD_DIR_INFO *)self.buffer.data;
+
+    return &self;
 }
 
-auto API FindNext(file_walker &self, file_metadata &outMetadata) -> bool
+auto API Next(region_alloc &alloc, dir_iter &self, file_metadata &out) -> bool
 {
-    if (FindNextFileA(self.handle, &self.data))
+    auto &fileInfo = self.fileInfo;
+
+    if (fileInfo)
     {
-        SetFileMetadata(self.data, outMetadata);
+        MemZero(&out);
+        out.creationTime = fileInfo->CreationTime.QuadPart;
+        out.lastAccessTime = fileInfo->LastAccessTime.QuadPart;
+        out.lastWriteTime = fileInfo->LastWriteTime.QuadPart;
+        out.fileSize = fileInfo->EndOfFile.QuadPart;
+        out.fileName = ConvertWideCharToUTF8(alloc, {fileInfo->FileName, fileInfo->FileNameLength / 2});
+
+        if (fileInfo->FileAttributes & FILE_ATTRIBUTE_READONLY)
+            out.attributes |= file_attribute::Readonly;
+        if (fileInfo->FileAttributes & FILE_ATTRIBUTE_HIDDEN)
+            out.attributes |= file_attribute::Hidden;
+        if (fileInfo->FileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+            out.attributes |= file_attribute::Directory;
+
+        if (fileInfo->NextEntryOffset)
+            fileInfo = (FILE_ID_EXTD_DIR_INFO *)((uint8_t *)fileInfo + fileInfo->NextEntryOffset);
+        else
+            fileInfo = nullptr;
+
         return true;
     }
 
-    return false;
+    if (GetFileInformationByHandleEx(self.hDir, FileIdExtdDirectoryInfo, self.buffer.data, self.buffer.size))
+    {
+        return Next(alloc, self, out);
+    }
+
+    DWORD error = GetLastError();
+    if (error == ERROR_NO_MORE_FILES)
+        return false;
+
+    ASSERT(false, "Failed to list files, error %d", GetLastError());
 }
 
-void API Close(file_walker &self)
+void API Destroy(dir_iter &self)
 {
-    FindClose(self.handle);
+    CloseHandle(self.hDir);
 }
 
-} // namespace FileWalk
+}; // namespace DirIter
 
 } // namespace nyla

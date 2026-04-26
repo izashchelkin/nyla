@@ -1,10 +1,11 @@
 #pragma once
 
+#include <cstdint>
+
 #include "nyla/commons/bitenum.h"
 #include "nyla/commons/macros.h"
 #include "nyla/commons/region_alloc_def.h"
 #include "nyla/commons/span_def.h"
-#include <cstdint>
 
 namespace nyla
 {
@@ -39,8 +40,6 @@ auto API GetStdin() -> file_handle;
 auto API GetStdout() -> file_handle;
 auto API GetStderr() -> file_handle;
 
-struct file_walker;
-
 enum class file_attribute
 {
     Readonly = 1 << 0,
@@ -51,21 +50,23 @@ NYLA_BITENUM(file_attribute);
 
 struct file_metadata
 {
-    byteview name;
+    byteview fileName;
     file_attribute attributes;
-    uint64_t size;
+    uint64_t fileSize;
     uint64_t creationTime;
     uint64_t lastAccessTime;
     uint64_t lastWriteTime;
 };
 
-namespace FileWalk
+struct dir_iter;
+
+namespace DirIter
 {
 
-auto API FindFirst(region_alloc &alloc, byteview path, file_metadata &outMetadata) -> file_walker *;
-auto API FindNext(file_walker &self, file_metadata &outMetadata) -> bool;
-void API Close(file_walker &self);
+auto API Create(region_alloc &alloc, byteview path) -> dir_iter *;
+auto API Next(region_alloc &alloc, dir_iter &self, file_metadata &out) -> bool;
+void API Destroy(dir_iter &self);
 
-} // namespace FileWalk
+}; // namespace DirIter
 
 } // namespace nyla

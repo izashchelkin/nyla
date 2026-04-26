@@ -20,4 +20,10 @@ constexpr inline auto CastI32(int64_t a) -> int32_t
     return static_cast<int32_t>(a);
 }
 
+constexpr inline auto CastI32(uint64_t a) -> int32_t
+{
+    ASSERT(a <= Limits<int32_t>::Max());
+    return static_cast<int32_t>(a);
+}
+
 } // namespace nyla
