@@ -3,76 +3,29 @@
 #include <cstdint>
 
 #include "nyla/commons/fmt.h"
+#include "nyla/commons/macros.h"
 
 namespace nyla
 {
 
-constexpr inline auto ParseHexChar(uint8_t ch) -> uint8_t
+constexpr INLINE auto GetHexChar(uint8_t b) -> uint8_t
 {
-    switch (ch)
-    {
-    case '0':
-        return 0;
-
-    case '1':
-        return 1;
-
-    case '2':
-        return 2;
-
-    case '3':
-        return 3;
-
-    case '4':
-        return 4;
-
-    case '5':
-        return 5;
-
-    case '6':
-        return 6;
-
-    case '7':
-        return 7;
-
-    case '8':
-        return 8;
-
-    case '9':
-        return 9;
-
-    case 'a':
-    case 'A':
-        return 10;
-
-    case 'b':
-    case 'B':
-        return 11;
-
-    case 'c':
-    case 'C':
-        return 12;
-
-    case 'd':
-    case 'D':
-        return 13;
-
-    case 'e':
-    case 'E':
-        return 14;
-
-    case 'f':
-    case 'F':
-        return 15;
-
-    default: {
-        ASSERT(false);
-        return 0xFF;
-    }
-    }
+    return "0123456789ABCDEF"[b & 0xF];
 }
 
-constexpr inline auto ParseHexByte(uint8_t ch1, uint8_t ch2) -> uint8_t
+constexpr INLINE auto ParseHexChar(uint8_t ch) -> uint8_t
+{
+    if (ch >= '0' && ch <= '9')
+        return ch - '0';
+    if (ch >= 'A' && ch <= 'F')
+        return ch - 'A' + 10;
+    if (ch >= 'a' && ch <= 'f')
+        return ch - 'a' + 10;
+
+    ASSERT(false);
+}
+
+constexpr INLINE auto ParseHexByte(uint8_t ch1, uint8_t ch2) -> uint8_t
 {
     uint8_t ret = 0;
     ret |= ParseHexChar(ch1) << 4;
@@ -80,7 +33,7 @@ constexpr inline auto ParseHexByte(uint8_t ch1, uint8_t ch2) -> uint8_t
     return ret;
 }
 
-constexpr inline auto ParseHexByte(const uint8_t *ch) -> uint8_t
+constexpr INLINE auto ParseHexByte(const uint8_t *ch) -> uint8_t
 {
     return ParseHexByte(*ch, *(ch + 1));
 }

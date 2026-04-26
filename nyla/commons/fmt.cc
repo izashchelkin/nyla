@@ -13,7 +13,7 @@
 namespace nyla
 {
 
-// TODO: we need hex printing
+// TODO: we need hex printing - use method from hex.h
 
 namespace
 {
