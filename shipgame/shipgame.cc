@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <numbers>
 
+#include "assets.h"
 #include "nyla/commons/array.h" // IWYU pragma: keep
 #include "nyla/commons/asset_manager.h"
 #include "nyla/commons/byteliterals.h"
@@ -237,8 +238,8 @@ void UserMain()
     };
 
     {
-        rhi_shader worldVs = GetShader(0xADCD20730AC5B056, rhi_shader_stage::Vertex);
-        rhi_shader worldPs = GetShader(0x342C534BC767600B, rhi_shader_stage::Pixel);
+        rhi_shader worldVs = GetShader(ID_shipgame_world_vs, rhi_shader_stage::Vertex);
+        rhi_shader worldPs = GetShader(ID_shipgame_world_ps, rhi_shader_stage::Pixel);
 
         array<rhi_vertex_attribute_desc, 2> worldAttrs{
             rhi_vertex_attribute_desc{
@@ -276,8 +277,8 @@ void UserMain()
         };
         game->worldPipeline = Rhi::CreateGraphicsPipeline(alloc, worldDesc);
 
-        rhi_shader gridVs = GetShader(0x5B83E19E4471FFA7, rhi_shader_stage::Vertex);
-        rhi_shader gridPs = GetShader(0x7D1F04E27E5102CB, rhi_shader_stage::Pixel);
+        rhi_shader gridVs = GetShader(ID_shipgame_grid_vs, rhi_shader_stage::Vertex);
+        rhi_shader gridPs = GetShader(ID_shipgame_grid_ps, rhi_shader_stage::Pixel);
 
         const rhi_graphics_pipeline_desc gridDesc{
             .debugName = "ShipgameGrid"_s,

@@ -3,6 +3,7 @@
 #include <cinttypes>
 #include <cstdint>
 
+#include "assets.h"
 #include "nyla/commons/array.h" // IWYU pragma: keep
 #include "nyla/commons/asset_manager.h"
 #include "nyla/commons/gltf.h"
@@ -82,7 +83,7 @@ void API Update(region_alloc &alloc, rhi_cmdlist cmd)
         { // TODO: probably deal with this at packing stage - add custom attributes into gltf? or resolve via path <-
           // this is ugly
             gltf_image image = Span::Front(parser.images);
-            metadata.texture = TextureManager::DeclareTexture(0x7974C3986C0A4EAB);
+            metadata.texture = TextureManager::DeclareTexture(ID_texture_wall);
         }
 
         for (const auto &mesh : parser.meshes)

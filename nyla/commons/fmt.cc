@@ -514,7 +514,7 @@ void BufferWriteFmt(auto &&consumer, span<uint8_t> buffer, byteview fmt, va_list
 
 } // namespace
 
-auto API StringWriteFmt(span<uint8_t> out, byteview fmt, va_list args) -> uint64_t
+auto API StringWriteFmt_(span<uint8_t> out, byteview fmt, va_list args) -> uint64_t
 {
     uint64_t written = 0;
 
@@ -529,22 +529,22 @@ auto API StringWriteFmt(span<uint8_t> out, byteview fmt, va_list args) -> uint64
     return written;
 }
 
-void API FileWriteFmt(file_handle handle, span<uint8_t> buffer, byteview fmt, va_list args)
+void API FileWriteFmt_(file_handle handle, span<uint8_t> buffer, byteview fmt, va_list args)
 {
     BufferWriteFmt([handle](const uint8_t *data, uint64_t size) -> void { FileWrite(handle, (uint32_t)size, data); },
                    buffer, fmt, args);
 }
 
-void API FileWriteFmt(file_handle handle, byteview fmt, va_list args)
+void API FileWriteFmt_(file_handle handle, byteview fmt, va_list args)
 {
-    FileWriteFmt(handle, buf, fmt, args);
+    FileWriteFmt_(handle, buf, fmt, args);
 }
 
 void API FileWriteFmt(file_handle handle, span<uint8_t> buffer, byteview fmt, ...)
 {
     va_list(args);
     va_start(args, fmt);
-    FileWriteFmt(handle, buffer, fmt, args);
+    FileWriteFmt_(handle, buffer, fmt, args);
     va_end(args);
 }
 
@@ -552,7 +552,7 @@ void API FileWriteFmt(file_handle handle, byteview fmt, ...)
 {
     va_list(args);
     va_start(args, fmt);
-    FileWriteFmt(handle, fmt, args);
+    FileWriteFmt_(handle, fmt, args);
     va_end(args);
 }
 
@@ -560,21 +560,21 @@ auto API StringWriteFmt(span<uint8_t> out, byteview fmt, ...) -> uint64_t
 {
     va_list(args);
     va_start(args, fmt);
-    uint64_t written = StringWriteFmt(out, fmt, args);
+    uint64_t written = StringWriteFmt_(out, fmt, args);
     va_end(args);
     return written;
 }
 
-auto API StringWriteFmt(byteview fmt, va_list args) -> byteview
+auto API StringWriteFmt_(byteview fmt, va_list args) -> byteview
 {
-    return {buf.data, StringWriteFmt(buf, fmt, args)};
+    return {buf.data, StringWriteFmt_(buf, fmt, args)};
 }
 
 auto API StringWriteFmt(byteview fmt, ...) -> byteview
 {
     va_list(args);
     va_start(args, fmt);
-    byteview ret = {buf.data, StringWriteFmt(buf, fmt, args)};
+    byteview ret = {buf.data, StringWriteFmt_(buf, fmt, args)};
     va_end(args);
     return ret;
 }

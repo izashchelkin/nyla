@@ -1,5 +1,6 @@
 #include <cstdint>
 
+#include "assets.h"
 #include "nyla/commons/array.h" // IWYU pragma: keep
 #include "nyla/commons/asset_manager.h"
 #include "nyla/commons/debug_text_renderer.h"
@@ -30,15 +31,6 @@ namespace nyla
 
 namespace
 {
-
-const uint64_t kCubeGltfGuid = 0x1077DCB383E4F409;
-const uint64_t kCubeBinGuid = 0x7C9E66305CB656C0;
-
-const uint64_t kSphereGltfGuid = 0x831167E33B4E1011;
-const uint64_t kSphereBinGuid = 0xDE33DC595E98C184;
-
-const uint64_t kRectGltfGuid = 0x328C6225041A814B;
-const uint64_t kRectBinGuid = 0x07EB6974550BDCD0;
 
 struct game_state
 {
@@ -77,9 +69,9 @@ void UserMain()
     DebugTextRenderer::Bootstrap(alloc);
     Renderer::Bootstrap(alloc);
 
-    mesh_handle cubeMesh = MeshManager::DeclareMesh(kCubeGltfGuid, kCubeBinGuid);
-    mesh_handle sphereMesh = MeshManager::DeclareMesh(kSphereGltfGuid, kSphereBinGuid);
-    mesh_handle rectMesh = MeshManager::DeclareMesh(kRectGltfGuid, kRectBinGuid);
+    mesh_handle cubeMesh = MeshManager::DeclareMesh(ID_mesh_gltf_cube, ID_mesh_bin_cube);
+    mesh_handle sphereMesh = MeshManager::DeclareMesh(ID_mesh_gltf_sphere, ID_mesh_bin_sphere);
+    mesh_handle rectMesh = MeshManager::DeclareMesh(ID_mesh_rect_gltf, ID_mesh_bin_rect);
 
     render_targets renderTargets{
         .ColorFormat = rhi_texture_format::B8G8R8A8_sRGB,

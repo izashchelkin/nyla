@@ -1,5 +1,6 @@
 #include <cstdint>
 
+#include "assets.h"
 #include "nyla/commons/array.h" // IWYU pragma: keep
 #include "nyla/commons/asset_manager.h"
 #include "nyla/commons/color.h"
@@ -34,33 +35,9 @@ namespace nyla
 namespace
 {
 
-const uint64_t kCubeGltfGuid = 0x1077DCB383E4F409;
-const uint64_t kCubeBinGuid = 0x7C9E66305CB656C0;
-
-const uint64_t kSphereGltfGuid = 0x831167E33B4E1011;
-const uint64_t kSphereBinGuid = 0xDE33DC595E98C184;
-
-const uint64_t kRectGltfGuid = 0x328C6225041A814B;
-const uint64_t kRectBinGuid = 0x07EB6974550BDCD0;
-
-const uint64_t kBackgroundGuid = 0x1C3EBA857F103740;
-const uint64_t kBallSmallBlueGuid = 0xB0851B6A9FDC5EC3;
-const uint64_t kBrick1Guid = 0x536DFA7327C4D3E0;
-const uint64_t kBrick2Guid = 0x3111A93E450AEFCF;
-const uint64_t kBrick3Guid = 0x361985575F1F6033;
-const uint64_t kBrick4Guid = 0x71D9101DC62A152D;
-const uint64_t kBrick5Guid = 0x1E86F2389D300F95;
-const uint64_t kBrick6Guid = 0x645A2B0CB91DBFDD;
-const uint64_t kBrick7Guid = 0xB516416E99DC16A6;
-const uint64_t kBrick8Guid = 0xC6AEED02BCC31788;
-const uint64_t kBrick9Guid = 0x12DAADBE8487CBB7;
-const uint64_t kBrickUnbreakableGuid = 0xDFF1B727573A893D;
-const uint64_t kFrameGuid = 0xFB8F0BA1D020EB59;
-const uint64_t kPlayerGuid = 0x45B048CC6E76F0AE;
-const uint64_t kPlayerFlashGuid = 0x7BA51AB5A7863015;
-
 const uint64_t kBricks[] = {
-    kBrick1Guid, kBrick2Guid, kBrick3Guid, kBrick4Guid, kBrick5Guid, kBrick6Guid, kBrick7Guid, kBrick8Guid, kBrick9Guid,
+    ID_breakout_brick_1_4, ID_breakout_brick_2_4, ID_breakout_brick_3_4, ID_breakout_brick_4_4, ID_breakout_brick_5_4,
+    ID_breakout_brick_6_4, ID_breakout_brick_7_4, ID_breakout_brick_8_4, ID_breakout_brick_9_4,
 };
 
 struct brick_data
@@ -129,16 +106,16 @@ void UserMain()
     DebugTextRenderer::Bootstrap(alloc);
     Renderer::Bootstrap(alloc);
 
-    mesh_handle cubeMesh = MeshManager::DeclareMesh(kCubeGltfGuid, kCubeBinGuid);
-    mesh_handle sphereMesh = MeshManager::DeclareMesh(kSphereGltfGuid, kSphereBinGuid);
-    mesh_handle rectMesh = MeshManager::DeclareMesh(kRectGltfGuid, kRectBinGuid);
+    mesh_handle cubeMesh = MeshManager::DeclareMesh(ID_mesh_gltf_cube, ID_mesh_bin_cube);
+    mesh_handle sphereMesh = MeshManager::DeclareMesh(ID_mesh_gltf_sphere, ID_mesh_bin_sphere);
+    mesh_handle rectMesh = MeshManager::DeclareMesh(ID_mesh_rect_gltf, ID_mesh_bin_rect);
 
-    texture_handle backgroundTex = TextureManager::DeclareTexture(kBackgroundGuid);
-    texture_handle ballTex = TextureManager::DeclareTexture(kBallSmallBlueGuid);
-    texture_handle frameTex = TextureManager::DeclareTexture(kFrameGuid);
-    texture_handle playerTex = TextureManager::DeclareTexture(kPlayerGuid);
-    texture_handle playerFlashTex = TextureManager::DeclareTexture(kPlayerFlashGuid);
-    texture_handle brickUnbreakableTex = TextureManager::DeclareTexture(kBrickUnbreakableGuid);
+    texture_handle backgroundTex = TextureManager::DeclareTexture(ID_breakout_background1);
+    texture_handle ballTex = TextureManager::DeclareTexture(ID_breakout_ball_small_blue);
+    texture_handle frameTex = TextureManager::DeclareTexture(ID_breakout_frame);
+    texture_handle playerTex = TextureManager::DeclareTexture(ID_breakout_player);
+    texture_handle playerFlashTex = TextureManager::DeclareTexture(ID_breakout_player_flash);
+    texture_handle brickUnbreakableTex = TextureManager::DeclareTexture(ID_breakout_brick_unbreakable2);
 
     array<texture_handle, 9> brickTextures;
     for (int i = 0; i < 9; ++i)
@@ -224,7 +201,7 @@ void UserMain()
             game->framesCounted = 0;
         }
 
-        DebugTextRenderer::Fmt(500, 10, "fps=%d"_s, uint32_t(game->fps));
+        DebugTextRenderer::Fmt(500, 10, "fps=%d"_s, uint32_t{game->fps});
 
         for (;;)
         {

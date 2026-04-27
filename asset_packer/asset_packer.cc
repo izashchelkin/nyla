@@ -254,12 +254,32 @@ void UserMain()
         }
     }
 
+    file_handle assetsHeaderFile = FileOpen("assets.h"_s, FileOpenMode::Write);
+    ASSERT(FileValid(assetsHeaderFile));
+
+    FileWriteFmt(assetsHeaderFile, "#pragma once\n\n"_s);
+    FileWriteFmt(assetsHeaderFile, "#include <cstdint>\n\n"_s);
+    FileWriteFmt(assetsHeaderFile, "namespace nyla\n"_s);
+    FileWriteFmt(assetsHeaderFile, "{\n\n"_s);
+
     for (uint64_t i = 0; i < entries.size; ++i)
     {
-        ASSERT(entries[i].alias.size > 0, "missing alias in meta");
-        for (uint64_t j = i + 1; j < entries.size; ++j)
-            ASSERT(!Span::Eq(entries[i].alias, entries[j].alias), "duplicate alias");
+        auto &entry = entries[i];
+        if (entry.alias.size)
+        {
+            for (uint64_t j = i + 1; j < entries.size; ++j)
+                ASSERT(!Span::Eq(entry.alias, entries[j].alias), "duplicate alias");
+
+            FileWriteFmt(assetsHeaderFile, "constexpr inline uint64_t ID_" SV_FMT " = 0x%" PRIx64 ";\n"_s,
+                         SV_ARG(entry.alias), entry.guid);
+        }
+        else
+        {
+            LOG("missing alias in meta");
+        }
     }
+
+    FileWriteFmt(assetsHeaderFile, "\n} // namespace nyla"_s);
 
     for (uint64_t i = 1; i < entries.size; ++i)
     {
