@@ -1,19 +1,20 @@
 #include "nyla/commons/fmt.h"
 
 #include <cstdarg>
+#include <cstddef>
 #include <cstdint>
+#include <cstdio>
 
 #include "nyla/commons/array_def.h"
 #include "nyla/commons/byteparser.h"
 #include "nyla/commons/file.h"
+#include "nyla/commons/hex.h"
 #include "nyla/commons/macros.h"
 #include "nyla/commons/mem.h"
 #include "nyla/commons/word.h"
 
 namespace nyla
 {
-
-// TODO: we need hex printing - use method from hex.h
 
 namespace
 {
@@ -54,6 +55,62 @@ auto S64ToBuffer(uint8_t *buf, int64_t val) -> uint32_t
     return U64ToBuffer(buf, (uint64_t)val);
 }
 
+void EmitPadded(auto &&consumer, const uint8_t *data, uint32_t len, uint32_t width, uint8_t padCh)
+{
+    if (width <= len)
+    {
+        consumer(data, len);
+        return;
+    }
+
+    uint32_t padLen = width - len;
+    uint8_t pad[64];
+    ASSERT(padLen <= sizeof(pad));
+
+    if (padCh == '0' && len > 0 && data[0] == '-')
+    {
+        consumer(data, 1);
+        for (uint32_t i = 0; i < padLen; ++i)
+            pad[i] = '0';
+        consumer(pad, padLen);
+        consumer(data + 1, len - 1);
+    }
+    else
+    {
+        for (uint32_t i = 0; i < padLen; ++i)
+            pad[i] = padCh;
+        consumer(pad, padLen);
+        consumer(data, len);
+    }
+}
+
+auto U64ToHexBuffer(uint8_t *buf, uint64_t val, bool upper = false) -> uint32_t
+{
+    if (val == 0)
+    {
+        buf[0] = '0';
+        return 1;
+    }
+
+    uint8_t temp[16];
+    uint32_t i = 0;
+    while (val > 0)
+    {
+        if (upper)
+            temp[i++] = GetHexCharUpper((uint8_t)(val & 0xF));
+        else
+            temp[i++] = GetHexChar((uint8_t)(val & 0xF));
+        val >>= 4;
+    }
+
+    uint32_t len = i;
+    for (uint32_t j = 0; j < len; ++j)
+    {
+        buf[j] = temp[len - 1 - j];
+    }
+    return len;
+}
+
 void WriteFmt(auto &&consumer, byteview fmt, va_list args)
 {
     byte_parser parser;
@@ -67,6 +124,19 @@ void WriteFmt(auto &&consumer, byteview fmt, va_list args)
         {
         case '%': {
             uint8_t ch1 = ByteParser::ReadOrDefault(parser, '\0');
+
+            uint32_t width = 0;
+            uint8_t padCh = ' ';
+            if (ch1 >= '0' && ch1 <= '9')
+            {
+                if (ch1 == '0')
+                    padCh = '0';
+                while (ch1 >= '0' && ch1 <= '9')
+                {
+                    width = width * 10 + (uint32_t)(ch1 - '0');
+                    ch1 = ByteParser::ReadOrDefault(parser, '\0');
+                }
+            }
 
             switch (ch1)
             {
@@ -107,7 +177,28 @@ void WriteFmt(auto &&consumer, byteview fmt, va_list args)
                 case 'u': {
                     uint8_t buf[32];
                     uint64_t len = U64ToBuffer(buf, va_arg(args, unsigned long));
-                    consumer(buf, len);
+                    EmitPadded(consumer, buf, len, width, padCh);
+                    break;
+                }
+
+                case 'd': {
+                    uint8_t buf[32];
+                    uint32_t len = S64ToBuffer(buf, va_arg(args, long));
+                    EmitPadded(consumer, buf, len, width, padCh);
+                    break;
+                }
+
+                case 'x': {
+                    uint8_t buf[16];
+                    uint64_t len = U64ToHexBuffer(buf, va_arg(args, unsigned long));
+                    EmitPadded(consumer, buf, len, width, padCh);
+                    break;
+                }
+
+                case 'X': {
+                    uint8_t buf[16];
+                    uint64_t len = U64ToHexBuffer(buf, va_arg(args, unsigned long), true);
+                    EmitPadded(consumer, buf, len, width, padCh);
                     break;
                 }
 
@@ -119,7 +210,28 @@ void WriteFmt(auto &&consumer, byteview fmt, va_list args)
                     case 'u': {
                         uint8_t buf[32];
                         uint64_t len = U64ToBuffer(buf, va_arg(args, unsigned long long));
-                        consumer(buf, len);
+                        EmitPadded(consumer, buf, len, width, padCh);
+                        break;
+                    }
+
+                    case 'd': {
+                        uint8_t buf[32];
+                        uint32_t len = S64ToBuffer(buf, va_arg(args, long long));
+                        EmitPadded(consumer, buf, len, width, padCh);
+                        break;
+                    }
+
+                    case 'x': {
+                        uint8_t buf[16];
+                        uint64_t len = U64ToHexBuffer(buf, va_arg(args, unsigned long long));
+                        EmitPadded(consumer, buf, len, width, padCh);
+                        break;
+                    }
+
+                    case 'X': {
+                        uint8_t buf[16];
+                        uint64_t len = U64ToHexBuffer(buf, va_arg(args, unsigned long long), true);
+                        EmitPadded(consumer, buf, len, width, padCh);
                         break;
                     }
 
@@ -144,25 +256,192 @@ void WriteFmt(auto &&consumer, byteview fmt, va_list args)
             case 'd': {
                 uint8_t buf[32];
                 uint32_t len = S64ToBuffer(buf, va_arg(args, int));
-                consumer(buf, len);
+                EmitPadded(consumer, buf, len, width, padCh);
                 break;
             }
 
             case 'f': {
-                TRAP();
-                UNREACHABLE();
+                double val = va_arg(args, double);
+                char tmp[512];
+                int n = ::snprintf(tmp, sizeof(tmp), "%f", val);
+                if (n > 0)
+                {
+                    if ((uint64_t)n >= sizeof(tmp))
+                        n = sizeof(tmp) - 1;
+                    consumer((const uint8_t *)tmp, (uint64_t)n);
+                }
                 break;
             }
 
             case 'u': {
                 uint8_t buf[32];
                 uint32_t len = U64ToBuffer(buf, va_arg(args, uint32_t));
-                consumer(buf, len);
+                EmitPadded(consumer, buf, len, width, padCh);
+                break;
+            }
+
+            case 'x': {
+                uint8_t buf[16];
+                uint32_t len = U64ToHexBuffer(buf, va_arg(args, uint32_t));
+                EmitPadded(consumer, buf, len, width, padCh);
+                break;
+            }
+
+            case 'X': {
+                uint8_t buf[16];
+                uint32_t len = U64ToHexBuffer(buf, va_arg(args, uint32_t), true);
+                EmitPadded(consumer, buf, len, width, padCh);
+                break;
+            }
+
+            case 'c': {
+                uint8_t c = (uint8_t)va_arg(args, int);
+                consumer(&c, 1);
+                break;
+            }
+
+            case 'b': {
+                bool b = (bool)va_arg(args, int);
+                if (b)
+                    consumer((uint8_t *)"true", 4);
+                else
+                    consumer((uint8_t *)"false", 5);
+                break;
+            }
+
+            case 'h': {
+                uint8_t ch2 = ByteParser::ReadOrDefault(parser, '\0');
+
+                switch (ch2)
+                {
+                case 'd': {
+                    uint8_t buf[32];
+                    uint32_t len = S64ToBuffer(buf, (int16_t)va_arg(args, int));
+                    EmitPadded(consumer, buf, len, width, padCh);
+                    break;
+                }
+
+                case 'u': {
+                    uint8_t buf[32];
+                    uint32_t len = U64ToBuffer(buf, (uint16_t)va_arg(args, unsigned int));
+                    EmitPadded(consumer, buf, len, width, padCh);
+                    break;
+                }
+
+                case 'x': {
+                    uint8_t buf[16];
+                    uint32_t len = U64ToHexBuffer(buf, (uint16_t)va_arg(args, unsigned int));
+                    EmitPadded(consumer, buf, len, width, padCh);
+                    break;
+                }
+
+                case 'X': {
+                    uint8_t buf[16];
+                    uint32_t len = U64ToHexBuffer(buf, (uint16_t)va_arg(args, unsigned int), true);
+                    EmitPadded(consumer, buf, len, width, padCh);
+                    break;
+                }
+
+                case 'h': {
+                    uint8_t ch3 = ByteParser::ReadOrDefault(parser, '\0');
+
+                    switch (ch3)
+                    {
+                    case 'd': {
+                        uint8_t buf[32];
+                        uint32_t len = S64ToBuffer(buf, (int8_t)va_arg(args, int));
+                        EmitPadded(consumer, buf, len, width, padCh);
+                        break;
+                    }
+
+                    case 'u': {
+                        uint8_t buf[32];
+                        uint32_t len = U64ToBuffer(buf, (uint8_t)va_arg(args, unsigned int));
+                        EmitPadded(consumer, buf, len, width, padCh);
+                        break;
+                    }
+
+                    case 'x': {
+                        uint8_t buf[16];
+                        uint32_t len = U64ToHexBuffer(buf, (uint8_t)va_arg(args, unsigned int));
+                        EmitPadded(consumer, buf, len, width, padCh);
+                        break;
+                    }
+
+                    case 'X': {
+                        uint8_t buf[16];
+                        uint32_t len = U64ToHexBuffer(buf, (uint8_t)va_arg(args, unsigned int), true);
+                        EmitPadded(consumer, buf, len, width, padCh);
+                        break;
+                    }
+
+                    default: {
+                        TRAP();
+                        UNREACHABLE();
+                    }
+                    }
+
+                    break;
+                }
+
+                default: {
+                    TRAP();
+                    UNREACHABLE();
+                }
+                }
+
+                break;
+            }
+
+            case 'z': {
+                uint8_t ch2 = ByteParser::ReadOrDefault(parser, '\0');
+
+                switch (ch2)
+                {
+                case 'u': {
+                    uint8_t buf[32];
+                    uint32_t len = U64ToBuffer(buf, va_arg(args, size_t));
+                    EmitPadded(consumer, buf, len, width, padCh);
+                    break;
+                }
+
+                case 'd': {
+                    uint8_t buf[32];
+                    uint32_t len = S64ToBuffer(buf, va_arg(args, ptrdiff_t));
+                    EmitPadded(consumer, buf, len, width, padCh);
+                    break;
+                }
+
+                case 'x': {
+                    uint8_t buf[16];
+                    uint32_t len = U64ToHexBuffer(buf, va_arg(args, size_t));
+                    EmitPadded(consumer, buf, len, width, padCh);
+                    break;
+                }
+
+                case 'X': {
+                    uint8_t buf[16];
+                    uint32_t len = U64ToHexBuffer(buf, va_arg(args, size_t), true);
+                    EmitPadded(consumer, buf, len, width, padCh);
+                    break;
+                }
+
+                default: {
+                    TRAP();
+                    UNREACHABLE();
+                }
+                }
+
                 break;
             }
 
             case 'p': {
-                consumer((uint8_t *)"0x[pointer]", 11);
+                void *ptr = va_arg(args, void *);
+                uint8_t buf[18];
+                buf[0] = '0';
+                buf[1] = 'x';
+                uint32_t len = U64ToHexBuffer(buf + 2, (uint64_t)(uintptr_t)ptr);
+                consumer(buf, 2 + len);
                 break;
             }
 
@@ -180,7 +459,7 @@ void WriteFmt(auto &&consumer, byteview fmt, va_list args)
         }
 
         default: {
-            const uint8_t *start = &ByteParser::Peek(parser) - 1;
+            const uint8_t *start = parser.at - 1;
             while (ByteParser::HasNext(parser) && ByteParser::Peek(parser) != '%')
                 ByteParser::Advance(parser);
 

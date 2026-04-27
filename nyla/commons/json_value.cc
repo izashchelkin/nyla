@@ -136,30 +136,37 @@ auto GetNext(json_value &self) -> json_value *
 
 void Log(json_value &self, uint32_t indent)
 {
+    static constexpr uint8_t spaces[] = "                                                                              "
+                                        "                                                  ";
+    constexpr uint32_t maxIndent = sizeof(spaces) - 1;
+    if (indent > maxIndent)
+        indent = maxIndent;
+    byteview pad = {spaces, indent};
+
     switch (self.tag)
     {
     case json_tag::Null: {
-        LOG("%*snull", indent, " ");
+        LOG(SV_FMT "null", SV_ARG(pad));
         return;
     }
     case json_tag::Bool: {
-        LOG("%*s%d", indent, " ", JsonValue::Bool(self));
+        LOG(SV_FMT "%d", SV_ARG(pad), JsonValue::Bool(self));
         return;
     }
     case json_tag::Integer: {
-        LOG("%*s%" PRIu64, indent, " ", JsonValue::QWord(self));
+        LOG(SV_FMT "%" PRIu64, SV_ARG(pad), JsonValue::QWord(self));
         return;
     }
     case json_tag::Double: {
-        LOG("%*s%f", indent, " ", JsonValue::Double(self));
+        LOG(SV_FMT "%f", SV_ARG(pad), JsonValue::Double(self));
         return;
     }
     case json_tag::String: {
-        LOG("%*s\"" SV_FMT "\"", indent, " ", SV_ARG(JsonValue::String(self)));
+        LOG(SV_FMT "\"" SV_FMT "\"", SV_ARG(pad), SV_ARG(JsonValue::String(self)));
         return;
     }
     case json_tag::ArrayBegin: {
-        LOG("%*s[", indent, " ");
+        LOG(SV_FMT "[", SV_ARG(pad));
 
         auto end = self.end();
         for (auto it = self.begin(); it != end; ++it)
@@ -168,11 +175,11 @@ void Log(json_value &self, uint32_t indent)
         // Fallthrough
     }
     case json_tag::ArrayEnd: {
-        LOG("%*s]", indent, " ");
+        LOG(SV_FMT "]", SV_ARG(pad));
         return;
     }
     case json_tag::ObjectBegin: {
-        LOG("%*s{", indent, " ");
+        LOG(SV_FMT "{", SV_ARG(pad));
 
         auto end = self.end();
         for (auto it = self.begin(); it != end; ++it)
@@ -183,7 +190,7 @@ void Log(json_value &self, uint32_t indent)
         // Fallthrough
     }
     case json_tag::ObjectEnd: {
-        LOG("%*s}", indent, " ");
+        LOG(SV_FMT "}", SV_ARG(pad));
         return;
     }
     default: {

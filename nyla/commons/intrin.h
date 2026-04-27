@@ -99,7 +99,12 @@ INLINE auto LRound(double x) -> int64_t
 #if defined(__clang__) || defined(__GNUC__)
     return __builtin_lround(x);
 #else
-    return _mm_cvtsd_si64(_mm_set_sd(x + (x >= 0 ? 0.5 : -0.5)));
+    double bias;
+    if (x >= 0)
+        bias = 0.5;
+    else
+        bias = -0.5;
+    return _mm_cvtsd_si64(_mm_set_sd(x + bias));
 #endif
 }
 
@@ -137,8 +142,8 @@ INLINE auto Cos(float f) -> float
 
 INLINE auto SinCos(float f, float &outSin, float &outCos)
 {
-    outSin = ::sin(f);
-    outCos = ::cos(f);
+    outSin = ::sinf(f);
+    outCos = ::cosf(f);
 }
 
 INLINE auto Tan(float f) -> float

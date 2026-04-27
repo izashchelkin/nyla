@@ -1187,6 +1187,26 @@ void Rhi::Bootstrap(region_alloc &alloc, const rhi_init_desc &rhiDesc)
             InlineVec::Append(deviceExtensions, VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_EXTENSION_NAME);
         }
 
+        constexpr static uint32_t kInvalidQueueFamilyIndex = std::numeric_limits<uint32_t>::max();
+
+        auto deviceTypeRank = [](VkPhysicalDeviceType type) -> int {
+            switch (type)
+            {
+            case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
+                return 4;
+            case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
+                return 3;
+            case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
+                return 2;
+            case VK_PHYSICAL_DEVICE_TYPE_CPU:
+                return 1;
+            default:
+                return 0;
+            }
+        };
+
+        int bestRank = -1;
+
         for (VkPhysicalDevice physDev : physDevs)
         {
             uint32_t extensionCount = 0;
@@ -1232,7 +1252,6 @@ void Rhi::Bootstrap(region_alloc &alloc, const rhi_init_desc &rhiDesc)
             vkGetPhysicalDeviceQueueFamilyProperties(physDev, &queueFamilyPropCount,
                                                      InlineVec::DataPtr(queueFamilyProperties));
 
-            constexpr static uint32_t kInvalidQueueFamilyIndex = std::numeric_limits<uint32_t>::max();
             uint32_t graphicsQueueIndex = kInvalidQueueFamilyIndex;
             uint32_t transferQueueIndex = kInvalidQueueFamilyIndex;
 
@@ -1273,17 +1292,20 @@ void Rhi::Bootstrap(region_alloc &alloc, const rhi_init_desc &rhiDesc)
                 continue;
             }
 
-            // TODO: pick best device
+            const int rank = deviceTypeRank(props.deviceType);
+            if (rank <= bestRank)
+                continue;
+
+            bestRank = rank;
             rhi->physDev = physDev;
             rhi->physDevProps = props;
             rhi->physDevMemProps = memProps;
             rhi->graphicsQueue.queueFamilyIndex = graphicsQueueIndex;
             rhi->transferQueue.queueFamilyIndex = transferQueueIndex;
-
-            break;
         }
 
         ASSERT(rhi->physDev);
+        LOG("Picked device: %s", rhi->physDevProps.deviceName);
 
         const float queuePriority = 1.0f;
         auto &queueCreateInfos = RegionAlloc::AllocVec<VkDeviceQueueCreateInfo, 2>(alloc);
@@ -1505,11 +1527,11 @@ void Rhi::Bootstrap(region_alloc &alloc, const rhi_init_desc &rhiDesc)
 
         initDescriptorTable(rhi->constantsDescriptorTable, descriptorSetLayoutCreateInfo);
 
-        const uint64_t bufferSize =
-            rhi->limits.numFramesInFlight * (CbvOffset(rhi->limits.frameConstantSize) +
-                                             rhi->limits.maxPassCount * CbvOffset(rhi->limits.passConstantSize) +
-                                             rhi->limits.maxDrawCount * CbvOffset(rhi->limits.drawConstantSize) +
-                                             rhi->limits.maxDrawCount * CbvOffset(rhi->limits.largeDrawConstantSize));
+        const uint64_t bufferSize = uint64_t{rhi->limits.numFramesInFlight} *
+                                    (CbvOffset(rhi->limits.frameConstantSize) +
+                                     uint64_t{rhi->limits.maxPassCount} * CbvOffset(rhi->limits.passConstantSize) +
+                                     uint64_t{rhi->limits.maxDrawCount} * CbvOffset(rhi->limits.drawConstantSize) +
+                                     uint64_t{rhi->limits.maxDrawCount} * CbvOffset(rhi->limits.largeDrawConstantSize));
         LOG("Constants Buffer Size: %" PRIu64 "mb", CeilDiv(bufferSize, 1 << 20));
 
         rhi->constantsUniformBuffer = CreateBuffer(rhi_buffer_desc{
@@ -1863,6 +1885,7 @@ auto Rhi::CmdSetCheckpoint(rhi_cmdlist cmd, uint64_t data) -> uint64_t
     const VulkanCmdListData &cmdData = HandlePool::ResolveData(rhi->cmdlists, cmd);
 
     static auto fn = VK_GET_INSTANCE_PROC_ADDR(vkCmdSetCheckpointNV);
+    // NOLINTNEXTLINE(performance-no-int-to-ptr)
     fn(cmdData.cmdbuf, reinterpret_cast<void *>(data));
 
     return data;

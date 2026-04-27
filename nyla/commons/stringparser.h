@@ -1,6 +1,7 @@
 #pragma once
 
 #include "nyla/commons/byteparser.h"
+#include "nyla/commons/macros.h"
 #include <cstdint>
 
 namespace nyla
@@ -13,7 +14,7 @@ INLINE auto IsNumber(uint8_t ch) -> bool
 
 INLINE auto IsAlpha(uint8_t ch) -> bool
 {
-    return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch < 'Z');
+    return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z');
 }
 
 INLINE auto IsWhitespace(uint8_t ch) -> bool
@@ -46,59 +47,75 @@ enum ParseNumberResult
     Long,
 };
 
-INLINE auto ParseLong(byte_parser &self) -> int64_t;
+// Defined in stringparser.cc. Linker drops it (and the libc strtod reference)
+// when no caller pulls ParseDecimal/ParseLong into the program.
+auto ParseDoubleFromBytes(const uint8_t *data, uint64_t size) -> double;
 
 inline auto ParseDecimal(byte_parser &self, double &outDouble, int64_t &outLong) -> ParseNumberResult
 {
-    int32_t sign = 1;
-    if (ByteParser::Peek(self) == '-')
+    const uint8_t *start = self.at;
+
+    bool negative = false;
+    if (ByteParser::HasNext(self) && ByteParser::Peek(self) == '-')
     {
-        sign = -1;
+        negative = true;
         ByteParser::Advance(self);
     }
 
-    uint64_t integer = 0;
-    uint64_t fraction = 0;
-    uint64_t fractionCount = 0;
+    uint64_t mantissa = 0;
+    int32_t digitCount = 0;
+    bool overflow = false;
 
-    while (ByteParser::BytesLeft(self) > 0 && IsNumber(ByteParser::Peek(self)))
+    while (ByteParser::HasNext(self) && IsNumber(ByteParser::Peek(self)))
     {
-        integer *= 10;
-        integer += ByteParser::Read(self) - '0';
-    }
-
-    if (ByteParser::Peek(self) == '.')
-    {
-        ByteParser::Advance(self);
-        while (ByteParser::BytesLeft(self) > 0 && IsNumber(ByteParser::Peek(self)))
+        uint8_t digit = ByteParser::Read(self) - '0';
+        if (digitCount < 19)
         {
-            ++fractionCount;
-            fraction *= 10;
-            fraction += ByteParser::Read(self) - '0';
+            mantissa = mantissa * 10 + digit;
+            ++digitCount;
         }
-
-        int64_t powerOfTen = 0;
-
-        if (ByteParser::BytesLeft(self) > 0 && ByteParser::Peek(self) == 'e')
+        else
         {
+            overflow = true;
+        }
+    }
+
+    bool hasDot = false;
+    if (ByteParser::HasNext(self) && ByteParser::Peek(self) == '.')
+    {
+        hasDot = true;
+        ByteParser::Advance(self);
+        while (ByteParser::HasNext(self) && IsNumber(ByteParser::Peek(self)))
             ByteParser::Advance(self);
-            powerOfTen = ParseLong(self);
-        }
+    }
 
-        auto f = static_cast<double>(fraction);
-        for (uint32_t i = 0; i < fractionCount; ++i)
-            f /= 10.0;
+    bool hasExp = false;
+    if (ByteParser::HasNext(self) && (ByteParser::Peek(self) == 'e' || ByteParser::Peek(self) == 'E'))
+    {
+        hasExp = true;
+        ByteParser::Advance(self);
+        if (ByteParser::HasNext(self) && (ByteParser::Peek(self) == '+' || ByteParser::Peek(self) == '-'))
+            ByteParser::Advance(self);
+        while (ByteParser::HasNext(self) && IsNumber(ByteParser::Peek(self)))
+            ByteParser::Advance(self);
+    }
 
-        f += static_cast<double>(integer);
-
-        f *= Pow(10, (float)powerOfTen);
-
-        outDouble = static_cast<double>(sign * f);
+    uint64_t int64AbsLimit;
+    if (negative)
+        int64AbsLimit = (uint64_t)INT64_MAX + 1;
+    else
+        int64AbsLimit = (uint64_t)INT64_MAX;
+    if (hasDot || hasExp || overflow || mantissa > int64AbsLimit)
+    {
+        outDouble = ParseDoubleFromBytes(start, (uint64_t)(self.at - start));
         return ParseNumberResult::Double;
     }
     else
     {
-        outLong = static_cast<int64_t>(sign * integer);
+        if (negative)
+            outLong = (int64_t)(0u - mantissa);
+        else
+            outLong = (int64_t)mantissa;
         return ParseNumberResult::Long;
     }
 }

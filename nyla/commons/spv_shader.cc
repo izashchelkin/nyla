@@ -211,7 +211,7 @@ auto API ProcessShader(spv_shader &self, span<uint32_t> data) -> span<uint32_t>
         switch (result)
         {
         case spv_op_process_result::Ok: {
-            ByteParser::Advance(reader, wordCount * 4);
+            ByteParser::Advance(reader, uint64_t{wordCount} * 4);
             break;
         }
         case spv_op_process_result::InvalidState: {
@@ -220,7 +220,7 @@ auto API ProcessShader(spv_shader &self, span<uint32_t> data) -> span<uint32_t>
         }
         case spv_op_process_result::Remove: {
             data = Span::Erase(data, (uint32_t *)reader.at, (uint32_t *)reader.at + wordCount);
-            reader.end -= wordCount * 4;
+            reader.end -= uint64_t{wordCount} * 4;
             break;
         }
         }

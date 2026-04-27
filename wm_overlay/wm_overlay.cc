@@ -4,8 +4,10 @@
 #include <xcb/xcb.h>
 #include <xcb/xproto.h>
 
+#include "nyla/commons/asset_manager.h"
 #include "nyla/commons/debug_text_renderer.h"
 #include "nyla/commons/entrypoint.h"
+#include "nyla/commons/file.h"
 #include "nyla/commons/platform_linux.h"
 #include "nyla/commons/region_alloc.h"
 #include "nyla/commons/rhi.h"
@@ -43,6 +45,7 @@ void UserMain()
                                   },
                           });
 
+    AssetManager::Bootstrap(FileOpen(R"(assets.bin)"_s, FileOpenMode::Read));
     DebugTextRenderer::Bootstrap(alloc);
 
     for (;;)

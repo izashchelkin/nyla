@@ -60,7 +60,7 @@ INLINE auto ReadHeader(spv_reader &self) -> spv_shader_header
 [[nodiscard]]
 INLINE auto ReadString(spv_reader &self) -> byteview
 {
-    byteview str = ByteParser::PeekCStr(self);
+    byteview str = ByteParser::ReadCStr(self);
     ByteParser::Advance(self, AlignedUp(self.at, 4) - self.at);
     return str;
 }

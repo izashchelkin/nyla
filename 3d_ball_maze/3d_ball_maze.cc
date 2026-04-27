@@ -73,9 +73,9 @@ void UserMain()
     TextureManager::Bootstrap();
     MeshManager::Bootstrap();
     TweenManager::Bootstrap();
+    AssetManager::Bootstrap(FileOpen(R"(assets.bin)"_s, FileOpenMode::Read));
     DebugTextRenderer::Bootstrap(alloc);
     Renderer::Bootstrap(alloc);
-    AssetManager::Bootstrap(FileOpen(R"(assets.bin)"_s, FileOpenMode::Read));
 
     mesh_handle cubeMesh = MeshManager::DeclareMesh(kCubeGltfGuid, kCubeBinGuid);
     mesh_handle sphereMesh = MeshManager::DeclareMesh(kSphereGltfGuid, kSphereBinGuid);

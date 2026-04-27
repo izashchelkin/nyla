@@ -22,6 +22,7 @@ target_sources(${TARGET} PRIVATE
     shader.cc
     spv_shader.cc
     staging.cc
+    stringparser.cc
     texture_manager.cc
     tween_manager.cc
     wave.cc
@@ -95,6 +96,7 @@ target_sources(${TARGET} PUBLIC
     stringparser.h
     texture_manager.h
     time.h
+    tokenparser.h
     tuple.h
     tween_manager.h
     vec.h

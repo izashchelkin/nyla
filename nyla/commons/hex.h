@@ -10,6 +10,11 @@ namespace nyla
 
 constexpr INLINE auto GetHexChar(uint8_t b) -> uint8_t
 {
+    return "0123456789abcdef"[b & 0xF];
+}
+
+constexpr INLINE auto GetHexCharUpper(uint8_t b) -> uint8_t
+{
     return "0123456789ABCDEF"[b & 0xF];
 }
 

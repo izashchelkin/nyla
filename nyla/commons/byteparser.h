@@ -32,13 +32,13 @@ INLINE auto BytesLeft(const byte_parser &self) -> uint64_t
     return self.end - self.at;
 }
 
-INLINE auto HasNext(const byte_parser &self) -> uint64_t
+INLINE auto HasNext(const byte_parser &self) -> bool
 {
     return self.end > self.at;
 }
 
 [[nodiscard]]
-INLINE auto Peek(const byte_parser &self) -> const uint8_t &
+INLINE auto Peek(const byte_parser &self) -> uint8_t
 {
     return *self.at;
 }
@@ -54,10 +54,10 @@ INLINE void Advance(byte_parser &self)
     Advance(self, 1);
 }
 
-INLINE auto Read(byte_parser &self) -> uint8_t
+template <typename T = uint8_t> INLINE auto Read(byte_parser &self) -> T
 {
-    const uint8_t ret = Peek(self);
-    Advance(self);
+    const T ret = LoadU<T>(self.at);
+    Advance(self, sizeof(ret));
     return ret;
 }
 
@@ -67,27 +67,6 @@ INLINE auto ReadOrDefault(byte_parser &self, uint8_t defaultValue) -> uint8_t
         return Read(self);
     else
         return defaultValue;
-}
-
-template <typename T> INLINE auto Read(byte_parser &self) -> T
-{
-    const T ret = LoadU<T>(self.at);
-    Advance(self, sizeof(ret));
-    return ret;
-}
-
-INLINE auto ReadN(byte_parser &self, void *out, uint64_t count) -> bool
-{
-    if (BytesLeft(self) >= count)
-    {
-        MemCpy(out, self.at, count);
-        Advance(self, count);
-        return true;
-    }
-    else
-    {
-        return false;
-    }
 }
 
 INLINE auto Read16(byte_parser &self) -> uint16_t
@@ -120,29 +99,44 @@ INLINE auto Read64BE(byte_parser &self) -> uint64_t
     return ByteSwap64(Read64(self));
 }
 
-INLINE auto PeekCStr(byte_parser &self) -> byteview
+[[nodiscard]]
+INLINE auto ReadBytes(byte_parser &self, uint64_t count) -> byteview
+{
+    DASSERT(BytesLeft(self) >= count);
+    byteview ret{self.at, count};
+    self.at += count;
+    return ret;
+}
+
+[[nodiscard]]
+INLINE auto ReadCStr(byte_parser &self) -> byteview
 {
     uint64_t len = CStrLen(self.at, self.end - self.at);
     byteview ret{self.at, len};
     self.at += len;
+    if (self.at < self.end)
+        ++self.at;
     return ret;
 }
 
-//
-
 INLINE void SkipUntil(byte_parser &self, uint8_t ch)
 {
-    while (Peek(self) != ch)
+    while (HasNext(self) && Peek(self) != ch)
         Advance(self);
+}
+
+INLINE void SkipPast(byte_parser &self, uint8_t ch)
+{
+    while (HasNext(self) && Read(self) != ch)
+        ;
 }
 
 INLINE void NextLine(byte_parser &self)
 {
-    while (Read(self) != '\n')
-        ;
+    SkipPast(self, '\n');
 }
 
-INLINE auto StartsWith(byte_parser &self, byteview prefix) -> bool
+INLINE auto StartsWith(const byte_parser &self, byteview prefix) -> bool
 {
     return MemStartsWith(self.at, BytesLeft(self), prefix.data, prefix.size);
 }

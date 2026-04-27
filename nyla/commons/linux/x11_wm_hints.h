@@ -33,7 +33,7 @@ struct X11WmHints
         return flags & X11WmHints::kUrgencyHint;
     }
 };
-static_assert(sizeof(X11WmHints) == 9 * 4);
+static_assert(sizeof(X11WmHints) == 9uz * 4uz);
 
 void Initialize(X11WmHints &h);
 
@@ -59,7 +59,7 @@ struct X11WmNormalHints
     int32_t baseWidth, baseHeight;
     xcb_gravity_t winGravity;
 };
-static_assert(sizeof(X11WmNormalHints) == 18 * 4);
+static_assert(sizeof(X11WmNormalHints) == 18uz * 4uz);
 
 void Initialize(X11WmNormalHints &h);
 

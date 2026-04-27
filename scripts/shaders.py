@@ -125,18 +125,21 @@ def compile_shader(src_str: str) -> tuple[str, bool, int]:
 
     dxc = find_dxc()
 
-    out_dir = src.parent / "build"
-    out_dir.mkdir(parents=True, exist_ok=True)
+    dxil_out_dir = src.parent / "build"
+    dxil_out_dir.mkdir(parents=True, exist_ok=True)
 
-    ok_spv, ms_spv = compile_spirv(dxc, src, profile, out_dir)
-    ok_dxil, ms_dxil = compile_dxil(dxc, src, profile, out_dir)
+    spv_out_dir = Path("asset_public") / "shaders"
+    spv_out_dir.mkdir(parents=True, exist_ok=True)
+
+    ok_spv, ms_spv = compile_spirv(dxc, src, profile, spv_out_dir)
+    ok_dxil, ms_dxil = compile_dxil(dxc, src, profile, dxil_out_dir)
 
     ok = ok_spv and ok_dxil
     return src_str, ok, ms_spv + ms_dxil
 
 
 def main() -> int:
-    srcs = glob("nyla/**/shaders/*.hlsl", recursive=True)
+    srcs = [s for s in glob("**/shaders/*.hlsl", recursive=True) if not s.startswith(("build/", "build\\"))]
     if not srcs:
         print("No HLSL shaders found under nyla/**/shaders", file=sys.stderr)
         return 0

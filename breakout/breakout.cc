@@ -125,9 +125,9 @@ void UserMain()
     TextureManager::Bootstrap();
     MeshManager::Bootstrap();
     TweenManager::Bootstrap();
+    AssetManager::Bootstrap(FileOpen(R"(assets.bin)"_s, FileOpenMode::Read));
     DebugTextRenderer::Bootstrap(alloc);
     Renderer::Bootstrap(alloc);
-    AssetManager::Bootstrap(FileOpen(R"(assets.bin)"_s, FileOpenMode::Read));
 
     mesh_handle cubeMesh = MeshManager::DeclareMesh(kCubeGltfGuid, kCubeBinGuid);
     mesh_handle sphereMesh = MeshManager::DeclareMesh(kSphereGltfGuid, kSphereBinGuid);
@@ -175,12 +175,18 @@ void UserMain()
                 float y = 20.f - (float)i * 1.5f;
                 float x = -28.f + (float)j * 3.5f;
 
+                float posX;
+                if (j % 2)
+                    posX = 50.f;
+                else
+                    posX = -50.f;
+                float posY;
+                if (j % 3)
+                    posY = -50.f;
+                else
+                    posY = 50.f;
                 brick_data &brick = InlineVec::Append(game->bricks, brick_data{
-                                                                        .pos =
-                                                                            {
-                                                                                50.f * (float)((j % 2) ? 1 : -1),
-                                                                                50.f * (float)((j % 3) ? -1 : 1),
-                                                                            },
+                                                                        .pos = {posX, posY},
                                                                         .size = {40.f / 15.f, 1.f},
                                                                     });
 
@@ -286,11 +292,12 @@ void UserMain()
                     InputManager::IsPressed(input_id::MoveRight) - InputManager::IsPressed(input_id::MoveLeft);
 
                 // game simulation
-                static float dtAccumulator = 0.f;
-                dtAccumulator += dt;
+                static uint64_t dtUsAccumulator = 0;
+                dtUsAccumulator += dtUs;
 
+                constexpr uint64_t kStepUs = 1'000'000 / 120;
                 constexpr float kStep = 1.f / 120.f;
-                for (; dtAccumulator >= kStep; dtAccumulator -= kStep)
+                for (; dtUsAccumulator >= kStepUs; dtUsAccumulator -= kStepUs)
                 {
                     game->playerPosX += 100.f * kStep * dx;
                     game->playerPosX = Clamp(game->playerPosX, game->worldBoundaryX[0] + game->playerWidth / 2.f,

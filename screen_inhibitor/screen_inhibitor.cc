@@ -87,6 +87,7 @@ static void ReplyString(DBusMessage *msg, const char *str)
     DBusMessage *reply = dbus_message_new_method_return(msg);
     DBusMessageIter it;
     dbus_message_iter_init_append(reply, &it);
+    // NOLINTNEXTLINE(bugprone-multi-level-implicit-pointer-conversion)
     dbus_message_iter_append_basic(&it, DBUS_TYPE_STRING, &str);
     dbus_connection_send(inhibitor->dbusConn, reply, nullptr);
     dbus_message_unref(reply);

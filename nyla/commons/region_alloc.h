@@ -71,6 +71,7 @@ INLINE auto Alloc(region_alloc &self, uint64_t size, uint64_t align) -> uint8_t 
             oldCommitedEnd = self.begin;
 
         self.commitedEnd = AlignedUp(self.at, kPageSize);
+        // NOLINTNEXTLINE(clang-analyzer-core.NullPointerArithm)
         CommitMemPages(oldCommitedEnd, self.commitedEnd - oldCommitedEnd);
     }
 

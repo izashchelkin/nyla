@@ -8,10 +8,13 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <dirent.h>
 #include <fcntl.h>
 #include <linux/close_range.h>
 #include <sys/mman.h>
+#include <sys/random.h>
 #include <sys/signal.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -84,6 +87,7 @@ auto API FileOpen(byteview path, FileOpenMode mode) -> file_handle
         }
     }
 
+    // NOLINTNEXTLINE(performance-no-int-to-ptr)
     return (void *)(int64_t)open(Span::CStr(path), flag, 0666);
 }
 
@@ -151,6 +155,82 @@ auto API GetStdout() -> file_handle
 auto API GetStderr() -> file_handle
 {
     return (void *)2;
+}
+
+//
+
+struct dir_iter
+{
+    DIR *handle;
+    int fd;
+};
+
+namespace DirIter
+{
+
+auto API Create(region_alloc &alloc, byteview path) -> dir_iter *
+{
+    DIR *d = opendir(Span::CStr(path));
+    if (!d)
+        return nullptr;
+
+    auto &self = RegionAlloc::Alloc<dir_iter>(alloc);
+    self.handle = d;
+    self.fd = dirfd(d);
+    return &self;
+}
+
+auto API Next(region_alloc &alloc, dir_iter &self, file_metadata &out) -> bool
+{
+    errno = 0;
+    struct dirent *de = readdir(self.handle);
+    if (!de)
+    {
+        ASSERT(errno == 0);
+        return false;
+    }
+
+    MemZero(&out);
+
+    uint64_t nameLen = CStrLen(de->d_name, 256);
+    span<uint8_t> nameCopy = RegionAlloc::AllocArray<uint8_t>(alloc, nameLen);
+    MemCpy(nameCopy.data, de->d_name, nameLen);
+    out.fileName = nameCopy;
+
+    struct stat st;
+    if (fstatat(self.fd, de->d_name, &st, AT_SYMLINK_NOFOLLOW) == 0)
+    {
+        out.fileSize = (uint64_t)st.st_size;
+        out.lastWriteTime = (uint64_t)st.st_mtime;
+        out.lastAccessTime = (uint64_t)st.st_atime;
+        out.creationTime = (uint64_t)st.st_ctime;
+        if (S_ISDIR(st.st_mode))
+            out.attributes |= file_attribute::Directory;
+    }
+    else if (de->d_type == DT_DIR)
+    {
+        out.attributes |= file_attribute::Directory;
+    }
+
+    if (de->d_name[0] == '.')
+        out.attributes |= file_attribute::Hidden;
+
+    return true;
+}
+
+void API Destroy(dir_iter &self)
+{
+    closedir(self.handle);
+}
+
+} // namespace DirIter
+
+auto API GenRandom64() -> uint64_t
+{
+    uint64_t buf;
+    ssize_t got = getrandom(&buf, sizeof(buf), 0);
+    ASSERT(got == sizeof(buf));
+    return buf;
 }
 
 //
@@ -376,32 +456,35 @@ auto API WinPollEvent(PlatformEvent &outEvent) -> bool
     }
 }
 
+static auto EnsureSigchldReaper() -> bool
+{
+    static bool installed = false;
+    if (installed)
+        return true;
+
+    struct sigaction sa;
+    sa.sa_handler = [](int signum) -> void {
+        pid_t pid;
+        int status;
+        while ((pid = waitpid(-1, &status, WNOHANG)) > 0)
+            ;
+    };
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART;
+    if (sigaction(SIGCHLD, &sa, nullptr) == -1)
+    {
+        LOG("sigaction failed");
+        return false;
+    }
+
+    installed = true;
+    return true;
+}
+
 auto API Spawn(span<const char *const> cmd) -> bool
 {
-    { // TODO: move this somewhere
-        static bool installed = false;
-        if (!installed)
-        {
-            struct sigaction sa;
-            sa.sa_handler = [](int signum) -> void {
-                pid_t pid;
-                int status;
-                while ((pid = waitpid(-1, &status, WNOHANG)) > 0)
-                    ;
-            };
-            sigemptyset(&sa.sa_mask);
-            sa.sa_flags = SA_RESTART;
-            if (sigaction(SIGCHLD, &sa, nullptr) == -1)
-            {
-                LOG("sigaction failed");
-                return false;
-            }
-            else
-            {
-                installed = true;
-            }
-        }
-    }
+    if (!EnsureSigchldReaper())
+        return false;
 
     if (cmd.size <= 1)
         return false;

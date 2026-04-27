@@ -4,6 +4,7 @@
 #include <cstdint>
 
 #include "nyla/commons/array.h" // IWYU pragma: keep
+#include "nyla/commons/asset_file_format.h"
 #include "nyla/commons/asset_manager.h"
 #include "nyla/commons/fmt.h"
 #include "nyla/commons/gpu_upload.h"
@@ -69,17 +70,14 @@ void API Update(rhi_cmdlist cmd)
         LOG("Uploading texture '%" PRIu64 "'", metadata.guid);
 
         byteview rawBytes = AssetManager::Get(metadata.guid);
+        ASSERT(rawBytes.size >= sizeof(texture_blob_header));
+        auto *header = (const texture_blob_header *)rawBytes.data;
 
-#if 0
-        uint8_t *pixelData = stbi_load_from_memory(rawBytes.data, rawBytes.size, (int *)&metadata.width,
-                                                   (int *)&metadata.height, (int *)&metadata.channels, 4);
-        ASSERT(pixelData, "stbi_load failed for '%" PRIu64 "': %s", metadata.guid, stbi_failure_reason());
-#else
-        uint8_t *pixelData = nullptr;
-#endif
-
+        metadata.width = header->width;
+        metadata.height = header->height;
         metadata.channels = 4;
-        // ASSERT(metadata.channels == 4, "Unexpected channels: %d", metadata.channels);
+
+        const uint8_t *pixelData = rawBytes.data + header->pixelOffset;
 
         const rhi_texture texture = Rhi::CreateTexture(rhi_texture_desc{
             .width = metadata.width,
@@ -98,11 +96,10 @@ void API Update(rhi_cmdlist cmd)
         Rhi::CmdTransitionTexture(cmd, texture, rhi_texture_state::TransferDst);
 
         const uint32_t byteSize = metadata.width * metadata.height * metadata.channels;
+        ASSERT(rawBytes.size >= header->pixelOffset + byteSize);
 
         char *uploadMemory = GpuUpload::CmdCopyTexture(cmd, texture, byteSize);
         MemCpy(uploadMemory, pixelData, byteSize);
-
-        free(pixelData);
 
         // TODO: this is suboptimal - move to where it's used
         Rhi::CmdTransitionTexture(cmd, texture, rhi_texture_state::ShaderRead);

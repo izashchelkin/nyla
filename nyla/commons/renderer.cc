@@ -60,8 +60,8 @@ void API Bootstrap(region_alloc &alloc)
 {
     renderer = &RegionAlloc::Alloc<renderer_state>(RegionAlloc::g_BootstrapAlloc);
 
-    rhi_shader vs = GetShader(alloc, "renderer.vs"_s, rhi_shader_stage::Vertex);
-    rhi_shader ps = GetShader(alloc, "renderer.ps"_s, rhi_shader_stage::Pixel);
+    rhi_shader vs = GetShader(0xA1B649BF9958EC11, rhi_shader_stage::Vertex);
+    rhi_shader ps = GetShader(0xFE6E3D0D77673448, rhi_shader_stage::Pixel);
 
     array<rhi_vertex_attribute_desc, 3> vertexAttributes{
         rhi_vertex_attribute_desc{

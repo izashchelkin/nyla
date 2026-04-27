@@ -7,11 +7,7 @@
 namespace nyla
 {
 
-struct asset_meta_header
-{
-    uint64_t guid;
-    uint32_t entryCount;
-};
+constexpr inline uint32_t kAssetDbMagic = DWord("ASDB");
 
 struct assetdb_header
 {
@@ -24,6 +20,14 @@ struct assetdb_index_entry
     uint64_t guid;
     uint64_t dataOffset;
     uint64_t dataSize;
+};
+
+struct texture_blob_header
+{
+    uint32_t width;
+    uint32_t height;
+    uint32_t format; // 0 = RGBA8
+    uint32_t pixelOffset;
 };
 
 } // namespace nyla

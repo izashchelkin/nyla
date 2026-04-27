@@ -23,6 +23,7 @@ INLINE constexpr auto AlignedUp(uint64_t n, uint64_t align) -> uint64_t
 
 template <typename T> INLINE constexpr auto AlignedUp(T *ptr, uint64_t align) -> T *
 {
+    // NOLINTNEXTLINE(performance-no-int-to-ptr)
     return (T *)AlignedUp((uint64_t)ptr, align);
 }
 

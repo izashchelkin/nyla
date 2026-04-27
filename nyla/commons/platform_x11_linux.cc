@@ -58,8 +58,7 @@ auto API X11InternAtom(byteview name, bool onlyIfExists) -> xcb_atom_t
 {
     xcb_intern_atom_reply_t *reply = xcb_intern_atom_reply(
         platform->x11.conn, xcb_intern_atom(platform->x11.conn, onlyIfExists, name.size, (char *)name.data), nullptr);
-    if (!reply || !reply->atom)
-        LOG("could not intern atom " SV_FMT, SV_ARG(name));
+    ASSERT(reply);
 
     auto ret = reply->atom;
     free(reply);

@@ -47,8 +47,8 @@ void API Bootstrap(region_alloc &alloc)
 {
     renderer = &RegionAlloc::Alloc<debug_text_renderer>(RegionAlloc::g_BootstrapAlloc);
 
-    const rhi_shader vs = GetShader(alloc, "fullscreen.vs"_s, rhi_shader_stage::Vertex);
-    const rhi_shader ps = GetShader(alloc, "debug_text_renderer.ps"_s, rhi_shader_stage::Pixel);
+    const rhi_shader vs = GetShader(0xF3624967BC396A3C, rhi_shader_stage::Vertex);
+    const rhi_shader ps = GetShader(0x040C5CF806D5A00D, rhi_shader_stage::Pixel);
 
     rhi_texture_format colorFormat = rhi_texture_format::B8G8R8A8_sRGB;
     const rhi_graphics_pipeline_desc pipelineDesc{

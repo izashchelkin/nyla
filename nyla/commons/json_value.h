@@ -141,6 +141,7 @@ INLINE void SetValue(json_value &self, json_tag tag, uint32_t count, json_value 
     };
 }
 
+// NOLINTBEGIN(bugprone-macro-parentheses)
 #define X(name, out)                                                                                                   \
     auto Try##name(json_value &self, span<byteview>, out &) -> bool;                                                   \
     INLINE auto name(json_value &self, span<byteview> path) -> out                                                     \
@@ -165,6 +166,7 @@ INLINE void SetValue(json_value &self, json_tag tag, uint32_t count, json_value 
     {                                                                                                                  \
         return name(self, span<byteview>{});                                                                           \
     }
+// NOLINTEND(bugprone-macro-parentheses)
 
 X(Any, json_value *);
 X(Object, json_value *);

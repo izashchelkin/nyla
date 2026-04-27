@@ -5,6 +5,7 @@
 #include "nyla/commons/asset_file_format.h"
 #include "nyla/commons/asset_manager.h"
 #include "nyla/commons/bdf.h"
+#include "nyla/commons/byteparser.h"
 #include "nyla/commons/cast.h"
 #include "nyla/commons/color.h"
 #include "nyla/commons/debug_text_renderer.h"
@@ -38,8 +39,10 @@
 #include "nyla/commons/sampler_manager.h"
 #include "nyla/commons/span_def.h"
 #include "nyla/commons/spv_shader_enums.h"
+#include "nyla/commons/stringparser.h"
 #include "nyla/commons/texture_manager.h"
 #include "nyla/commons/time.h"
+#include "nyla/commons/tokenparser.h"
 #include "nyla/commons/tween_manager.h"
 #include "nyla/commons/vec.h"
 
@@ -65,20 +68,34 @@ enum class AssetType
     Gltf = 2,
     Bin = 3,
     BdfFont = 4,
+    Spv = 5,
 };
+
+namespace
+{
+
+struct pending_entry
+{
+    uint64_t guid;
+    byteview alias;
+    AssetType type;
+    byteview processed;
+};
+
+} // namespace
 
 void UserMain()
 {
     uint64_t randomState[4];
     SeedXoshiro256ss(randomState);
 
-    file_handle output = FileOpen("test.bin"_s, FileOpenMode::Write | FileOpenMode::Append);
-    ASSERT(FileValid(output));
-
     auto alloc = RegionAlloc::Create(MemPagePool::kChunkSize, 0);
 
     auto &searchList = RegionAlloc::AllocVec<byteview, 256>(alloc);
     InlineVec::Append(searchList, R"(assets)"_s);
+    InlineVec::Append(searchList, R"(asset_public)"_s);
+
+    auto &entries = RegionAlloc::AllocVec<pending_entry, 4096>(alloc);
 
     while (searchList.size > 0)
     {
@@ -119,48 +136,66 @@ void UserMain()
                         type = AssetType::Gltf;
                     else if (Span::EndsWith(meta.fileName, ".bin"_s))
                         type = AssetType::Bin;
+                    else if (Span::EndsWith(meta.fileName, ".spv"_s))
+                        type = AssetType::Spv;
                     else
                         type = AssetType::Unknown;
 
                     if (type != AssetType::Unknown)
                     {
-                        void *allocMark = alloc.at;
+                        auto &fullPathVec = RegionAlloc::AllocVec<uint8_t, 0x100>(alloc);
+                        InlineVec::Append(fullPathVec, currentDir);
+                        InlineVec::Append(fullPathVec, "/"_s);
+                        InlineVec::Append(fullPathVec, meta.fileName);
+                        byteview fullPath = fullPathVec;
 
-                        auto &fullPath = RegionAlloc::AllocVec<uint8_t, 0x100>(alloc);
-                        InlineVec::Append(fullPath, currentDir);
-                        InlineVec::Append(fullPath, "/"_s);
-                        InlineVec::Append(fullPath, meta.fileName);
+                        auto &metaPathVec = RegionAlloc::AllocVec<uint8_t, 0x100>(alloc);
+                        InlineVec::Append(metaPathVec, fullPath);
+                        InlineVec::Append(metaPathVec, ".meta"_s);
+                        byteview metaPath = metaPathVec;
 
-                        auto &metaPath = RegionAlloc::AllocVec<uint8_t, 0x100>(alloc);
-                        InlineVec::Append(metaPath, (byteview)fullPath);
-                        InlineVec::Append(metaPath, ".meta"_s);
-
-                        file_handle metaFile = FileOpen(metaPath, FileOpenMode::Read | FileOpenMode::Append);
-                        ASSERT(FileValid(metaFile));
-
-                        uint64_t metaFileSize = FileTell(metaFile);
-                        if (FileTell(metaFile) > 0)
+                        uint64_t guid = 0;
+                        byteview alias{};
+                        file_handle metaFile = FileOpen(metaPath, FileOpenMode::Read);
+                        if (FileValid(metaFile))
                         {
-                            LOG("already written!");
+                            span buf = FileReadFully(alloc, metaFile);
+                            FileClose(metaFile);
 
-                            FileSeek(metaFile, 0, file_seek_mode::Begin);
+                            byte_parser p;
+                            ByteParser::Init(p, buf.data, buf.size);
+                            while (ByteParser::HasNext(p))
+                            {
+                                StringParser::SkipWhitespace(p);
+                                if (!ByteParser::HasNext(p))
+                                    break;
+                                if (TokenParser::SkipLineComment(p))
+                                    continue;
 
-                            span buf = RegionAlloc::AllocArray<uint8_t>(alloc, metaFileSize);
-                            FileRead(metaFile, buf.size, buf.data);
+                                byteview key = TokenParser::ParseIdentifier(p);
+                                TokenParser::SkipLineWhitespace(p);
 
-                            asset_meta_header *header = (asset_meta_header *)buf.data;
+                                if (Span::Eq(key, "guid"_s))
+                                    guid = TokenParser::ParseHexU64(p);
+                                else if (Span::Eq(key, "alias"_s))
+                                    alias = TokenParser::ParseIdentifier(p);
+                                else
+                                    ByteParser::NextLine(p);
+                            }
 
-                            LOG("guid: %" PRIu64 " entryCount: %" PRIu64, header->guid, header->entryCount);
+                            LOG("meta exists guid: 0x%016" PRIX64 " alias: " SV_FMT, guid, SV_ARG(alias));
                         }
                         else
                         {
-                            LOG("writing...");
+                            guid = Xoshiro256ss(randomState);
 
-                            uint64_t guid = Xoshiro256ss(randomState);
-                            FileWrite(metaFile, asset_meta_header{
-                                                    .guid = guid,
-                                                    .entryCount = 0,
-                                                });
+                            file_handle newMeta = FileOpen(metaPath, FileOpenMode::Write);
+                            ASSERT(FileValid(newMeta));
+                            FileWriteFmt(newMeta, "guid  0x%016" PRIX64 "\n# alias <fill_me>\n"_s, guid);
+                            FileClose(newMeta);
+
+                            LOG("meta minted guid: 0x%016" PRIX64 " (alias missing — fill in " SV_FMT ")", guid,
+                                SV_ARG(metaPath));
                         }
 
                         file_handle file = FileOpen(fullPath, FileOpenMode::Read);
@@ -169,33 +204,48 @@ void UserMain()
                         LOG("file: " SV_FMT, SV_ARG(fullPath));
 
                         span rawBytes = FileReadFully(alloc, file);
+                        FileClose(file);
 
+                        byteview processed;
                         switch (type)
                         {
                         case AssetType::Texture: {
                             int texWidth;
                             int texHeight;
+                            uint8_t *pixelData = stbi_load_from_memory(rawBytes.data, CastI32(rawBytes.size), &texWidth,
+                                                                       &texHeight, nullptr, 4);
+                            ASSERT(pixelData);
 
-                            {
-                                uint8_t *pixelData = stbi_load_from_memory(rawBytes.data, CastI32(rawBytes.size),
-                                                                           &texWidth, &texHeight, nullptr, 4);
-#if 1
-                                ASSERT(pixelData);
-#else
-                                ASSERT(pixelData, "stbi_load failed for '%" PRIu64 "': %s", metadata.guid,
-                                       stbi_failure_reason());
-#endif
-
-                                uint32_t pixelDataSize = (uint32_t)4 * texWidth * texHeight;
-
-                                FileWrite(output, pixelDataSize, pixelData);
-                            }
+                            uint64_t pixelDataSize = (uint64_t)4 * texWidth * texHeight;
+                            uint64_t totalSize = sizeof(texture_blob_header) + pixelDataSize;
+                            span<uint8_t> dst = RegionAlloc::AllocArray<uint8_t>(alloc, totalSize);
+                            *(texture_blob_header *)dst.data = texture_blob_header{
+                                .width = (uint32_t)texWidth,
+                                .height = (uint32_t)texHeight,
+                                .format = 0,
+                                .pixelOffset = (uint32_t)sizeof(texture_blob_header),
+                            };
+                            MemCpy(dst.data + sizeof(texture_blob_header), pixelData, pixelDataSize);
+                            free(pixelData);
+                            processed = dst;
                             break;
                         }
+                        case AssetType::Bin:
+                        case AssetType::Gltf:
+                        case AssetType::BdfFont:
+                        case AssetType::Spv:
+                            processed = rawBytes;
+                            break;
+                        case AssetType::Unknown:
+                            UNREACHABLE();
                         }
 
-                        FileClose(file);
-                        RegionAlloc::Reset(alloc, allocMark);
+                        InlineVec::Append(entries, pending_entry{
+                                                       .guid = guid,
+                                                       .alias = alias,
+                                                       .type = type,
+                                                       .processed = processed,
+                                                   });
                     }
                 }
             };
@@ -203,6 +253,73 @@ void UserMain()
             DirIter::Destroy(*dirIter);
         }
     }
+
+    for (uint64_t i = 0; i < entries.size; ++i)
+    {
+        ASSERT(entries[i].alias.size > 0, "missing alias in meta");
+        for (uint64_t j = i + 1; j < entries.size; ++j)
+            ASSERT(!Span::Eq(entries[i].alias, entries[j].alias), "duplicate alias");
+    }
+
+    for (uint64_t i = 1; i < entries.size; ++i)
+    {
+        pending_entry tmp = entries[i];
+        uint64_t j = i;
+        while (j > 0 && entries[j - 1].guid > tmp.guid)
+        {
+            entries[j] = entries[j - 1];
+            --j;
+        }
+        entries[j] = tmp;
+    }
+
+    uint64_t entryCount = entries.size;
+    uint64_t indexBytes = entryCount * sizeof(assetdb_index_entry);
+    uint64_t dataAreaStart = AlignedUp(sizeof(assetdb_header) + indexBytes, 8);
+
+    span<assetdb_index_entry> index = RegionAlloc::AllocArray<assetdb_index_entry>(alloc, entryCount);
+    uint64_t cursor = dataAreaStart;
+    for (uint64_t i = 0; i < entryCount; ++i)
+    {
+        cursor = AlignedUp(cursor, 8);
+        index[i] = assetdb_index_entry{
+            .guid = entries[i].guid,
+            .dataOffset = cursor,
+            .dataSize = entries[i].processed.size,
+        };
+        cursor += entries[i].processed.size;
+    }
+
+    file_handle output = FileOpen("assets.bin"_s, FileOpenMode::Write);
+    ASSERT(FileValid(output));
+
+    FileWrite(output, assetdb_header{
+                          .magic = kAssetDbMagic,
+                          .entryCount = (uint32_t)entryCount,
+                      });
+    if (entryCount > 0)
+        FileWriteSpan(output, index);
+
+    static const uint8_t kZeroPad[8] = {};
+    uint64_t bytesWritten = sizeof(assetdb_header) + indexBytes;
+    for (uint64_t i = 0; i < entryCount; ++i)
+    {
+        uint64_t targetOffset = index[i].dataOffset;
+        if (targetOffset > bytesWritten)
+        {
+            uint64_t pad = targetOffset - bytesWritten;
+            ASSERT(pad < 8);
+            FileWrite(output, (uint32_t)pad, kZeroPad);
+            bytesWritten += pad;
+        }
+        ASSERT(entries[i].processed.size <= UINT32_MAX);
+        FileWrite(output, (uint32_t)entries[i].processed.size, entries[i].processed.data);
+        bytesWritten += entries[i].processed.size;
+    }
+
+    FileClose(output);
+
+    LOG("packed %" PRIu64 " entries to assets.bin", entryCount);
 }
 
 } // namespace nyla

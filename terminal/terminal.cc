@@ -209,6 +209,7 @@ auto LABToRGB(float3 lab) -> float3
 
 //
 
+// NOLINTBEGIN(bugprone-throwing-static-initialization)
 uint32_t Background = PackRGB(28, 28, 28);
 uint32_t Foreground = PackRGB(188, 188, 188);
 
@@ -230,6 +231,7 @@ array<uint32_t, 256> Palette{
     PackRGB(135, 175, 175), // 14: Bright Cyan
     PackRGB(238, 238, 238), // 15: Bright White
 };
+// NOLINTEND(bugprone-throwing-static-initialization)
 
 } // namespace
 

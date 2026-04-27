@@ -45,6 +45,10 @@ file(GLOB_RECURSE NYLA_ALL_CXX_FILES
         "${PROJECT_SOURCE_DIR}/breakout/*.h"
         "${PROJECT_SOURCE_DIR}/breakout/*.hlsl"
 
+        "${PROJECT_SOURCE_DIR}/shipgame/*.cc"
+        "${PROJECT_SOURCE_DIR}/shipgame/*.h"
+        "${PROJECT_SOURCE_DIR}/shipgame/*.hlsl"
+
         "${PROJECT_SOURCE_DIR}/terminal/*.cc"
         "${PROJECT_SOURCE_DIR}/terminal/*.h"
         "${PROJECT_SOURCE_DIR}/terminal/*.hlsl"
@@ -64,6 +68,10 @@ file(GLOB_RECURSE NYLA_ALL_CXX_FILES
         "${PROJECT_SOURCE_DIR}/asset_packer/*.cc"
         "${PROJECT_SOURCE_DIR}/asset_packer/*.h"
         "${PROJECT_SOURCE_DIR}/asset_packer/*.hlsl"
+
+        "${PROJECT_SOURCE_DIR}/psf2_glsl/*.cc"
+        "${PROJECT_SOURCE_DIR}/psf2_glsl/*.h"
+        "${PROJECT_SOURCE_DIR}/psf2_glsl/*.hlsl"
 )
 
 add_custom_target(format
@@ -78,7 +86,9 @@ add_subdirectory(nyla)
 add_subdirectory(asset_packer)
 add_subdirectory(3d_ball_maze)
 add_subdirectory(breakout)
+add_subdirectory(shipgame)
 add_subdirectory(terminal)
 add_subdirectory(wm)
 add_subdirectory(wm_overlay)
 add_subdirectory(screen_inhibitor)
+add_subdirectory(psf2_glsl)

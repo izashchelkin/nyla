@@ -1,10 +1,9 @@
 Checks: >
   clang-analyzer-*,
-  -clang-analyzer-security.FloatLoopCounter,
   -clang-analyzer-optin.core.EnumCastOutOfRange,
 
   bugprone-*,
-  -bugprone-easily-swappable-parameters
+  -bugprone-easily-swappable-parameters,
 
   performance-*,
   -performance-enum-size,
@@ -14,6 +13,12 @@ Checks: >
   -modernize-use-ranges,
   -modernize-loop-convert,
   -modernize-avoid-c-arrays,
+  -modernize-avoid-c-style-cast,
+  -modernize-use-designated-initializers,
+  -modernize-use-trailing-return-type,
+  -modernize-use-auto,
+  -modernize-avoid-variadic-functions,
+  -modernize-use-std-numbers,
 
   readability-identifier-naming,
 
@@ -67,7 +72,8 @@ Checks: >
 # - key: readability-identifier-naming.MethodIgnoredRegexp
 #   value: '^(begin|end|cbegin|cend)$'
 
-HeaderFilterRegex: 'nyla/nyla/.*'
+HeaderFilterRegex: '(nyla/nyla|3d_ball_maze|asset_packer|breakout|psf2_glsl|screen_inhibitor|terminal|wm|wm_overlay)/.*'
+ExcludeHeaderFilterRegex: 'stb_image\.h$'
 FormatStyle: none
 
 ExtraArgs: [ -std=c++23 ]

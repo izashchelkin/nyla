@@ -1,34 +1,20 @@
 #include "nyla/commons/shader.h"
 
-#include "nyla/commons/file.h"
-#include "nyla/commons/file_utils.h"
-#include "nyla/commons/fmt.h"
-#include "nyla/commons/inline_vec.h"
-#include "nyla/commons/region_alloc.h"
+#include "nyla/commons/asset_manager.h"
 #include "nyla/commons/rhi.h"
+#include "nyla/commons/span_def.h"
 
 namespace nyla
 {
 
-auto API GetShader(region_alloc &alloc, byteview name, rhi_shader_stage stage) -> rhi_shader
+auto API GetShader(uint64_t guid, rhi_shader_stage stage) -> rhi_shader
 {
-    void *allocMark = alloc.at;
+    byteview data = AssetManager::Get(guid);
 
-    auto &path = RegionAlloc::AllocString<256>(alloc);
-    InlineVec::Resize(path, StringWriteFmt(Span::Resize((span<uint8_t>)path, InlineVec::Capacity(path)),
-                                           R"(D:\nyla\nyla\shaders\build\)" SV_FMT R"(.hlsl.spv)"_s, SV_ARG(name)));
-
-    file_handle file = FileOpen(path, FileOpenMode::Read);
-    span<uint8_t> data = FileReadFully(alloc, file);
-
-    // TODO: this makes an unnecessary copy! <- belongs together with the lifetime todo
-    rhi_shader shader = Rhi::CreateShader(rhi_shader_desc{
+    return Rhi::CreateShader(rhi_shader_desc{
         .stage = stage,
-        .code = Span::Cast<uint32_t>(data),
+        .code = span<uint32_t>{(uint32_t *)data.data, data.size / sizeof(uint32_t)},
     });
-
-    RegionAlloc::Reset(alloc, allocMark);
-    return shader;
 }
 
 } // namespace nyla

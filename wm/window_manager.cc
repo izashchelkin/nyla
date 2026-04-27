@@ -442,8 +442,11 @@ void Activate(const window_stack &stack, xcb_timestamp_t time)
 
     wm->borderDirty = true;
 
-    xcb_window_t immediateFocus =
-        (idx->flags & window_index_entry::Flag_WM_Hints_Input) ? stack.activeWindow : X11GetRoot();
+    xcb_window_t immediateFocus;
+    if (idx->flags & window_index_entry::Flag_WM_Hints_Input)
+        immediateFocus = stack.activeWindow;
+    else
+        immediateFocus = X11GetRoot();
     xcb_set_input_focus(X11GetConn(), XCB_INPUT_FOCUS_NONE, immediateFocus, time);
 
     if (idx->flags & window_index_entry::Flag_WM_TakeFocus)
@@ -486,7 +489,10 @@ void AdoptPendingTransients(xcb_window_t parentWindow)
             InlineVec::Erase(s.windows, pos);
             if (s.activeWindow == childWindow)
             {
-                s.activeWindow = s.windows.size > 0 ? s.windows[0] : 0;
+                if (s.windows.size > 0)
+                    s.activeWindow = s.windows[0];
+                else
+                    s.activeWindow = 0;
                 if (istack == wm->activeStackIndex)
                     Activate(s, s.activeWindow, XCB_CURRENT_TIME);
             }
@@ -616,13 +622,21 @@ void UnmanageClient(xcb_window_t clientWindow)
         }
     }
 
-    xcb_window_t transientFor = realTransient ? idx->parent : 0;
+    xcb_window_t transientFor;
+    if (realTransient)
+        transientFor = idx->parent;
+    else
+        transientFor = 0;
     RemoveWindow(clientWindow);
 
     for (uint32_t istack = 0; istack < 9; ++istack)
     {
         window_stack &stack = wm->stacks[istack];
-        xcb_window_t lookFor = transientFor ? transientFor : clientWindow;
+        xcb_window_t lookFor;
+        if (transientFor)
+            lookFor = transientFor;
+        else
+            lookFor = clientWindow;
         xcb_window_t *winPos = InlineVec::Find(stack.windows, lookFor);
         if (!winPos)
             continue;
@@ -676,7 +690,10 @@ void MoveStack(xcb_timestamp_t time, auto computeIdx)
             ASSERT(pos);
             InlineVec::Erase(oldStack.windows, pos);
 
-            oldStack.activeWindow = oldStack.windows.size > 0 ? oldStack.windows[0] : 0;
+            if (oldStack.windows.size > 0)
+                oldStack.activeWindow = oldStack.windows[0];
+            else
+                oldStack.activeWindow = 0;
             Activate(newStack, newStack.activeWindow, time);
             wm->borderDirty = true;
         }
@@ -1004,6 +1021,9 @@ void WmProcess(bool &isRunning)
             LOG("xcb error: %d, sequence: %d", err->error_code, err->sequence);
             break;
         }
+
+        default:
+            break;
         }
 
         free(event);
@@ -1287,7 +1307,12 @@ void WmProcess(bool &isRunning)
                     window_index_entry *idx = FindIndex(clientWindow);
                     if (idx)
                     {
-                        ConfigureClientIfNeeded(clientWindow, *idx, *idx->dataEntry, screenRect, wm->follow ? 2 : 0);
+                        uint32_t followFlag;
+                        if (wm->follow)
+                            followFlag = 2;
+                        else
+                            followFlag = 0;
+                        ConfigureClientIfNeeded(clientWindow, *idx, *idx->dataEntry, screenRect, followFlag);
                         configureSubwindows(*idx->dataEntry);
                     }
                 }
