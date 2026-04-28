@@ -70,7 +70,7 @@ void UserMain()
     Renderer::Bootstrap(alloc);
 #if !defined(NDEBUG)
     CellRenderer::Bootstrap(alloc, cell_renderer_init_desc{
-                                       .bdfGuid = 0x30B510FE27A113FB,
+                                       .bdfGuid = ID_bdf_terminus_u32,
                                    });
     Tunables::Bootstrap("3d_ball_maze.tunables"_s);
 #endif

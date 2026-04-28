@@ -7,10 +7,6 @@
 #include "nyla/commons/platform_thread.h"
 #include "nyla/commons/region_alloc.h"
 
-#include <audioclient.h>
-#include <mmdeviceapi.h>
-#include <objbase.h>
-
 #include <cstdint>
 
 namespace nyla

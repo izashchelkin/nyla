@@ -77,10 +77,6 @@ struct game_state
 };
 game_state *game;
 
-// TODO: replace dummy guids with real ones from assets.h once .wav files are packed.
-constexpr uint64_t kID_breakout_brick_hit_wav = 0xAAAA'BBBB'CCCC'0001ull;
-constexpr uint64_t kID_breakout_paddle_hit_wav = 0xAAAA'BBBB'CCCC'0002ull;
-
 auto IsInside(float pos, float size, float2 boundary) -> bool
 {
     if (pos > boundary[0] - size / 2.f && pos < boundary[1] + size / 2.f)
@@ -128,7 +124,7 @@ void UserMain()
     Renderer::Bootstrap(alloc);
 #if !defined(NDEBUG)
     CellRenderer::Bootstrap(alloc, cell_renderer_init_desc{
-                                       .bdfGuid = 0x30B510FE27A113FB,
+                                       .bdfGuid = ID_bdf_terminus_u32,
                                    });
     Tunables::Bootstrap("breakout.tunables"_s);
     Tunables::RegisterFloat("ball.radius"_s, &game->ballRadius, 0.05f, 0.1f, 5.f);
@@ -139,8 +135,8 @@ void UserMain()
 
     Audio::Bootstrap(48000, 2, 20'000);
 
-    game->brickHitClip = Audio::DeclareClip(kID_breakout_brick_hit_wav);
-    game->paddleHitClip = Audio::DeclareClip(kID_breakout_paddle_hit_wav);
+    game->brickHitClip = Audio::DeclareClip(ID_breakout_brick_hit_wav);
+    game->paddleHitClip = Audio::DeclareClip(ID_breakout_paddle_hit_wav);
 
     mesh_handle cubeMesh = MeshManager::DeclareMesh(ID_mesh_gltf_cube, ID_mesh_bin_cube);
     mesh_handle sphereMesh = MeshManager::DeclareMesh(ID_mesh_gltf_sphere, ID_mesh_bin_sphere);

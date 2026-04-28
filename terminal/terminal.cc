@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "assets.h"
 #include "nyla/commons/array.h" // IWYU pragma: keep
 #include "nyla/commons/asset_manager.h"
 #include "nyla/commons/cell_renderer.h"
@@ -38,31 +39,6 @@ namespace nyla
 
 namespace
 {
-
-const uint64_t kCubeGltfGuid = 0x1077DCB383E4F409;
-const uint64_t kCubeBinGuid = 0x7C9E66305CB656C0;
-
-const uint64_t kSphereGltfGuid = 0x831167E33B4E1011;
-const uint64_t kSphereBinGuid = 0xDE33DC595E98C184;
-
-const uint64_t kRectGltfGuid = 0x328C6225041A814B;
-const uint64_t kRectBinGuid = 0x07EB6974550BDCD0;
-
-const uint64_t kBackgroundGuid = 0x1C3EBA857F103740;
-const uint64_t kBallSmallBlueGuid = 0xB0851B6A9FDC5EC3;
-const uint64_t kBrick1Guid = 0x536DFA7327C4D3E0;
-const uint64_t kBrick2Guid = 0x3111A93E450AEFCF;
-const uint64_t kBrick3Guid = 0x361985575F1F6033;
-const uint64_t kBrick4Guid = 0x71D9101DC62A152D;
-const uint64_t kBrick5Guid = 0x1E86F2389D300F95;
-const uint64_t kBrick6Guid = 0x645A2B0CB91DBFDD;
-const uint64_t kBrick7Guid = 0xB516416E99DC16A6;
-const uint64_t kBrick8Guid = 0xC6AEED02BCC31788;
-const uint64_t kBrick9Guid = 0x12DAADBE8487CBB7;
-const uint64_t kBrickUnbreakableGuid = 0xDFF1B727573A893D;
-const uint64_t kFrameGuid = 0xFB8F0BA1D020EB59;
-const uint64_t kPlayerGuid = 0x45B048CC6E76F0AE;
-const uint64_t kPlayerFlashGuid = 0x7BA51AB5A7863015;
 
 constexpr auto PackRGB(uint8_t r, uint8_t g, uint8_t b) -> uint32_t
 {
@@ -214,7 +190,7 @@ void UserMain()
     DebugTextRenderer::Bootstrap(alloc);
     Renderer::Bootstrap(alloc);
     CellRenderer::Bootstrap(alloc, cell_renderer_init_desc{
-                                       .bdfGuid = 0x30B510FE27A113FB,
+                                       .bdfGuid = ID_bdf_terminus_u32,
                                    });
 
     {

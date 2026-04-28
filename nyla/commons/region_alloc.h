@@ -49,7 +49,7 @@ INLINE void Reset(region_alloc &self)
 
 INLINE void Reset(region_alloc &self, void *p)
 {
-    DASSERT(p != nullptr && p >= self.begin && p < self.end && p < self.commitedEnd);
+    DASSERT(p != nullptr && (p == self.begin || (p >= self.begin && p < self.end && p < self.commitedEnd)));
 
     self.at = (uint8_t *)p;
 }

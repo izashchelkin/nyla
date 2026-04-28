@@ -246,7 +246,7 @@ void UserMain()
     DebugTextRenderer::Bootstrap(alloc);
 #if !defined(NDEBUG)
     CellRenderer::Bootstrap(alloc, cell_renderer_init_desc{
-                                       .bdfGuid = 0x30B510FE27A113FB,
+                                       .bdfGuid = ID_bdf_terminus_u32,
                                    });
     Tunables::Bootstrap("shipgame.tunables"_s);
     Tunables::RegisterFloat("camera.zoom"_s, &game->cameraZoom, 0.05f, 0.1f, 2.5f);

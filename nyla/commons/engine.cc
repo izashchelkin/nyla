@@ -82,7 +82,7 @@ auto API FrameBegin(region_alloc &alloc) -> engine_frame
         g_engine->framesCounted = 0;
     }
 
-    for (;;)
+    for (; !ShouldExit();)
     {
         PlatformEvent event{};
         if (!WinPollEvent(event))

@@ -12,9 +12,9 @@ endif()
 find_package(Vulkan)
 find_package(Threads REQUIRED)
 
-if (WIN32)
-    set(D3D12_FOUND TRUE)
-endif()
+# if (WIN32)
+#     set(D3D12_FOUND TRUE)
+# endif()
 
 target_link_libraries(${TARGET}
     PUBLIC

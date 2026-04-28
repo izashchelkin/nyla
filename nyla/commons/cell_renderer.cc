@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "assets.h"
 #include "nyla/commons/array.h" // IWYU pragma: keep
 #include "nyla/commons/asset_file_format.h"
 #include "nyla/commons/asset_manager.h"
@@ -189,7 +190,7 @@ void API Bootstrap(region_alloc &, const cell_renderer_init_desc &desc)
         .depthFormat = rhi_texture_format::D32_Float_S8_UINT,
     };
 
-    cr->pipeline = PipelineCache::Acquire(0x6D1A8F7C2E5B9043, 0x9E3F4D8A1C07B2E6, pipelineDesc);
+    cr->pipeline = PipelineCache::Acquire(ID_cell_renderer_vs, ID_cell_renderer_ps, pipelineDesc);
 }
 
 void API Begin(int32_t originPxX, int32_t originPxY, uint32_t cols, uint32_t rows)

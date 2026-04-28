@@ -174,7 +174,7 @@ void API CmdFlush(rhi_cmdlist cmd, int32_t originPxX, int32_t originPxY, uint32_
     const double frameMs = (double)g_profiler->lastFrameUs * 1e-3;
     uint8_t headerBuf[128];
     const uint64_t headerN = StringWriteFmt(span<uint8_t>{headerBuf, sizeof(headerBuf)},
-                                            "profiler (F7 hide)  frame %.2f ms  %u fps"_s, frameMs, fps);
+                                            "profiler (F7 hide)  frame %f ms  %u fps"_s, frameMs, fps);
     CellRenderer::Text(0, 0, byteview{headerBuf, headerN}, headerFg, headerBg);
 
     for (uint32_t i = 0; i < scopeRows; ++i)
@@ -191,7 +191,7 @@ void API CmdFlush(rhi_cmdlist cmd, int32_t originPxX, int32_t originPxY, uint32_
         }
 
         const uint64_t bodyN = StringWriteFmt(span<uint8_t>{lineBuf + col, (uint64_t)sizeof(lineBuf) - col},
-                                              "%.*s  %.2f ms"_s, e.name.size, e.name.data.data, ms);
+                                              "%.*s  %f ms"_s, e.name.size, e.name.data.data, ms);
         CellRenderer::Text(0, i + 1, byteview{lineBuf, col + bodyN}, rowFg, rowBg);
     }
 

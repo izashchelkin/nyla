@@ -119,7 +119,7 @@ auto API Poll(platform_dir_watch &self, platform_dir_watch_event &out) -> bool
             break;
         }
 
-        int outLen = WideCharToMultiByte(CP_UTF8, 0, info->FileName, CastI32(info->FileNameLength / 2),
+        int outLen = WideCharToMultiByte(CP_UTF8, 0, info->FileName, info->FileNameLength / 2,
                                          (char *)self.nameUtf8.data, kNameBufSize, nullptr, nullptr);
         out.name = byteview{self.nameUtf8.data, (uint64_t)outLen};
 
