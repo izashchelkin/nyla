@@ -188,6 +188,8 @@ auto ConvertVertexFormatIntoVkFormat(rhi_vertex_format format) -> VkFormat
         return VK_FORMAT_R32G32B32_SFLOAT;
     case rhi_vertex_format::R32G32Float:
         return VK_FORMAT_R32G32_SFLOAT;
+    case rhi_vertex_format::R32G32B32A32Uint:
+        return VK_FORMAT_R32G32B32A32_UINT;
     }
     ASSERT(false);
     return static_cast<VkFormat>(0);
@@ -445,6 +447,8 @@ auto GetVertexFormatSize(rhi_vertex_format format) -> uint32_t
     case rhi_vertex_format::R32G32B32Float:
         return 12;
     case rhi_vertex_format::R32G32B32A32Float:
+        return 16;
+    case rhi_vertex_format::R32G32B32A32Uint:
         return 16;
     }
     ASSERT(false);
@@ -2111,17 +2115,13 @@ void Rhi::PassEnd()
 
 auto Rhi::CreateShader(const rhi_shader_desc &desc) -> rhi_shader
 {
-    // TODO: correct lifetime. probably doesn't matter until we have more shaders and need a more complicated shader
-    // system
-    auto alloc = RegionAlloc::Create(16_MiB, 0);
+    return HandlePool::Acquire(rhi->shaders, VulkanShaderData{.spv = desc.code});
+}
 
-    span<uint32_t> spv = RegionAlloc::AllocArray<uint32_t>(alloc, desc.code);
-    MemCpy(spv.data, desc.code.data, Span::SizeBytes(desc.code));
-
-    const rhi_shader handle = HandlePool::Acquire(rhi->shaders, VulkanShaderData{.spv = spv});
-    VulkanShaderData &shaderData = HandlePool::ResolveData(rhi->shaders, handle);
-
-    return handle;
+void Rhi::ReloadShader(rhi_shader shader, span<uint32_t> code)
+{
+    VulkanShaderData &data = HandlePool::ResolveData(rhi->shaders, shader);
+    data.spv = code;
 }
 
 void Rhi::DestroyShader(rhi_shader shader)
@@ -2565,10 +2565,10 @@ auto Rhi::CreateGraphicsPipeline(region_alloc &alloc, const rhi_graphics_pipelin
     auto &pixelShaderData = HandlePool::ResolveData(rhi->shaders, desc.ps);
 
     spv_shader vsMan{.stage = rhi_shader_stage::Vertex};
-    vertexShaderData.spv = SpvShader::ProcessShader(vsMan, vertexShaderData.spv);
+    span<uint32_t> vsSpv = SpvShader::ProcessShader(vsMan, vertexShaderData.spv);
 
     spv_shader psMan{.stage = rhi_shader_stage::Pixel};
-    pixelShaderData.spv = SpvShader::ProcessShader(psMan, pixelShaderData.spv);
+    span<uint32_t> psSpv = SpvShader::ProcessShader(psMan, pixelShaderData.spv);
 
     VulkanPipelineData pipelineData = {
         .bindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -2589,7 +2589,12 @@ auto Rhi::CreateGraphicsPipeline(region_alloc &alloc, const rhi_graphics_pipelin
     {
         uint32_t location;
         if (!SpvShader::FindLocationBySemantic(vsMan, attribute.semantic, spv_shader_storage_class::Input, &location))
-            ASSERT(false);
+        {
+            LOG("CreateGraphicsPipeline: vs missing input semantic " SV_FMT " (" SV_FMT ")", SV_ARG(attribute.semantic),
+                SV_ARG(desc.debugName));
+            RegionAlloc::Reset(alloc, allocMark);
+            return {};
+        }
 
         InlineVec::Append(vertexAttributes, VkVertexInputAttributeDescription{
                                                 .location = location,
@@ -2603,44 +2608,71 @@ auto Rhi::CreateGraphicsPipeline(region_alloc &alloc, const rhi_graphics_pipelin
     {
         byteview semantic;
         if (!SpvShader::FindSemanticById(psMan, id, &semantic))
-            ASSERT(false);
+        {
+            LOG("CreateGraphicsPipeline: ps missing semantic for id %u (" SV_FMT ")", id, SV_ARG(desc.debugName));
+            RegionAlloc::Reset(alloc, allocMark);
+            return {};
+        }
 
         if (Span::StartsWith(semantic, "SV_"_s))
             continue;
 
         uint32_t location;
         if (!SpvShader::FindLocationBySemantic(vsMan, semantic, spv_shader_storage_class::Output, &location))
-            ASSERT(false);
+        {
+            LOG("CreateGraphicsPipeline: vs missing output semantic " SV_FMT " (" SV_FMT ")", SV_ARG(semantic),
+                SV_ARG(desc.debugName));
+            RegionAlloc::Reset(alloc, allocMark);
+            return {};
+        }
 
-        if (!SpvShader::RewriteLocationForSemantic(psMan, pixelShaderData.spv, semantic,
-                                                   spv_shader_storage_class::Input, location))
-            ASSERT(false);
+        if (!SpvShader::RewriteLocationForSemantic(psMan, psSpv, semantic, spv_shader_storage_class::Input, location))
+        {
+            LOG("CreateGraphicsPipeline: ps rewrite location failed " SV_FMT " (" SV_FMT ")", SV_ARG(semantic),
+                SV_ARG(desc.debugName));
+            RegionAlloc::Reset(alloc, allocMark);
+            return {};
+        }
     }
 
-    auto createShaderModule = [](span<const uint32_t> spv) -> VkShaderModule {
+    auto tryCreateShaderModule = [](span<const uint32_t> spv, VkShaderModule &out) -> VkResult {
         const VkShaderModuleCreateInfo createInfo{
             .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
             .codeSize = Span::SizeBytes(spv),
             .pCode = spv.data,
         };
-
-        VkShaderModule shaderModule;
-        VK_CHECK(vkCreateShaderModule(rhi->dev, &createInfo, nullptr, &shaderModule));
-
-        return shaderModule;
+        return vkCreateShaderModule(rhi->dev, &createInfo, nullptr, &out);
     };
+
+    VkShaderModule vsModule = VK_NULL_HANDLE;
+    VkShaderModule psModule = VK_NULL_HANDLE;
+    if (VkResult res = tryCreateShaderModule(vsSpv, vsModule); res != VK_SUCCESS)
+    {
+        LOG("CreateGraphicsPipeline: vs vkCreateShaderModule failed: %s (" SV_FMT ")", string_VkResult(res),
+            SV_ARG(desc.debugName));
+        RegionAlloc::Reset(alloc, allocMark);
+        return {};
+    }
+    if (VkResult res = tryCreateShaderModule(psSpv, psModule); res != VK_SUCCESS)
+    {
+        LOG("CreateGraphicsPipeline: ps vkCreateShaderModule failed: %s (" SV_FMT ")", string_VkResult(res),
+            SV_ARG(desc.debugName));
+        vkDestroyShaderModule(rhi->dev, vsModule, nullptr);
+        RegionAlloc::Reset(alloc, allocMark);
+        return {};
+    }
 
     const array<VkPipelineShaderStageCreateInfo, 2> stages{
         VkPipelineShaderStageCreateInfo{
             .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
             .stage = VK_SHADER_STAGE_VERTEX_BIT,
-            .module = createShaderModule(vertexShaderData.spv),
+            .module = vsModule,
             .pName = "main",
         },
         VkPipelineShaderStageCreateInfo{
             .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
             .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-            .module = createShaderModule(pixelShaderData.spv),
+            .module = psModule,
             .pName = "main",
         },
     };
@@ -2793,8 +2825,20 @@ auto Rhi::CreateGraphicsPipeline(region_alloc &alloc, const rhi_graphics_pipelin
         .basePipelineIndex = -1,
     };
 
-    VK_CHECK(
-        vkCreateGraphicsPipelines(rhi->dev, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &pipelineData.pipeline));
+    VkResult pipeRes =
+        vkCreateGraphicsPipelines(rhi->dev, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &pipelineData.pipeline);
+
+    vkDestroyShaderModule(rhi->dev, vsModule, nullptr);
+    vkDestroyShaderModule(rhi->dev, psModule, nullptr);
+
+    if (pipeRes != VK_SUCCESS)
+    {
+        LOG("CreateGraphicsPipeline: vkCreateGraphicsPipelines failed: %s (" SV_FMT ")", string_VkResult(pipeRes),
+            SV_ARG(desc.debugName));
+        vkDestroyPipelineLayout(rhi->dev, pipelineData.layout, nullptr);
+        RegionAlloc::Reset(alloc, allocMark);
+        return {};
+    }
 
     RegionAlloc::Reset(alloc, allocMark);
     return HandlePool::Acquire(rhi->graphicsPipelines, pipelineData);
@@ -2859,6 +2903,11 @@ void Rhi::SetLargeDrawConstant(rhi_cmdlist cmd, byteview data)
 void Rhi::TriggerSwapchainRecreate()
 {
     rhi->recreateSwapchain = true;
+}
+
+void Rhi::WaitGpuIdle()
+{
+    vkDeviceWaitIdle(rhi->dev);
 }
 
 auto Rhi::GetFrameIndex() -> uint32_t

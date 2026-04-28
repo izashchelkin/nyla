@@ -34,6 +34,8 @@ struct texture_metadata
     rhi_texture_format textureFormat;
     rhi_texture texture;
     rhi_srv textureView;
+    rhi_texture pendingDestroyTexture;
+    rhi_srv pendingDestroyView;
     uint32_t width;
     uint32_t height;
     uint32_t channels;
@@ -46,6 +48,28 @@ struct texture_manager
 
 texture_manager *manager;
 
+void OnAssetChanged(uint64_t guid, byteview, void *)
+{
+    for (auto &slot : manager->textures)
+    {
+        if (!slot.used)
+            continue;
+
+        texture_metadata &metadata = slot.data;
+        if (metadata.guid != guid)
+            continue;
+
+        if (metadata.state == texture_state::Uploaded)
+        {
+            metadata.pendingDestroyTexture = metadata.texture;
+            metadata.pendingDestroyView = metadata.textureView;
+            metadata.texture = {};
+            metadata.textureView = {};
+        }
+        metadata.state = texture_state::NotUploaded;
+    }
+}
+
 } // namespace
 
 namespace TextureManager
@@ -54,6 +78,7 @@ namespace TextureManager
 void API Bootstrap()
 {
     manager = &RegionAlloc::Alloc<texture_manager>(RegionAlloc::g_BootstrapAlloc);
+    AssetManager::Subscribe(OnAssetChanged, nullptr);
 }
 
 void API Update(rhi_cmdlist cmd)
@@ -66,6 +91,17 @@ void API Update(rhi_cmdlist cmd)
         texture_metadata &metadata = slot.data;
         if (metadata.state != texture_state::NotUploaded)
             continue;
+
+        if (metadata.pendingDestroyTexture || metadata.pendingDestroyView)
+        {
+            Rhi::WaitGpuIdle();
+            if (metadata.pendingDestroyView)
+                Rhi::DestroySampledTextureView(metadata.pendingDestroyView);
+            if (metadata.pendingDestroyTexture)
+                Rhi::DestroyTexture(metadata.pendingDestroyTexture);
+            metadata.pendingDestroyTexture = {};
+            metadata.pendingDestroyView = {};
+        }
 
         LOG("Uploading texture '%" PRIu64 "'", metadata.guid);
 

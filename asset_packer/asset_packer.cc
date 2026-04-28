@@ -15,7 +15,6 @@
 #include "nyla/commons/file_utils.h"
 #include "nyla/commons/fmt.h"
 #include "nyla/commons/gamepad.h"
-#include "nyla/commons/glyph_renderer.h"
 #include "nyla/commons/gpu_upload.h"
 #include "nyla/commons/inline_vec.h"
 #include "nyla/commons/input_manager.h"
@@ -46,17 +45,7 @@
 #include "nyla/commons/tween_manager.h"
 #include "nyla/commons/vec.h"
 
-#define STB_IMAGE_IMPLEMENTATION
-// #define STBI_NO_JPEG
-// #define STBI_NO_PNG
-#define STBI_NO_BMP
-#define STBI_NO_PSD
-#define STBI_NO_TGA
-#define STBI_NO_GIF
-#define STBI_NO_HDR
-#define STBI_NO_PIC
-#define STBI_NO_PNM
-#include "asset_packer/stb_image.h"
+#include "nyla/commons/asset_import.h"
 
 namespace nyla
 {
@@ -69,6 +58,8 @@ enum class AssetType
     Bin = 3,
     BdfFont = 4,
     Spv = 5,
+    Wav = 6,
+    Pipeline = 7,
 };
 
 namespace
@@ -138,6 +129,10 @@ void UserMain()
                         type = AssetType::Bin;
                     else if (Span::EndsWith(meta.fileName, ".spv"_s))
                         type = AssetType::Spv;
+                    else if (Span::EndsWith(meta.fileName, ".wav"_s))
+                        type = AssetType::Wav;
+                    else if (Span::EndsWith(meta.fileName, ".pipeline"_s))
+                        type = AssetType::Pipeline;
                     else
                         type = AssetType::Unknown;
 
@@ -210,30 +205,16 @@ void UserMain()
                         switch (type)
                         {
                         case AssetType::Texture: {
-                            int texWidth;
-                            int texHeight;
-                            uint8_t *pixelData = stbi_load_from_memory(rawBytes.data, CastI32(rawBytes.size), &texWidth,
-                                                                       &texHeight, nullptr, 4);
-                            ASSERT(pixelData);
-
-                            uint64_t pixelDataSize = (uint64_t)4 * texWidth * texHeight;
-                            uint64_t totalSize = sizeof(texture_blob_header) + pixelDataSize;
-                            span<uint8_t> dst = RegionAlloc::AllocArray<uint8_t>(alloc, totalSize);
-                            *(texture_blob_header *)dst.data = texture_blob_header{
-                                .width = (uint32_t)texWidth,
-                                .height = (uint32_t)texHeight,
-                                .format = 0,
-                                .pixelOffset = (uint32_t)sizeof(texture_blob_header),
-                            };
-                            MemCpy(dst.data + sizeof(texture_blob_header), pixelData, pixelDataSize);
-                            free(pixelData);
-                            processed = dst;
+                            processed = ImportTextureFromPngOrJpg(rawBytes, alloc);
+                            ASSERT(processed.size > 0);
                             break;
                         }
                         case AssetType::Bin:
                         case AssetType::Gltf:
                         case AssetType::BdfFont:
                         case AssetType::Spv:
+                        case AssetType::Wav:
+                        case AssetType::Pipeline:
                             processed = rawBytes;
                             break;
                         case AssetType::Unknown:

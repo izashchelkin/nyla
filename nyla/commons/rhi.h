@@ -58,6 +58,7 @@ enum class rhi_vertex_format
     R32G32B32A32Float,
     R32G32B32Float,
     R32G32Float,
+    R32G32B32A32Uint,
 };
 
 enum class rhi_input_rate
@@ -370,6 +371,7 @@ auto API CreateSampler(const rhi_sampler_desc &) -> rhi_sampler;
 void API DestroySampler(rhi_sampler);
 
 auto API CreateShader(const rhi_shader_desc &) -> rhi_shader;
+void API ReloadShader(rhi_shader, span<uint32_t> code);
 void API DestroyShader(rhi_shader);
 
 auto API CreateTexture(const rhi_texture_desc &) -> rhi_texture;
@@ -393,6 +395,8 @@ auto API GetTexture(rhi_dsv dsv) -> rhi_texture;
 
 auto API GetBackbufferView() -> rhi_rtv;
 void API TriggerSwapchainRecreate();
+
+void API WaitGpuIdle();
 
 void API SetFrameConstant(rhi_cmdlist cmd, byteview data);
 void API SetPassConstant(rhi_cmdlist cmd, byteview data);

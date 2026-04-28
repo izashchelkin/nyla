@@ -1,37 +1,39 @@
 #pragma once
 
+#include <cstdint>
+
 #include "nyla/commons/bitenum.h"
-#include <string_view>
+#include "nyla/commons/macros.h"
+#include "nyla/commons/region_alloc_def.h"
+#include "nyla/commons/span_def.h"
 
 namespace nyla
 {
 
-enum class PlatformDirWatchEventType
+struct platform_dir_watch;
+
+enum class platform_dir_watch_event_type : uint8_t
 {
-    Modified,
-    Deleted,
-    MovedFrom,
-    MovedTo
+    Modified = 1 << 0,
+    Deleted = 1 << 1,
+    MovedFrom = 1 << 2,
+    MovedTo = 1 << 3,
 };
-NYLA_BITENUM(PlatformDirWatchEventType);
+NYLA_BITENUM(platform_dir_watch_event_type);
 
-struct PlatformDirWatchEvent
+struct platform_dir_watch_event
 {
-    Str name;
-    PlatformDirWatchEventType mask;
+    byteview name;
+    platform_dir_watch_event_type mask;
 };
 
-class PlatformDirWatch
+namespace PlatformDirWatch
 {
-  public:
-    void Init(const char *path);
-    void Destroy();
 
-    auto Poll(PlatformDirWatchEvent &outChange) -> bool;
+auto API Create(region_alloc &alloc, byteview path) -> platform_dir_watch *;
+void API Destroy(platform_dir_watch &self);
+auto API Poll(platform_dir_watch &self, platform_dir_watch_event &out) -> bool;
 
-  private:
-    class Impl;
-    Impl *m_Impl{};
-};
+} // namespace PlatformDirWatch
 
 } // namespace nyla

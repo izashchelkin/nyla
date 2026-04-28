@@ -7,6 +7,7 @@
 #include "nyla/commons/file.h"
 #include "nyla/commons/gamepad.h"
 #include "nyla/commons/inline_queue.h"
+#include "nyla/commons/inline_vec.h"
 #include "nyla/commons/intrin.h"
 #include "nyla/commons/keyboard.h"
 #include "nyla/commons/limits.h"
@@ -93,6 +94,150 @@ auto API GetMonotonicTimeMicros() -> uint64_t
 void API Sleep(uint64_t millis)
 {
     ::Sleep((DWORD)millis);
+}
+
+namespace
+{
+
+void AppendQuotedArg(inline_vec<char, 0x1000> &out, const char *arg)
+{
+    bool needsQuote = false;
+    for (const char *p = arg; *p; ++p)
+    {
+        if (*p == ' ' || *p == '\t' || *p == '"')
+        {
+            needsQuote = true;
+            break;
+        }
+    }
+
+    if (!needsQuote)
+    {
+        for (const char *p = arg; *p; ++p)
+            InlineVec::Append(out, *p);
+        return;
+    }
+
+    InlineVec::Append(out, '"');
+    for (const char *p = arg; *p;)
+    {
+        uint64_t backslashes = 0;
+        while (*p == '\\')
+        {
+            ++p;
+            ++backslashes;
+        }
+
+        if (*p == 0)
+        {
+            for (uint64_t i = 0; i < backslashes * 2; ++i)
+                InlineVec::Append(out, '\\');
+            break;
+        }
+        else if (*p == '"')
+        {
+            for (uint64_t i = 0; i < backslashes * 2 + 1; ++i)
+                InlineVec::Append(out, '\\');
+            InlineVec::Append(out, '"');
+            ++p;
+        }
+        else
+        {
+            for (uint64_t i = 0; i < backslashes; ++i)
+                InlineVec::Append(out, '\\');
+            InlineVec::Append(out, *p);
+            ++p;
+        }
+    }
+    InlineVec::Append(out, '"');
+}
+
+} // namespace
+
+auto API RunSync(span<const char *const> cmd, region_alloc &alloc, byteview &outLog) -> int32_t
+{
+    outLog = byteview{nullptr, 0};
+
+    if (cmd.size <= 1)
+        return -1;
+    if (Span::Back(cmd) != nullptr)
+        return -1;
+
+    auto &cmdline = RegionAlloc::AllocVec<char, 0x1000>(alloc);
+    for (uint64_t i = 0; i + 1 < cmd.size; ++i)
+    {
+        if (i > 0)
+            InlineVec::Append(cmdline, ' ');
+        AppendQuotedArg(cmdline, cmd[i]);
+    }
+    InlineVec::Append(cmdline, '\0');
+
+    SECURITY_ATTRIBUTES saAttr{};
+    saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);
+    saAttr.bInheritHandle = TRUE;
+    saAttr.lpSecurityDescriptor = nullptr;
+
+    HANDLE readEnd = nullptr;
+    HANDLE writeEnd = nullptr;
+    if (!CreatePipe(&readEnd, &writeEnd, &saAttr, 0))
+        return -1;
+
+    if (!SetHandleInformation(readEnd, HANDLE_FLAG_INHERIT, 0))
+    {
+        CloseHandle(readEnd);
+        CloseHandle(writeEnd);
+        return -1;
+    }
+
+    STARTUPINFOA si{};
+    si.cb = sizeof(STARTUPINFOA);
+    si.dwFlags = STARTF_USESTDHANDLES;
+    si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+    si.hStdOutput = writeEnd;
+    si.hStdError = writeEnd;
+
+    PROCESS_INFORMATION pi{};
+    BOOL ok = CreateProcessA(nullptr, InlineVec::DataPtr(cmdline), nullptr, nullptr, TRUE, CREATE_NO_WINDOW, nullptr,
+                             nullptr, &si, &pi);
+    CloseHandle(writeEnd);
+    if (!ok)
+    {
+        CloseHandle(readEnd);
+        return -1;
+    }
+
+    constexpr uint64_t kCap = 0x2000;
+    span<uint8_t> buf = RegionAlloc::AllocArray<uint8_t>(alloc, kCap);
+    uint64_t bufLen = 0;
+    for (;;)
+    {
+        uint8_t scratch[1024];
+        DWORD n = 0;
+        BOOL r = ReadFile(readEnd, scratch, sizeof(scratch), &n, nullptr);
+        if (!r || n == 0)
+            break;
+        uint64_t avail = (kCap > bufLen) ? (kCap - bufLen) : 0;
+        uint64_t copy = (uint64_t)n;
+        if (copy > avail)
+            copy = avail;
+        if (copy)
+        {
+            MemCpy(buf.data + bufLen, scratch, copy);
+            bufLen += copy;
+        }
+    }
+    CloseHandle(readEnd);
+
+    WaitForSingleObject(pi.hProcess, INFINITE);
+
+    DWORD exitCode = 0;
+    GetExitCodeProcess(pi.hProcess, &exitCode);
+
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+
+    outLog = byteview{buf.data, bufLen};
+    return (int32_t)exitCode;
 }
 
 auto API ReserveMemPages(uint64_t size) -> void *

@@ -5,10 +5,10 @@
 #include "nyla/commons/array.h" // IWYU pragma: keep
 #include "nyla/commons/inline_vec.h"
 #include "nyla/commons/minmax.h"
+#include "nyla/commons/pipeline_cache.h"
 #include "nyla/commons/region_alloc.h"
 #include "nyla/commons/region_alloc_def.h"
 #include "nyla/commons/rhi.h"
-#include "nyla/commons/shader.h"
 #include "nyla/commons/span.h"
 #include "nyla/commons/span_def.h"
 #include "nyla/commons/vec.h"
@@ -19,7 +19,7 @@ namespace nyla
 namespace
 {
 
-rhi_graphics_pipeline m_Pipeline;
+pipeline_cache_handle m_Pipeline;
 
 struct draw_data
 {
@@ -43,22 +43,17 @@ debug_text_renderer *renderer;
 namespace DebugTextRenderer
 {
 
-void API Bootstrap(region_alloc &alloc)
+void API Bootstrap(region_alloc &)
 {
     renderer = &RegionAlloc::Alloc<debug_text_renderer>(RegionAlloc::g_BootstrapAlloc);
-
-    const rhi_shader vs = GetShader(0xF3624967BC396A3C, rhi_shader_stage::Vertex);
-    const rhi_shader ps = GetShader(0x040C5CF806D5A00D, rhi_shader_stage::Pixel);
 
     rhi_texture_format colorFormat = rhi_texture_format::B8G8R8A8_sRGB;
     const rhi_graphics_pipeline_desc pipelineDesc{
         .debugName = "DebugTextRender"_s,
-        .vs = vs,
-        .ps = ps,
         .colorTargetFormats = {&colorFormat, 1},
         .depthFormat = rhi_texture_format::D32_Float_S8_UINT,
     };
-    m_Pipeline = Rhi::CreateGraphicsPipeline(alloc, pipelineDesc);
+    m_Pipeline = PipelineCache::Acquire(0xF3624967BC396A3C, 0x040C5CF806D5A00D, pipelineDesc);
 }
 
 void API Text(int32_t x, int32_t y, byteview text)
@@ -95,7 +90,7 @@ void API CmdFlush(rhi_cmdlist cmd)
 
     const uint32_t frameIndex = Rhi::GetFrameIndex();
 
-    Rhi::CmdBindGraphicsPipeline(cmd, m_Pipeline);
+    Rhi::CmdBindGraphicsPipeline(cmd, PipelineCache::Resolve(m_Pipeline));
 
     for (const draw_data &drawData : renderer->pendingDraws)
     {

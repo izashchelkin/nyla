@@ -1,11 +1,17 @@
 target_sources(${TARGET} PRIVATE
+    asset_import.cc
     asset_manager.cc
+    audio.cc
     bdf.cc
+    cell_renderer.cc
     debug_text_renderer.cc
+    dev_assets.cc
+    dev_log.cc
+    dev_shaders.cc
+    dir_watcher.cc
     engine.cc
     fmt.cc
     gltf.cc
-    glyph_renderer.cc
     gpu_upload.cc
     input_manager.cc
     json_parser.cc
@@ -15,6 +21,8 @@ target_sources(${TARGET} PRIVATE
     mem.cc
     mempage_pool.cc
     mesh_manager.cc
+    pipeline_cache.cc
+    profiler.cc
     region_alloc.cc
     render_targets.cc
     renderer.cc
@@ -24,6 +32,7 @@ target_sources(${TARGET} PRIVATE
     staging.cc
     stringparser.cc
     texture_manager.cc
+    tunables.cc
     tween_manager.cc
     wave.cc
 )
@@ -32,17 +41,24 @@ target_sources(${TARGET} PUBLIC
     array_def.h
     array.h
     asset_file_format.h
+    asset_import.h
     asset_manager.h
+    audio.h
     bdf.h
     binary_search.h
     bitenum.h
     byteliterals.h
     byteparser.h
     cast.h
+    cell_renderer.h
     color.h
     complex.h
     concepts.h
     debug_text_renderer.h
+    dev_assets.h
+    dev_log.h
+    dev_shaders.h
+    dir_watcher.h
     elf.h
     engine.h
     entrypoint.h
@@ -51,7 +67,6 @@ target_sources(${TARGET} PUBLIC
     fmt.h
     gamepad.h
     gltf.h
-    glyph_renderer.h
     gpu_upload.h
     handle_pool.h
     handle.h
@@ -76,13 +91,20 @@ target_sources(${TARGET} PUBLIC
     mempage_pool.h
     mesh_manager.h
     minmax.h
+    pipeline_cache.h
     platform_audio.h
+    platform_condvar.h
     platform_dir_watch.h
+    platform_mutex.h
+    platform_thread.h
     platform.h
+    profiler.h
     random.h
     region_alloc_def.h
     region_alloc.h
     render_targets.h
+    renderdoc_app.h
+    renderdoc.h
     renderer.h
     rhi.h
     sampler_manager.h
@@ -93,10 +115,12 @@ target_sources(${TARGET} PUBLIC
     spv_shader_enums.h
     spv_shader.h
     staging.h
+    stb_image.h
     stringparser.h
     texture_manager.h
     time.h
     tokenparser.h
+    tunables.h
     tuple.h
     tween_manager.h
     vec.h
@@ -106,7 +130,12 @@ target_sources(${TARGET} PUBLIC
 if (WIN32)
     target_sources(${TARGET} PRIVATE
         file_windows.cc
+        platform_audio_windows.cc
+        platform_dir_watch_windows.cc
+        platform_mutex_windows.cc
+        platform_thread_windows.cc
         platform_windows.cc
+        renderdoc_windows.cc
     )
     target_sources(${TARGET} PUBLIC
         entrypoint_windows.h
@@ -116,17 +145,33 @@ if (WIN32)
     )
 else()
     target_sources(${TARGET} PRIVATE
+        platform_audio_linux.cc
+        platform_dir_watch_linux.cc
         platform_linux.cc
+        platform_mutex_linux.cc
+        platform_thread_linux.cc
         platform_x11_linux.cc
+        renderdoc_linux.cc
     )
     target_sources(${TARGET} PUBLIC
         abi_linux.h
         entrypoint_linux.h
         platform_linux.h
+        x11_error_linux.h
+        x11_wm_hints_linux.h
     )
 endif()
 if (Vulkan_FOUND)
     target_sources(${TARGET} PRIVATE
         rhi_vulkan.cc
+    )
+endif()
+if (D3D12_FOUND)
+    target_sources(${TARGET} PRIVATE
+        rhi_d3d12.cc
+        rhi_swapchain_d3d12.cc
+    )
+    target_sources(${TARGET} PUBLIC
+        rhi_d3d12.h
     )
 endif()

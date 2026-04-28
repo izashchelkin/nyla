@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "nyla/commons/array_def.h"
+#include "nyla/commons/intrin.h"
 #include "nyla/commons/macros.h"
 #include "nyla/commons/math.h"
 #include "nyla/commons/minmax.h"

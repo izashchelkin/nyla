@@ -1,30 +1,31 @@
 #pragma once
 
 #include <cstdint>
-#include <span>
+
+#include "nyla/commons/macros.h"
 
 namespace nyla
 {
+
+using PlatformAudioCallback = void (*)(void *user, int16_t *out, uint32_t numFrames);
 
 struct PlatformAudioInitDesc
 {
     uint32_t sampleRate;
     uint32_t channels;
     uint32_t latencyUs;
+    PlatformAudioCallback callback;
+    void *user;
 };
 
-class PlatformAudio
+namespace PlatformAudio
 {
-  public:
-    void Init(const PlatformAudioInitDesc &);
-    void Destroy();
-    void Write(Span<const std::byte> data);
 
-  private:
-    class Impl;
-    Impl *m_Impl;
-};
+void API Init(const PlatformAudioInitDesc &desc);
+void API Destroy();
+auto API GetSampleRate() -> uint32_t;
+auto API GetChannels() -> uint32_t;
 
-extern PlatformAudio *g_PlatformAudio;
+} // namespace PlatformAudio
 
 } // namespace nyla

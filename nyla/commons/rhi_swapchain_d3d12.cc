@@ -1,7 +1,8 @@
-#include "nyla/commons/assert.h"
-#include "nyla/commons/d3d12/rhi_d3d12.h"
+#include "nyla/commons/rhi_d3d12.h"
+
+#include "nyla/commons/macros.h"
 #include "nyla/commons/platform.h"
-#include "nyla/commons/windows/platform_windows.h"
+#include "nyla/commons/platform_windows.h"
 
 namespace nyla
 {

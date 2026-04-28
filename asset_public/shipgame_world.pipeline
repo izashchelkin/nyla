@@ -1,0 +1,4 @@
+depth_test  false
+depth_write false
+cull        None
+front_face  CCW

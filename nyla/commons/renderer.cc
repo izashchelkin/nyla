@@ -8,11 +8,11 @@
 #include "nyla/commons/macros.h"
 #include "nyla/commons/mat.h"
 #include "nyla/commons/math.h"
+#include "nyla/commons/pipeline_cache.h"
 #include "nyla/commons/region_alloc.h"
 #include "nyla/commons/region_alloc_def.h"
 #include "nyla/commons/rhi.h"
 #include "nyla/commons/sampler_manager.h"
-#include "nyla/commons/shader.h"
 #include "nyla/commons/span.h"
 #include "nyla/commons/texture_manager.h"
 #include "nyla/commons/vec.h"
@@ -46,7 +46,7 @@ struct renderer_state
 {
     float4x4 View;
     float4x4 Proj;
-    rhi_graphics_pipeline Pipeline;
+    pipeline_cache_handle Pipeline;
     inline_vec<draw_call, 256> DrawQueue;
 };
 renderer_state *renderer;
@@ -56,12 +56,9 @@ renderer_state *renderer;
 namespace Renderer
 {
 
-void API Bootstrap(region_alloc &alloc)
+void API Bootstrap(region_alloc &)
 {
     renderer = &RegionAlloc::Alloc<renderer_state>(RegionAlloc::g_BootstrapAlloc);
-
-    rhi_shader vs = GetShader(0xA1B649BF9958EC11, rhi_shader_stage::Vertex);
-    rhi_shader ps = GetShader(0xFE6E3D0D77673448, rhi_shader_stage::Pixel);
 
     array<rhi_vertex_attribute_desc, 3> vertexAttributes{
         rhi_vertex_attribute_desc{
@@ -94,8 +91,6 @@ void API Bootstrap(region_alloc &alloc)
 
     const rhi_graphics_pipeline_desc pipelineDesc{
         .debugName = "Renderer"_s,
-        .vs = vs,
-        .ps = ps,
         .vertexBindings = {&vertexBinding, 1},
         .vertexAttributes = vertexAttributes,
         .colorTargetFormats = {&colorFormat, 1},
@@ -106,7 +101,7 @@ void API Bootstrap(region_alloc &alloc)
         .frontFace = rhi_front_face::CCW,
     };
 
-    renderer->Pipeline = Rhi::CreateGraphicsPipeline(alloc, pipelineDesc);
+    renderer->Pipeline = PipelineCache::Acquire(0xA1B649BF9958EC11, 0xFE6E3D0D77673448, pipelineDesc);
 }
 
 void API SetView(float4x4 m)
@@ -173,7 +168,7 @@ void API Mesh(float3 pos, float3 scale, mesh_handle Mesh, texture_handle Texture
 
 void API CmdFlush(rhi_cmdlist cmd)
 {
-    Rhi::CmdBindGraphicsPipeline(cmd, renderer->Pipeline);
+    Rhi::CmdBindGraphicsPipeline(cmd, PipelineCache::Resolve(renderer->Pipeline));
 
     float4x4 vp = renderer->Proj * renderer->View;
     float4x4 invVp = Mat::Inverse(vp);

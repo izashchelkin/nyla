@@ -5,14 +5,23 @@
 namespace nyla
 {
 
-constexpr inline uint64_t ID_debug_text_renderer_ps = 0x40c5cf806d5a00d;
-constexpr inline uint64_t ID_fullscreen_vs = 0xf3624967bc396a3c;
+constexpr inline uint64_t ID_shipgame_world_pipeline = 0x9c4a2f817bd306e5;
+constexpr inline uint64_t ID_shipgame_grid_pipeline = 0x4e85b1c92a73fd08;
 constexpr inline uint64_t ID_shipgame_grid_ps = 0x7d1f04e27e5102cb;
 constexpr inline uint64_t ID_shipgame_grid_vs = 0x5b83e19e4471ffa7;
-constexpr inline uint64_t ID_renderer_ps = 0xfe6e3d0d77673448;
+constexpr inline uint64_t ID_cell_renderer_vs = 0x6d1a8f7c2e5b9043;
 constexpr inline uint64_t ID_renderer_vs = 0xa1b649bf9958ec11;
-constexpr inline uint64_t ID_shipgame_world_ps = 0x342c534bc767600b;
+constexpr inline uint64_t ID_renderer_ps = 0xfe6e3d0d77673448;
+constexpr inline uint64_t ID_cell_renderer_ps = 0x9e3f4d8a1c07b2e6;
 constexpr inline uint64_t ID_shipgame_world_vs = 0xadcd20730ac5b056;
+constexpr inline uint64_t ID_shipgame_world_ps = 0x342c534bc767600b;
+constexpr inline uint64_t ID_debug_text_renderer_ps = 0x40c5cf806d5a00d;
+constexpr inline uint64_t ID_fullscreen_vs = 0xf3624967bc396a3c;
+constexpr inline uint64_t ID_test_bin = 0xf922a47b9ddd76b;
+
+// Legacy IDs — backing meta/asset removed but consumers still reference them.
+// Restored by hand so commons + breakout + 3d_ball_maze compile. Will be wiped
+// next asset_packer run; re-merge here until the dead consumers are cleaned up.
 constexpr inline uint64_t ID_mesh_bin_cube = 0x5d74ca30bc585064;
 constexpr inline uint64_t ID_mesh_gltf_cube = 0xc60511c3cf60225d;
 constexpr inline uint64_t ID_mesh_bin_rect = 0x57d4f9db5f2512e9;

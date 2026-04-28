@@ -4,6 +4,7 @@
 
 #include "nyla/commons/bitenum.h"
 #include "nyla/commons/macros.h"
+#include "nyla/commons/region_alloc_def.h"
 #include "nyla/commons/span_def.h"
 
 namespace nyla
@@ -63,6 +64,7 @@ struct PlatformEvent
 auto API GenRandom64() -> uint64_t;
 void API Sleep(uint64_t millis);
 auto API Spawn(span<const char *const> cmd) -> bool;
+auto API RunSync(span<const char *const> cmd, region_alloc &alloc, byteview &outLog) -> int32_t;
 void API WinOpen();
 auto API WinGetSize() -> PlatformWindowSize;
 auto API WinPollEvent(PlatformEvent &outEvent) -> bool;

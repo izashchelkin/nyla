@@ -1,9 +1,12 @@
-#include "nyla/commons/renderdoc/renderdoc.h"
+#include "nyla/commons/renderdoc.h"
 
 #if !defined(NDEBUG)
 
-#include "nyla/commons/debug/debugger.h"
-#include "nyla/commons/renderdoc/renderdoc_app.h"
+#include "nyla/commons/fmt.h"
+#include "nyla/commons/macros.h"
+#include "nyla/commons/renderdoc_app.h"
+
+#include <dlfcn.h>
 
 namespace nyla
 {
@@ -27,7 +30,7 @@ static auto GetRenderDocAPI() -> RENDERDOC_API_1_6_0 *
         }
 
         LOG("failed to get renderdoc api");
-        DebugBreak();
+        TRAP();
     }
 
     return nullptr;
@@ -55,9 +58,23 @@ auto RenderDocCaptureEnd() -> bool
     return false;
 }
 
+auto RenderDocTriggerCapture() -> bool
+{
+    if (auto api = GetRenderDocAPI())
+    {
+        api->TriggerCapture();
+        return true;
+    }
+
+    return false;
+}
+
 } // namespace nyla
 
 #else
+
+namespace nyla
+{
 
 auto RenderDocCaptureStart() -> bool
 {
@@ -67,5 +84,11 @@ auto RenderDocCaptureEnd() -> bool
 {
     return false;
 }
+auto RenderDocTriggerCapture() -> bool
+{
+    return false;
+}
+
+} // namespace nyla
 
 #endif

@@ -7,7 +7,12 @@
 #include "nyla/commons/array.h" // IWYU pragma: keep
 #include "nyla/commons/asset_manager.h"
 #include "nyla/commons/byteliterals.h"
+#include "nyla/commons/cell_renderer.h"
 #include "nyla/commons/debug_text_renderer.h"
+#include "nyla/commons/dev_assets.h"
+#include "nyla/commons/dev_log.h"
+#include "nyla/commons/dev_shaders.h"
+#include "nyla/commons/engine.h"
 #include "nyla/commons/entrypoint.h"
 #include "nyla/commons/file.h"
 #include "nyla/commons/gpu_upload.h"
@@ -19,7 +24,8 @@
 #include "nyla/commons/macros.h" // IWYU pragma: keep
 #include "nyla/commons/mat.h"
 #include "nyla/commons/minmax.h"
-#include "nyla/commons/platform.h"
+#include "nyla/commons/pipeline_cache.h"
+#include "nyla/commons/profiler.h"
 #include "nyla/commons/region_alloc.h"
 #include "nyla/commons/region_alloc_def.h"
 #include "nyla/commons/render_targets.h"
@@ -29,7 +35,7 @@
 #include "nyla/commons/span.h"
 #include "nyla/commons/span_def.h"
 #include "nyla/commons/texture_manager.h"
-#include "nyla/commons/time.h"
+#include "nyla/commons/tunables.h"
 #include "nyla/commons/tween_manager.h"
 #include "nyla/commons/vec.h"
 
@@ -83,15 +89,8 @@ struct game_object
 
 struct game_state
 {
-    uint64_t targetFrameDurationUs;
-    uint64_t lastFrameStartUs;
-    uint32_t dtUsAccum;
-    uint32_t framesCounted;
-    uint32_t fps;
-    bool shouldExit;
-
-    rhi_graphics_pipeline worldPipeline;
-    rhi_graphics_pipeline gridPipeline;
+    pipeline_cache_handle worldPipeline;
+    pipeline_cache_handle gridPipeline;
     rhi_buffer vertexBuffer;
 
     game_object solarSystem;
@@ -100,20 +99,19 @@ struct game_state
 
     float2 cameraPos;
     float cameraZoom;
+    float metersOnScreen;
 
     uint64_t boostStartUs;
     bool boostActive;
 };
 game_state *game;
 
-auto MakeOrtho(uint32_t width, uint32_t height, float2 cameraPos, float zoom) -> scene_ubo
+auto MakeOrtho(uint32_t width, uint32_t height, float2 cameraPos, float zoom, float metersOnScreen) -> scene_ubo
 {
-    constexpr float kMetersOnScreen = 64.f;
-
     float worldW;
     float worldH;
 
-    const float base = kMetersOnScreen * zoom;
+    const float base = metersOnScreen * zoom;
     const float aspect = static_cast<float>(width) / static_cast<float>(height);
     if (aspect >= 1.f)
     {
@@ -214,23 +212,47 @@ void DrawObject(rhi_cmdlist cmd, const game_object &obj, vertex *vbBase, uint32_
 void UserMain()
 {
     game = &RegionAlloc::Alloc<game_state>(RegionAlloc::g_BootstrapAlloc);
-    game->targetFrameDurationUs = 1'000'000 / 144;
     game->cameraZoom = 1.f;
+    game->metersOnScreen = 64.f;
 
     region_alloc alloc = RegionAlloc::Create(16_MiB, 0);
 
-    WinOpen();
-    Rhi::Bootstrap(alloc, {
-                              .flags = rhi_flags::VSync,
-                          });
+    Engine::Bootstrap(alloc, engine_init_desc{
+                                 .maxFps = 144,
+                                 .vsync = true,
+                             });
 
-    InputManager::Bootstrap();
+    AssetManager::Bootstrap(FileOpen(R"(assets.bin)"_s, FileOpenMode::Read));
     GpuUpload::Bootstrap();
     SamplerManager::Bootstrap();
     TextureManager::Bootstrap();
     TweenManager::Bootstrap();
-    AssetManager::Bootstrap(FileOpen(R"(assets.bin)"_s, FileOpenMode::Read));
+#if !defined(NDEBUG)
+    {
+        DevLog::Bootstrap();
+
+        const byteview devRoots[] = {"assets"_s, "asset_public"_s};
+        DevAssets::Bootstrap(span<const byteview>{devRoots, 2});
+
+        const dev_shader_root shaderRoots[] = {
+            {.srcDir = "nyla/shaders"_s, .outDir = "asset_public/shaders"_s},
+            {.srcDir = "shipgame/shaders"_s, .outDir = "asset_public/shaders"_s},
+        };
+        DevShaders::Bootstrap(span<const dev_shader_root>{shaderRoots, 2});
+    }
+#endif
+    Shader::Bootstrap();
+    PipelineCache::Bootstrap();
     DebugTextRenderer::Bootstrap(alloc);
+#if !defined(NDEBUG)
+    CellRenderer::Bootstrap(alloc, cell_renderer_init_desc{
+                                       .bdfGuid = 0x30B510FE27A113FB,
+                                   });
+    Tunables::Bootstrap("shipgame.tunables"_s);
+    Tunables::RegisterFloat("camera.zoom"_s, &game->cameraZoom, 0.05f, 0.1f, 2.5f);
+    Tunables::RegisterFloat("camera.metersOnScreen"_s, &game->metersOnScreen, 4.f, 8.f, 256.f);
+    Profiler::Bootstrap();
+#endif
 
     render_targets renderTargets{
         .ColorFormat = rhi_texture_format::B8G8R8A8_sRGB,
@@ -238,9 +260,6 @@ void UserMain()
     };
 
     {
-        rhi_shader worldVs = GetShader(ID_shipgame_world_vs, rhi_shader_stage::Vertex);
-        rhi_shader worldPs = GetShader(ID_shipgame_world_ps, rhi_shader_stage::Pixel);
-
         array<rhi_vertex_attribute_desc, 2> worldAttrs{
             rhi_vertex_attribute_desc{
                 .binding = 0,
@@ -266,8 +285,6 @@ void UserMain()
 
         const rhi_graphics_pipeline_desc worldDesc{
             .debugName = "ShipgameWorld"_s,
-            .vs = worldVs,
-            .ps = worldPs,
             .vertexBindings = {&worldBinding, 1},
             .vertexAttributes = worldAttrs,
             .colorTargetFormats = {&colorFormat, 1},
@@ -275,21 +292,18 @@ void UserMain()
             .cullMode = rhi_cull_mode::None,
             .frontFace = rhi_front_face::CCW,
         };
-        game->worldPipeline = Rhi::CreateGraphicsPipeline(alloc, worldDesc);
-
-        rhi_shader gridVs = GetShader(ID_shipgame_grid_vs, rhi_shader_stage::Vertex);
-        rhi_shader gridPs = GetShader(ID_shipgame_grid_ps, rhi_shader_stage::Pixel);
+        game->worldPipeline =
+            PipelineCache::Acquire(ID_shipgame_world_vs, ID_shipgame_world_ps, worldDesc, ID_shipgame_world_pipeline);
 
         const rhi_graphics_pipeline_desc gridDesc{
             .debugName = "ShipgameGrid"_s,
-            .vs = gridVs,
-            .ps = gridPs,
             .colorTargetFormats = {&colorFormat, 1},
             .depthFormat = rhi_texture_format::D32_Float_S8_UINT,
             .cullMode = rhi_cull_mode::None,
             .frontFace = rhi_front_face::CCW,
         };
-        game->gridPipeline = Rhi::CreateGraphicsPipeline(alloc, gridDesc);
+        game->gridPipeline =
+            PipelineCache::Acquire(ID_shipgame_grid_vs, ID_shipgame_grid_ps, gridDesc, ID_shipgame_grid_pipeline);
     }
 
     {
@@ -304,9 +318,6 @@ void UserMain()
     }
 
     { // game init
-
-        game->lastFrameStartUs = GetMonotonicTimeMicros();
-
         game->solarSystem = game_object{
             .type = object_type::SolarSystem,
             .pos = {0.f, 0.f},
@@ -359,84 +370,16 @@ void UserMain()
         InputManager::Map(input_id::CameraZoomOut, input_interface_type::Keyboard, (uint32_t)KeyPhysical::I);
     }
 
-    for (;;)
+    while (!Engine::ShouldExit())
     {
-        RegionAlloc::Reset(alloc);
+        engine_frame frame = Engine::FrameBegin(alloc);
 
-        rhi_cmdlist cmd = Rhi::FrameBegin(alloc);
-
-        const uint64_t frameStart = GetMonotonicTimeMicros();
-
-        const uint64_t dtUs = frameStart - game->lastFrameStartUs;
-        game->dtUsAccum += dtUs;
-        ++game->framesCounted;
-
-        const float dt = static_cast<float>(dtUs) * 1e-6f;
-        game->lastFrameStartUs = frameStart;
-
-        if (game->dtUsAccum >= (uint64_t)500'000)
-        {
-            const double seconds = static_cast<double>(game->dtUsAccum) / 1'000'000.0;
-            const double fpsF64 = game->framesCounted / seconds;
-
-            game->fps = LRound(fpsF64);
-            game->dtUsAccum = 0;
-            game->framesCounted = 0;
-        }
-
-        DebugTextRenderer::Fmt(500, 10, "fps=%d"_s, uint32_t(game->fps));
-
-        for (;;)
-        {
-            PlatformEvent event{};
-            if (!WinPollEvent(event))
-                break;
-
-            switch (event.type)
-            {
-
-            case PlatformEventType::KeyDown: {
-                InputManager::HandlePressed(input_interface_type::Keyboard, uint32_t(event.key), frameStart);
-                break;
-            }
-            case PlatformEventType::KeyUp: {
-                InputManager::HandleReleased(input_interface_type::Keyboard, uint32_t(event.key), frameStart);
-                break;
-            }
-
-            case PlatformEventType::MousePress: {
-                InputManager::HandlePressed(input_interface_type::Mouse, event.mouse.code, frameStart);
-                break;
-            }
-            case PlatformEventType::MouseRelease: {
-                InputManager::HandleReleased(input_interface_type::Mouse, event.mouse.code, frameStart);
-                break;
-            }
-
-            case PlatformEventType::WinResize: {
-                Rhi::TriggerSwapchainRecreate();
-                break;
-            }
-
-            case PlatformEventType::Quit: {
-                Exit(0);
-            }
-
-            case PlatformEventType::Repaint:
-            case PlatformEventType::None:
-                break;
-
-            default: {
-                TRAP();
-                break;
-            }
-            }
-        }
+        DebugTextRenderer::Fmt(500, 10, "fps=%d"_s, uint32_t(frame.fps));
 
         GpuUpload::Update();
         InputManager::Update();
-        TweenManager::Update(dt);
-        TextureManager::Update(cmd);
+        TweenManager::Update(frame.dt);
+        TextureManager::Update(frame.cmd);
 
         {
             rhi_texture backbuffer = Rhi::GetTexture(Rhi::GetBackbufferView());
@@ -457,7 +400,7 @@ void UserMain()
 
                 if (boost && !game->boostActive)
                 {
-                    game->boostStartUs = frameStart;
+                    game->boostStartUs = frame.frameStartUs;
                     game->boostActive = true;
                 }
                 else if (!boost)
@@ -467,7 +410,7 @@ void UserMain()
 
                 // game simulation
                 static uint64_t dtUsAccumulator = 0;
-                dtUsAccumulator += dtUs;
+                dtUsAccumulator += frame.dtUs;
 
                 constexpr uint64_t kStepUs = 1'000'000 / 120;
                 constexpr float kStep = 1.f / 120.f;
@@ -491,7 +434,7 @@ void UserMain()
                         const float2 direction = Vec::Normalized(
                             float2{std::cos(game->ship.angleRadians), std::sin(game->ship.angleRadians)});
 
-                        const uint64_t duration = frameStart - game->boostStartUs;
+                        const uint64_t duration = frame.frameStartUs - game->boostStartUs;
                         const float maxSpeed =
                             duration < 100'000 ? 100.f : 100.f + static_cast<float>(duration - 100'000) / 10000.f;
 
@@ -549,23 +492,25 @@ void UserMain()
                 }
 
                 if (InputManager::IsPressed(input_id::CameraZoomIn))
-                    game->cameraZoom *= 1.f + 1.5f * dt;
+                    game->cameraZoom *= 1.f + 1.5f * frame.dt;
                 if (InputManager::IsPressed(input_id::CameraZoomOut))
-                    game->cameraZoom /= 1.f + 1.5f * dt;
+                    game->cameraZoom /= 1.f + 1.5f * frame.dt;
                 game->cameraZoom = Clamp(game->cameraZoom, .1f, 2.5f);
 
                 rhi_texture renderTarget = Rhi::GetTexture(rtv);
                 rhi_texture_info rtInfo = Rhi::GetTextureInfo(renderTarget);
-                Rhi::CmdTransitionTexture(cmd, renderTarget, rhi_texture_state::ColorTarget);
-                Rhi::CmdTransitionTexture(cmd, Rhi::GetTexture(dsv), rhi_texture_state::DepthTarget);
+                Rhi::CmdTransitionTexture(frame.cmd, renderTarget, rhi_texture_state::ColorTarget);
+                Rhi::CmdTransitionTexture(frame.cmd, Rhi::GetTexture(dsv), rhi_texture_state::DepthTarget);
 
                 Rhi::PassBegin({
                     .rtv = rtv,
                     .dsv = dsv,
                 });
                 {
-                    scene_ubo scene = MakeOrtho(rtInfo.width, rtInfo.height, game->cameraPos, game->cameraZoom);
-                    Rhi::SetPassConstant(cmd, Span::ByteViewPtr(&scene));
+                    PROFILE_SCOPE("render");
+                    scene_ubo scene =
+                        MakeOrtho(rtInfo.width, rtInfo.height, game->cameraPos, game->cameraZoom, game->metersOnScreen);
+                    Rhi::SetPassConstant(frame.cmd, Span::ByteViewPtr(&scene));
 
                     const uint32_t frameIndex = Rhi::GetFrameIndex();
                     const uint64_t vbFrameOffset =
@@ -575,49 +520,61 @@ void UserMain()
                     vertex *vbBase = reinterpret_cast<vertex *>(vbMappedBase + vbFrameOffset);
                     uint32_t vbWriteOffset = 0;
 
-                    Rhi::CmdBindGraphicsPipeline(cmd, game->worldPipeline);
-                    Rhi::CmdBindVertexBuffers(cmd, 0, {&game->vertexBuffer, 1}, {&vbFrameOffset, 1});
-
-                    for (game_object &planet : game->planets)
-                        DrawObject(cmd, planet, vbBase, kMaxVerticesPerFrame, vbWriteOffset);
-                    DrawObject(cmd, game->ship, vbBase, kMaxVerticesPerFrame, vbWriteOffset);
-
-                    Rhi::BufferMarkWritten(game->vertexBuffer, static_cast<uint32_t>(vbFrameOffset),
-                                           vbWriteOffset * sizeof(vertex));
-
                     {
-                        Rhi::CmdBindGraphicsPipeline(cmd, game->gridPipeline);
-                        entity_ubo unused{};
-                        Rhi::SetDrawConstant(cmd, Span::ByteViewPtr(&unused));
-                        Rhi::CmdDraw(cmd, 3, 1, 0, 0);
+                        PROFILE_SCOPE("world");
+                        Rhi::CmdBindGraphicsPipeline(frame.cmd, PipelineCache::Resolve(game->worldPipeline));
+                        Rhi::CmdBindVertexBuffers(frame.cmd, 0, {&game->vertexBuffer, 1}, {&vbFrameOffset, 1});
+
+                        for (game_object &planet : game->planets)
+                            DrawObject(frame.cmd, planet, vbBase, kMaxVerticesPerFrame, vbWriteOffset);
+                        DrawObject(frame.cmd, game->ship, vbBase, kMaxVerticesPerFrame, vbWriteOffset);
+
+                        Rhi::BufferMarkWritten(game->vertexBuffer, static_cast<uint32_t>(vbFrameOffset),
+                                               vbWriteOffset * sizeof(vertex));
                     }
 
-                    DebugTextRenderer::CmdFlush(cmd);
+                    {
+                        PROFILE_SCOPE("grid");
+                        Rhi::CmdBindGraphicsPipeline(frame.cmd, PipelineCache::Resolve(game->gridPipeline));
+                        entity_ubo unused{};
+                        Rhi::SetDrawConstant(frame.cmd, Span::ByteViewPtr(&unused));
+                        Rhi::CmdDraw(frame.cmd, 3, 1, 0, 0);
+                    }
+
+                    {
+                        PROFILE_SCOPE("debug_text");
+                        DebugTextRenderer::CmdFlush(frame.cmd);
+                    }
+
+#if !defined(NDEBUG)
+                    {
+                        span<byteview> lines = DevLog::Snapshot(alloc, 8);
+                        if (lines.size > 0)
+                        {
+                            CellRenderer::Begin(8, 8, 100, (uint32_t)lines.size);
+                            for (uint64_t i = 0; i < lines.size; ++i)
+                                CellRenderer::Text(0, (uint32_t)i, lines[i], 0xFFFF8080u, 0xFF000000u);
+                            CellRenderer::CmdFlush(frame.cmd);
+                        }
+                        Profiler::CmdFlush(frame.cmd, 8, 8 + 32 * 9, frame.fps);
+                        Tunables::CmdFlush(frame.cmd, 8, 8 + 32 * 18);
+                    }
+#endif
                 }
                 Rhi::PassEnd();
             }
 
             rhi_texture renderTarget = Rhi::GetTexture(rtv);
 
-            Rhi::CmdTransitionTexture(cmd, renderTarget, rhi_texture_state::TransferSrc);
-            Rhi::CmdTransitionTexture(cmd, backbuffer, rhi_texture_state::TransferDst);
+            Rhi::CmdTransitionTexture(frame.cmd, renderTarget, rhi_texture_state::TransferSrc);
+            Rhi::CmdTransitionTexture(frame.cmd, backbuffer, rhi_texture_state::TransferDst);
 
-            Rhi::CmdCopyTexture(cmd, backbuffer, renderTarget);
+            Rhi::CmdCopyTexture(frame.cmd, backbuffer, renderTarget);
 
-            Rhi::CmdTransitionTexture(cmd, backbuffer, rhi_texture_state::Present);
+            Rhi::CmdTransitionTexture(frame.cmd, backbuffer, rhi_texture_state::Present);
         }
 
-        Rhi::FrameEnd(alloc);
-
-        uint64_t frameEndUs = GetMonotonicTimeMicros();
-        uint64_t frameDurationUs = frameEndUs - game->lastFrameStartUs;
-
-        if (game->targetFrameDurationUs > frameDurationUs)
-        {
-            uint64_t sleepForMillis = (game->targetFrameDurationUs - frameDurationUs) / 1000;
-            if (sleepForMillis)
-                Sleep(sleepForMillis);
-        }
+        Engine::FrameEnd(alloc);
     }
 }
 

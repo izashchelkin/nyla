@@ -5,7 +5,6 @@
 #include "nyla/commons/inline_string.h"
 #include "nyla/commons/inline_vec.h"
 #include "nyla/commons/keyboard.h"
-#include "nyla/commons/linux/x11_wm_hints.h"
 #include "nyla/commons/macros.h"
 #include "nyla/commons/mem.h"
 #include "nyla/commons/mempage_pool.h"
@@ -15,6 +14,7 @@
 #include "nyla/commons/region_alloc.h"
 #include "nyla/commons/span.h"
 #include "nyla/commons/time.h"
+#include "nyla/commons/x11_wm_hints_linux.h"
 
 namespace nyla
 {

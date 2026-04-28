@@ -1,41 +1,37 @@
 #pragma once
 
-#if 0
-
 #include <cstdint>
 
-#include "nyla/commons/region_alloc.h"
+#include "nyla/commons/macros.h"
+#include "nyla/commons/region_alloc_def.h"
 #include "nyla/commons/rhi.h"
 
 namespace nyla
 {
 
-struct EngineInitDesc
+struct engine_init_desc
 {
     uint32_t maxFps;
     bool vsync;
 };
 
-struct EngineFrameBeginResult
+struct engine_frame
 {
     rhi_cmdlist cmd;
     float dt;
+    uint64_t dtUs;
+    uint64_t frameStartUs;
     uint32_t fps;
 };
 
 namespace Engine
 {
 
-void API Init(const EngineInitDesc &);
+void API Bootstrap(region_alloc &alloc, const engine_init_desc &desc);
+auto API FrameBegin(region_alloc &alloc) -> engine_frame;
+void API FrameEnd(region_alloc &alloc);
 auto API ShouldExit() -> bool;
-
-auto API FrameBegin() -> EngineFrameBeginResult;
-auto API FrameEnd() -> void;
-
-auto API GetPerFrameAlloc() -> region_alloc &;
 
 } // namespace Engine
 
 } // namespace nyla
-
-#endif

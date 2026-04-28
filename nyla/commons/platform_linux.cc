@@ -520,6 +520,83 @@ failure:
     _exit(127);
 }
 
+auto API RunSync(span<const char *const> cmd, region_alloc &alloc, byteview &outLog) -> int32_t
+{
+    outLog = byteview{nullptr, 0};
+
+    if (cmd.size <= 1)
+        return -1;
+    if (Span::Back(cmd) != nullptr)
+        return -1;
+
+    int pipefd[2];
+    if (pipe(pipefd) == -1)
+        return -1;
+
+    pid_t pid = fork();
+    if (pid == -1)
+    {
+        close(pipefd[0]);
+        close(pipefd[1]);
+        return -1;
+    }
+
+    if (pid == 0)
+    {
+        close(pipefd[0]);
+
+        int devNullFd = open("/dev/null", O_RDONLY);
+        if (devNullFd != -1)
+        {
+            dup2(devNullFd, STDIN_FILENO);
+            close(devNullFd);
+        }
+
+        dup2(pipefd[1], STDOUT_FILENO);
+        dup2(pipefd[1], STDERR_FILENO);
+        close(pipefd[1]);
+
+        if (close_range(3, ~0U, CLOSE_RANGE_UNSHARE) != 0)
+            _exit(127);
+
+        execvp(cmd[0], const_cast<char *const *>(cmd.data));
+        _exit(127);
+    }
+
+    close(pipefd[1]);
+
+    constexpr uint64_t kCap = 0x2000;
+    span<uint8_t> buf = RegionAlloc::AllocArray<uint8_t>(alloc, kCap);
+    uint64_t bufLen = 0;
+    for (;;)
+    {
+        uint8_t scratch[1024];
+        ssize_t n = read(pipefd[0], scratch, sizeof(scratch));
+        if (n <= 0)
+            break;
+        uint64_t avail = (kCap > bufLen) ? (kCap - bufLen) : 0;
+        uint64_t copy = (uint64_t)n;
+        if (copy > avail)
+            copy = avail;
+        if (copy)
+        {
+            MemCpy(buf.data + bufLen, scratch, copy);
+            bufLen += copy;
+        }
+    }
+    close(pipefd[0]);
+
+    int status = 0;
+    if (waitpid(pid, &status, 0) == -1)
+        return -1;
+
+    outLog = byteview{buf.data, bufLen};
+
+    if (WIFEXITED(status))
+        return (int32_t)WEXITSTATUS(status);
+    return -1;
+}
+
 //
 
 void PlatformInit0()

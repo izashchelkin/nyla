@@ -6,11 +6,15 @@
 
 #include "nyla/commons/asset_manager.h"
 #include "nyla/commons/debug_text_renderer.h"
+#include "nyla/commons/dev_assets.h"
+#include "nyla/commons/dev_shaders.h"
 #include "nyla/commons/entrypoint.h"
 #include "nyla/commons/file.h"
+#include "nyla/commons/pipeline_cache.h"
 #include "nyla/commons/platform_linux.h"
 #include "nyla/commons/region_alloc.h"
 #include "nyla/commons/rhi.h"
+#include "nyla/commons/shader.h"
 #include "nyla/commons/time.h"
 
 namespace nyla
@@ -46,6 +50,19 @@ void UserMain()
                           });
 
     AssetManager::Bootstrap(FileOpen(R"(assets.bin)"_s, FileOpenMode::Read));
+#if !defined(NDEBUG)
+    {
+        const byteview devRoots[] = {"assets"_s, "asset_public"_s};
+        DevAssets::Bootstrap(span<const byteview>{devRoots, 2});
+
+        const dev_shader_root shaderRoots[] = {
+            {.srcDir = "nyla/shaders"_s, .outDir = "asset_public/shaders"_s},
+        };
+        DevShaders::Bootstrap(span<const dev_shader_root>{shaderRoots, 1});
+    }
+#endif
+    Shader::Bootstrap();
+    PipelineCache::Bootstrap();
     DebugTextRenderer::Bootstrap(alloc);
 
     for (;;)

@@ -3,29 +3,36 @@
 #include "assets.h"
 #include "nyla/commons/array.h" // IWYU pragma: keep
 #include "nyla/commons/asset_manager.h"
+#include "nyla/commons/audio.h"
+#include "nyla/commons/byteliterals.h"
+#include "nyla/commons/cell_renderer.h"
 #include "nyla/commons/color.h"
 #include "nyla/commons/debug_text_renderer.h"
+#include "nyla/commons/dev_assets.h"
+#include "nyla/commons/dev_log.h"
+#include "nyla/commons/dev_shaders.h"
+#include "nyla/commons/engine.h"
 #include "nyla/commons/entrypoint.h"
 #include "nyla/commons/file.h"
-#include "nyla/commons/gamepad.h"
 #include "nyla/commons/gpu_upload.h"
 #include "nyla/commons/input_manager.h"
 #include "nyla/commons/keyboard.h"
 #include "nyla/commons/macros.h" // IWYU pragma: keep
 #include "nyla/commons/mat.h"
-#include "nyla/commons/math.h"
-#include "nyla/commons/mem.h"
 #include "nyla/commons/mesh_manager.h"
 #include "nyla/commons/minmax.h"
-#include "nyla/commons/platform.h"
+#include "nyla/commons/pipeline_cache.h"
+#include "nyla/commons/profiler.h"
 #include "nyla/commons/region_alloc.h"
 #include "nyla/commons/region_alloc_def.h"
 #include "nyla/commons/render_targets.h"
 #include "nyla/commons/renderer.h"
 #include "nyla/commons/rhi.h"
 #include "nyla/commons/sampler_manager.h"
+#include "nyla/commons/shader.h"
 #include "nyla/commons/texture_manager.h"
 #include "nyla/commons/time.h"
+#include "nyla/commons/tunables.h"
 #include "nyla/commons/tween_manager.h"
 #include "nyla/commons/vec.h"
 
@@ -52,14 +59,10 @@ struct brick_data
 
 struct game_state
 {
-    uint64_t targetFrameDurationUs;
-    uint64_t lastFrameStartUs;
-    uint32_t dtUsAccum;
-    uint32_t framesCounted;
-    uint32_t fps;
-    bool shouldExit;
-
     inline_vec<brick_data, 512> bricks;
+
+    audio_clip_handle brickHitClip;
+    audio_clip_handle paddleHitClip;
 
     float2 worldBoundaryX;
     float2 worldBoundaryY;
@@ -68,10 +71,15 @@ struct game_state
     float playerPosY;
     float playerHeight;
     float playerWidth;
+    float playerSpeed;
     float2 ballPos;
     float2 ballVel;
 };
 game_state *game;
+
+// TODO: replace dummy guids with real ones from assets.h once .wav files are packed.
+constexpr uint64_t kID_breakout_brick_hit_wav = 0xAAAA'BBBB'CCCC'0001ull;
+constexpr uint64_t kID_breakout_paddle_hit_wav = 0xAAAA'BBBB'CCCC'0002ull;
 
 auto IsInside(float pos, float size, float2 boundary) -> bool
 {
@@ -87,24 +95,52 @@ auto IsInside(float pos, float size, float2 boundary) -> bool
 void UserMain()
 {
     game = &RegionAlloc::Alloc<game_state>(RegionAlloc::g_BootstrapAlloc);
-    game->targetFrameDurationUs = 1'000'000 / 144;
 
     region_alloc alloc = RegionAlloc::Create(16_MiB, 0);
 
-    WinOpen();
-    Rhi::Bootstrap(alloc, {
-                              .flags = rhi_flags::VSync,
-                          });
+    Engine::Bootstrap(alloc, engine_init_desc{
+                                 .maxFps = 144,
+                                 .vsync = true,
+                             });
 
-    InputManager::Bootstrap();
+    AssetManager::Bootstrap(FileOpen(R"(assets.bin)"_s, FileOpenMode::Read));
     GpuUpload::Bootstrap();
     SamplerManager::Bootstrap();
     TextureManager::Bootstrap();
     MeshManager::Bootstrap();
     TweenManager::Bootstrap();
-    AssetManager::Bootstrap(FileOpen(R"(assets.bin)"_s, FileOpenMode::Read));
+#if !defined(NDEBUG)
+    {
+        DevLog::Bootstrap();
+
+        const byteview devRoots[] = {"assets"_s, "asset_public"_s};
+        DevAssets::Bootstrap(span<const byteview>{devRoots, 2});
+
+        const dev_shader_root shaderRoots[] = {
+            {.srcDir = "nyla/shaders"_s, .outDir = "asset_public/shaders"_s},
+        };
+        DevShaders::Bootstrap(span<const dev_shader_root>{shaderRoots, 1});
+    }
+#endif
+    Shader::Bootstrap();
+    PipelineCache::Bootstrap();
     DebugTextRenderer::Bootstrap(alloc);
     Renderer::Bootstrap(alloc);
+#if !defined(NDEBUG)
+    CellRenderer::Bootstrap(alloc, cell_renderer_init_desc{
+                                       .bdfGuid = 0x30B510FE27A113FB,
+                                   });
+    Tunables::Bootstrap("breakout.tunables"_s);
+    Tunables::RegisterFloat("ball.radius"_s, &game->ballRadius, 0.05f, 0.1f, 5.f);
+    Tunables::RegisterFloat("player.height"_s, &game->playerHeight, 0.1f, 0.5f, 10.f);
+    Tunables::RegisterFloat("player.speed"_s, &game->playerSpeed, 5.f, 5.f, 400.f);
+    Profiler::Bootstrap();
+#endif
+
+    Audio::Bootstrap(48000, 2, 20'000);
+
+    game->brickHitClip = Audio::DeclareClip(kID_breakout_brick_hit_wav);
+    game->paddleHitClip = Audio::DeclareClip(kID_breakout_paddle_hit_wav);
 
     mesh_handle cubeMesh = MeshManager::DeclareMesh(ID_mesh_gltf_cube, ID_mesh_bin_cube);
     mesh_handle sphereMesh = MeshManager::DeclareMesh(ID_mesh_gltf_sphere, ID_mesh_bin_sphere);
@@ -127,8 +163,6 @@ void UserMain()
     };
 
     { // game init
-
-        game->lastFrameStartUs = GetMonotonicTimeMicros();
         game->worldBoundaryX = {-35.f, 35.f};
         game->worldBoundaryY = {-30.f, 30.f};
         game->ballRadius = .8f;
@@ -136,6 +170,7 @@ void UserMain()
         game->playerPosY = game->worldBoundaryY[0] + 1.6f;
         game->playerHeight = 2.5f;
         game->playerWidth = (74.f / 26.f) * game->playerHeight;
+        game->playerSpeed = 100.f;
         game->ballPos = {10.f, game->playerPosY};
         game->ballVel = {40.f, 40.f};
 
@@ -176,85 +211,17 @@ void UserMain()
         InputManager::Map(input_id::MoveLeft, input_interface_type::Keyboard, (uint32_t)KeyPhysical::S);
     }
 
-    for (;;)
+    while (!Engine::ShouldExit())
     {
-        RegionAlloc::Reset(alloc);
+        engine_frame frame = Engine::FrameBegin(alloc);
 
-        rhi_cmdlist cmd = Rhi::FrameBegin(alloc);
-
-        const uint64_t frameStart = GetMonotonicTimeMicros();
-
-        const uint64_t dtUs = frameStart - game->lastFrameStartUs;
-        game->dtUsAccum += dtUs;
-        ++game->framesCounted;
-
-        const float dt = static_cast<float>(dtUs) * 1e-6f;
-        game->lastFrameStartUs = frameStart;
-
-        if (game->dtUsAccum >= (uint64_t)500'000)
-        {
-            const double seconds = static_cast<double>(game->dtUsAccum) / 1'000'000.0;
-            const double fpsF64 = game->framesCounted / seconds;
-
-            game->fps = LRound(fpsF64);
-            game->dtUsAccum = 0;
-            game->framesCounted = 0;
-        }
-
-        DebugTextRenderer::Fmt(500, 10, "fps=%d"_s, uint32_t{game->fps});
-
-        for (;;)
-        {
-            PlatformEvent event{};
-            if (!WinPollEvent(event))
-                break;
-
-            switch (event.type)
-            {
-
-            case PlatformEventType::KeyDown: {
-                InputManager::HandlePressed(input_interface_type::Keyboard, uint32_t(event.key), frameStart);
-                break;
-            }
-            case PlatformEventType::KeyUp: {
-                InputManager::HandleReleased(input_interface_type::Keyboard, uint32_t(event.key), frameStart);
-                break;
-            }
-
-            case PlatformEventType::MousePress: {
-                InputManager::HandlePressed(input_interface_type::Mouse, event.mouse.code, frameStart);
-                break;
-            }
-            case PlatformEventType::MouseRelease: {
-                InputManager::HandleReleased(input_interface_type::Mouse, event.mouse.code, frameStart);
-                break;
-            }
-
-            case PlatformEventType::WinResize: {
-                Rhi::TriggerSwapchainRecreate();
-                break;
-            }
-
-            case PlatformEventType::Quit: {
-                Exit(0);
-            }
-
-            case PlatformEventType::Repaint:
-            case PlatformEventType::None:
-                break;
-
-            default: {
-                TRAP();
-                break;
-            }
-            }
-        }
+        DebugTextRenderer::Fmt(500, 10, "fps=%d"_s, uint32_t{frame.fps});
 
         GpuUpload::Update();
         InputManager::Update();
-        TweenManager::Update(dt);
-        MeshManager::Update(alloc, cmd);
-        TextureManager::Update(cmd);
+        TweenManager::Update(frame.dt);
+        MeshManager::Update(alloc, frame.cmd);
+        TextureManager::Update(frame.cmd);
 
         {
             rhi_texture backbuffer = Rhi::GetTexture(Rhi::GetBackbufferView());
@@ -270,13 +237,13 @@ void UserMain()
 
                 // game simulation
                 static uint64_t dtUsAccumulator = 0;
-                dtUsAccumulator += dtUs;
+                dtUsAccumulator += frame.dtUs;
 
                 constexpr uint64_t kStepUs = 1'000'000 / 120;
                 constexpr float kStep = 1.f / 120.f;
                 for (; dtUsAccumulator >= kStepUs; dtUsAccumulator -= kStepUs)
                 {
-                    game->playerPosX += 100.f * kStep * dx;
+                    game->playerPosX += game->playerSpeed * kStep * dx;
                     game->playerPosX = Clamp(game->playerPosX, game->worldBoundaryX[0] + game->playerWidth / 2.f,
                                              game->worldBoundaryX[1] - game->playerWidth / 2.f);
 
@@ -289,11 +256,6 @@ void UserMain()
                     {
                         game->ballVel[1] = -game->ballVel[1];
                     }
-
-                    // What's happening?
-                    // ball_pos[0] = std::clamp(ball_pos[0], kWorldBoundaryX[0] + kBallRadius, kWorldBoundaryX[1] -
-                    // kBallRadius); ball_pos[1] = std::clamp(ball_pos[1], kWorldBoundaryY[0] + kBallRadius,
-                    // kWorldBoundaryY[1] - kBallRadius);
 
                     game->ballPos += game->ballVel * kStep;
 
@@ -315,6 +277,7 @@ void UserMain()
                                 game->ballVel[0] = -game->ballVel[0];
                                 hit = true;
                                 brick.flags |= brick_data::kFlagDead;
+                                Audio::Play(game->brickHitClip);
                             }
                         }
 
@@ -333,6 +296,7 @@ void UserMain()
                             {
                                 game->ballVel[1] = -game->ballVel[1];
                                 game->ballVel[0] = -game->ballVel[0];
+                                Audio::Play(game->paddleHitClip);
                             }
                         }
                     }
@@ -340,7 +304,7 @@ void UserMain()
 
                 rhi_texture renderTarget = Rhi::GetTexture(rtv);
                 rhi_texture_info rtInfo = Rhi::GetTextureInfo(renderTarget);
-                Rhi::CmdTransitionTexture(cmd, renderTarget, rhi_texture_state::ColorTarget);
+                Rhi::CmdTransitionTexture(frame.cmd, renderTarget, rhi_texture_state::ColorTarget);
 
                 Rhi::PassBegin({
                     .rtv = rtv,
@@ -384,33 +348,38 @@ void UserMain()
                     Mat::Identity(view);
                     Renderer::SetView(view);
 
-                    Renderer::CmdFlush(cmd);
-                    DebugTextRenderer::CmdFlush(cmd);
+                    Renderer::CmdFlush(frame.cmd);
+                    DebugTextRenderer::CmdFlush(frame.cmd);
+
+#if !defined(NDEBUG)
+                    {
+                        span<byteview> lines = DevLog::Snapshot(alloc, 8);
+                        if (lines.size > 0)
+                        {
+                            CellRenderer::Begin(8, 8, 100, (uint32_t)lines.size);
+                            for (uint64_t i = 0; i < lines.size; ++i)
+                                CellRenderer::Text(0, (uint32_t)i, lines[i], 0xFFFF8080u, 0xFF000000u);
+                            CellRenderer::CmdFlush(frame.cmd);
+                        }
+                        Profiler::CmdFlush(frame.cmd, 8, 8 + 32 * 9, frame.fps);
+                        Tunables::CmdFlush(frame.cmd, 8, 8 + 32 * 18);
+                    }
+#endif
                 }
                 Rhi::PassEnd();
             }
 
             rhi_texture renderTarget = Rhi::GetTexture(rtv);
 
-            Rhi::CmdTransitionTexture(cmd, renderTarget, rhi_texture_state::TransferSrc);
-            Rhi::CmdTransitionTexture(cmd, backbuffer, rhi_texture_state::TransferDst);
+            Rhi::CmdTransitionTexture(frame.cmd, renderTarget, rhi_texture_state::TransferSrc);
+            Rhi::CmdTransitionTexture(frame.cmd, backbuffer, rhi_texture_state::TransferDst);
 
-            Rhi::CmdCopyTexture(cmd, backbuffer, renderTarget);
+            Rhi::CmdCopyTexture(frame.cmd, backbuffer, renderTarget);
 
-            Rhi::CmdTransitionTexture(cmd, backbuffer, rhi_texture_state::Present);
+            Rhi::CmdTransitionTexture(frame.cmd, backbuffer, rhi_texture_state::Present);
         }
 
-        Rhi::FrameEnd(alloc);
-
-        uint64_t frameEndUs = GetMonotonicTimeMicros();
-        uint64_t frameDurationUs = frameEndUs - game->lastFrameStartUs;
-
-        if (game->targetFrameDurationUs > frameDurationUs)
-        {
-            uint64_t sleepForMillis = (game->targetFrameDurationUs - frameDurationUs) / 1000;
-            if (sleepForMillis)
-                Sleep(sleepForMillis);
-        }
+        Engine::FrameEnd(alloc);
     }
 }
 

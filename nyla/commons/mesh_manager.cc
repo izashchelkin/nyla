@@ -46,6 +46,21 @@ struct mesh_manager
 };
 mesh_manager *manager;
 
+void OnAssetChanged(uint64_t guid, byteview, void *)
+{
+    for (auto &slot : manager->meshes)
+    {
+        if (!slot.used)
+            continue;
+
+        mesh_metadata &metadata = slot.data;
+        if (metadata.guidGltf != guid && metadata.guidBin != guid)
+            continue;
+
+        metadata.state = mesh_state::NotUploaded;
+    }
+}
+
 } // namespace
 
 namespace MeshManager
@@ -54,6 +69,7 @@ namespace MeshManager
 void API Bootstrap()
 {
     manager = &RegionAlloc::Alloc<mesh_manager>(RegionAlloc::g_BootstrapAlloc);
+    AssetManager::Subscribe(OnAssetChanged, nullptr);
 }
 
 void API Update(region_alloc &alloc, rhi_cmdlist cmd)
@@ -83,7 +99,8 @@ void API Update(region_alloc &alloc, rhi_cmdlist cmd)
         { // TODO: probably deal with this at packing stage - add custom attributes into gltf? or resolve via path <-
           // this is ugly
             gltf_image image = Span::Front(parser.images);
-            metadata.texture = TextureManager::DeclareTexture(ID_texture_wall);
+            if (!metadata.texture)
+                metadata.texture = TextureManager::DeclareTexture(ID_texture_wall);
         }
 
         for (const auto &mesh : parser.meshes)

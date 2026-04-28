@@ -1,5 +1,4 @@
-#ifndef NYLA_FMT_H
-#define NYLA_FMT_H
+#pragma once
 
 #include <cmath>
 #include <cstdint>
@@ -173,6 +172,40 @@ INLINE auto Exit(int code)
     ::quick_exit(code);
 }
 
-} // namespace nyla
-
+INLINE auto AtomicLoad32(const uint32_t *p) -> uint32_t
+{
+#if defined(__clang__) || defined(__GNUC__)
+    return __atomic_load_n(p, __ATOMIC_ACQUIRE);
+#else
+    return (uint32_t)_InterlockedOr((volatile long *)p, 0);
 #endif
+}
+
+INLINE void AtomicStore32(uint32_t *p, uint32_t v)
+{
+#if defined(__clang__) || defined(__GNUC__)
+    __atomic_store_n(p, v, __ATOMIC_RELEASE);
+#else
+    _InterlockedExchange((volatile long *)p, (long)v);
+#endif
+}
+
+INLINE auto AtomicLoad64(const uint64_t *p) -> uint64_t
+{
+#if defined(__clang__) || defined(__GNUC__)
+    return __atomic_load_n(p, __ATOMIC_ACQUIRE);
+#else
+    return (uint64_t)_InterlockedOr64((volatile long long *)p, 0);
+#endif
+}
+
+INLINE void AtomicStore64(uint64_t *p, uint64_t v)
+{
+#if defined(__clang__) || defined(__GNUC__)
+    __atomic_store_n(p, v, __ATOMIC_RELEASE);
+#else
+    _InterlockedExchange64((volatile long long *)p, (long long)v);
+#endif
+}
+
+} // namespace nyla
