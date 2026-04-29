@@ -183,6 +183,8 @@ auto API ProcessShader(spv_shader &self, span<uint32_t> data) -> span<uint32_t>
         uint32_t word = *(uint32_t *)reader.at;
         spv_op op = (spv_op)(word & 0xFFFF);
         uint16_t wordCount = word >> 16;
+        ASSERT(wordCount);
+
         span<uint32_t> operands{(uint32_t *)reader.at + 1, (uint64_t)wordCount - 1};
 
         spv_op_process_result result = spv_op_process_result::Ok;

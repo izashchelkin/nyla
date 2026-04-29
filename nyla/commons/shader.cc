@@ -21,29 +21,24 @@ struct shader_cache_entry
     uint64_t guid;
     rhi_shader_stage stage;
     rhi_shader handle;
-    const uint8_t *lastDataPtr;
 };
 
-struct shader_state
+struct shader_manager
 {
     inline_vec<shader_cache_entry, 64> entries;
 };
-shader_state *g_shader;
-
-auto AsCode(byteview data) -> span<uint32_t>
-{
-    return span<uint32_t>{(uint32_t *)data.data, data.size / sizeof(uint32_t)};
-}
+shader_manager *manager;
 
 void OnAssetChanged(uint64_t guid, byteview data, void *)
 {
-    for (uint64_t i = 0; i < g_shader->entries.size; ++i)
+    for (uint64_t i = 0; i < manager->entries.size; ++i)
     {
-        shader_cache_entry &e = g_shader->entries[i];
-        if (e.guid != guid)
-            continue;
-        Rhi::ReloadShader(e.handle, AsCode(data));
-        e.lastDataPtr = data.data;
+        shader_cache_entry &e = manager->entries[i];
+        if (e.guid == guid)
+        {
+            Rhi::ReloadShader(e.handle, Span::Cast<uint32_t>(data));
+            break;
+        }
     }
 }
 
@@ -54,7 +49,7 @@ namespace Shader
 
 void API Bootstrap()
 {
-    g_shader = &RegionAlloc::Alloc<shader_state>(RegionAlloc::g_BootstrapAlloc);
+    manager = &RegionAlloc::Alloc<shader_manager>(RegionAlloc::g_BootstrapAlloc);
     AssetManager::Subscribe(OnAssetChanged, nullptr);
 }
 
@@ -62,9 +57,9 @@ void API Bootstrap()
 
 auto API GetShader(uint64_t guid, rhi_shader_stage stage) -> rhi_shader
 {
-    for (uint64_t i = 0; i < g_shader->entries.size; ++i)
+    for (uint64_t i = 0; i < manager->entries.size; ++i)
     {
-        shader_cache_entry &e = g_shader->entries[i];
+        shader_cache_entry &e = manager->entries[i];
         if (e.guid == guid && e.stage == stage)
             return e.handle;
     }
@@ -74,12 +69,11 @@ auto API GetShader(uint64_t guid, rhi_shader_stage stage) -> rhi_shader
         .stage = stage,
         .code = AsCode(data),
     });
-    InlineVec::Append(g_shader->entries, shader_cache_entry{
-                                             .guid = guid,
-                                             .stage = stage,
-                                             .handle = handle,
-                                             .lastDataPtr = data.data,
-                                         });
+    InlineVec::Append(manager->entries, shader_cache_entry{
+                                            .guid = guid,
+                                            .stage = stage,
+                                            .handle = handle,
+                                        });
     return handle;
 }
 

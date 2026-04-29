@@ -47,63 +47,13 @@ struct pipeline_cache_entry
     rhi_graphics_pipeline currentPipeline;
 };
 
-void ApplyStateOverrides(byteview text, pipeline_cache_entry &entry)
-{
-    byte_parser p;
-    ByteParser::Init(p, text.data, text.size);
-
-    while (ByteParser::HasNext(p))
-    {
-        StringParser::SkipWhitespace(p);
-        if (!ByteParser::HasNext(p))
-            break;
-        if (TokenParser::SkipLineComment(p))
-            continue;
-
-        byteview key = TokenParser::ParseIdentifier(p);
-        TokenParser::SkipLineWhitespace(p);
-        byteview val = TokenParser::ParseIdentifier(p);
-
-        if (Span::Eq(key, "depth_test"_s))
-            entry.depthTestEnabled = Span::Eq(val, "true"_s);
-        else if (Span::Eq(key, "depth_write"_s))
-            entry.depthWriteEnabled = Span::Eq(val, "true"_s);
-        else if (Span::Eq(key, "cull"_s))
-        {
-            if (Span::Eq(val, "None"_s))
-                entry.cullMode = rhi_cull_mode::None;
-            else if (Span::Eq(val, "Back"_s))
-                entry.cullMode = rhi_cull_mode::Back;
-            else if (Span::Eq(val, "Front"_s))
-                entry.cullMode = rhi_cull_mode::Front;
-        }
-        else if (Span::Eq(key, "front_face"_s))
-        {
-            if (Span::Eq(val, "CCW"_s))
-                entry.frontFace = rhi_front_face::CCW;
-            else if (Span::Eq(val, "CW"_s))
-                entry.frontFace = rhi_front_face::CW;
-        }
-
-        ByteParser::NextLine(p);
-    }
-}
-
 struct pipeline_cache_state
 {
     region_alloc storage;
     region_alloc scratch;
     handle_pool<pipeline_cache_handle, pipeline_cache_entry, 32> entries;
 };
-pipeline_cache_state *g_cache;
-
-auto CopyByteview(region_alloc &alloc, byteview src) -> byteview
-{
-    span<uint8_t> dst = RegionAlloc::AllocArray<uint8_t>(alloc, src.size + 1);
-    MemCpy(dst.data, src.data, src.size);
-    dst.data[src.size] = 0;
-    return byteview{dst.data, src.size};
-}
+pipeline_cache_state *manager;
 
 auto BuildPipeline(pipeline_cache_entry &entry) -> rhi_graphics_pipeline
 {
@@ -114,7 +64,50 @@ auto BuildPipeline(pipeline_cache_entry &entry) -> rhi_graphics_pipeline
     {
         byteview stateBytes = AssetManager::Get(entry.stateGuid);
         if (stateBytes.size)
-            ApplyStateOverrides(stateBytes, entry);
+        {
+            byte_parser p;
+            ByteParser::Init(p, stateBytes.data, stateBytes.size);
+
+            while (ByteParser::HasNext(p))
+            {
+                StringParser::SkipWhitespace(p);
+                if (!ByteParser::HasNext(p))
+                    break;
+                if (TokenParser::SkipLineComment(p))
+                    continue;
+
+                byteview key = TokenParser::ParseIdentifier(p);
+                TokenParser::SkipLineWhitespace(p);
+                byteview val = TokenParser::ParseIdentifier(p);
+
+                // TODO: this is a mess. i would like to have a generic format for key value configs. on second thought
+                // it's not that bad because it doesn't do stupid things like copying strings that into dynamic data
+                // structures. so probably keep?
+
+                if (Span::Eq(key, "depth_test"_s))
+                    entry.depthTestEnabled = Span::Eq(val, "true"_s);
+                else if (Span::Eq(key, "depth_write"_s))
+                    entry.depthWriteEnabled = Span::Eq(val, "true"_s);
+                else if (Span::Eq(key, "cull"_s))
+                {
+                    if (Span::Eq(val, "None"_s))
+                        entry.cullMode = rhi_cull_mode::None;
+                    else if (Span::Eq(val, "Back"_s))
+                        entry.cullMode = rhi_cull_mode::Back;
+                    else if (Span::Eq(val, "Front"_s))
+                        entry.cullMode = rhi_cull_mode::Front;
+                }
+                else if (Span::Eq(key, "front_face"_s))
+                {
+                    if (Span::Eq(val, "CCW"_s))
+                        entry.frontFace = rhi_front_face::CCW;
+                    else if (Span::Eq(val, "CW"_s))
+                        entry.frontFace = rhi_front_face::CW;
+                }
+
+                ByteParser::NextLine(p);
+            }
+        }
     }
 
     rhi_graphics_pipeline_desc desc{
@@ -134,15 +127,17 @@ auto BuildPipeline(pipeline_cache_entry &entry) -> rhi_graphics_pipeline
         .frontFace = entry.frontFace,
     };
 
-    RegionAlloc::Reset(g_cache->scratch);
-    return Rhi::CreateGraphicsPipeline(g_cache->scratch, desc);
+    RegionAlloc::Reset(manager->scratch);
+    return Rhi::CreateGraphicsPipeline(manager->scratch, desc);
 }
 
+// TODO; how do these things handle dependencies? this one definitely depends on the shader one
+// TODO: callbacks in general need to have RegionAlloc passed in!
 void OnAssetChanged(uint64_t guid, byteview, void *)
 {
-    for (uint32_t i = 0; i < HandlePool::Capacity(g_cache->entries); ++i)
+    for (uint32_t i = 0; i < HandlePool::Capacity(manager->entries); ++i)
     {
-        handle_slot<pipeline_cache_entry> &slot = g_cache->entries[i];
+        handle_slot<pipeline_cache_entry> &slot = manager->entries[i];
         if (!slot.used)
             continue;
 
@@ -154,7 +149,7 @@ void OnAssetChanged(uint64_t guid, byteview, void *)
         if (!rebuilt)
         {
             LOG("pipeline_cache: rebuild failed, keeping previous pipeline (" SV_FMT ")", SV_ARG(entry.debugName));
-            uint8_t lineBuf[256];
+            uint8_t lineBuf[256]; // see todo before that about region alloc
             uint64_t n = StringWriteFmt(span<uint8_t>{lineBuf, sizeof(lineBuf)}, "pipeline fail: " SV_FMT ""_s,
                                         SV_ARG(entry.debugName));
             DevLog::Push(byteview{lineBuf, n});
@@ -174,9 +169,9 @@ namespace PipelineCache
 
 void API Bootstrap()
 {
-    g_cache = &RegionAlloc::Alloc<pipeline_cache_state>(RegionAlloc::g_BootstrapAlloc);
-    g_cache->storage = RegionAlloc::Create(MemPagePool::kChunkSize, 0);
-    g_cache->scratch = RegionAlloc::Create(MemPagePool::kChunkSize, 0);
+    manager = &RegionAlloc::Alloc<pipeline_cache_state>(RegionAlloc::g_BootstrapAlloc);
+    manager->storage = RegionAlloc::Create(MemPagePool::kChunkSize, 0);
+    manager->scratch = RegionAlloc::Create(MemPagePool::kChunkSize, 0);
 
     AssetManager::Subscribe(OnAssetChanged, nullptr);
 }
@@ -188,7 +183,7 @@ auto API Acquire(uint64_t vsGuid, uint64_t psGuid, const rhi_graphics_pipeline_d
         .vsGuid = vsGuid,
         .psGuid = psGuid,
         .stateGuid = stateGuid,
-        .debugName = CopyByteview(g_cache->storage, desc.debugName),
+        .debugName = RegionAlloc::CopyByteView(manager->storage, desc.debugName),
         .depthFormat = desc.depthFormat,
         .depthWriteEnabled = desc.depthWriteEnabled,
         .depthTestEnabled = desc.depthTestEnabled,
@@ -202,7 +197,7 @@ auto API Acquire(uint64_t vsGuid, uint64_t psGuid, const rhi_graphics_pipeline_d
     for (const rhi_vertex_attribute_desc &a : desc.vertexAttributes)
     {
         rhi_vertex_attribute_desc copy = a;
-        copy.semantic = CopyByteview(g_cache->storage, a.semantic);
+        copy.semantic = RegionAlloc::CopyByteView(manager->storage, a.semantic);
         InlineVec::Append(entry.vertexAttributes, copy);
     }
 
@@ -211,12 +206,12 @@ auto API Acquire(uint64_t vsGuid, uint64_t psGuid, const rhi_graphics_pipeline_d
 
     entry.currentPipeline = BuildPipeline(entry);
 
-    return HandlePool::Acquire(g_cache->entries, entry);
+    return HandlePool::Acquire(manager->entries, entry);
 }
 
 auto API Resolve(pipeline_cache_handle h) -> rhi_graphics_pipeline
 {
-    return HandlePool::ResolveData(g_cache->entries, h).currentPipeline;
+    return HandlePool::ResolveData(manager->entries, h).currentPipeline;
 }
 
 } // namespace PipelineCache

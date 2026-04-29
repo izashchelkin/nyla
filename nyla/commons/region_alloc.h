@@ -136,6 +136,13 @@ INLINE auto SafeCStr(region_alloc &self, byteview str) -> const char *
     return Span::CStr((byteview)ret);
 }
 
+INLINE auto CopyByteView(region_alloc &alloc, byteview src) -> byteview
+{
+    span<uint8_t> dst = RegionAlloc::AllocArray<uint8_t>(alloc, src.size);
+    MemCpy(dst.data, src.data, src.size);
+    return byteview{dst.data, src.size};
+}
+
 #if 0
 [[nodiscard]]
 INLINE auto SubAlloc(region_alloc &self, uint64_t size) -> region_alloc
