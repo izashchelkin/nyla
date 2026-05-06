@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "nyla/commons/dir_watcher.h"
+#include "nyla/commons/inline_vec.h"
 #include "nyla/commons/input_manager.h"
 #include "nyla/commons/intrin.h"
 #include "nyla/commons/keyboard.h"
@@ -30,6 +31,11 @@ struct engine_state
     uint32_t framesCounted;
     uint32_t fps;
     bool shouldExit;
+
+    // Pointer state carried across frames; edges + delta reset each FrameBegin.
+    int32_t pointerX;
+    int32_t pointerY;
+    uint32_t pointerButtons;
 };
 engine_state *g_engine;
 
@@ -53,7 +59,7 @@ void API Bootstrap(region_alloc &alloc, const engine_init_desc &desc)
     WinOpen();
     Rhi::Bootstrap(alloc, rhi_init_desc{.flags = flags});
     InputManager::Bootstrap();
-    DirWatcher::Bootstrap(alloc);
+    DirWatcher::Bootstrap();
 }
 
 auto API FrameBegin(region_alloc &alloc) -> engine_frame
@@ -82,11 +88,29 @@ auto API FrameBegin(region_alloc &alloc) -> engine_frame
         g_engine->framesCounted = 0;
     }
 
+    constexpr uint64_t kTextBufCap = 256;
+    inline_vec<uint8_t, kTextBufCap> textBuf{};
+
+    const int32_t pointerStartX = g_engine->pointerX;
+    const int32_t pointerStartY = g_engine->pointerY;
+    uint32_t pointerPressEdges = 0;
+    uint32_t pointerReleaseEdges = 0;
+
     for (; !ShouldExit();)
     {
         PlatformEvent event{};
         if (!WinPollEvent(event))
             break;
+
+        if (event.textLen > 0)
+        {
+            // InlineVec::Append asserts size+n < Capacity (strict), so leave one slot unused.
+            uint64_t limit = kTextBufCap - 1;
+            uint64_t room = textBuf.size < limit ? limit - textBuf.size : 0;
+            uint64_t take = event.textLen < room ? event.textLen : room;
+            if (take > 0)
+                InlineVec::Append(textBuf, byteview{event.textBytes, take});
+        }
 
         switch (event.type)
         {
@@ -132,9 +156,29 @@ auto API FrameBegin(region_alloc &alloc) -> engine_frame
             break;
         case PlatformEventType::MousePress:
             InputManager::HandlePressed(input_interface_type::Mouse, event.mouse.code, frameStart);
+            g_engine->pointerX = event.mouse.x;
+            g_engine->pointerY = event.mouse.y;
+            if (event.mouse.code >= 1 && event.mouse.code <= 32)
+            {
+                uint32_t bit = 1u << (event.mouse.code - 1);
+                pointerPressEdges |= bit;
+                g_engine->pointerButtons |= bit;
+            }
             break;
         case PlatformEventType::MouseRelease:
             InputManager::HandleReleased(input_interface_type::Mouse, event.mouse.code, frameStart);
+            g_engine->pointerX = event.mouse.x;
+            g_engine->pointerY = event.mouse.y;
+            if (event.mouse.code >= 1 && event.mouse.code <= 32)
+            {
+                uint32_t bit = 1u << (event.mouse.code - 1);
+                pointerReleaseEdges |= bit;
+                g_engine->pointerButtons &= ~bit;
+            }
+            break;
+        case PlatformEventType::MouseMove:
+            g_engine->pointerX = event.mouse.x;
+            g_engine->pointerY = event.mouse.y;
             break;
         case PlatformEventType::WinResize:
             Rhi::TriggerSwapchainRecreate();
@@ -142,6 +186,7 @@ auto API FrameBegin(region_alloc &alloc) -> engine_frame
         case PlatformEventType::Quit:
             g_engine->shouldExit = true;
             break;
+        case PlatformEventType::TextInput:
         case PlatformEventType::Repaint:
         case PlatformEventType::None:
             break;
@@ -151,12 +196,24 @@ auto API FrameBegin(region_alloc &alloc) -> engine_frame
         }
     }
 
+    byteview textChars{};
+    if (textBuf.size > 0)
+        textChars = RegionAlloc::CopyByteView(alloc, byteview{textBuf.data.data, textBuf.size});
+
     return engine_frame{
         .cmd = cmd,
         .dt = dt,
         .dtUs = dtUs,
         .frameStartUs = frameStart,
         .fps = g_engine->fps,
+        .textChars = textChars,
+        .pointerX = g_engine->pointerX,
+        .pointerY = g_engine->pointerY,
+        .pointerDx = g_engine->pointerX - pointerStartX,
+        .pointerDy = g_engine->pointerY - pointerStartY,
+        .pointerButtons = g_engine->pointerButtons,
+        .pointerPress = pointerPressEdges,
+        .pointerRelease = pointerReleaseEdges,
     };
 }
 
@@ -180,6 +237,11 @@ void API FrameEnd(region_alloc &alloc)
 auto API ShouldExit() -> bool
 {
     return g_engine->shouldExit;
+}
+
+void API RequestExit()
+{
+    g_engine->shouldExit = true;
 }
 
 } // namespace Engine

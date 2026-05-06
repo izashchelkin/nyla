@@ -41,6 +41,8 @@ enum class PlatformEventType
     KeyUp,
     MousePress,
     MouseRelease,
+    MouseMove,
+    TextInput,
 
     WinResize,
 
@@ -56,9 +58,15 @@ struct PlatformEvent
 
         struct
         {
-            uint32_t code;
+            uint32_t code; // button id for Press/Release; 0 for Move
+            int32_t x;     // window-relative pixels
+            int32_t y;
         } mouse;
     };
+    // utf8 bytes produced by typing; populated on KeyDown (Linux xkb) or TextInput (Windows WM_CHAR).
+    // Control codes follow xkb/WM_CHAR conventions: 0x08 Backspace, 0x09 Tab, 0x0D Enter, 0x1B Escape.
+    uint8_t textBytes[4];
+    uint8_t textLen;
 };
 
 auto API GenRandom64() -> uint64_t;

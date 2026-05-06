@@ -1,63 +1,8 @@
-#include "nyla/commons/platform.h"
 #include <cmath>
 #include <cstdint>
 
 namespace nyla
 {
-
-#if 0
-auto RecompileShadersIfNeeded() -> bool
-{
-    static bool b = false;
-    if (!b)
-    {
-        b = true;
-        return true;
-    }
-
-    return false;
-
-    static bool spvChanged = true;
-    static bool srcChanged = true;
-
-    for (auto &change : PlatformFsGetFileChanges())
-    {
-        if (change.seen)
-            continue;
-        change.seen = true;
-
-        const auto &path = change.path;
-        if (path.ends_with(".spv"))
-        {
-            spvChanged = true;
-        }
-        else if (path.ends_with(".hlsl"))
-        {
-            srcChanged = true;
-        }
-        else
-        {
-        }
-    }
-
-    if (srcChanged)
-    {
-        system("python3 /home/izashchelkin/nyla/scripts/shaders.py");
-        usleep(1e6);
-        PlatformProcessEvents();
-
-        srcChanged = false;
-    }
-
-    if (srcChanged || spvChanged)
-    {
-        spvChanged = false;
-        return true;
-    }
-
-    return false;
-}
-#endif
 
 void UpdateDtFps(uint64_t nowUs, uint32_t &fps, float &dt)
 {

@@ -35,6 +35,11 @@ void API Bootstrap(region_alloc &alloc, const cell_renderer_init_desc &desc);
 
 void API Begin(int32_t originPxX, int32_t originPxY, uint32_t cols, uint32_t rows);
 
+// Clip stack — PutCell drops cells outside the top of stack. Begin resets to the full grid.
+// Pushed rect is intersected with the current top so children always stay inside parents.
+void API PushClip(int32_t col, int32_t row, int32_t w, int32_t h);
+void API PopClip();
+
 void API PutCell(uint32_t col, uint32_t row, cell_attr cell);
 
 void API Text(uint32_t col, uint32_t row, byteview text, uint32_t fgRgba, uint32_t bgRgba);

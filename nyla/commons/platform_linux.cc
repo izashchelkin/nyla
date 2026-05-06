@@ -192,10 +192,7 @@ auto API Next(region_alloc &alloc, dir_iter &self, file_metadata &out) -> bool
 
     MemZero(&out);
 
-    uint64_t nameLen = CStrLen(de->d_name, 256);
-    span<uint8_t> nameCopy = RegionAlloc::AllocArray<uint8_t>(alloc, nameLen);
-    MemCpy(nameCopy.data, de->d_name, nameLen);
-    out.fileName = nameCopy;
+    out.fileName = RegionAlloc::CopyByteView(alloc, Span::FromCStr(de->d_name, 256));
 
     struct stat st;
     if (fstatat(self.fd, de->d_name, &st, AT_SYMLINK_NOFOLLOW) == 0)
@@ -231,6 +228,38 @@ auto API GenRandom64() -> uint64_t
     ssize_t got = getrandom(&buf, sizeof(buf), 0);
     ASSERT(got == sizeof(buf));
     return buf;
+}
+
+void API ParseStdArgs(byteview *args, uint32_t maxArgs)
+{
+    static uint8_t buf[4096];
+    static uint64_t len = 0;
+    static bool loaded = false;
+
+    if (!loaded)
+    {
+        loaded = true;
+        int fd = open("/proc/self/cmdline", O_RDONLY);
+        if (fd >= 0)
+        {
+            ssize_t n = read(fd, buf, sizeof(buf));
+            close(fd);
+            if (n > 0)
+                len = (uint64_t)n;
+        }
+    }
+
+    uint32_t argCount = 0;
+    uint64_t i = 0;
+    while (i < len && argCount < maxArgs)
+    {
+        uint64_t start = i;
+        while (i < len && buf[i] != 0)
+            ++i;
+        args[argCount++] = byteview{buf + start, (uint32_t)(i - start)};
+        if (i < len)
+            ++i;
+    }
 }
 
 //
@@ -317,7 +346,8 @@ void API WinOpen()
 
     constexpr auto kEventMask = static_cast<xcb_event_mask_t>(
         XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_KEY_RELEASE | XCB_EVENT_MASK_BUTTON_PRESS |
-        XCB_EVENT_MASK_BUTTON_RELEASE | XCB_EVENT_MASK_EXPOSURE | XCB_EVENT_MASK_STRUCTURE_NOTIFY);
+        XCB_EVENT_MASK_BUTTON_RELEASE | XCB_EVENT_MASK_POINTER_MOTION | XCB_EVENT_MASK_EXPOSURE |
+        XCB_EVENT_MASK_STRUCTURE_NOTIFY);
     platform->x11.win =
         X11CreateWin(X11GetScreen()->width_in_pixels, X11GetScreen()->height_in_pixels, false, kEventMask);
 
@@ -339,23 +369,36 @@ INLINE auto ProcessXEvent(xcb_generic_event_t *event, PlatformEvent &outEvent) -
     case XCB_KEY_PRESS: {
         auto keypress = reinterpret_cast<xcb_key_press_event_t *>(event);
 
+        outEvent = PlatformEvent{
+            .type = PlatformEventType::KeyDown,
+            .key = KeyPhysical::Unknown,
+        };
         for (uint32_t i = 1; i < static_cast<uint32_t>(KeyPhysical::Count); ++i)
         {
             if (platform->x11.keyCodes[i] == keypress->detail)
             {
-                outEvent = PlatformEvent{
-                    .type = PlatformEventType::KeyDown,
-                    .key = static_cast<KeyPhysical>(i),
-                };
-                return true;
+                outEvent.key = static_cast<KeyPhysical>(i);
+                break;
             }
         }
 
-        return false;
+        char buf[5] = {};
+        int n = xkb_state_key_get_utf8(platform->x11.xkbState, keypress->detail, buf, sizeof(buf));
+        xkb_state_update_key(platform->x11.xkbState, keypress->detail, XKB_KEY_DOWN);
+        if (n > 0 && n <= 4)
+        {
+            for (int j = 0; j < n; ++j)
+                outEvent.textBytes[j] = (uint8_t)buf[j];
+            outEvent.textLen = (uint8_t)n;
+        }
+
+        return outEvent.key != KeyPhysical::Unknown || outEvent.textLen > 0;
     }
 
     case XCB_KEY_RELEASE: {
         auto keyrelease = reinterpret_cast<xcb_key_release_event_t *>(event);
+
+        xkb_state_update_key(platform->x11.xkbState, keyrelease->detail, XKB_KEY_UP);
 
         for (uint32_t i = 1; i < static_cast<uint32_t>(KeyPhysical::Count); ++i)
         {
@@ -376,7 +419,7 @@ INLINE auto ProcessXEvent(xcb_generic_event_t *event, PlatformEvent &outEvent) -
         auto buttonpress = reinterpret_cast<xcb_button_press_event_t *>(event);
         outEvent = PlatformEvent{
             .type = PlatformEventType::MousePress,
-            .mouse = {.code = buttonpress->detail},
+            .mouse = {.code = buttonpress->detail, .x = buttonpress->event_x, .y = buttonpress->event_y},
         };
         return true;
     }
@@ -385,7 +428,16 @@ INLINE auto ProcessXEvent(xcb_generic_event_t *event, PlatformEvent &outEvent) -
         auto buttonrelease = reinterpret_cast<xcb_button_release_event_t *>(event);
         outEvent = PlatformEvent{
             .type = PlatformEventType::MouseRelease,
-            .mouse = {.code = buttonrelease->detail},
+            .mouse = {.code = buttonrelease->detail, .x = buttonrelease->event_x, .y = buttonrelease->event_y},
+        };
+        return true;
+    }
+
+    case XCB_MOTION_NOTIFY: {
+        auto motion = reinterpret_cast<xcb_motion_notify_event_t *>(event);
+        outEvent = PlatformEvent{
+            .type = PlatformEventType::MouseMove,
+            .mouse = {.code = 0, .x = motion->event_x, .y = motion->event_y},
         };
         return true;
     }
@@ -646,26 +698,27 @@ void PlatformInit1()
     }
 
     {
-        xkb_context *ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
-        ASSERT(ctx);
+        platform->x11.xkbCtx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
+        ASSERT(platform->x11.xkbCtx);
 
         const int32_t deviceId = xkb_x11_get_core_keyboard_device_id(X11GetConn());
         ASSERT(deviceId != -1);
 
-        xkb_keymap *keymap = xkb_x11_keymap_new_from_device(ctx, X11GetConn(), deviceId, XKB_KEYMAP_COMPILE_NO_FLAGS);
-        ASSERT(keymap);
+        platform->x11.xkbKeymap =
+            xkb_x11_keymap_new_from_device(platform->x11.xkbCtx, X11GetConn(), deviceId, XKB_KEYMAP_COMPILE_NO_FLAGS);
+        ASSERT(platform->x11.xkbKeymap);
+
+        platform->x11.xkbState = xkb_x11_state_new_from_device(platform->x11.xkbKeymap, X11GetConn(), deviceId);
+        ASSERT(platform->x11.xkbState);
 
         for (uint32_t i = 1; i < static_cast<uint32_t>(KeyPhysical::Count); ++i)
         {
             const auto key = static_cast<KeyPhysical>(i);
             byteview xkbName = X11ConvertKeyPhysicalIntoXkbName(key);
-            const xkb_keycode_t keycode = xkb_keymap_key_by_name(keymap, Span::CStr(xkbName));
+            const xkb_keycode_t keycode = xkb_keymap_key_by_name(platform->x11.xkbKeymap, Span::CStr(xkbName));
             ASSERT(xkb_keycode_is_legal_x11(keycode));
             platform->x11.keyCodes[i] = keycode;
         }
-
-        xkb_keymap_unref(keymap);
-        xkb_context_unref(ctx);
     }
 
     {

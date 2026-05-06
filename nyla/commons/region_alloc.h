@@ -143,20 +143,47 @@ INLINE auto CopyByteView(region_alloc &alloc, byteview src) -> byteview
     return byteview{dst.data, src.size};
 }
 
-#if 0
-[[nodiscard]]
-INLINE auto SubAlloc(region_alloc &self, uint64_t size) -> region_alloc
+template <std::same_as<byteview>... Srcs> INLINE auto CopyByteViews(region_alloc &alloc, Srcs... srcs) -> span<uint8_t>
 {
-    ASSERT(size > 0);
-    uint8_t *mem = Alloc(self, size, Platform::kPageSize);
-    return region_alloc{
-        .at = mem,
-        .begin = mem,
-        .end = mem + size,
-        .commitedEnd = mem + size,
+    static_assert(sizeof...(Srcs) > 1);
+
+    uint64_t allocSize = (srcs.size + ...);
+    span<uint8_t> dst = RegionAlloc::AllocArray<uint8_t>(alloc, allocSize);
+
+    uint8_t *out = dst.data;
+    auto copyOne = [&](const auto &src) {
+        MemCpy(out, src.data, src.size);
+        out += src.size;
     };
+    (copyOne(srcs), ...);
+
+    return span<uint8_t>{dst.data, allocSize};
 }
-#endif
+
+struct cstr_terminator_t
+{
+};
+constexpr cstr_terminator_t cstr_term{};
+
+template <std::same_as<byteview>... Srcs>
+INLINE auto CopyByteViews(region_alloc &alloc, cstr_terminator_t, Srcs... srcs) -> byteview
+{
+    static_assert(sizeof...(Srcs) >= 1);
+
+    uint64_t allocSize = (srcs.size + ...);
+    span<uint8_t> dst = RegionAlloc::AllocArray<uint8_t>(alloc, allocSize + 1);
+
+    uint8_t *out = dst.data;
+    auto copyOne = [&](const auto &src) {
+        MemCpy(out, src.data, src.size);
+        out += src.size;
+    };
+    (copyOne(srcs), ...);
+    *out = 0;
+
+    return byteview{dst.data, allocSize};
+}
 
 } // namespace RegionAlloc
+
 } // namespace nyla

@@ -130,10 +130,7 @@ auto HandleOpDecorateString(spv_shader &self, span<uint32_t> operands) -> spv_op
         InlineVec::Append(self.semanticDataIds, targetId);
 
         inline_string<16> &name = InlineVec::Append(self.semanticDataNames);
-        byteview src = SpvReader::ReadString(reader);
-        InlineVec::Resize(name, src.size);
-        MemCpy(name.data.data, src.data, src.size);
-
+        InlineString::Assign(name, SpvReader::ReadString(reader));
         InlineString::AsciiToUpper(name);
 
         LOG("" SV_FMT, SV_ARG((byteview)name));

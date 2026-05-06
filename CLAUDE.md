@@ -4,6 +4,28 @@
 
 Project moves fast; rules age fast. Each entry should be a posture or a tripwire, not a checklist. Avoid enumerating APIs, function names, or file lists — point at the wrapper file and stop. If you find yourself adding a third bullet to clarify the second, the rule is too detailed.
 
+## Cleanup tripwires
+
+Recurring slop patterns and the methodology to fix them live in the `cleanup` skill (`.claude/skills/cleanup/SKILL.md`). When you spot a tripwire (duplicated helper, manual span/copy, naming drift, half-finished refactor) in code you're already touching, invoke the skill and fix it in the same pass.
+
+## Token-econ tripwires
+
+Repo read-pattern rules and the survey methodology for finding new ones live in the `token-econ` skill (`.claude/skills/token-econ/SKILL.md`). Static rules live in the **Token economy** section below. Invoke the skill when you want to scan for fresh waste sources or propose new tripwires.
+
+## Working with `ITERATION.md`
+
+Living plan, not a changelog. Read it for current focus before starting any non-trivial task. Three sections do real work: **Posture** (rules that hold across all work), **What works today** (capability inventory), **What's pending** (priority queue).
+
+Editing rules:
+
+- When a pending item ships, **move it** into "What works today" as a one-line bullet with entry-point file. Do not keep a "Done" log — `git log` is authoritative.
+- "What works today" stays terse: one line per capability, file path, no narration. Trim or merge bullets when a feature subsumes another.
+- "What's pending" stays at 5-7 items. Anything beyond that is noise — drop it or fold into a parent item. Top of list = next thing.
+- Each pending item gets a **Why** (the motivation) and a **How** (concrete entry point or sketch). Items without both rot fastest.
+- Posture is for *recurring* rules. New rule earns a place only when the same instance appears in three or more places. Edit existing rules in place; don't append a variant per case.
+- No references to specific commits, PRs, dates, or completed work. The doc describes the state, not the journey.
+- When the doc drifts toward narrative paragraphs or grows past ~80 lines, that's a signal to compact — same posture as code review on prose.
+
 ## Project shape
 
 Durable facts. Phase-specific work lives in `ITERATION.md` when present — read it for current focus.
@@ -57,7 +79,7 @@ No wrapper yet → ask before reaching std. Usually belongs in `intrin.h` or a s
 ## Token economy
 
 - Don't read `CMakeListsGenerated.txt`. Re-run `gencmake.ps1`; `grep` to verify.
-- Don't full-read large platform files (`platform_linux.cc`, `platform_windows.cc`, `rhi_vulkan.cc`, `rhi_d3d12.cc`). `grep -n` to locate, then `Read` with `offset`/`limit`.
+- Don't full-read large platform / vendored / generated files (`platform_linux.cc`, `platform_windows.cc`, `rhi_vulkan.cc`, `rhi_d3d12.cc`, `stb_image.h`, `spv_shader_enums.h`, `renderdoc_app.h`). `grep -n` to locate, then `Read` with `offset`/`limit`. Don't edit vendored/generated.
 - Apps share bootstrap boilerplate (`shipgame`, `breakout`, `3d_ball_maze`, `terminal`, `wm_overlay`). Same change across several apps → batch the Edits in one message.
 - clangd noise from cross-platform indexing (`windows.h not found`, unrelated `unused-includes`) — ignore unless your edit touched that line.
 - Cap build/log tails (~20 lines) unless an error demands more.

@@ -91,16 +91,11 @@ INLINE void MemMove(void *dest, const void *src, uint64_t size)
 #endif
 }
 
-#if 1
 [[nodiscard]]
 auto INLINE MemEq(const void *p1, const void *p2, uint64_t len) -> bool
 {
     return memcmp(p1, p2, len) == 0;
 }
-#else
-[[nodiscard]]
-auto API MemEq(const void *p1, const void *p2, uint64_t len) -> bool;
-#endif
 
 [[nodiscard]]
 INLINE auto MemStartsWith(const void *str, uint64_t strLen, const void *prefix, uint64_t prefixLen) -> bool
@@ -122,7 +117,6 @@ INLINE auto MemEndsWith(const void *str, uint64_t strLen, const void *suffix, ui
 
 //
 
-#if 1
 [[nodiscard]]
 INLINE auto CStrLen(const void *str, uint64_t maxLen) -> uint64_t
 {
@@ -130,10 +124,6 @@ INLINE auto CStrLen(const void *str, uint64_t maxLen) -> uint64_t
     ASSERT(p);
     return p - (uint8_t *)str;
 }
-#else
-[[nodiscard]]
-API auto CStrLen(const void *str, uint64_t maxLen) -> uint64_t;
-#endif
 
 template <is_plain T> INLINE void Swap(T &lhs, T &rhs)
 {

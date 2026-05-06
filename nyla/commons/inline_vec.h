@@ -53,6 +53,20 @@ INLINE auto DataPtr(inline_vec<T, Capacity> &self) -> T *
 
 template <typename T, uint64_t Capacity>
 [[nodiscard]]
+INLINE auto AsSpan(inline_vec<T, Capacity> &self) -> span<T>
+{
+    return span<T>{self.data.data, self.size};
+}
+
+template <typename T, uint64_t Capacity>
+[[nodiscard]]
+INLINE auto AsSpan(const inline_vec<T, Capacity> &self) -> span<const T>
+{
+    return span<const T>{self.data.data, self.size};
+}
+
+template <typename T, uint64_t Capacity>
+[[nodiscard]]
 INLINE auto Front(inline_vec<T, Capacity> &self) -> T &
 {
     DASSERT(self.size);
@@ -138,7 +152,7 @@ INLINE auto Find(inline_vec<T, Capacity> &self, const T &val) -> T *
 
 template <typename T, uint64_t Capacity> INLINE void Erase(inline_vec<T, Capacity> &self, T *pos)
 {
-    span<T> s = Span::Erase(span<T>{self.data.data, self.size}, pos);
+    span<T> s = Span::Erase(AsSpan(self), pos);
     self.size = s.size;
 }
 

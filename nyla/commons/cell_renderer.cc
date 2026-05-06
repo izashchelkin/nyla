@@ -38,6 +38,13 @@ struct gpu_cell
     uint32_t bgRgba;
 };
 
+struct clip_rect
+{
+    int32_t x, y, w, h;
+};
+
+constexpr uint32_t kClipStackMax = 16;
+
 struct cell_renderer_state
 {
     cell_renderer_init_desc desc;
@@ -59,6 +66,9 @@ struct cell_renderer_state
     uint32_t cellCount;
     uint32_t cellCap;
     gpu_cell *frameCells;
+
+    clip_rect clipStack[kClipStackMax];
+    uint32_t clipDepth;
 
     uint32_t lastFrameIdx;
     uint32_t frameSliceByteOffset;
@@ -200,6 +210,8 @@ void API Begin(int32_t originPxX, int32_t originPxY, uint32_t cols, uint32_t row
     cr->cols = cols;
     cr->rows = rows;
     cr->cellCount = 0;
+    cr->clipDepth = 1;
+    cr->clipStack[0] = clip_rect{0, 0, (int32_t)cols, (int32_t)rows};
 
     const uint32_t frameIdx = Rhi::GetFrameIndex();
     if (frameIdx != cr->lastFrameIdx)
@@ -228,9 +240,36 @@ auto API GlyphForCodepoint(uint32_t codepoint) -> uint16_t
     return cr->codepointToGlyph[codepoint];
 }
 
+void API PushClip(int32_t col, int32_t row, int32_t w, int32_t h)
+{
+    ASSERT(cr->clipDepth < kClipStackMax);
+    const clip_rect &top = cr->clipStack[cr->clipDepth - 1];
+    int32_t x0 = col > top.x ? col : top.x;
+    int32_t y0 = row > top.y ? row : top.y;
+    int32_t x1 = col + w;
+    int32_t y1 = row + h;
+    int32_t topX1 = top.x + top.w;
+    int32_t topY1 = top.y + top.h;
+    if (x1 > topX1)
+        x1 = topX1;
+    if (y1 > topY1)
+        y1 = topY1;
+    cr->clipStack[cr->clipDepth++] = clip_rect{x0, y0, x1 > x0 ? x1 - x0 : 0, y1 > y0 ? y1 - y0 : 0};
+}
+
+void API PopClip()
+{
+    ASSERT(cr->clipDepth > 1);
+    --cr->clipDepth;
+}
+
 void API PutCell(uint32_t col, uint32_t row, cell_attr cell)
 {
     if (col >= cr->cols || row >= cr->rows)
+        return;
+    const clip_rect &clip = cr->clipStack[cr->clipDepth - 1];
+    if ((int32_t)col < clip.x || (int32_t)col >= clip.x + clip.w || (int32_t)row < clip.y ||
+        (int32_t)row >= clip.y + clip.h)
         return;
     if (cr->cellCount >= cr->cellCap)
         return;

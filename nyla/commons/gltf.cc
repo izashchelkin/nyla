@@ -9,37 +9,6 @@
 namespace nyla
 {
 
-#if 0
-auto GlbChunkParser::Parse(Span<char> &jsonChunk, Span<char> &binChunk) -> bool
-{
-    if (PopDWord() != DWord("glTF"))
-        return false;
-
-    const uint32_t version = PopDWord();
-    const uint32_t length = PopDWord();
-
-    //
-
-    const uint32_t jsonChunkLength = PopDWord();
-
-    if (PopDWord() != DWord("JSON"))
-        return false;
-
-    jsonChunk = {(char *)m_At, jsonChunkLength};
-
-    m_At = (char *)m_At + jsonChunkLength;
-    m_At = (char *)m_Base + AlignedUp<uint32_t>((char *)m_At - (char *)m_Base, 4);
-
-    const uint32_t binChunkLength = PopDWord();
-    if (PopDWord() != DWord("BIN\0"))
-        return false;
-
-    binChunk = {(char *)m_At, binChunkLength};
-
-    return true;
-}
-#endif
-
 namespace GltfParser
 {
 

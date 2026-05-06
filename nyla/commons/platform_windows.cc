@@ -473,6 +473,43 @@ auto CALLBACK WindowsPlatform::MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, 
         return 0;
     }
 
+    case WM_MOUSEMOVE: {
+        InlineQueue::Write(g_EventsQueue, PlatformEvent{
+                                              .type = PlatformEventType::MouseMove,
+                                              .mouse = {.code = 0,
+                                                        .x = (int32_t)(int16_t)LOWORD(lParam),
+                                                        .y = (int32_t)(int16_t)HIWORD(lParam)},
+                                          });
+        return 0;
+    }
+
+    case WM_LBUTTONDOWN:
+    case WM_RBUTTONDOWN:
+    case WM_MBUTTONDOWN: {
+        // X11 parity: Left=1, Middle=2, Right=3.
+        uint32_t code = (uMsg == WM_LBUTTONDOWN) ? 1u : (uMsg == WM_MBUTTONDOWN) ? 2u : 3u;
+        InlineQueue::Write(g_EventsQueue, PlatformEvent{
+                                              .type = PlatformEventType::MousePress,
+                                              .mouse = {.code = code,
+                                                        .x = (int32_t)(int16_t)LOWORD(lParam),
+                                                        .y = (int32_t)(int16_t)HIWORD(lParam)},
+                                          });
+        return 0;
+    }
+
+    case WM_LBUTTONUP:
+    case WM_RBUTTONUP:
+    case WM_MBUTTONUP: {
+        uint32_t code = (uMsg == WM_LBUTTONUP) ? 1u : (uMsg == WM_MBUTTONUP) ? 2u : 3u;
+        InlineQueue::Write(g_EventsQueue, PlatformEvent{
+                                              .type = PlatformEventType::MouseRelease,
+                                              .mouse = {.code = code,
+                                                        .x = (int32_t)(int16_t)LOWORD(lParam),
+                                                        .y = (int32_t)(int16_t)HIWORD(lParam)},
+                                          });
+        return 0;
+    }
+
         // case WM_SYSKEYDOWN:
     case WM_KEYDOWN: {
         UINT scanCode = (UINT)((lParam >> 16) & 0xFF);
@@ -487,6 +524,61 @@ auto CALLBACK WindowsPlatform::MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, 
                                                   .key = key,
                                               });
         }
+        return 0;
+    }
+
+    case WM_CHAR: {
+        // TranslateMessage feeds WM_CHAR after WM_KEYDOWN. Surrogate pairs arrive as two messages
+        // (high then low). We buffer the high surrogate and combine on the low.
+        static uint16_t s_HighSurrogate = 0;
+        uint16_t unit = (uint16_t)wParam;
+        uint32_t cp = 0;
+        if (unit >= 0xD800 && unit <= 0xDBFF)
+        {
+            s_HighSurrogate = unit;
+            return 0;
+        }
+        if (unit >= 0xDC00 && unit <= 0xDFFF)
+        {
+            if (!s_HighSurrogate)
+                return 0; // stray low surrogate
+            cp = 0x10000u + (((uint32_t)s_HighSurrogate - 0xD800u) << 10) + ((uint32_t)unit - 0xDC00u);
+            s_HighSurrogate = 0;
+        }
+        else
+        {
+            s_HighSurrogate = 0; // reset stale high if any
+            cp = unit;
+        }
+
+        PlatformEvent ev{.type = PlatformEventType::TextInput};
+        if (cp < 0x80u)
+        {
+            ev.textBytes[0] = (uint8_t)cp;
+            ev.textLen = 1;
+        }
+        else if (cp < 0x800u)
+        {
+            ev.textBytes[0] = (uint8_t)(0xC0u | (cp >> 6));
+            ev.textBytes[1] = (uint8_t)(0x80u | (cp & 0x3Fu));
+            ev.textLen = 2;
+        }
+        else if (cp < 0x10000u)
+        {
+            ev.textBytes[0] = (uint8_t)(0xE0u | (cp >> 12));
+            ev.textBytes[1] = (uint8_t)(0x80u | ((cp >> 6) & 0x3Fu));
+            ev.textBytes[2] = (uint8_t)(0x80u | (cp & 0x3Fu));
+            ev.textLen = 3;
+        }
+        else
+        {
+            ev.textBytes[0] = (uint8_t)(0xF0u | (cp >> 18));
+            ev.textBytes[1] = (uint8_t)(0x80u | ((cp >> 12) & 0x3Fu));
+            ev.textBytes[2] = (uint8_t)(0x80u | ((cp >> 6) & 0x3Fu));
+            ev.textBytes[3] = (uint8_t)(0x80u | (cp & 0x3Fu));
+            ev.textLen = 4;
+        }
+        InlineQueue::Write(g_EventsQueue, ev);
         return 0;
     }
 

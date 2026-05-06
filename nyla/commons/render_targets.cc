@@ -10,15 +10,31 @@ namespace nyla
 namespace RenderTargets
 {
 
-// TODO: we have to recrate render targets on backbuffer resize!
-
 void API GetTargets(render_targets &self, uint32_t width, uint32_t height, rhi_rtv *outRtv, rhi_dsv *outDsv)
 {
+    if (width != self.CachedWidth || height != self.CachedHeight)
+    {
+        for (rhi_rtv rtv : self.Rtvs)
+            Rhi::DestroyRenderTargetView(rtv);
+        for (rhi_texture tex : self.ColorTextures)
+            Rhi::DestroyTexture(tex);
+        for (rhi_dsv dsv : self.Dsvs)
+            Rhi::DestroyDepthStencilView(dsv);
+        for (rhi_texture tex : self.DepthStencilTextures)
+            Rhi::DestroyTexture(tex);
+        InlineVec::Clear(self.Rtvs);
+        InlineVec::Clear(self.ColorTextures);
+        InlineVec::Clear(self.Dsvs);
+        InlineVec::Clear(self.DepthStencilTextures);
+        self.CachedWidth = width;
+        self.CachedHeight = height;
+    }
+
     uint32_t frameIndex = Rhi::GetFrameIndex();
 
     if (outRtv)
     {
-        if (frameIndex >= self.Rtvs.size)
+        while (self.Rtvs.size <= frameIndex)
         {
             rhi_texture Texture = Rhi::CreateTexture(rhi_texture_desc{
                 .width = width,
@@ -40,7 +56,7 @@ void API GetTargets(render_targets &self, uint32_t width, uint32_t height, rhi_r
 
     if (outDsv)
     {
-        if (frameIndex >= self.Dsvs.size)
+        while (self.Dsvs.size <= frameIndex)
         {
             rhi_texture Texture = Rhi::CreateTexture(rhi_texture_desc{
                 .width = width,

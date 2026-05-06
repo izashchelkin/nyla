@@ -74,15 +74,7 @@ struct dev_shaders_state
     platform_thread *worker;
 };
 
-dev_shaders_state *g_dev_shaders;
-
-auto CopyByteview(region_alloc &alloc, byteview src) -> byteview
-{
-    span<uint8_t> dst = RegionAlloc::AllocArray<uint8_t>(alloc, src.size + 1);
-    MemCpy(dst.data, src.data, src.size);
-    dst.data[src.size] = 0;
-    return byteview{dst.data, src.size};
-}
+dev_shaders_state *manager;
 
 template <uint64_t Cap> void WriteCStrPath(inline_string<Cap> &out, byteview dir, byteview name, byteview tail)
 {
@@ -127,11 +119,10 @@ void RunCompile(const compile_job &job)
         nullptr,
     };
 
-    RegionAlloc::Reset(g_dev_shaders->workerScratch);
+    RegionAlloc::Reset(manager->workerScratch);
 
     byteview log{};
-    int32_t rc =
-        RunSync(span<const char *const>{argv, sizeof(argv) / sizeof(argv[0])}, g_dev_shaders->workerScratch, log);
+    int32_t rc = RunSync(span<const char *const>{argv, sizeof(argv) / sizeof(argv[0])}, manager->workerScratch, log);
 
     if (rc == 0)
     {
@@ -151,15 +142,15 @@ void RunCompile(const compile_job &job)
 
 void WaitPopJob(compile_job &out)
 {
-    PlatformMutex::Lock(*g_dev_shaders->queueMutex);
-    while (g_dev_shaders->queue.size == 0)
-        PlatformCondvar::Wait(*g_dev_shaders->queueCv, *g_dev_shaders->queueMutex);
-    out = g_dev_shaders->queue.data.data[0];
-    if (g_dev_shaders->queue.size > 1)
-        MemMove(g_dev_shaders->queue.data.data, g_dev_shaders->queue.data.data + 1,
-                (g_dev_shaders->queue.size - 1) * sizeof(compile_job));
-    g_dev_shaders->queue.size -= 1;
-    PlatformMutex::Unlock(*g_dev_shaders->queueMutex);
+    PlatformMutex::Lock(*manager->queueMutex);
+    while (manager->queue.size == 0)
+        PlatformCondvar::Wait(*manager->queueCv, *manager->queueMutex);
+    out = manager->queue.data.data[0];
+    if (manager->queue.size > 1)
+        MemMove(manager->queue.data.data, manager->queue.data.data + 1,
+                (manager->queue.size - 1) * sizeof(compile_job));
+    manager->queue.size -= 1;
+    PlatformMutex::Unlock(*manager->queueMutex);
 }
 
 void WorkerMain(void *)
@@ -174,9 +165,9 @@ void WorkerMain(void *)
 
 auto FindFile(const dev_shader_root_entry *root, byteview relPath) -> int32_t
 {
-    for (uint64_t i = 0; i < g_dev_shaders->files.size; ++i)
+    for (uint64_t i = 0; i < manager->files.size; ++i)
     {
-        const shader_file &f = g_dev_shaders->files[i];
+        const shader_file &f = manager->files[i];
         if (f.root == root && Span::Eq(f.relPath, relPath))
             return (int32_t)i;
     }
@@ -189,17 +180,17 @@ auto FindOrInsertFile(const dev_shader_root_entry *root, byteview relPath) -> in
     if (found >= 0)
         return found;
 
-    if (g_dev_shaders->files.size >= kFilesCap)
+    if (manager->files.size >= kFilesCap)
     {
         LOG("dev_shaders: file table full, dropping " SV_FMT, SV_ARG(relPath));
         return -1;
     }
 
-    auto &f = InlineVec::Append(g_dev_shaders->files);
+    auto &f = InlineVec::Append(manager->files);
     f.root = root;
-    f.relPath = CopyByteview(g_dev_shaders->persistent, relPath);
+    f.relPath = RegionAlloc::CopyByteView(manager->persistent, relPath);
     f.includes.size = 0;
-    return (int32_t)(g_dev_shaders->files.size - 1);
+    return (int32_t)(manager->files.size - 1);
 }
 
 void ScanIncludes(byteview src, const dev_shader_root_entry *root, inline_vec<uint16_t, kIncludesPerFile> &out)
@@ -265,11 +256,11 @@ void ScanIncludes(byteview src, const dev_shader_root_entry *root, inline_vec<ui
 
 void RescanIncludes(uint16_t idx)
 {
-    shader_file &f = g_dev_shaders->files[idx];
+    shader_file &f = manager->files[idx];
 
-    RegionAlloc::Reset(g_dev_shaders->scratch);
+    RegionAlloc::Reset(manager->scratch);
 
-    auto &fullPath = RegionAlloc::AllocVec<uint8_t, 0x200>(g_dev_shaders->scratch);
+    auto &fullPath = RegionAlloc::AllocVec<uint8_t, 0x200>(manager->scratch);
     InlineVec::Append(fullPath, f.root->srcDir);
     InlineVec::Append(fullPath, "/"_s);
     InlineVec::Append(fullPath, f.relPath);
@@ -284,7 +275,7 @@ void RescanIncludes(uint16_t idx)
     }
 
     span<uint8_t> bytes;
-    bool ok = TryFileReadFully(g_dev_shaders->scratch, file, bytes);
+    bool ok = TryFileReadFully(manager->scratch, file, bytes);
     FileClose(file);
     if (!ok)
     {
@@ -296,7 +287,7 @@ void RescanIncludes(uint16_t idx)
     // shader_file reference if the storage moves. inline_vec storage is
     // fixed-cap and never reallocates, so f stays valid; we still re-resolve
     // by index at the end to be defensive.
-    ScanIncludes(byteview{bytes.data, bytes.size}, g_dev_shaders->files[idx].root, g_dev_shaders->files[idx].includes);
+    ScanIncludes(byteview{bytes.data, bytes.size}, manager->files[idx].root, manager->files[idx].includes);
 }
 
 void CollectDependents(uint16_t seedIdx, inline_vec<uint16_t, kFilesCap> &out)
@@ -308,7 +299,7 @@ void CollectDependents(uint16_t seedIdx, inline_vec<uint16_t, kFilesCap> &out)
     while (cursor < out.size)
     {
         uint16_t cur = out[cursor++];
-        for (uint64_t i = 0; i < g_dev_shaders->files.size; ++i)
+        for (uint64_t i = 0; i < manager->files.size; ++i)
         {
             bool already = false;
             for (uint64_t j = 0; j < out.size; ++j)
@@ -320,7 +311,7 @@ void CollectDependents(uint16_t seedIdx, inline_vec<uint16_t, kFilesCap> &out)
             if (already)
                 continue;
 
-            const shader_file &f = g_dev_shaders->files[i];
+            const shader_file &f = manager->files[i];
             for (uint64_t k = 0; k < f.includes.size; ++k)
             {
                 if (f.includes[k] == cur)
@@ -354,11 +345,11 @@ void EnqueueCompile(const shader_file &f)
     WriteCStr(pending.dirPath, f.root->srcDir);
     WriteCStr(pending.name, f.relPath);
 
-    PlatformMutex::Lock(*g_dev_shaders->queueMutex);
+    PlatformMutex::Lock(*manager->queueMutex);
     bool dup = false;
-    for (uint64_t i = 0; i < g_dev_shaders->queue.size; ++i)
+    for (uint64_t i = 0; i < manager->queue.size; ++i)
     {
-        const compile_job &j = g_dev_shaders->queue.data.data[i];
+        const compile_job &j = manager->queue.data.data[i];
         if (Span::Eq((byteview)j.srcPath, (byteview)pending.srcPath))
         {
             dup = true;
@@ -369,18 +360,18 @@ void EnqueueCompile(const shader_file &f)
     bool pushed = false;
     if (!dup)
     {
-        if (g_dev_shaders->queue.size < kQueueCap)
+        if (manager->queue.size < kQueueCap)
         {
-            g_dev_shaders->queue.data.data[g_dev_shaders->queue.size++] = pending;
+            manager->queue.data.data[manager->queue.size++] = pending;
             pushed = true;
         }
         else
             dropped = true;
     }
-    PlatformMutex::Unlock(*g_dev_shaders->queueMutex);
+    PlatformMutex::Unlock(*manager->queueMutex);
 
     if (pushed)
-        PlatformCondvar::Signal(*g_dev_shaders->queueCv);
+        PlatformCondvar::Signal(*manager->queueCv);
     if (dropped)
         LOG("dev_shaders: queue full, dropped " SV_FMT, SV_ARG(f.relPath));
 }
@@ -391,11 +382,11 @@ void OnShaderEvent(const dir_watcher_event &ev, void *)
         return;
 
     const dev_shader_root_entry *root = nullptr;
-    for (uint64_t i = 0; i < g_dev_shaders->roots.size; ++i)
+    for (uint64_t i = 0; i < manager->roots.size; ++i)
     {
-        if (Span::Eq(g_dev_shaders->roots[i].srcDir, ev.dirPath))
+        if (Span::Eq(manager->roots[i].srcDir, ev.dirPath))
         {
-            root = &g_dev_shaders->roots[i];
+            root = &manager->roots[i];
             break;
         }
     }
@@ -415,16 +406,16 @@ void OnShaderEvent(const dir_watcher_event &ev, void *)
 
     if (isHlsl)
     {
-        EnqueueCompile(g_dev_shaders->files[idx]);
+        EnqueueCompile(manager->files[idx]);
         return;
     }
 
-    auto &deps = RegionAlloc::AllocVec<uint16_t, kFilesCap>(g_dev_shaders->scratch);
+    auto &deps = RegionAlloc::AllocVec<uint16_t, kFilesCap>(manager->scratch);
     deps.size = 0;
     CollectDependents((uint16_t)idx, deps);
     for (uint64_t i = 0; i < deps.size; ++i)
     {
-        const shader_file &f = g_dev_shaders->files[deps[i]];
+        const shader_file &f = manager->files[deps[i]];
         if (Span::EndsWith(f.relPath, ".hlsl"_s))
             EnqueueCompile(f);
     }
@@ -446,14 +437,14 @@ auto SpvMissing(const shader_file &f) -> bool
 
 void ScanRoot(const dev_shader_root_entry *root)
 {
-    RegionAlloc::Reset(g_dev_shaders->scratch);
+    RegionAlloc::Reset(manager->scratch);
 
-    dir_iter *it = DirIter::Create(g_dev_shaders->scratch, root->srcDir);
+    dir_iter *it = DirIter::Create(manager->scratch, root->srcDir);
     if (!it)
         return;
 
     file_metadata meta;
-    while (DirIter::Next(g_dev_shaders->scratch, *it, meta))
+    while (DirIter::Next(manager->scratch, *it, meta))
     {
         if (Any(meta.attributes & file_attribute::Hidden))
             continue;
@@ -478,38 +469,38 @@ namespace DevShaders
 
 void API Bootstrap(span<const dev_shader_root> roots)
 {
-    g_dev_shaders = &RegionAlloc::Alloc<dev_shaders_state>(RegionAlloc::g_BootstrapAlloc);
-    g_dev_shaders->persistent = RegionAlloc::Create(MemPagePool::kChunkSize, 0);
-    g_dev_shaders->workerScratch = RegionAlloc::Create(MemPagePool::kChunkSize, 0);
-    g_dev_shaders->scratch = RegionAlloc::Create(MemPagePool::kChunkSize, 0);
+    manager = &RegionAlloc::Alloc<dev_shaders_state>(RegionAlloc::g_BootstrapAlloc);
+    manager->persistent = RegionAlloc::Create(MemPagePool::kChunkSize, 0);
+    manager->workerScratch = RegionAlloc::Create(MemPagePool::kChunkSize, 0);
+    manager->scratch = RegionAlloc::Create(MemPagePool::kChunkSize, 0);
 
-    g_dev_shaders->queueMutex = PlatformMutex::Create(RegionAlloc::g_BootstrapAlloc);
-    g_dev_shaders->queueCv = PlatformCondvar::Create(RegionAlloc::g_BootstrapAlloc);
+    manager->queueMutex = PlatformMutex::Create(RegionAlloc::g_BootstrapAlloc);
+    manager->queueCv = PlatformCondvar::Create(RegionAlloc::g_BootstrapAlloc);
 
     DirWatcher::Subscribe(".hlsl"_s, OnShaderEvent, nullptr);
     DirWatcher::Subscribe(".hlsli"_s, OnShaderEvent, nullptr);
 
     for (uint64_t i = 0; i < roots.size; ++i)
     {
-        byteview src = CopyByteview(g_dev_shaders->persistent, roots[i].srcDir);
-        byteview out = CopyByteview(g_dev_shaders->persistent, roots[i].outDir);
-        InlineVec::Append(g_dev_shaders->roots, dev_shader_root_entry{
-                                                    .srcDir = src,
-                                                    .outDir = out,
-                                                });
-        DirWatcher::WatchDir(g_dev_shaders->persistent, src);
+        byteview src = RegionAlloc::CopyByteView(manager->persistent, roots[i].srcDir);
+        byteview out = RegionAlloc::CopyByteView(manager->persistent, roots[i].outDir);
+        InlineVec::Append(manager->roots, dev_shader_root_entry{
+                                              .srcDir = src,
+                                              .outDir = out,
+                                          });
+        DirWatcher::WatchDir(manager->persistent, src);
     }
 
-    for (uint64_t i = 0; i < g_dev_shaders->roots.size; ++i)
-        ScanRoot(&g_dev_shaders->roots[i]);
+    for (uint64_t i = 0; i < manager->roots.size; ++i)
+        ScanRoot(&manager->roots[i]);
 
-    for (uint64_t i = 0; i < g_dev_shaders->files.size; ++i)
+    for (uint64_t i = 0; i < manager->files.size; ++i)
         RescanIncludes((uint16_t)i);
 
     uint64_t missingCount = 0;
-    for (uint64_t i = 0; i < g_dev_shaders->files.size; ++i)
+    for (uint64_t i = 0; i < manager->files.size; ++i)
     {
-        const shader_file &f = g_dev_shaders->files[i];
+        const shader_file &f = manager->files[i];
         bool isHlsli = Span::EndsWith(f.relPath, ".hlsli"_s);
         bool isHlsl = !isHlsli && Span::EndsWith(f.relPath, ".hlsl"_s);
         if (!isHlsl)
@@ -521,13 +512,13 @@ void API Bootstrap(span<const dev_shader_root> roots)
         }
     }
 
-    RegionAlloc::Reset(g_dev_shaders->scratch);
+    RegionAlloc::Reset(manager->scratch);
 
-    g_dev_shaders->worker = PlatformThread::Create(RegionAlloc::g_BootstrapAlloc, &WorkerMain, nullptr);
-    PlatformThread::SetName(*g_dev_shaders->worker, "nyla-shadercc");
+    manager->worker = PlatformThread::Create(RegionAlloc::g_BootstrapAlloc, &WorkerMain, nullptr);
+    PlatformThread::SetName(*manager->worker, "nyla-shadercc");
 
     LOG("dev_shaders: %" PRIu64 " roots watched, %" PRIu64 " files indexed, %" PRIu64 " missing spv enqueued",
-        g_dev_shaders->roots.size, g_dev_shaders->files.size, missingCount);
+        manager->roots.size, manager->files.size, missingCount);
 }
 
 } // namespace DevShaders

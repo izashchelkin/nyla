@@ -43,7 +43,7 @@ template <typename T>
 INLINE auto CStr(span<T> self) -> const char *
     requires(sizeof(T) == 1)
 {
-    ASSERT(*(self.data + self.size) == 0);
+    DASSERT(*(self.data + self.size) == 0);
     return (const char *)self.data;
 }
 

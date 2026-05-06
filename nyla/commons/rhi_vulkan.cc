@@ -927,24 +927,6 @@ void WaitTimeline(VkSemaphore timeline, uint64_t waitValue)
     };
 
     VK_CHECK(vkWaitSemaphores(rhi->dev, &waitInfo, 1e9));
-
-#if 0
-    {
-        uint64_t currentValue = -1;
-        vkGetSemaphoreCounterValue(g_State->m_Dev, timeline, &currentValue);
-        DebugBreak();
-
-        VkSemaphoreSignalInfo info{
-            .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO,
-            .semaphore = timeline,
-            .value = waitValue,
-        };
-        VK_CHECK(vkSignalSemaphore(g_State->m_Dev, &info));
-
-        vkGetSemaphoreCounterValue(g_State->m_Dev, g_State->m_GraphicsQueue.timeline, &currentValue);
-        DebugBreak();
-    }
-#endif
 }
 
 void WriteDescriptorTables(region_alloc &alloc)
@@ -1685,7 +1667,7 @@ void Rhi::NameBuffer(rhi_buffer buf, byteview name)
 
 void Rhi::DestroyBuffer(rhi_buffer buffer)
 {
-    VulkanBufferData bufferData = HandlePool::ResolveData(rhi->buffers, buffer);
+    VulkanBufferData bufferData = HandlePool::ReleaseData(rhi->buffers, buffer);
 
     if (bufferData.mapped)
     {
@@ -2127,11 +2109,6 @@ void Rhi::ReloadShader(rhi_shader shader, span<uint32_t> code)
 void Rhi::DestroyShader(rhi_shader shader)
 {
     HandlePool::ReleaseData(rhi->shaders, shader);
-
-#if 0
-    VkShaderModule shaderModule = g_State->m_Shaders.ReleaseData(shader);
-    vkDestroyShaderModule(g_State->m_Dev, shaderModule, nullptr);
-#endif
 }
 
 void Rhi::DestroyGraphicsPipeline(rhi_graphics_pipeline pipeline)
@@ -2474,7 +2451,7 @@ void Rhi::CmdTransitionTexture(rhi_cmdlist cmd, rhi_texture texture, rhi_texture
 
 void Rhi::DestroyTexture(rhi_texture texture)
 {
-    VulkanTextureData textureData = HandlePool::ResolveData(rhi->textures, texture);
+    VulkanTextureData textureData = HandlePool::ReleaseData(rhi->textures, texture);
 
     ASSERT(textureData.image);
     vkDestroyImage(rhi->dev, textureData.image, rhi->vkAlloc);
@@ -2485,7 +2462,7 @@ void Rhi::DestroyTexture(rhi_texture texture)
 
 void Rhi::DestroySampledTextureView(rhi_srv textureView)
 {
-    const VulkanTextureViewData &textureViewData = HandlePool::ResolveData(rhi->stvs, textureView);
+    VulkanTextureViewData textureViewData = HandlePool::ReleaseData(rhi->stvs, textureView);
     ASSERT(textureViewData.imageView);
 
     vkDestroyImageView(rhi->dev, textureViewData.imageView, rhi->vkAlloc);
@@ -2493,7 +2470,7 @@ void Rhi::DestroySampledTextureView(rhi_srv textureView)
 
 void Rhi::DestroyRenderTargetView(rhi_rtv textureView)
 {
-    const VulkanTextureViewData &textureViewData = HandlePool::ResolveData(rhi->rtvs, textureView);
+    VulkanTextureViewData textureViewData = HandlePool::ReleaseData(rhi->rtvs, textureView);
     ASSERT(textureViewData.imageView);
 
     vkDestroyImageView(rhi->dev, textureViewData.imageView, rhi->vkAlloc);
@@ -2501,7 +2478,7 @@ void Rhi::DestroyRenderTargetView(rhi_rtv textureView)
 
 void Rhi::DestroyDepthStencilView(rhi_dsv textureView)
 {
-    const VulkanTextureViewData &textureViewData = HandlePool::ResolveData(rhi->dsvs, textureView);
+    VulkanTextureViewData textureViewData = HandlePool::ReleaseData(rhi->dsvs, textureView);
     ASSERT(textureViewData.imageView);
 
     vkDestroyImageView(rhi->dev, textureViewData.imageView, rhi->vkAlloc);
@@ -2760,21 +2737,6 @@ auto Rhi::CreateGraphicsPipeline(region_alloc &alloc, const rhi_graphics_pipelin
         .depthAttachmentFormat = ConvertTextureFormatIntoVkFormat(desc.depthFormat, nullptr),
     };
 
-#if 0
-    ASSERT(desc.bindGroupLayoutsCount <= std::Size(desc.bindGroupLayouts));
-    pipelineData.bindGroupLayoutCount = desc.bindGroupLayoutsCount;
-    pipelineData.bindGroupLayouts = desc.bindGroupLayouts;
-#endif
-
-#if 0
-    ASSERT(desc.pushConstantSize <= kRhiMaxPushConstantSize);
-    const VkPushConstantRange pushConstantRange{
-        .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-        .offset = 0,
-        .size = desc.pushConstantSize,
-    };
-#endif
-
     const array<VkDescriptorSetLayout, 3> descriptorSetLayouts = {
         rhi->constantsDescriptorTable.layout,
         rhi->texturesDescriptorTable.layout,
@@ -2785,10 +2747,6 @@ auto Rhi::CreateGraphicsPipeline(region_alloc &alloc, const rhi_graphics_pipelin
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         .setLayoutCount = Array::Size(descriptorSetLayouts),
         .pSetLayouts = descriptorSetLayouts.data,
-#if 0
-        .pushConstantRangeCount = desc.pushConstantSize > 0,
-        .pPushConstantRanges = &pushConstantRange,
-#endif
     };
 
     vkCreatePipelineLayout(rhi->dev, &pipelineLayoutCreateInfo, nullptr, &pipelineData.layout);

@@ -14,7 +14,6 @@
 #include "nyla/commons/fmt.h"
 #include "nyla/commons/inline_vec.h"
 #include "nyla/commons/macros.h"
-#include "nyla/commons/mem.h"
 #include "nyla/commons/mempage_pool.h"
 #include "nyla/commons/platform_dir_watch.h"
 #include "nyla/commons/region_alloc.h"
@@ -47,15 +46,7 @@ struct dev_assets_state
     inline_vec<dev_asset_entry, 1024> entries;
 };
 
-dev_assets_state *g_dev;
-
-auto CopyByteview(region_alloc &alloc, byteview src) -> byteview
-{
-    span<uint8_t> dst = RegionAlloc::AllocArray<uint8_t>(alloc, src.size + 1);
-    MemCpy(dst.data, src.data, src.size);
-    dst.data[src.size] = 0;
-    return byteview{dst.data, src.size};
-}
+dev_assets_state *manager;
 
 auto ParseGuidFromMeta(byteview metaContents) -> uint64_t
 {
@@ -83,9 +74,9 @@ auto ParseGuidFromMeta(byteview metaContents) -> uint64_t
 
 auto FindEntry(byteview dirPath, byteview name) -> dev_asset_entry *
 {
-    for (uint64_t i = 0; i < g_dev->entries.size; ++i)
+    for (uint64_t i = 0; i < manager->entries.size; ++i)
     {
-        dev_asset_entry &e = g_dev->entries[i];
+        dev_asset_entry &e = manager->entries[i];
         if (Span::Eq(e.dirPath, dirPath) && Span::Eq(e.name, name))
             return &e;
     }
@@ -104,7 +95,7 @@ auto LookupAndOpen(const dir_watcher_event &ev, dev_asset_entry *&outEntry, byte
         return nullptr;
     }
 
-    auto &fullPath = RegionAlloc::AllocVec<uint8_t, 0x200>(g_dev->scratch);
+    auto &fullPath = RegionAlloc::AllocVec<uint8_t, 0x200>(manager->scratch);
     InlineVec::Append(fullPath, entry->dirPath);
     InlineVec::Append(fullPath, "/"_s);
     InlineVec::Append(fullPath, entry->name);
@@ -125,7 +116,7 @@ auto LookupAndOpen(const dir_watcher_event &ev, dev_asset_entry *&outEntry, byte
 
 void OnSpvEvent(const dir_watcher_event &ev, void *)
 {
-    RegionAlloc::Reset(g_dev->scratch);
+    RegionAlloc::Reset(manager->scratch);
 
     dev_asset_entry *entry = nullptr;
     byteview fullPath{};
@@ -138,7 +129,7 @@ void OnSpvEvent(const dir_watcher_event &ev, void *)
     FileSeek(file, 0, file_seek_mode::Begin);
 
     if (entry->slot.data == nullptr)
-        entry->slot = RegionAlloc::AllocArray<uint8_t>(g_dev->persistent, kSpvSlotSize);
+        entry->slot = RegionAlloc::AllocArray<uint8_t>(manager->persistent, kSpvSlotSize);
 
     if (fileSize > entry->slot.size)
     {
@@ -171,7 +162,7 @@ void OnSpvEvent(const dir_watcher_event &ev, void *)
 
 void OnTextureEvent(const dir_watcher_event &ev, void *)
 {
-    RegionAlloc::Reset(g_dev->scratch);
+    RegionAlloc::Reset(manager->scratch);
 
     dev_asset_entry *entry = nullptr;
     byteview fullPath{};
@@ -180,7 +171,7 @@ void OnTextureEvent(const dir_watcher_event &ev, void *)
         return;
 
     span<uint8_t> raw;
-    bool readOk = TryFileReadFully(g_dev->scratch, file, raw);
+    bool readOk = TryFileReadFully(manager->scratch, file, raw);
     FileClose(file);
     if (!readOk)
     {
@@ -188,7 +179,7 @@ void OnTextureEvent(const dir_watcher_event &ev, void *)
         return;
     }
 
-    byteview blob = ImportTextureFromPngOrJpg(byteview{raw.data, raw.size}, g_dev->persistent);
+    byteview blob = ImportTextureFromPngOrJpg(byteview{raw.data, raw.size}, manager->persistent);
     if (blob.size == 0)
     {
         LOG("dev_assets: image decode failed " SV_FMT, SV_ARG(fullPath));
@@ -206,7 +197,7 @@ void OnTextureEvent(const dir_watcher_event &ev, void *)
 // dev sessions; promote to per-guid slots if memory growth becomes a problem.
 void OnRawAssetEvent(const dir_watcher_event &ev, void *)
 {
-    RegionAlloc::Reset(g_dev->scratch);
+    RegionAlloc::Reset(manager->scratch);
 
     dev_asset_entry *entry = nullptr;
     byteview fullPath{};
@@ -218,7 +209,7 @@ void OnRawAssetEvent(const dir_watcher_event &ev, void *)
     uint64_t fileSize = FileTell(file);
     FileSeek(file, 0, file_seek_mode::Begin);
 
-    span<uint8_t> dst = RegionAlloc::AllocArray<uint8_t>(g_dev->persistent, fileSize);
+    span<uint8_t> dst = RegionAlloc::AllocArray<uint8_t>(manager->persistent, fileSize);
 
     uint64_t read = 0;
     uint64_t remaining = fileSize;
@@ -243,14 +234,14 @@ void OnRawAssetEvent(const dir_watcher_event &ev, void *)
 
 void ScanDir(byteview dirPath, bool watchThis)
 {
-    dir_iter *it = DirIter::Create(g_dev->scratch, dirPath);
+    dir_iter *it = DirIter::Create(manager->scratch, dirPath);
     if (!it)
         return;
 
     bool watched = false;
 
     file_metadata meta;
-    while (DirIter::Next(g_dev->scratch, *it, meta))
+    while (DirIter::Next(manager->scratch, *it, meta))
     {
         if (Any(meta.attributes & file_attribute::Hidden))
             continue;
@@ -259,7 +250,7 @@ void ScanDir(byteview dirPath, bool watchThis)
 
         if (Any(meta.attributes & file_attribute::Directory))
         {
-            auto &subDir = RegionAlloc::AllocVec<uint8_t, 0x200>(g_dev->scratch);
+            auto &subDir = RegionAlloc::AllocVec<uint8_t, 0x200>(manager->scratch);
             InlineVec::Append(subDir, dirPath);
             InlineVec::Append(subDir, "/"_s);
             InlineVec::Append(subDir, meta.fileName);
@@ -274,7 +265,7 @@ void ScanDir(byteview dirPath, bool watchThis)
         if (assetName.size == 0)
             continue;
 
-        auto &metaPath = RegionAlloc::AllocVec<uint8_t, 0x200>(g_dev->scratch);
+        auto &metaPath = RegionAlloc::AllocVec<uint8_t, 0x200>(manager->scratch);
         InlineVec::Append(metaPath, dirPath);
         InlineVec::Append(metaPath, "/"_s);
         InlineVec::Append(metaPath, meta.fileName);
@@ -283,25 +274,25 @@ void ScanDir(byteview dirPath, bool watchThis)
         if (!FileValid(f))
             continue;
 
-        span<uint8_t> contents = FileReadFully(g_dev->scratch, f);
+        span<uint8_t> contents = FileReadFully(manager->scratch, f);
         FileClose(f);
 
         uint64_t guid = ParseGuidFromMeta(contents);
         if (!guid)
             continue;
 
-        InlineVec::Append(g_dev->entries, dev_asset_entry{
-                                              .dirPath = CopyByteview(g_dev->persistent, dirPath),
-                                              .name = CopyByteview(g_dev->persistent, assetName),
-                                              .guid = guid,
-                                          });
+        InlineVec::Append(manager->entries, dev_asset_entry{
+                                                .dirPath = RegionAlloc::CopyByteView(manager->persistent, dirPath),
+                                                .name = RegionAlloc::CopyByteView(manager->persistent, assetName),
+                                                .guid = guid,
+                                            });
         watched = true;
     }
 
     DirIter::Destroy(*it);
 
     if (watchThis && watched)
-        DirWatcher::WatchDir(g_dev->persistent, dirPath);
+        DirWatcher::WatchDir(manager->persistent, dirPath);
 }
 
 } // namespace
@@ -311,9 +302,9 @@ namespace DevAssets
 
 void API Bootstrap(span<const byteview> roots)
 {
-    g_dev = &RegionAlloc::Alloc<dev_assets_state>(RegionAlloc::g_BootstrapAlloc);
-    g_dev->persistent = RegionAlloc::Create(MemPagePool::kChunkSize, 0);
-    g_dev->scratch = RegionAlloc::Create(MemPagePool::kChunkSize, 0);
+    manager = &RegionAlloc::Alloc<dev_assets_state>(RegionAlloc::g_BootstrapAlloc);
+    manager->persistent = RegionAlloc::Create(MemPagePool::kChunkSize, 0);
+    manager->scratch = RegionAlloc::Create(MemPagePool::kChunkSize, 0);
 
     DirWatcher::Subscribe(".spv"_s, OnSpvEvent, nullptr);
     DirWatcher::Subscribe(".png"_s, OnTextureEvent, nullptr);
@@ -327,9 +318,9 @@ void API Bootstrap(span<const byteview> roots)
     for (uint64_t i = 0; i < roots.size; ++i)
         ScanDir(roots[i], true);
 
-    RegionAlloc::Reset(g_dev->scratch);
+    RegionAlloc::Reset(manager->scratch);
 
-    LOG("dev_assets: %" PRIu64 " entries indexed", g_dev->entries.size);
+    LOG("dev_assets: %" PRIu64 " entries indexed", manager->entries.size);
 }
 
 } // namespace DevAssets

@@ -15,6 +15,9 @@ struct render_targets
     rhi_texture_format DepthStencilFormat;
     inline_vec<rhi_texture, kRhiMaxNumFramesInFlight> DepthStencilTextures;
     inline_vec<rhi_dsv, kRhiMaxNumFramesInFlight> Dsvs;
+
+    uint32_t CachedWidth;
+    uint32_t CachedHeight;
 };
 
 namespace RenderTargets

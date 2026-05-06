@@ -20,7 +20,7 @@ using dir_watcher_callback = void (*)(const dir_watcher_event &event, void *user
 namespace DirWatcher
 {
 
-void API Bootstrap(region_alloc &alloc);
+void API Bootstrap();
 void API WatchDir(region_alloc &alloc, byteview path);
 void API Subscribe(byteview suffix, dir_watcher_callback cb, void *user);
 void API Tick();

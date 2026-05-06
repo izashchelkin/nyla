@@ -18,7 +18,6 @@ target_sources(${TARGET} PRIVATE
     json_value.cc
     libmain.cc
     mat.cc
-    mem.cc
     mempage_pool.cc
     mesh_manager.cc
     pipeline_cache.cc
@@ -34,6 +33,7 @@ target_sources(${TARGET} PRIVATE
     texture_manager.cc
     tunables.cc
     tween_manager.cc
+    ui_imgui.cc
     wave.cc
 )
 target_sources(${TARGET} PUBLIC
@@ -70,6 +70,7 @@ target_sources(${TARGET} PUBLIC
     gpu_upload.h
     handle_pool.h
     handle.h
+    hash.h
     hex.h
     inline_path.h
     inline_queue.h
@@ -123,6 +124,7 @@ target_sources(${TARGET} PUBLIC
     tunables.h
     tuple.h
     tween_manager.h
+    ui_imgui.h
     vec.h
     wave.h
     word.h
@@ -154,7 +156,6 @@ else()
         renderdoc_linux.cc
     )
     target_sources(${TARGET} PUBLIC
-        abi_linux.h
         entrypoint_linux.h
         platform_linux.h
         x11_error_linux.h

@@ -57,7 +57,7 @@ auto API Poll(platform_dir_watch &self, platform_dir_watch_event &out) -> bool
         ASSERT(self.bufPos <= self.bufLen);
         if (!self.bufPos || self.bufPos == self.bufLen)
         {
-            ssize_t n = read(self.fd, self.buf.data, kBufSize);
+            int64_t n = read(self.fd, self.buf.data, kBufSize);
             if (n <= 0)
             {
                 self.bufPos = 0;
@@ -68,7 +68,7 @@ auto API Poll(platform_dir_watch &self, platform_dir_watch_event &out) -> bool
             self.bufLen = (uint32_t)n;
         }
 
-        const auto *event = reinterpret_cast<const inotify_event *>(self.buf.data + self.bufPos);
+        const auto *event = (const inotify_event *)(self.buf.data + self.bufPos);
         self.bufPos += sizeof(inotify_event);
 
         if (event->mask & IN_ISDIR)
@@ -76,25 +76,24 @@ auto API Poll(platform_dir_watch &self, platform_dir_watch_event &out) -> bool
             self.bufPos += event->len;
             continue;
         }
+        else
+        {
+            out.mask = None<platform_dir_watch_event_type>();
+            if (event->mask & IN_MODIFY)
+                out.mask |= platform_dir_watch_event_type::Modified;
+            if (event->mask & IN_DELETE)
+                out.mask |= platform_dir_watch_event_type::Deleted;
+            if (event->mask & IN_MOVED_FROM)
+                out.mask |= platform_dir_watch_event_type::MovedFrom;
+            if (event->mask & IN_MOVED_TO)
+                out.mask |= platform_dir_watch_event_type::MovedTo;
 
-        out.mask = None<platform_dir_watch_event_type>();
-        if (event->mask & IN_MODIFY)
-            out.mask |= platform_dir_watch_event_type::Modified;
-        if (event->mask & IN_DELETE)
-            out.mask |= platform_dir_watch_event_type::Deleted;
-        if (event->mask & IN_MOVED_FROM)
-            out.mask |= platform_dir_watch_event_type::MovedFrom;
-        if (event->mask & IN_MOVED_TO)
-            out.mask |= platform_dir_watch_event_type::MovedTo;
+            const uint8_t *name = self.buf.data + self.bufPos;
+            out.name = byteview{name, CStrLen(name, 1024)};
 
-        const uint8_t *name = self.buf.data + self.bufPos;
-        uint32_t nameLen = 0;
-        while (nameLen < event->len && name[nameLen] != 0)
-            ++nameLen;
-        out.name = byteview{name, nameLen};
-
-        self.bufPos += event->len;
-        return true;
+            self.bufPos += event->len;
+            return true;
+        }
     }
 }
 

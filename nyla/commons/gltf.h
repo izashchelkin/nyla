@@ -131,25 +131,6 @@ struct gltf_mesh
     span<gltf_mesh_primitive> primitives;
 };
 
-#if 0
-class GlbChunkParser : public ByteParser
-{
-  public:
-    void Init(void *data, uint64_t size)
-    {
-        m_Base = (uint32_t *)data;
-        ByteParser::Init((char *)m_Base, size);
-    }
-
-    auto Parse(Span<char> &jsonChunk, Span<char> &binChunk) -> bool;
-
-  private:
-    void *m_Base;
-    void *m_At;
-    uint64_t m_BytesLeft;
-};
-#endif
-
 struct gltf_parser
 {
     byteview jsonChunk;

@@ -114,12 +114,9 @@ auto BuildPipeline(pipeline_cache_entry &entry) -> rhi_graphics_pipeline
         .debugName = entry.debugName,
         .vs = vs,
         .ps = ps,
-        .vertexBindings =
-            span<rhi_vertex_binding_desc>{InlineVec::DataPtr(entry.vertexBindings), entry.vertexBindings.size},
-        .vertexAttributes =
-            span<rhi_vertex_attribute_desc>{InlineVec::DataPtr(entry.vertexAttributes), entry.vertexAttributes.size},
-        .colorTargetFormats =
-            span<rhi_texture_format>{InlineVec::DataPtr(entry.colorTargetFormats), entry.colorTargetFormats.size},
+        .vertexBindings = InlineVec::AsSpan(entry.vertexBindings),
+        .vertexAttributes = InlineVec::AsSpan(entry.vertexAttributes),
+        .colorTargetFormats = InlineVec::AsSpan(entry.colorTargetFormats),
         .depthFormat = entry.depthFormat,
         .depthWriteEnabled = entry.depthWriteEnabled,
         .depthTestEnabled = entry.depthTestEnabled,

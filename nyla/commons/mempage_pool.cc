@@ -19,7 +19,7 @@ struct mempage_pool
     uint8_t *begin;
     array<uint64_t, MemPagePool::kNumChunks / 64> bitset;
 };
-mempage_pool *g_MemPagePool;
+mempage_pool *manager;
 
 } // namespace
 
@@ -28,16 +28,16 @@ namespace MemPagePool
 
 void Bootstrap()
 {
-    g_MemPagePool = &RegionAlloc::Alloc<mempage_pool>(RegionAlloc::g_BootstrapAlloc);
-    g_MemPagePool->begin = RegionAlloc::g_BootstrapAlloc.begin;
-    g_MemPagePool->bitset[0] |= 1; // bootstrapAlloc owns first chunk
+    manager = &RegionAlloc::Alloc<mempage_pool>(RegionAlloc::g_BootstrapAlloc);
+    manager->begin = RegionAlloc::g_BootstrapAlloc.begin;
+    manager->bitset[0] |= 1; // bootstrapAlloc owns first chunk
 }
 
 auto API AcquireChunk() -> span<uint8_t>
 {
-    for (uint64_t i = 0; i < Array::Size(g_MemPagePool->bitset); ++i)
+    for (uint64_t i = 0; i < Array::Size(manager->bitset); ++i)
     {
-        uint64_t &qword = g_MemPagePool->bitset[i];
+        uint64_t &qword = manager->bitset[i];
 
         if (qword == Limits<uint64_t>::Max())
             continue;
@@ -46,7 +46,7 @@ auto API AcquireChunk() -> span<uint8_t>
         qword |= ((uint64_t)1) << index;
 
         return span<uint8_t>{
-            g_MemPagePool->begin + (kChunkSize * ((i * 64) + index)),
+            manager->begin + (kChunkSize * ((i * 64) + index)),
             kChunkSize,
         };
     }
@@ -57,8 +57,8 @@ auto API AcquireChunk() -> span<uint8_t>
 
 void API ReleaseChunk(void *p)
 {
-    uint64_t ichunk = ((uint8_t *)p - g_MemPagePool->begin) / kChunkSize;
-    uint64_t &qword = g_MemPagePool->bitset[ichunk / 64];
+    uint64_t ichunk = ((uint8_t *)p - manager->begin) / kChunkSize;
+    uint64_t &qword = manager->bitset[ichunk / 64];
 
     uint64_t mask = ((uint64_t)1) << (ichunk % 64);
     DASSERT(qword & mask);

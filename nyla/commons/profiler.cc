@@ -6,7 +6,6 @@
 #include "nyla/commons/fmt.h"
 #include "nyla/commons/inline_string.h"
 #include "nyla/commons/macros.h"
-#include "nyla/commons/mem.h"
 #include "nyla/commons/minmax.h"
 #include "nyla/commons/region_alloc.h"
 #include "nyla/commons/rhi.h"
@@ -49,15 +48,7 @@ struct profiler_state
     bool visible;
 };
 
-profiler_state *g_profiler;
-
-void StoreName(inline_string<kNameCap> &dst, byteview name)
-{
-    uint64_t n = Min<uint64_t>(name.size, kNameCap);
-    if (n)
-        MemCpy(dst.data.data, name.data, n);
-    dst.size = n;
-}
+profiler_state *manager;
 
 } // namespace
 
@@ -66,100 +57,100 @@ namespace Profiler
 
 void API Bootstrap()
 {
-    g_profiler = &RegionAlloc::Alloc<profiler_state>(RegionAlloc::g_BootstrapAlloc);
-    g_profiler->currentCount = 0;
-    g_profiler->displayCount = 0;
-    g_profiler->stackDepth = 0;
-    g_profiler->frameStartUs = 0;
-    g_profiler->lastFrameUs = 0;
-    g_profiler->overflowCount = 0;
-    g_profiler->visible = true;
+    manager = &RegionAlloc::Alloc<profiler_state>(RegionAlloc::g_BootstrapAlloc);
+    manager->currentCount = 0;
+    manager->displayCount = 0;
+    manager->stackDepth = 0;
+    manager->frameStartUs = 0;
+    manager->lastFrameUs = 0;
+    manager->overflowCount = 0;
+    manager->visible = true;
 }
 
 void API FrameBegin()
 {
-    if (!g_profiler)
+    if (!manager)
         return;
-    g_profiler->currentCount = 0;
-    g_profiler->stackDepth = 0;
-    g_profiler->overflowCount = 0;
-    g_profiler->frameStartUs = GetMonotonicTimeMicros();
+    manager->currentCount = 0;
+    manager->stackDepth = 0;
+    manager->overflowCount = 0;
+    manager->frameStartUs = GetMonotonicTimeMicros();
 }
 
 void API FrameEnd()
 {
-    if (!g_profiler)
+    if (!manager)
         return;
 
     const uint64_t now = GetMonotonicTimeMicros();
-    g_profiler->lastFrameUs = now - g_profiler->frameStartUs;
+    manager->lastFrameUs = now - manager->frameStartUs;
 
-    while (g_profiler->stackDepth > 0)
+    while (manager->stackDepth > 0)
     {
-        const uint16_t idx = g_profiler->stack[--g_profiler->stackDepth];
-        auto &e = g_profiler->current[idx];
+        const uint16_t idx = manager->stack[--manager->stackDepth];
+        auto &e = manager->current[idx];
         e.durationUs = now - e.startUs;
     }
 
-    const uint32_t n = Min<uint32_t>(g_profiler->currentCount, kMaxEntries);
+    const uint32_t n = Min<uint32_t>(manager->currentCount, kMaxEntries);
     for (uint32_t i = 0; i < n; ++i)
-        g_profiler->display[i] = g_profiler->current[i];
-    g_profiler->displayCount = n;
+        manager->display[i] = manager->current[i];
+    manager->displayCount = n;
 }
 
 void API BeginScope(byteview name)
 {
-    if (!g_profiler)
+    if (!manager)
         return;
-    if (g_profiler->currentCount >= kMaxEntries || g_profiler->stackDepth >= kMaxStack)
+    if (manager->currentCount >= kMaxEntries || manager->stackDepth >= kMaxStack)
     {
-        ++g_profiler->overflowCount;
+        ++manager->overflowCount;
         return;
     }
 
-    const uint16_t idx = (uint16_t)g_profiler->currentCount++;
-    auto &e = g_profiler->current[idx];
-    StoreName(e.name, name);
+    const uint16_t idx = (uint16_t)manager->currentCount++;
+    auto &e = manager->current[idx];
+    InlineString::Assign(e.name, name);
     e.startUs = GetMonotonicTimeMicros();
     e.durationUs = 0;
-    e.depth = g_profiler->stackDepth;
-    g_profiler->stack[g_profiler->stackDepth++] = idx;
+    e.depth = manager->stackDepth;
+    manager->stack[manager->stackDepth++] = idx;
 }
 
 void API EndScope()
 {
-    if (!g_profiler)
+    if (!manager)
         return;
-    if (g_profiler->stackDepth == 0)
+    if (manager->stackDepth == 0)
         return;
 
-    const uint16_t idx = g_profiler->stack[--g_profiler->stackDepth];
-    auto &e = g_profiler->current[idx];
+    const uint16_t idx = manager->stack[--manager->stackDepth];
+    auto &e = manager->current[idx];
     e.durationUs = GetMonotonicTimeMicros() - e.startUs;
 }
 
 void API ToggleVisible()
 {
-    if (!g_profiler)
+    if (!manager)
         return;
-    g_profiler->visible = !g_profiler->visible;
+    manager->visible = !manager->visible;
 }
 
 auto API IsVisible() -> bool
 {
-    return g_profiler && g_profiler->visible;
+    return manager && manager->visible;
 }
 
 void API CmdFlush(rhi_cmdlist cmd, int32_t originPxX, int32_t originPxY, uint32_t fps)
 {
-    if (!g_profiler || !g_profiler->visible)
+    if (!manager || !manager->visible)
         return;
 
     constexpr uint32_t kCols = 64;
     constexpr uint32_t kIndent = 2;
     constexpr uint32_t kHeaderRows = 1;
 
-    const uint32_t scopeRows = Min<uint32_t>(g_profiler->displayCount, kMaxEntries);
+    const uint32_t scopeRows = Min<uint32_t>(manager->displayCount, kMaxEntries);
     const uint32_t rows = kHeaderRows + scopeRows;
     if (!rows)
         return;
@@ -171,7 +162,7 @@ void API CmdFlush(rhi_cmdlist cmd, int32_t originPxX, int32_t originPxY, uint32_
 
     CellRenderer::Begin(originPxX, originPxY, kCols, rows);
 
-    const double frameMs = (double)g_profiler->lastFrameUs * 1e-3;
+    const double frameMs = (double)manager->lastFrameUs * 1e-3;
     uint8_t headerBuf[128];
     const uint64_t headerN = StringWriteFmt(span<uint8_t>{headerBuf, sizeof(headerBuf)},
                                             "profiler (F7 hide)  frame %f ms  %u fps"_s, frameMs, fps);
@@ -179,7 +170,7 @@ void API CmdFlush(rhi_cmdlist cmd, int32_t originPxX, int32_t originPxY, uint32_
 
     for (uint32_t i = 0; i < scopeRows; ++i)
     {
-        const auto &e = g_profiler->display[i];
+        const auto &e = manager->display[i];
         const double ms = (double)e.durationUs * 1e-3;
 
         uint8_t lineBuf[160];

@@ -8,8 +8,6 @@
 #include "nyla/commons/fmt.h"
 #include "nyla/commons/inline_string.h"
 #include "nyla/commons/macros.h"
-#include "nyla/commons/mem.h"
-#include "nyla/commons/minmax.h"
 #include "nyla/commons/region_alloc.h"
 #include "nyla/commons/span.h"
 #include "nyla/commons/span_def.h"
@@ -70,23 +68,7 @@ struct tunables_state
     uint32_t pendingCount;
 };
 
-tunables_state *g_tunables;
-
-void StoreName(inline_string<kNameCap> &dst, byteview name)
-{
-    uint64_t n = Min<uint64_t>(name.size, kNameCap);
-    if (n)
-        MemCpy(dst.data.data, name.data, n);
-    dst.size = n;
-}
-
-void StorePath(inline_string<kPathCap> &dst, byteview path)
-{
-    uint64_t n = Min<uint64_t>(path.size, kPathCap);
-    if (n)
-        MemCpy(dst.data.data, path.data, n);
-    dst.size = n;
-}
+tunables_state *manager;
 
 auto NameView(const inline_string<kNameCap> &s) -> byteview
 {
@@ -113,11 +95,11 @@ auto ReadNameToken(byte_parser &p) -> byteview
 
 void ApplyPending(tunable_entry &e, byteview name, void *ptr, tunable_type type)
 {
-    if (!g_tunables)
+    if (!manager)
         return;
-    for (uint32_t i = 0; i < g_tunables->pendingCount; ++i)
+    for (uint32_t i = 0; i < manager->pendingCount; ++i)
     {
-        const auto &pv = g_tunables->pending[i];
+        const auto &pv = manager->pending[i];
         if (!Span::Eq(NameView(pv.name), name))
             continue;
         if (type == tunable_type::Float)
@@ -221,10 +203,10 @@ void LoadFromFile(byteview path)
         const auto kind = StringParser::ParseDecimal(p, dv, lv);
         const double value = (kind == StringParser::ParseNumberResult::Double) ? dv : (double)lv;
 
-        if (g_tunables->pendingCount < kMaxTunables)
+        if (manager->pendingCount < kMaxTunables)
         {
-            auto &pv = g_tunables->pending[g_tunables->pendingCount++];
-            StoreName(pv.name, name);
+            auto &pv = manager->pending[manager->pendingCount++];
+            InlineString::Assign(pv.name, name);
             pv.value = value;
         }
 
@@ -239,25 +221,25 @@ namespace Tunables
 
 void API Bootstrap(byteview persistPath)
 {
-    g_tunables = &RegionAlloc::Alloc<tunables_state>(RegionAlloc::g_BootstrapAlloc);
-    g_tunables->count = 0;
-    g_tunables->selected = 0;
-    g_tunables->visible = false;
-    g_tunables->pendingCount = 0;
-    StorePath(g_tunables->persistPath, persistPath);
+    manager = &RegionAlloc::Alloc<tunables_state>(RegionAlloc::g_BootstrapAlloc);
+    manager->count = 0;
+    manager->selected = 0;
+    manager->visible = false;
+    manager->pendingCount = 0;
+    InlineString::Assign(manager->persistPath, persistPath);
 
     LoadFromFile(persistPath);
 }
 
 void API RegisterFloat(byteview name, float *ptr, float step, float minV, float maxV)
 {
-    if (!g_tunables)
+    if (!manager)
         return;
-    if (g_tunables->count >= kMaxTunables)
+    if (manager->count >= kMaxTunables)
         return;
 
-    auto &e = g_tunables->entries[g_tunables->count++];
-    StoreName(e.name, name);
+    auto &e = manager->entries[manager->count++];
+    InlineString::Assign(e.name, name);
     e.ptr = ptr;
     e.type = tunable_type::Float;
     e.f.step = step;
@@ -269,13 +251,13 @@ void API RegisterFloat(byteview name, float *ptr, float step, float minV, float 
 
 void API RegisterInt(byteview name, int32_t *ptr, int32_t step, int32_t minV, int32_t maxV)
 {
-    if (!g_tunables)
+    if (!manager)
         return;
-    if (g_tunables->count >= kMaxTunables)
+    if (manager->count >= kMaxTunables)
         return;
 
-    auto &e = g_tunables->entries[g_tunables->count++];
-    StoreName(e.name, name);
+    auto &e = manager->entries[manager->count++];
+    InlineString::Assign(e.name, name);
     e.ptr = ptr;
     e.type = tunable_type::Int;
     e.i.step = step;
@@ -287,36 +269,36 @@ void API RegisterInt(byteview name, int32_t *ptr, int32_t step, int32_t minV, in
 
 void API ToggleVisible()
 {
-    if (!g_tunables)
+    if (!manager)
         return;
-    g_tunables->visible = !g_tunables->visible;
+    manager->visible = !manager->visible;
 }
 
 auto API IsVisible() -> bool
 {
-    return g_tunables && g_tunables->visible;
+    return manager && manager->visible;
 }
 
 void API SelectPrev()
 {
-    if (!g_tunables || !g_tunables->count)
+    if (!manager || !manager->count)
         return;
-    g_tunables->selected = (g_tunables->selected + g_tunables->count - 1) % g_tunables->count;
+    manager->selected = (manager->selected + manager->count - 1) % manager->count;
 }
 
 void API SelectNext()
 {
-    if (!g_tunables || !g_tunables->count)
+    if (!manager || !manager->count)
         return;
-    g_tunables->selected = (g_tunables->selected + 1) % g_tunables->count;
+    manager->selected = (manager->selected + 1) % manager->count;
 }
 
 void API Decrement()
 {
-    if (!g_tunables || !g_tunables->count)
+    if (!manager || !manager->count)
         return;
 
-    auto &e = g_tunables->entries[g_tunables->selected];
+    auto &e = manager->entries[manager->selected];
     if (e.type == tunable_type::Float)
     {
         float &v = *static_cast<float *>(e.ptr);
@@ -335,10 +317,10 @@ void API Decrement()
 
 void API Increment()
 {
-    if (!g_tunables || !g_tunables->count)
+    if (!manager || !manager->count)
         return;
 
-    auto &e = g_tunables->entries[g_tunables->selected];
+    auto &e = manager->entries[manager->selected];
     if (e.type == tunable_type::Float)
     {
         float &v = *static_cast<float *>(e.ptr);
@@ -357,21 +339,20 @@ void API Increment()
 
 void API Save()
 {
-    if (!g_tunables || !g_tunables->persistPath.size)
+    if (!manager || !manager->persistPath.size)
         return;
 
-    file_handle f = FileOpen(PathView(g_tunables->persistPath), FileOpenMode::Write);
+    file_handle f = FileOpen(PathView(manager->persistPath), FileOpenMode::Write);
     if (!FileValid(f))
     {
-        LOG("tunables: save failed (open) %.*s"_s, (int)g_tunables->persistPath.size,
-            g_tunables->persistPath.data.data);
+        LOG("tunables: save failed (open) %.*s"_s, (int)manager->persistPath.size, manager->persistPath.data.data);
         return;
     }
 
     uint8_t lineBuf[256];
-    for (uint32_t i = 0; i < g_tunables->count; ++i)
+    for (uint32_t i = 0; i < manager->count; ++i)
     {
-        const auto &e = g_tunables->entries[i];
+        const auto &e = manager->entries[i];
         if (e.type == tunable_type::Float)
         {
             const float v = *static_cast<const float *>(e.ptr);
@@ -386,25 +367,24 @@ void API Save()
     }
 
     FileClose(f);
-    LOG("tunables: saved %u to %.*s"_s, g_tunables->count, (int)g_tunables->persistPath.size,
-        g_tunables->persistPath.data.data);
+    LOG("tunables: saved %u to %.*s"_s, manager->count, (int)manager->persistPath.size, manager->persistPath.data.data);
 }
 
 void API CmdFlush(rhi_cmdlist cmd, int32_t originPxX, int32_t originPxY)
 {
-    if (!g_tunables || !g_tunables->visible || !g_tunables->count)
+    if (!manager || !manager->visible || !manager->count)
         return;
 
     constexpr uint32_t kCols = 80;
-    const uint32_t rows = g_tunables->count + 1;
+    const uint32_t rows = manager->count + 1;
 
     CellRenderer::Begin(originPxX, originPxY, kCols, rows);
     CellRenderer::Text(0, 0, "tunables (F1 hide  F2/F3 sel  F4/F5 -/+  F6 save):"_s, 0xFFFFFF80u, 0xFF202020u);
 
-    for (uint32_t i = 0; i < g_tunables->count; ++i)
+    for (uint32_t i = 0; i < manager->count; ++i)
     {
-        const auto &e = g_tunables->entries[i];
-        const bool sel = (i == g_tunables->selected);
+        const auto &e = manager->entries[i];
+        const bool sel = (i == manager->selected);
         const uint32_t fg = sel ? 0xFF000000u : 0xFFD0D0D0u;
         const uint32_t bg = sel ? 0xFFFFD080u : 0xFF202020u;
 

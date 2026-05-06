@@ -53,7 +53,7 @@ auto ParseWavFile(byteview bytes) -> ParseWavFileResult
     while (p != bytes.data + bytes.size)
     {
         WaveChunkHeader header{};
-        memcpy(&header, p, sizeof(header));
+        MemCpy(&header, p, sizeof(header));
 
         switch (header.chunkId)
         {

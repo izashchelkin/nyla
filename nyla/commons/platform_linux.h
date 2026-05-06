@@ -74,6 +74,10 @@ struct platform_state
         array<xcb_keycode_t, static_cast<uint32_t>(KeyPhysical::Count)> keyCodes;
 
         xcb_errors_context_t *errorsContext;
+
+        xkb_context *xkbCtx;
+        xkb_keymap *xkbKeymap;
+        xkb_state *xkbState;
     } x11;
 };
 extern platform_state *platform;

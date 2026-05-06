@@ -1,0 +1,5 @@
+target_sources(${TARGET} PRIVATE
+    asset_tool.cc
+)
+target_sources(${TARGET} PUBLIC
+)

@@ -67,7 +67,7 @@ auto API GetShader(uint64_t guid, rhi_shader_stage stage) -> rhi_shader
     byteview data = AssetManager::Get(guid);
     rhi_shader handle = Rhi::CreateShader(rhi_shader_desc{
         .stage = stage,
-        .code = AsCode(data),
+        .code = Span::Cast<uint32_t>(data),
     });
     InlineVec::Append(manager->entries, shader_cache_entry{
                                             .guid = guid,
