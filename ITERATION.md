@@ -46,6 +46,8 @@ Single rolling inventory. One line per capability, with entry-point file. When a
 
 ## What's pending (priority order)
 
+BUGS to fix first: when testing on windows it seems like input is broken at least in breakout. also in asset_tool the modal window doesn't work but navigation otherwise is fine.
+
 Top of list = next thing to work on. Trim to the top 5-7. Each item: rule/feature, **Why**, **How**, plus **Decided** / **Open** lines where ambiguity must survive a context drop.
 
 Active thrust: **UI framework — Imgui-style GUI for in-app overlays + standalone tools**. Remaining path: list scope primitive + wrap asset_tool main view, pixel backend.

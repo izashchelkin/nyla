@@ -434,8 +434,7 @@ auto Selectable(ui_state &s, uint32_t localId) -> ui_selectable_result
     return r;
 }
 
-auto SelectableHit(ui_state &s, uint32_t localId, int32_t x, int32_t y, int32_t w, int32_t h)
-    -> ui_selectable_result
+auto SelectableHit(ui_state &s, uint32_t localId, int32_t x, int32_t y, int32_t w, int32_t h) -> ui_selectable_result
 {
     uint32_t id = MakeId(s, localId);
     if (s.curCount < ui_state::kItemsMax)
@@ -661,8 +660,7 @@ auto BeginWindow(ui_state &s, uint32_t localId, const ui_window_desc &desc) -> b
         // Persist position via tunables. Silent no-op if Tunables wasn't bootstrapped, or if
         // the registration cap is hit — pos just doesn't survive across runs in that case.
         uint8_t namebuf[24];
-        uint64_t n =
-            StringWriteFmt(span<uint8_t>{namebuf, sizeof(namebuf)}, "ui.win.%08x.x"_s, id);
+        uint64_t n = StringWriteFmt(span<uint8_t>{namebuf, sizeof(namebuf)}, "ui.win.%08x.x"_s, id);
         Tunables::RegisterInt(byteview{namebuf, n}, &slot->x, 1, -10000, 10000);
         n = StringWriteFmt(span<uint8_t>{namebuf, sizeof(namebuf)}, "ui.win.%08x.y"_s, id);
         Tunables::RegisterInt(byteview{namebuf, n}, &slot->y, 1, -10000, 10000);
@@ -715,8 +713,7 @@ auto BeginWindow(ui_state &s, uint32_t localId, const ui_window_desc &desc) -> b
         if (ty >= 0 && ty < (int32_t)s.viewportRows && endCol > startCol)
         {
             int32_t skip = startCol - tx;
-            CellRenderer::Text((uint32_t)startCol, (uint32_t)ty,
-                               byteview{line + skip, (uint64_t)(endCol - startCol)},
+            CellRenderer::Text((uint32_t)startCol, (uint32_t)ty, byteview{line + skip, (uint64_t)(endCol - startCol)},
                                s.theme.bg, s.theme.focusedFg);
         }
     }
@@ -738,8 +735,7 @@ auto BeginWindow(ui_state &s, uint32_t localId, const ui_window_desc &desc) -> b
                 continue;
             if (endCol > startCol)
                 CellRenderer::Text((uint32_t)startCol, (uint32_t)row,
-                                   byteview{line + skip, (uint64_t)(endCol - startCol)},
-                                   s.theme.focusedFg, s.theme.bg);
+                                   byteview{line + skip, (uint64_t)(endCol - startCol)}, s.theme.focusedFg, s.theme.bg);
         }
     }
 

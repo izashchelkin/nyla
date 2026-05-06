@@ -66,16 +66,16 @@ struct ui_window_slot
 {
     uint32_t id;
     int32_t x, y;
-    int32_t w, h;        // content rect (title row not included in h)
-    uint32_t zOrder;     // higher = drawn on top; refreshed on click-to-front
-    uint32_t flags;      // mirror of ui_window_desc.flags from this/last frame
+    int32_t w, h;    // content rect (title row not included in h)
+    uint32_t zOrder; // higher = drawn on top; refreshed on click-to-front
+    uint32_t flags;  // mirror of ui_window_desc.flags from this/last frame
     // Item-array ranges occupied by widgets registered inside this window. Used for
     // modal-scope focus restriction and focus-on-open. prev* covers prev frame, cur* this.
     uint32_t prevItemsBegin, prevItemsEnd;
     uint32_t curItemsBegin, curItemsEnd;
-    bool presentThisFrame;     // any BeginWindow for this id seen this frame
-    bool wasPresentLastFrame;  // snapshot of presentThisFrame at frame Begin
-    bool openedJustNow;        // first appeared this frame (focus-on-open trigger)
+    bool presentThisFrame;    // any BeginWindow for this id seen this frame
+    bool wasPresentLastFrame; // snapshot of presentThisFrame at frame Begin
+    bool openedJustNow;       // first appeared this frame (focus-on-open trigger)
 };
 
 struct ui_state
@@ -97,16 +97,16 @@ struct ui_state
     uint32_t prevCount;
 
     uint32_t focusId;
-    uint32_t hotId;     // widget under pointer this frame (set during the frame as widgets register)
-    uint32_t activeId;  // widget that received pointer-press; clears on release. Persists across frames while held.
+    uint32_t hotId;    // widget under pointer this frame (set during the frame as widgets register)
+    uint32_t activeId; // widget that received pointer-press; clears on release. Persists across frames while held.
     bool activeArmedActivate; // press landed on already-focused widget — Button uses this to require focus-then-click
 
     // Derived at Begin from prev frame's slots: any kWindowFlagModal window painted last
     // frame implies modal active. modalSlotIdx indexes into windows[] when modalActive.
     bool modalActive;
     uint32_t modalSlotIdx;
-    bool inModalScope;       // current scope is inside a kWindowFlagModal window (per-frame, set during BeginWindow)
-    bool savedInModalScope;  // saved by BeginWindow, restored by EndWindow
+    bool inModalScope;      // current scope is inside a kWindowFlagModal window (per-frame, set during BeginWindow)
+    bool savedInModalScope; // saved by BeginWindow, restored by EndWindow
 
     // Pointer state latched at Begin from ui_frame_input. Press edges are consumable
     // (widgets clear them when claiming the click) so only one widget activates per frame.
@@ -135,7 +135,7 @@ struct ui_state
     ui_window_slot windows[kWindowSlotsMax];
     uint32_t windowCount;
     uint32_t nextZOrder;
-    uint32_t hoveredWindowId; // top-most window under pointer at frame Begin (prev-frame z-order)
+    uint32_t hoveredWindowId;  // top-most window under pointer at frame Begin (prev-frame z-order)
     uint32_t draggingWindowId; // non-zero while title-bar drag in progress
     int32_t dragOffsetX, dragOffsetY;
 

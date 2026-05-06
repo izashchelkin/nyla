@@ -474,12 +474,12 @@ auto CALLBACK WindowsPlatform::MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, 
     }
 
     case WM_MOUSEMOVE: {
-        InlineQueue::Write(g_EventsQueue, PlatformEvent{
-                                              .type = PlatformEventType::MouseMove,
-                                              .mouse = {.code = 0,
-                                                        .x = (int32_t)(int16_t)LOWORD(lParam),
-                                                        .y = (int32_t)(int16_t)HIWORD(lParam)},
-                                          });
+        InlineQueue::Write(
+            g_EventsQueue,
+            PlatformEvent{
+                .type = PlatformEventType::MouseMove,
+                .mouse = {.code = 0, .x = (int32_t)(int16_t)LOWORD(lParam), .y = (int32_t)(int16_t)HIWORD(lParam)},
+            });
         return 0;
     }
 
@@ -488,12 +488,12 @@ auto CALLBACK WindowsPlatform::MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, 
     case WM_MBUTTONDOWN: {
         // X11 parity: Left=1, Middle=2, Right=3.
         uint32_t code = (uMsg == WM_LBUTTONDOWN) ? 1u : (uMsg == WM_MBUTTONDOWN) ? 2u : 3u;
-        InlineQueue::Write(g_EventsQueue, PlatformEvent{
-                                              .type = PlatformEventType::MousePress,
-                                              .mouse = {.code = code,
-                                                        .x = (int32_t)(int16_t)LOWORD(lParam),
-                                                        .y = (int32_t)(int16_t)HIWORD(lParam)},
-                                          });
+        InlineQueue::Write(
+            g_EventsQueue,
+            PlatformEvent{
+                .type = PlatformEventType::MousePress,
+                .mouse = {.code = code, .x = (int32_t)(int16_t)LOWORD(lParam), .y = (int32_t)(int16_t)HIWORD(lParam)},
+            });
         return 0;
     }
 
@@ -501,12 +501,12 @@ auto CALLBACK WindowsPlatform::MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, 
     case WM_RBUTTONUP:
     case WM_MBUTTONUP: {
         uint32_t code = (uMsg == WM_LBUTTONUP) ? 1u : (uMsg == WM_MBUTTONUP) ? 2u : 3u;
-        InlineQueue::Write(g_EventsQueue, PlatformEvent{
-                                              .type = PlatformEventType::MouseRelease,
-                                              .mouse = {.code = code,
-                                                        .x = (int32_t)(int16_t)LOWORD(lParam),
-                                                        .y = (int32_t)(int16_t)HIWORD(lParam)},
-                                          });
+        InlineQueue::Write(
+            g_EventsQueue,
+            PlatformEvent{
+                .type = PlatformEventType::MouseRelease,
+                .mouse = {.code = code, .x = (int32_t)(int16_t)LOWORD(lParam), .y = (int32_t)(int16_t)HIWORD(lParam)},
+            });
         return 0;
     }
 
