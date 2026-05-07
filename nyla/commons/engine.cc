@@ -36,6 +36,9 @@ struct engine_state
     int32_t pointerX;
     int32_t pointerY;
     uint32_t pointerButtons;
+
+    // Modifier mask carried across frames; bits = KeyMod::*.
+    uint8_t modMask;
 };
 engine_state *g_engine;
 
@@ -91,10 +94,30 @@ auto API FrameBegin(region_alloc &alloc) -> engine_frame
     constexpr uint64_t kTextBufCap = 256;
     inline_vec<uint8_t, kTextBufCap> textBuf{};
 
+    constexpr uint64_t kKeyDownCap = 64;
+    inline_vec<key_event, kKeyDownCap> keyDownBuf{};
+
     const int32_t pointerStartX = g_engine->pointerX;
     const int32_t pointerStartY = g_engine->pointerY;
     uint32_t pointerPressEdges = 0;
     uint32_t pointerReleaseEdges = 0;
+
+    auto modBit = [](KeyPhysical k) -> uint8_t {
+        switch (k)
+        {
+        case KeyPhysical::LeftShift:
+        case KeyPhysical::RightShift:
+            return KeyMod::Shift;
+        case KeyPhysical::LeftCtrl:
+        case KeyPhysical::RightCtrl:
+            return KeyMod::Ctrl;
+        case KeyPhysical::LeftAlt:
+        case KeyPhysical::RightAlt:
+            return KeyMod::Alt;
+        default:
+            return 0;
+        }
+    };
 
     for (; !ShouldExit();)
     {
@@ -116,6 +139,10 @@ auto API FrameBegin(region_alloc &alloc) -> engine_frame
         {
         case PlatformEventType::KeyDown:
             InputManager::HandlePressed(input_interface_type::Keyboard, uint32_t(event.key), frameStart);
+            if (uint8_t bit = modBit(event.key))
+                g_engine->modMask |= bit;
+            if (keyDownBuf.size + 1 < kKeyDownCap)
+                InlineVec::Append(keyDownBuf, key_event{.key = event.key, .mods = g_engine->modMask});
 #if !defined(NDEBUG)
             switch (event.key)
             {
@@ -153,6 +180,8 @@ auto API FrameBegin(region_alloc &alloc) -> engine_frame
             break;
         case PlatformEventType::KeyUp:
             InputManager::HandleReleased(input_interface_type::Keyboard, uint32_t(event.key), frameStart);
+            if (uint8_t bit = modBit(event.key))
+                g_engine->modMask &= ~bit;
             break;
         case PlatformEventType::MousePress:
             InputManager::HandlePressed(input_interface_type::Mouse, event.mouse.code, frameStart);
@@ -200,6 +229,16 @@ auto API FrameBegin(region_alloc &alloc) -> engine_frame
     if (textBuf.size > 0)
         textChars = RegionAlloc::CopyByteView(alloc, byteview{textBuf.data.data, textBuf.size});
 
+    span<const key_event> keyDown{};
+    if (keyDownBuf.size > 0)
+    {
+        auto *dst =
+            (key_event *)RegionAlloc::Alloc(alloc, sizeof(key_event) * keyDownBuf.size, alignof(key_event));
+        for (uint64_t i = 0; i < keyDownBuf.size; ++i)
+            dst[i] = keyDownBuf.data.data[i];
+        keyDown = span<const key_event>{dst, keyDownBuf.size};
+    }
+
     return engine_frame{
         .cmd = cmd,
         .dt = dt,
@@ -207,6 +246,7 @@ auto API FrameBegin(region_alloc &alloc) -> engine_frame
         .frameStartUs = frameStart,
         .fps = g_engine->fps,
         .textChars = textChars,
+        .keyDown = keyDown,
         .pointerX = g_engine->pointerX,
         .pointerY = g_engine->pointerY,
         .pointerDx = g_engine->pointerX - pointerStartX,

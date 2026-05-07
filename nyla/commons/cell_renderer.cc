@@ -240,6 +240,9 @@ auto API GlyphForCodepoint(uint32_t codepoint) -> uint16_t
     return cr->codepointToGlyph[codepoint];
 }
 
+auto API CellPxW() -> uint32_t { return cr->desc.cellPxW; }
+auto API CellPxH() -> uint32_t { return cr->desc.cellPxH; }
+
 void API PushClip(int32_t col, int32_t row, int32_t w, int32_t h)
 {
     ASSERT(cr->clipDepth < kClipStackMax);

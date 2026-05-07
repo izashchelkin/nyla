@@ -26,7 +26,7 @@ mempage_pool *manager;
 namespace MemPagePool
 {
 
-void Bootstrap()
+void API Bootstrap()
 {
     manager = &RegionAlloc::Alloc<mempage_pool>(RegionAlloc::g_BootstrapAlloc);
     manager->begin = RegionAlloc::g_BootstrapAlloc.begin;

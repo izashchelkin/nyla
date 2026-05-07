@@ -16,7 +16,7 @@ constexpr inline uint64_t kPoolSize = 256_GiB;
 constexpr inline uint64_t kChunkSize = 256_MiB;
 constexpr inline uint64_t kNumChunks = kPoolSize / kChunkSize;
 
-void Bootstrap();
+void API Bootstrap();
 auto API AcquireChunk() -> span<uint8_t>;
 void API ReleaseChunk(void *p);
 

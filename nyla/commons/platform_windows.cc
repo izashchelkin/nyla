@@ -622,6 +622,19 @@ auto WindowsPlatform::ScanCodeToKeyPhysical(uint8_t scanCode, bool extended) -> 
         case 0x50:
             return KeyPhysical::ArrowDown;
 
+        case 0x47:
+            return KeyPhysical::Home;
+        case 0x4F:
+            return KeyPhysical::End;
+        case 0x49:
+            return KeyPhysical::PageUp;
+        case 0x51:
+            return KeyPhysical::PageDown;
+        case 0x52:
+            return KeyPhysical::Insert;
+        case 0x53:
+            return KeyPhysical::Delete;
+
         default:
             return KeyPhysical::Unknown;
         }

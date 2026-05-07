@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "nyla/commons/keyboard.h"
 #include "nyla/commons/macros.h"
 #include "nyla/commons/region_alloc_def.h"
 #include "nyla/commons/rhi.h"
@@ -16,6 +17,20 @@ struct engine_init_desc
     bool vsync;
 };
 
+// Bit flags for key_event::mods. Tracked from physical Shift/Ctrl/Alt KeyDown/Up edges.
+namespace KeyMod
+{
+constexpr uint8_t Shift = 1u << 0;
+constexpr uint8_t Ctrl = 1u << 1;
+constexpr uint8_t Alt = 1u << 2;
+} // namespace KeyMod
+
+struct key_event
+{
+    KeyPhysical key;
+    uint8_t mods; // KeyMod bitmask at the moment of KeyDown
+};
+
 struct engine_frame
 {
     rhi_cmdlist cmd;
@@ -23,7 +38,8 @@ struct engine_frame
     uint64_t dtUs;
     uint64_t frameStartUs;
     uint32_t fps;
-    byteview textChars; // utf8 bytes typed this frame; valid for the frame only
+    byteview textChars;            // utf8 bytes typed this frame; valid for the frame only
+    span<const key_event> keyDown; // KeyDown edges this frame (incl. autorepeat); valid for the frame only
 
     // Pointer (mouse) state. Coordinates are window-relative pixels.
     // pointerButtons: current state bitmask, bit (button-1) set while held (X11 button ids; 1=Left, 2=Middle, 3=Right).

@@ -30,6 +30,7 @@ target_sources(${TARGET} PRIVATE
     spv_shader.cc
     staging.cc
     stringparser.cc
+    terminal_screen.cc
     texture_manager.cc
     tunables.cc
     tween_manager.cc
@@ -97,6 +98,7 @@ target_sources(${TARGET} PUBLIC
     platform_condvar.h
     platform_dir_watch.h
     platform_mutex.h
+    platform_pty.h
     platform_thread.h
     platform.h
     profiler.h
@@ -118,6 +120,7 @@ target_sources(${TARGET} PUBLIC
     staging.h
     stb_image.h
     stringparser.h
+    terminal_screen.h
     texture_manager.h
     time.h
     tokenparser.h
@@ -135,6 +138,7 @@ if (WIN32)
         platform_audio_windows.cc
         platform_dir_watch_windows.cc
         platform_mutex_windows.cc
+        platform_pty_windows.cc
         platform_thread_windows.cc
         platform_windows.cc
         renderdoc_windows.cc
@@ -151,6 +155,7 @@ else()
         platform_dir_watch_linux.cc
         platform_linux.cc
         platform_mutex_linux.cc
+        platform_pty_linux.cc
         platform_thread_linux.cc
         platform_x11_linux.cc
         renderdoc_linux.cc

@@ -161,9 +161,6 @@ auto BdfFontBoundingBox(byteview data, uint32_t &outW, uint32_t &outH) -> bool
     return false;
 }
 
-// Layout: row 0 = title, row 1 = filter input, row 2 = add input, row 3 = blank, row 4+ = list.
-constexpr uint32_t kListTop = 4;
-
 struct entry_row
 {
     uint64_t guid;
@@ -593,79 +590,54 @@ void RenderHex16(uint8_t *out, uint64_t v)
     }
 }
 
-constexpr uint32_t kTitleFg = 0xFF87AF87u;
 constexpr uint32_t kDeleteFg = 0xFFCC4444u;
 constexpr uint32_t kStagedFg = 0xFF87CEEBu;
 constexpr uint32_t kFilterFg = 0xFFD7D7AFu;
 constexpr uint32_t kAddFg = 0xFFAFD7AFu;
 constexpr uint32_t kButtonFg = 0xFFCCCCCCu;
 
-void DrawListRows(uint32_t cols, uint32_t rows, uint32_t focusedIdx)
+void PaintRow(const entry_row &row, int32_t y, uint32_t cols, bool selected)
 {
-    if (rows <= kListTop)
-        return;
-    const uint32_t listRows = rows - kListTop;
+    const ui_theme &th = tool->ui.theme;
+    uint32_t fg = selected ? th.bg : (row.markedDelete ? kDeleteFg : (row.staged ? kStagedFg : th.focusedFg));
+    uint32_t bg = selected ? th.focusedFg : th.bg;
 
-    for (uint32_t i = 0; i < listRows; ++i)
+    uint8_t line[256];
+    MemSet(line, ' ', sizeof(line));
+
+    if (row.markedDelete)
+        line[16] = 'D';
+    else if (row.staged)
+        line[16] = 'A';
+
+    uint8_t hex[16];
+    RenderHex16(hex, row.guid);
+    MemCpy(line, hex, 16);
+
+    uint8_t typeBuf[8];
+    byteview tn = EntryTypeName(row.type);
+    MemSet(typeBuf, ' ', sizeof(typeBuf));
+    MemCpy(typeBuf, tn.data, tn.size);
+    MemCpy(line + 18, typeBuf, 5);
+
+    uint8_t sizeBuf[16];
+    uint64_t sn = StringWriteFmt(span<uint8_t>{sizeBuf, sizeof(sizeBuf)}, "%10" PRIu64 ""_s, row.dataSize);
+    MemCpy(line + 24, sizeBuf, sn);
+
+    byteview alias = LookupAlias(row.guid);
+    if (alias.size == 0 && row.staged)
+        alias = row.srcPath;
+    if (alias.size > 0)
     {
-        uint32_t fIdx = tool->scroll + i;
-        if (fIdx >= tool->filtered.size)
-            break;
-        uint32_t idx = tool->filtered[fIdx];
-
-        const entry_row &row = tool->rows[idx];
-        bool selected = idx == focusedIdx;
-        const ui_theme &th = tool->ui.theme;
-        uint32_t fg = selected ? th.bg : (row.markedDelete ? kDeleteFg : (row.staged ? kStagedFg : th.focusedFg));
-        uint32_t bg = selected ? th.focusedFg : th.bg;
-
-        uint8_t line[256];
-        MemSet(line, ' ', sizeof(line));
-
-        if (row.markedDelete)
-            line[16] = 'D';
-        else if (row.staged)
-            line[16] = 'A';
-
-        uint8_t hex[16];
-        RenderHex16(hex, row.guid);
-        MemCpy(line, hex, 16);
-
-        uint8_t typeBuf[8];
-        byteview tn = EntryTypeName(row.type);
-        MemSet(typeBuf, ' ', sizeof(typeBuf));
-        MemCpy(typeBuf, tn.data, tn.size);
-        MemCpy(line + 18, typeBuf, 5);
-
-        uint8_t sizeBuf[16];
-        uint64_t sn = StringWriteFmt(span<uint8_t>{sizeBuf, sizeof(sizeBuf)}, "%10" PRIu64 ""_s, row.dataSize);
-        MemCpy(line + 24, sizeBuf, sn);
-
-        byteview alias = LookupAlias(row.guid);
-        if (alias.size == 0 && row.staged)
-            alias = row.srcPath;
-        if (alias.size > 0)
-        {
-            const uint64_t aliasCol = 36;
-            uint64_t copy = alias.size;
-            if (aliasCol + copy > sizeof(line))
-                copy = sizeof(line) - aliasCol;
-            MemCpy(line + aliasCol, alias.data, copy);
-        }
-
-        uint64_t printable = cols < sizeof(line) ? cols : sizeof(line);
-        CellRenderer::Text(0, kListTop + i, byteview{line, printable}, fg, bg);
+        const uint64_t aliasCol = 36;
+        uint64_t copy = alias.size;
+        if (aliasCol + copy > sizeof(line))
+            copy = sizeof(line) - aliasCol;
+        MemCpy(line + aliasCol, alias.data, copy);
     }
-}
 
-void EnsureVisible(uint32_t fIdx, uint32_t listRows)
-{
-    if (listRows == 0 || fIdx == UINT32_MAX)
-        return;
-    if (fIdx < tool->scroll)
-        tool->scroll = fIdx;
-    else if (fIdx >= tool->scroll + listRows)
-        tool->scroll = fIdx - listRows + 1;
+    uint64_t printable = cols < sizeof(line) ? cols : sizeof(line);
+    CellRenderer::Text(0, (uint32_t)y, byteview{line, printable}, fg, bg);
 }
 
 } // namespace
@@ -745,7 +717,9 @@ void UserMain()
         const uint32_t cellPxH = tool->cellPxH;
         const uint32_t cols = backbufferInfo.width > 16 ? (backbufferInfo.width - 16) / cellPxW : 1;
         const uint32_t rows = backbufferInfo.height > 16 ? (backbufferInfo.height - 16) / cellPxH : 1;
-        const uint32_t listRows = rows > kListTop ? rows - kListTop : 1;
+        // 1 row title bar + 3 rows toolbar (filter, add, buttons) above list.
+        constexpr uint32_t kRowsAboveList = 4;
+        const uint32_t listRows = rows > kRowsAboveList ? rows - kRowsAboveList : 1;
 
         ui_frame_input in = Ui::Pump(tool->ui, frame, (int32_t)listRows);
         // Convert pixel-space pointer to cell coords. CellRenderer::Begin used (8, 8) origin.
@@ -773,6 +747,7 @@ void UserMain()
         CellRenderer::Begin(8, 8, cols, rows);
         Ui::Begin(tool->ui, in, cols, rows);
 
+        constexpr uint32_t kIdMainWin = 9;
         constexpr uint32_t kIdFilter = 1;
         constexpr uint32_t kIdAdd = 2;
         constexpr uint32_t kIdRowsScope = 3;
@@ -782,55 +757,62 @@ void UserMain()
         constexpr uint32_t kIdSaveModalWin = 8;
         constexpr uint32_t kSaveModalAccent = 0xFFD7D7AFu;
 
-        {
-            uint8_t titleBuf[128];
-            uint64_t titleLen =
-                StringWriteFmt(span<uint8_t>{titleBuf, sizeof(titleBuf)},
-                               "asset_tool  %u/%u entries  [Up/Dn nav  Enter add/filter  X del  S save]"_s,
-                               (uint32_t)tool->filtered.size, (uint32_t)tool->rows.size);
-            Ui::Text(tool->ui, byteview{titleBuf, titleLen}, kTitleFg);
-        }
-
-        ui_text_input_result filterRes = Ui::TextInput(tool->ui, kIdFilter, "filter: "_s, tool->filterBuf,
-                                                       tool_state::kFilterCap, tool->filterLen, kFilterFg);
-        if (filterRes.changed)
-            tool->scroll = 0;
-
-        ui_text_input_result addRes =
-            Ui::TextInput(tool->ui, kIdAdd, "add:    "_s, tool->addBuf, tool_state::kAddCap, tool->addLen, kAddFg);
-
-        bool saveBtn = Ui::Button(tool->ui, kIdSaveBtn, "Save"_s, kButtonFg);
-        Ui::SameLine(tool->ui, 1);
-        bool deleteBtn = Ui::Button(tool->ui, kIdDeleteBtn, "Delete"_s, kButtonFg);
-        Ui::SameLine(tool->ui, 1);
-        bool quitBtn = Ui::Button(tool->ui, kIdQuitBtn, "Quit"_s, kButtonFg);
-
+        ui_text_input_result filterRes{};
+        ui_text_input_result addRes{};
+        bool saveBtn = false;
+        bool deleteBtn = false;
+        bool quitBtn = false;
         uint32_t focusedIdx = UINT32_MAX;
-        uint32_t focusedFIdx = UINT32_MAX;
-        Ui::PushId(tool->ui, kIdRowsScope);
-        for (uint32_t fI = 0; fI < tool->filtered.size; ++fI)
+
+        uint8_t titleBuf[64];
+        uint64_t titleLen = StringWriteFmt(span<uint8_t>{titleBuf, sizeof(titleBuf)}, "asset_tool  %u/%u entries"_s,
+                                           (uint32_t)tool->filtered.size, (uint32_t)tool->rows.size);
+        ui_window_desc mainDesc{
+            .flags = 0,
+            .initialX = 0,
+            .initialY = 0,
+            .w = (int32_t)cols,
+            .h = (int32_t)rows - 1,
+            .title = byteview{titleBuf, titleLen},
+        };
+        if (Ui::BeginWindow(tool->ui, kIdMainWin, mainDesc))
         {
-            uint32_t i = tool->filtered[fI];
-            const entry_row &row = tool->rows[i];
-            uint32_t localId = (uint32_t)(row.guid ^ (row.guid >> 32));
-            bool visible = fI >= tool->scroll && fI < tool->scroll + listRows;
-            ui_selectable_result r;
-            if (visible)
+            filterRes = Ui::TextInput(tool->ui, kIdFilter, "filter: "_s, tool->filterBuf, tool_state::kFilterCap,
+                                      tool->filterLen, kFilterFg);
+            if (filterRes.changed)
+                tool->scroll = 0;
+
+            addRes =
+                Ui::TextInput(tool->ui, kIdAdd, "add:    "_s, tool->addBuf, tool_state::kAddCap, tool->addLen, kAddFg);
+
+            saveBtn = Ui::Button(tool->ui, kIdSaveBtn, "Save"_s, kButtonFg);
+            Ui::SameLine(tool->ui, 1);
+            deleteBtn = Ui::Button(tool->ui, kIdDeleteBtn, "Delete"_s, kButtonFg);
+            Ui::SameLine(tool->ui, 1);
+            quitBtn = Ui::Button(tool->ui, kIdQuitBtn, "Quit"_s, kButtonFg);
+
+            ui_list_desc listDesc{
+                .w = (int32_t)cols,
+                .visibleRows = (int32_t)listRows,
+                .rowCount = (uint32_t)tool->filtered.size,
+                .scroll = &tool->scroll,
+            };
+            ui_list_scope listScope = Ui::BeginList(tool->ui, kIdRowsScope, listDesc);
+            for (uint32_t fI = 0; fI < (uint32_t)tool->filtered.size; ++fI)
             {
-                int32_t rowY = (int32_t)(kListTop + (fI - tool->scroll));
-                r = Ui::SelectableHit(tool->ui, localId, 0, rowY, (int32_t)cols, 1);
+                uint32_t i = tool->filtered[fI];
+                const entry_row &row = tool->rows[i];
+                uint32_t localId = (uint32_t)(row.guid ^ (row.guid >> 32));
+                ui_list_row_result rr = Ui::ListRow(tool->ui, listScope, fI, localId);
+                if (rr.hit.focused)
+                    focusedIdx = i;
+                if (rr.visible)
+                    PaintRow(row, rr.y, cols, rr.hit.focused);
             }
-            else
-            {
-                r = Ui::Selectable(tool->ui, localId);
-            }
-            if (r.focused)
-            {
-                focusedIdx = i;
-                focusedFIdx = fI;
-            }
+            Ui::EndList(tool->ui, listScope);
+
+            Ui::EndWindow(tool->ui);
         }
-        Ui::PopId(tool->ui);
 
         // Handle save trigger here so the modal window paints in the same frame.
         bool modalAlreadyOpen = tool->wantSaveModal;
@@ -892,15 +874,10 @@ void UserMain()
             SaveArchive(saveAlloc);
             RegionAlloc::Destroy(saveAlloc);
             focusedIdx = UINT32_MAX;
-            focusedFIdx = UINT32_MAX;
             tool->wantSaveModal = false;
         }
         if (saveModal.cancel)
             tool->wantSaveModal = false;
-
-        EnsureVisible(focusedFIdx, listRows);
-
-        DrawListRows(cols, rows, focusedIdx);
 
         rhi_texture renderTarget = Rhi::GetTexture(rtv);
         Rhi::CmdTransitionTexture(frame.cmd, renderTarget, rhi_texture_state::ColorTarget);

@@ -78,11 +78,24 @@ struct ui_window_slot
     bool openedJustNow;       // first appeared this frame (focus-on-open trigger)
 };
 
+// Per-list persistent state. Tracks the prev-frame item-array range so BeginList can map
+// s.focusId back to a row index this frame (s.focusId was set by Begin's nav over prev
+// items, so its position in the list's prev range == this frame's focused fIdx — assuming
+// stable row order). Lets EnsureVisible run before iteration with no scroll-lag.
+struct ui_list_slot
+{
+    uint32_t id;
+    uint32_t prevItemsBegin, prevItemsEnd;
+    uint32_t curItemsBegin, curItemsEnd;
+    bool presentThisFrame;
+};
+
 struct ui_state
 {
     static constexpr uint32_t kIdStackMax = 16;
     static constexpr uint32_t kItemsMax = 4096;
     static constexpr uint32_t kWindowSlotsMax = 16; // cap chosen to leave tunables headroom (2 ints/slot)
+    static constexpr uint32_t kListSlotsMax = 8;
 
     ui_theme theme;
 
@@ -146,6 +159,11 @@ struct ui_state
     int32_t savedLineH;
     bool savedPointerSuppress;
 
+    // List pool. Slots only exist to thread prev-frame item ranges into BeginList for
+    // focus-id → fIdx mapping; no persistent ui_state outside the slot.
+    ui_list_slot lists[kListSlotsMax];
+    uint32_t listCount;
+
     ui_pump_state pump;
 };
 
@@ -170,6 +188,40 @@ struct ui_modal_result
 {
     bool confirm;
     bool cancel;
+};
+
+// List: scrollable scope painting `visibleRows` rows starting at the cursor. Caller iterates
+// every fIdx in [0, rowCount) and calls ListRow per row with a stable row id (e.g. derived
+// from the row's guid). Visible rows return a paint y + SelectableHit-equivalent; off-screen
+// rows still register in the focus chain via Selectable so keyboard nav reaches them. Scroll
+// is auto-adjusted in BeginList from this frame's focus (resolved by mapping s.focusId back
+// to fIdx through the slot's prev-frame item range — assumes stable row order across
+// frames; under filter changes, callers should reset *desc.scroll). Caller paints the row
+// content (cells, colors) using the returned y; the list does not paint row data itself.
+struct ui_list_desc
+{
+    int32_t w;          // column width
+    int32_t visibleRows;// rows in the visible band
+    uint32_t rowCount;
+    uint32_t *scroll;   // caller-owned scroll index into [0, rowCount); BeginList may mutate
+};
+
+struct ui_list_scope
+{
+    int32_t baseX, baseY;
+    int32_t w;
+    int32_t visibleRows;
+    uint32_t rowCount;
+    uint32_t firstVisible, lastVisible; // [first, last) actually painted
+    uint32_t focusedFIdx;               // updated by ListRow; UINT32_MAX if none
+    uint32_t slotIdx;                   // ui_state.lists index, UINT32_MAX if pool exhausted
+};
+
+struct ui_list_row_result
+{
+    ui_selectable_result hit;
+    bool visible;
+    int32_t y; // valid when visible
 };
 
 // Window flag bits for ui_window_desc.flags.
@@ -247,6 +299,10 @@ auto API IsTextWidgetFocused(const ui_state &s) -> bool;
 // scopes set pointerSuppress, mirroring the modal mechanism.
 auto API BeginWindow(ui_state &s, uint32_t localId, const ui_window_desc &desc) -> bool;
 void API EndWindow(ui_state &s);
+
+auto API BeginList(ui_state &s, uint32_t localId, const ui_list_desc &desc) -> ui_list_scope;
+auto API ListRow(ui_state &s, ui_list_scope &scope, uint32_t fIdx, uint32_t rowLocalId) -> ui_list_row_result;
+void API EndList(ui_state &s, const ui_list_scope &scope);
 
 // Read + consume modal Y / Esc-or-N edges. Only fires while a kWindowFlagModal window is
 // active (painted last frame). Caller drives the open/close lifecycle through their own

@@ -285,6 +285,19 @@ auto API X11ConvertKeyPhysicalIntoXkbName(KeyPhysical key) -> byteview
     case K::ArrowDown:
         return "DOWN"_s;
 
+    case K::Home:
+        return "HOME"_s;
+    case K::End:
+        return "END"_s;
+    case K::PageUp:
+        return "PGUP"_s;
+    case K::PageDown:
+        return "PGDN"_s;
+    case K::Insert:
+        return "INS"_s;
+    case K::Delete:
+        return "DELE"_s;
+
     case K::F1:
         return "FK01"_s;
     case K::F2:

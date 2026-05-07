@@ -45,6 +45,8 @@ void API PutCell(uint32_t col, uint32_t row, cell_attr cell);
 void API Text(uint32_t col, uint32_t row, byteview text, uint32_t fgRgba, uint32_t bgRgba);
 
 auto API GlyphForCodepoint(uint32_t codepoint) -> uint16_t;
+auto API CellPxW() -> uint32_t;
+auto API CellPxH() -> uint32_t;
 
 void API CmdFlush(rhi_cmdlist cmd);
 

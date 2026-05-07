@@ -561,6 +561,11 @@ rhi_state *rhi;
 
 void VulkanNameHandle(VkObjectType type, uint64_t handle, byteview name)
 {
+    // VK_EXT_debug_utils is only enabled when kRhiValidations is on, so the proc-addr
+    // resolves null in release builds — calling it would segfault.
+    if constexpr (!kRhiValidations)
+        return;
+
     const VkDebugUtilsObjectNameInfoEXT nameInfo{
         .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
         .objectType = type,
@@ -740,7 +745,10 @@ void CreateSwapchain(region_alloc alloc)
             {
 
             case VK_PRESENT_MODE_FIFO_LATEST_READY_KHR: {
-                better = !Any(rhi->flags & rhi_flags::VSync);
+                // Tearing-free like FIFO but only the newest queued image is presented;
+                // drops input-latency stacking from a backed-up swap queue. Prefer it
+                // whether or not VSync is on.
+                better = true;
                 break;
             }
             case VK_PRESENT_MODE_IMMEDIATE_KHR: {

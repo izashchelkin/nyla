@@ -76,6 +76,13 @@ enum class KeyPhysical
     ArrowUp,
     ArrowDown,
 
+    Home,
+    End,
+    PageUp,
+    PageDown,
+    Insert,
+    Delete,
+
     F1,
     F2,
     F3,

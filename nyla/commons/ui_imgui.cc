@@ -230,6 +230,19 @@ void Begin(ui_state &s, const ui_frame_input &in, uint32_t viewportCols, uint32_
         w.openedJustNow = false;
     }
 
+    // List slot frame swap: archive prev-frame ranges, reset cur. Slots are persistent like
+    // window slots — never deleted, so prev range survives across frames where a list's
+    // BeginList wasn't called (the prev range will simply be empty next time).
+    for (uint32_t i = 0; i < s.listCount; ++i)
+    {
+        ui_list_slot &l = s.lists[i];
+        l.prevItemsBegin = l.curItemsBegin;
+        l.prevItemsEnd = l.curItemsEnd;
+        l.curItemsBegin = 0;
+        l.curItemsEnd = 0;
+        l.presentThisFrame = false;
+    }
+
     // Modal active = any kWindowFlagModal slot painted last frame.
     s.modalActive = false;
     s.modalSlotIdx = 0;
@@ -781,6 +794,118 @@ void EndWindow(ui_state &s)
     s.pointerSuppress = s.savedPointerSuppress;
     s.inModalScope = s.savedInModalScope;
     s.openWindowId = 0;
+}
+
+namespace
+{
+
+auto FindOrAllocListSlot(ui_state &s, uint32_t id) -> ui_list_slot *
+{
+    for (uint32_t i = 0; i < s.listCount; ++i)
+        if (s.lists[i].id == id)
+            return &s.lists[i];
+    if (s.listCount >= ui_state::kListSlotsMax)
+        return nullptr;
+    ui_list_slot *l = &s.lists[s.listCount++];
+    *l = ui_list_slot{};
+    l->id = id;
+    return l;
+}
+
+} // namespace
+
+auto BeginList(ui_state &s, uint32_t localId, const ui_list_desc &desc) -> ui_list_scope
+{
+    uint32_t id = MakeId(s, localId);
+    ui_list_slot *slot = FindOrAllocListSlot(s, id);
+    if (slot)
+        slot->presentThisFrame = true;
+
+    // Map this frame's focus id back to a row index using the slot's prev-frame item range.
+    // Begin set s.focusId by indexing prev items, so its position in our range == fIdx.
+    // Row order must be stable across frames for this to be accurate; filter changes that
+    // shuffle rows are the caller's responsibility (reset scroll on changes).
+    uint32_t curFocusedFIdx = UINT32_MAX;
+    if (slot && slot->prevItemsEnd > slot->prevItemsBegin)
+    {
+        for (uint32_t i = slot->prevItemsBegin; i < slot->prevItemsEnd; ++i)
+        {
+            if (s.prevItems[i] == s.focusId)
+            {
+                curFocusedFIdx = i - slot->prevItemsBegin;
+                break;
+            }
+        }
+    }
+
+    if (desc.visibleRows > 0 && desc.scroll)
+    {
+        if (curFocusedFIdx != UINT32_MAX)
+        {
+            if (curFocusedFIdx < *desc.scroll)
+                *desc.scroll = curFocusedFIdx;
+            else if (curFocusedFIdx >= *desc.scroll + (uint32_t)desc.visibleRows)
+                *desc.scroll = curFocusedFIdx - (uint32_t)desc.visibleRows + 1;
+        }
+        if (desc.rowCount <= (uint32_t)desc.visibleRows)
+            *desc.scroll = 0;
+        else if (*desc.scroll + (uint32_t)desc.visibleRows > desc.rowCount)
+            *desc.scroll = desc.rowCount - (uint32_t)desc.visibleRows;
+    }
+
+    ui_list_scope scope{};
+    scope.baseX = s.cursorX;
+    scope.baseY = s.cursorY;
+    scope.w = desc.w;
+    scope.visibleRows = desc.visibleRows;
+    scope.rowCount = desc.rowCount;
+    scope.firstVisible = desc.scroll ? *desc.scroll : 0;
+    scope.lastVisible = scope.firstVisible + (uint32_t)desc.visibleRows;
+    if (scope.lastVisible > desc.rowCount)
+        scope.lastVisible = desc.rowCount;
+    scope.focusedFIdx = UINT32_MAX;
+    scope.slotIdx = slot ? (uint32_t)(slot - s.lists) : UINT32_MAX;
+
+    CellRenderer::PushClip(scope.baseX, scope.baseY, desc.w, desc.visibleRows);
+    if (slot)
+        slot->curItemsBegin = s.curCount;
+
+    return scope;
+}
+
+auto ListRow(ui_state &s, ui_list_scope &scope, uint32_t fIdx, uint32_t rowLocalId) -> ui_list_row_result
+{
+    ui_list_row_result r{};
+    bool visible = fIdx >= scope.firstVisible && fIdx < scope.lastVisible;
+    r.visible = visible;
+    if (visible)
+    {
+        int32_t y = scope.baseY + (int32_t)(fIdx - scope.firstVisible);
+        r.y = y;
+        r.hit = SelectableHit(s, rowLocalId, scope.baseX, y, scope.w, 1);
+    }
+    else
+    {
+        r.hit = Selectable(s, rowLocalId);
+    }
+    if (r.hit.focused)
+        scope.focusedFIdx = fIdx;
+    return r;
+}
+
+void EndList(ui_state &s, const ui_list_scope &scope)
+{
+    CellRenderer::PopClip();
+    if (scope.slotIdx != UINT32_MAX)
+        s.lists[scope.slotIdx].curItemsEnd = s.curCount;
+    s.cursorX = scope.baseX;
+    s.cursorY = scope.baseY + scope.visibleRows;
+    s.lineStartX = scope.baseX;
+    s.lineH = 0;
+    s.lastItemX = scope.baseX;
+    s.lastItemY = scope.baseY;
+    s.lastItemW = scope.w;
+    s.lastItemH = scope.visibleRows;
 }
 
 } // namespace nyla::Ui
