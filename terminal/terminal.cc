@@ -256,18 +256,17 @@ void UserMain()
     uint32_t defaultFgRgba = 0xFF000000u | (Foreground & 0x00FFFFFFu);
     uint32_t defaultBgRgba = 0xFF000000u | (Background & 0x00FFFFFFu);
 
-    auto *screen = TerminalScreen::Create(RegionAlloc::g_BootstrapAlloc,
-                                          terminal_screen_init_desc{
-                                              .cols = curCols,
-                                              .rows = curRows,
-                                              .scrollbackLines = 10000,
-                                              .defaultFgRgba = defaultFgRgba,
-                                              .defaultBgRgba = defaultBgRgba,
-                                              .palette256 = Palette,
-                                          });
+    auto *screen = TerminalScreen::Create(RegionAlloc::g_BootstrapAlloc, terminal_screen_init_desc{
+                                                                             .cols = curCols,
+                                                                             .rows = curRows,
+                                                                             .scrollbackLines = 10000,
+                                                                             .defaultFgRgba = defaultFgRgba,
+                                                                             .defaultBgRgba = defaultBgRgba,
+                                                                             .palette256 = Palette,
+                                                                         });
 
 #if defined(_WIN32)
-    auto shellPath = "cmd.exe"_s;
+    auto shellPath = "pwsh.exe"_s;
 #else
     auto shellPath = "/bin/bash"_s;
 #endif
@@ -393,9 +392,9 @@ void UserMain()
 
             // Final letter for arrow / Home / End. Tilde-style (e.g. PgUp) handled below.
             char finalLetter = 0;
-            uint8_t tildeNum = 0;     // CSI <n>~ form when nonzero
+            uint8_t tildeNum = 0;        // CSI <n>~ form when nonzero
             const char *fkSeq = nullptr; // ESC O<x> for F1-F4
-            uint8_t fkTilde = 0;      // CSI <n>~ for F5-F12
+            uint8_t fkTilde = 0;         // CSI <n>~ for F5-F12
             // DECCKM: app-cursor-keys mode swaps CSI for SS3 on the cursor/Home/End set.
             bool useSS3 = TerminalScreen::ApplicationCursorKeys(*screen);
 

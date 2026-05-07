@@ -40,9 +40,9 @@ struct terminal_screen
     uint32_t defaultFg;
     uint32_t defaultBg;
 
-    span<terminal_cell> cells;     // active viewport (points at primary or alt)
-    span<terminal_cell> primary;   // primary cell buffer (cols*rows)
-    span<terminal_cell> alt;       // alt screen buffer (cols*rows); used by DECSET ?1049
+    span<terminal_cell> cells;   // active viewport (points at primary or alt)
+    span<terminal_cell> primary; // primary cell buffer (cols*rows)
+    span<terminal_cell> alt;     // alt screen buffer (cols*rows); used by DECSET ?1049
     // Per-row "this row's logical content continues onto next row" bit. Set by autowrap in
     // PutCodepoint, ridden along by scroll/insert/delete row ops, cleared by row erases.
     // activeWrapped points at primaryWrapped or altWrapped per inAltScreen.
@@ -50,7 +50,7 @@ struct terminal_screen
     span<uint8_t> altWrapped;
     span<uint8_t> activeWrapped;
     bool inAltScreen;
-    bool applicationCursorKeys;    // DECCKM (?1)
+    bool applicationCursorKeys; // DECCKM (?1)
     bool cursorVisible;
 
     // DECSTBM scrolling region (inclusive, 0-based). Default = full screen.
@@ -71,7 +71,7 @@ struct terminal_screen
 
     // Scrollback ring of full lines (cols cells per line). cap=0 disables.
     span<terminal_cell> scrollback;
-    span<uint8_t> scrollbackWrapped;  // parallel ring of wrapped bits, one per scrollback line
+    span<uint8_t> scrollbackWrapped; // parallel ring of wrapped bits, one per scrollback line
     uint32_t scrollbackCap;
     uint32_t scrollbackHead;  // index of next line slot to write
     uint32_t scrollbackCount; // stored line count (<= scrollbackCap)
@@ -405,8 +405,7 @@ void InsertLines(terminal_screen &s, uint32_t n)
     uint32_t shift = regionRows - n;
     if (shift > 0)
     {
-        MemMove(s.cells.data + (uint64_t)(s.cursorRow + n) * s.cols,
-                s.cells.data + (uint64_t)s.cursorRow * s.cols,
+        MemMove(s.cells.data + (uint64_t)(s.cursorRow + n) * s.cols, s.cells.data + (uint64_t)s.cursorRow * s.cols,
                 sizeof(terminal_cell) * (uint64_t)shift * s.cols);
         for (int32_t r = (int32_t)s.scrollBot; r >= (int32_t)(s.cursorRow + n); --r)
             s.activeWrapped[r] = s.activeWrapped[r - n];
@@ -429,8 +428,7 @@ void DeleteLines(terminal_screen &s, uint32_t n)
     uint32_t shift = regionRows - n;
     if (shift > 0)
     {
-        MemMove(s.cells.data + (uint64_t)s.cursorRow * s.cols,
-                s.cells.data + (uint64_t)(s.cursorRow + n) * s.cols,
+        MemMove(s.cells.data + (uint64_t)s.cursorRow * s.cols, s.cells.data + (uint64_t)(s.cursorRow + n) * s.cols,
                 sizeof(terminal_cell) * (uint64_t)shift * s.cols);
         for (uint32_t r = s.cursorRow; r + n <= s.scrollBot; ++r)
             s.activeWrapped[r] = s.activeWrapped[r + n];
@@ -667,7 +665,7 @@ void DispatchCsi(terminal_screen &s, uint8_t final)
         // Intermediate byte (0x20-0x2F) seen → CSI ' ' q, CSI '$' p etc; quietly swallow.
         if (s.csiIntermediate)
             break;
-        LOG("terminal_screen: unhandled CSI final '%c' (%d)"_s, (char)final, (uint32_t)final);
+        LOG("terminal_screen: unhandled CSI final '%c' (%d)"_s, (char) final, (uint32_t) final);
         break;
     }
 }
@@ -799,8 +797,7 @@ void AllocBuffers(terminal_screen &s)
 
     if (s.scrollbackCap > 0)
     {
-        s.scrollback = RegionAlloc::AllocArray<terminal_cell>(s.screenAlloc,
-                                                              (uint64_t)s.scrollbackCap * s.cols);
+        s.scrollback = RegionAlloc::AllocArray<terminal_cell>(s.screenAlloc, (uint64_t)s.scrollbackCap * s.cols);
         s.scrollbackWrapped = RegionAlloc::AllocArray<uint8_t>(s.screenAlloc, s.scrollbackCap);
         for (uint32_t k = 0; k < s.scrollbackCap; ++k)
             s.scrollbackWrapped[k] = 0;
@@ -880,8 +877,7 @@ void API Resize(terminal_screen &self, uint32_t newCols, uint32_t newRows)
     bool cursorOnPrimary = !self.inAltScreen;
     uint32_t cursorSrcRow = self.scrollbackCount + self.cursorRow;
 
-    auto SrcCells = [&self, oldCols](uint32_t idx) -> const terminal_cell *
-    {
+    auto SrcCells = [&self, oldCols](uint32_t idx) -> const terminal_cell * {
         if (idx < self.scrollbackCount)
         {
             uint32_t oldest = (self.scrollbackHead + self.scrollbackCap - self.scrollbackCount) % self.scrollbackCap;
@@ -892,8 +888,7 @@ void API Resize(terminal_screen &self, uint32_t newCols, uint32_t newRows)
         // Reflow always sources from primary; alt is treated as transient.
         return self.primary.data + (uint64_t)row * oldCols;
     };
-    auto SrcWrap = [&self](uint32_t idx) -> uint8_t
-    {
+    auto SrcWrap = [&self](uint32_t idx) -> uint8_t {
         if (idx < self.scrollbackCount)
         {
             uint32_t oldest = (self.scrollbackHead + self.scrollbackCap - self.scrollbackCount) % self.scrollbackCap;
@@ -904,8 +899,7 @@ void API Resize(terminal_screen &self, uint32_t newCols, uint32_t newRows)
     };
 
     terminal_cell defaultBlank{0x20, self.defaultFg, self.defaultBg, 0};
-    auto IsBlankDefault = [&self](const terminal_cell &c) -> bool
-    {
+    auto IsBlankDefault = [&self](const terminal_cell &c) -> bool {
         return c.codepoint == 0x20 && c.fgRgba == self.defaultFg && c.bgRgba == self.defaultBg && c.attrs == 0;
     };
 
@@ -1044,8 +1038,7 @@ void API Resize(terminal_screen &self, uint32_t newCols, uint32_t newRows)
     for (uint32_t r = 0; r < primaryFillCount; ++r)
     {
         MemCpy(self.primary.data + (uint64_t)r * newCols,
-               emitCells.data + (uint64_t)(newPrimaryEmitStart + r) * newCols,
-               sizeof(terminal_cell) * newCols);
+               emitCells.data + (uint64_t)(newPrimaryEmitStart + r) * newCols, sizeof(terminal_cell) * newCols);
         self.primaryWrapped[r] = emitWrap[newPrimaryEmitStart + r];
     }
 
@@ -1053,8 +1046,7 @@ void API Resize(terminal_screen &self, uint32_t newCols, uint32_t newRows)
     for (uint32_t r = 0; r < newScrollbackCount; ++r)
     {
         MemCpy(self.scrollback.data + (uint64_t)r * newCols,
-               emitCells.data + (uint64_t)(scrollbackEmitStart + r) * newCols,
-               sizeof(terminal_cell) * newCols);
+               emitCells.data + (uint64_t)(scrollbackEmitStart + r) * newCols, sizeof(terminal_cell) * newCols);
         self.scrollbackWrapped[r] = emitWrap[scrollbackEmitStart + r];
     }
 
@@ -1280,19 +1272,40 @@ void API Feed(terminal_screen &self, byteview bytes)
     }
 }
 
-auto API Cols(const terminal_screen &self) -> uint32_t { return self.cols; }
-auto API Rows(const terminal_screen &self) -> uint32_t { return self.rows; }
-auto API CursorCol(const terminal_screen &self) -> uint32_t { return self.cursorCol; }
-auto API CursorRow(const terminal_screen &self) -> uint32_t { return self.cursorRow; }
-auto API CursorVisible(const terminal_screen &self) -> bool { return self.cursorVisible; }
-auto API ApplicationCursorKeys(const terminal_screen &self) -> bool { return self.applicationCursorKeys; }
+auto API Cols(const terminal_screen &self) -> uint32_t
+{
+    return self.cols;
+}
+auto API Rows(const terminal_screen &self) -> uint32_t
+{
+    return self.rows;
+}
+auto API CursorCol(const terminal_screen &self) -> uint32_t
+{
+    return self.cursorCol;
+}
+auto API CursorRow(const terminal_screen &self) -> uint32_t
+{
+    return self.cursorRow;
+}
+auto API CursorVisible(const terminal_screen &self) -> bool
+{
+    return self.cursorVisible;
+}
+auto API ApplicationCursorKeys(const terminal_screen &self) -> bool
+{
+    return self.applicationCursorKeys;
+}
 
 auto API CellAt(const terminal_screen &self, uint32_t col, uint32_t row) -> terminal_cell
 {
     return self.cells[Idx(self, col, row)];
 }
 
-auto API ScrollbackCount(const terminal_screen &self) -> uint32_t { return self.scrollbackCount; }
+auto API ScrollbackCount(const terminal_screen &self) -> uint32_t
+{
+    return self.scrollbackCount;
+}
 
 auto API ScrollbackCellAt(const terminal_screen &self, uint32_t col, uint32_t line) -> terminal_cell
 {

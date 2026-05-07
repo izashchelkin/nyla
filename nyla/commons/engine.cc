@@ -232,8 +232,7 @@ auto API FrameBegin(region_alloc &alloc) -> engine_frame
     span<const key_event> keyDown{};
     if (keyDownBuf.size > 0)
     {
-        auto *dst =
-            (key_event *)RegionAlloc::Alloc(alloc, sizeof(key_event) * keyDownBuf.size, alignof(key_event));
+        auto *dst = (key_event *)RegionAlloc::Alloc(alloc, sizeof(key_event) * keyDownBuf.size, alignof(key_event));
         for (uint64_t i = 0; i < keyDownBuf.size; ++i)
             dst[i] = keyDownBuf.data.data[i];
         keyDown = span<const key_event>{dst, keyDownBuf.size};

@@ -200,10 +200,10 @@ struct ui_modal_result
 // content (cells, colors) using the returned y; the list does not paint row data itself.
 struct ui_list_desc
 {
-    int32_t w;          // column width
-    int32_t visibleRows;// rows in the visible band
+    int32_t w;           // column width
+    int32_t visibleRows; // rows in the visible band
     uint32_t rowCount;
-    uint32_t *scroll;   // caller-owned scroll index into [0, rowCount); BeginList may mutate
+    uint32_t *scroll; // caller-owned scroll index into [0, rowCount); BeginList may mutate
 };
 
 struct ui_list_scope
