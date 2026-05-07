@@ -23,6 +23,20 @@
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_C_COMPILER": "cl",
         "CMAKE_CXX_COMPILER": "cl",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "BUILD_SHARED_LIBS": "OFF"
+      }
+    },
+
+    {
+      "name": "windows-ninja-release",
+      "displayName": "Windows (Ninja + MSVC Debug)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/windows-ninja-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_C_COMPILER": "cl",
+        "CMAKE_CXX_COMPILER": "cl",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
       }
     },
@@ -52,22 +66,12 @@
         "BUILD_SHARED_LIBS": "ON"
       }
     },
+
     {
       "name": "linux-release",
       "displayName": "Linux (Ninja Release)",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/linux-release",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_CXX_COMPILER": "clang++",
-        "BUILD_SHARED_LIBS": "ON"
-      }
-    },
-    {
-      "name": "linux-static-release",
-      "displayName": "Linux (Ninja Release, Static)",
-      "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build/linux-static-release",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_CXX_COMPILER": "clang++",
@@ -81,6 +85,10 @@
       "name": "windows-ninja-debug",
       "configurePreset": "windows-ninja-debug"
     },
+    {
+      "name": "windows-ninja-release",
+      "configurePreset": "windows-ninja-release"
+    },
 
     {
       "name": "linux-debug",
@@ -89,10 +97,6 @@
     {
       "name": "linux-release",
       "configurePreset": "linux-release"
-    },
-    {
-      "name": "linux-static-release",
-      "configurePreset": "linux-static-release"
     }
   ]
 }

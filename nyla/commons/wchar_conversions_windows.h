@@ -21,4 +21,13 @@ INLINE auto ConvertWideCharToUTF8(region_alloc &alloc, span<const wchar_t> src) 
     return out;
 }
 
+INLINE auto ConvertUTF8ToWideChar(region_alloc &alloc, byteview src) -> span<const wchar_t>
+{
+    int outLen = MultiByteToWideChar(CP_UTF8, 0, (const char *)src.data, CastI32(src.size), nullptr, 0);
+    span out = RegionAlloc::AllocArray<wchar_t>(alloc, outLen);
+    MultiByteToWideChar(CP_UTF8, 0, (const char *)src.data, CastI32(src.size), out.data, outLen);
+
+    return out;
+}
+
 } // namespace nyla

@@ -15,13 +15,16 @@
 #include "nyla/commons/mem.h"
 #include "nyla/commons/platform.h"
 #include "nyla/commons/region_alloc.h"
+#include "nyla/commons/region_alloc_def.h"
 #include "nyla/commons/span.h"
 #include "nyla/commons/time.h"
 
-auto CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) -> LRESULT;
-
 namespace nyla
 {
+
+auto CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) -> LRESULT;
+
+using namespace win32;
 
 namespace
 {
@@ -315,10 +318,15 @@ auto API WinPollEvent(PlatformEvent &outEvent) -> bool
     return false;
 }
 
-auto WindowsPlatform::WinGetHandle() -> HWND
+auto win32::WinGetHandle() -> HWND
 {
     ASSERT(g_HWnd);
     return g_HWnd;
+}
+
+void API WinSetTitle(byteview title)
+{
+    SetWindowTextA(g_HWnd, Span::CStr(title));
 }
 
 void API WinOpen()
@@ -328,7 +336,7 @@ void API WinOpen()
         constexpr wchar_t kName[] = L"nyla";
 
         WNDCLASSW windowClass = {
-            .lpfnWndProc = WindowsPlatform::MainWndProc,
+            .lpfnWndProc = MainWndProc,
             .hInstance = g_HInstance,
             .lpszClassName = kName,
         };
@@ -341,7 +349,7 @@ void API WinOpen()
     ShowWindow(g_HWnd, SW_SHOW);
     UpdateWindow(g_HWnd);
 
-    GetWindowRect(g_HWnd, &g_WinRect);
+    GetClientRect(g_HWnd, &g_WinRect);
 }
 
 auto API WinGetSize() -> PlatformWindowSize
@@ -352,12 +360,12 @@ auto API WinGetSize() -> PlatformWindowSize
     };
 }
 
-auto WindowsPlatform::GetHInstance() -> HINSTANCE
+auto win32::GetHInstance() -> HINSTANCE
 {
     return g_HInstance;
 }
 
-void WindowsPlatform::SetHInstance(HINSTANCE hInstance)
+void win32::SetHInstance(HINSTANCE hInstance)
 {
     g_HInstance = hInstance;
 }
@@ -442,10 +450,11 @@ auto API GetGamepadRightTrigger(uint32_t index) -> float
     return GetGamepadTrigger(gamepad.bRightTrigger, XINPUT_GAMEPAD_TRIGGER_THRESHOLD);
 }
 
-auto CALLBACK WindowsPlatform::MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) -> LRESULT
+auto CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) -> LRESULT
 {
     switch (uMsg)
     {
+
     case WM_PAINT: {
         g_Flags |= kFlagRepaint;
         return 0;
@@ -463,12 +472,11 @@ auto CALLBACK WindowsPlatform::MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, 
     }
 
     case WM_SIZE: {
-        if (wParam == SIZE_MINIMIZED)
-            return 0;
-
-        g_Flags |= kFlagWinResize;
-        RECT newRect{};
-        GetWindowRect(g_HWnd, &newRect);
+        if (wParam != SIZE_MINIMIZED)
+        {
+            g_Flags |= kFlagWinResize;
+            GetClientRect(g_HWnd, &g_WinRect);
+        }
 
         return 0;
     }
@@ -518,7 +526,7 @@ auto CALLBACK WindowsPlatform::MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, 
 
         if (!wasDown)
         {
-            KeyPhysical key = WindowsPlatform::ScanCodeToKeyPhysical(scanCode, extended);
+            KeyPhysical key = ScanCodeToKeyPhysical(scanCode, extended);
             InlineQueue::Write(g_EventsQueue, PlatformEvent{
                                                   .type = PlatformEventType::KeyDown,
                                                   .key = key,
@@ -587,7 +595,7 @@ auto CALLBACK WindowsPlatform::MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, 
         UINT scanCode = (UINT)((lParam >> 16) & 0xFF);
         bool extended = ((lParam >> 24) & 0x01) != 0;
 
-        KeyPhysical key = WindowsPlatform::ScanCodeToKeyPhysical(scanCode, extended);
+        KeyPhysical key = ScanCodeToKeyPhysical(scanCode, extended);
         InlineQueue::Write(g_EventsQueue, PlatformEvent{
                                               .type = PlatformEventType::KeyUp,
                                               .key = key,
@@ -601,7 +609,7 @@ auto CALLBACK WindowsPlatform::MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, 
     return 0;
 }
 
-auto WindowsPlatform::ScanCodeToKeyPhysical(uint8_t scanCode, bool extended) -> KeyPhysical
+auto win32::ScanCodeToKeyPhysical(uint8_t scanCode, bool extended) -> KeyPhysical
 {
     // Extended (E0) keys first where collisions exist.
     if (extended)
@@ -882,10 +890,11 @@ void PlatformInit1()
 void PlatformTearDown()
 {
 #ifndef NDEBUG
+#if 0 // allow enabling this via flag or provide as a separate function - show be off by default
+    for (;;)
     HANDLE hConIn =
         CreateFileA("CONIN$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
 
-    for (;;)
     {
         INPUT_RECORD ir;
         DWORD read;
@@ -895,6 +904,7 @@ void PlatformTearDown()
                 break;
         }
     }
+#endif
 
     PostMessage(GetConsoleWindow(), WM_CLOSE, 0, 0);
 #endif

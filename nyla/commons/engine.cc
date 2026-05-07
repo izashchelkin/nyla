@@ -39,8 +39,10 @@ struct engine_state
 
     // Modifier mask carried across frames; bits = KeyMod::*.
     uint8_t modMask;
+
+    bool isWindowResized;
 };
-engine_state *g_engine;
+engine_state *engine;
 
 } // namespace
 
@@ -49,11 +51,11 @@ namespace Engine
 
 void API Bootstrap(region_alloc &alloc, const engine_init_desc &desc)
 {
-    g_engine = &RegionAlloc::Alloc<engine_state>(RegionAlloc::g_BootstrapAlloc);
+    engine = &RegionAlloc::Alloc<engine_state>(RegionAlloc::g_BootstrapAlloc);
 
     const uint32_t maxFps = desc.maxFps ? desc.maxFps : 144;
-    g_engine->targetFrameDurationUs = 1'000'000ull / maxFps;
-    g_engine->lastFrameStartUs = GetMonotonicTimeMicros();
+    engine->targetFrameDurationUs = 1'000'000ull / maxFps;
+    engine->lastFrameStartUs = GetMonotonicTimeMicros();
 
     rhi_flags flags{};
     if (desc.vsync)
@@ -76,19 +78,19 @@ auto API FrameBegin(region_alloc &alloc) -> engine_frame
     rhi_cmdlist cmd = Rhi::FrameBegin(alloc);
 
     const uint64_t frameStart = GetMonotonicTimeMicros();
-    const uint64_t dtUs = frameStart - g_engine->lastFrameStartUs;
+    const uint64_t dtUs = frameStart - engine->lastFrameStartUs;
     const float dt = static_cast<float>(dtUs) * 1e-6f;
-    g_engine->lastFrameStartUs = frameStart;
+    engine->lastFrameStartUs = frameStart;
 
-    g_engine->dtUsAccum += static_cast<uint32_t>(dtUs);
-    ++g_engine->framesCounted;
-    if (g_engine->dtUsAccum >= 500'000u)
+    engine->dtUsAccum += static_cast<uint32_t>(dtUs);
+    ++engine->framesCounted;
+    if (engine->dtUsAccum >= 500'000u)
     {
-        const double seconds = static_cast<double>(g_engine->dtUsAccum) / 1'000'000.0;
-        const double fpsF64 = static_cast<double>(g_engine->framesCounted) / seconds;
-        g_engine->fps = static_cast<uint32_t>(LRound(fpsF64));
-        g_engine->dtUsAccum = 0;
-        g_engine->framesCounted = 0;
+        const double seconds = static_cast<double>(engine->dtUsAccum) / 1'000'000.0;
+        const double fpsF64 = static_cast<double>(engine->framesCounted) / seconds;
+        engine->fps = static_cast<uint32_t>(LRound(fpsF64));
+        engine->dtUsAccum = 0;
+        engine->framesCounted = 0;
     }
 
     constexpr uint64_t kTextBufCap = 256;
@@ -97,8 +99,8 @@ auto API FrameBegin(region_alloc &alloc) -> engine_frame
     constexpr uint64_t kKeyDownCap = 64;
     inline_vec<key_event, kKeyDownCap> keyDownBuf{};
 
-    const int32_t pointerStartX = g_engine->pointerX;
-    const int32_t pointerStartY = g_engine->pointerY;
+    const int32_t pointerStartX = engine->pointerX;
+    const int32_t pointerStartY = engine->pointerY;
     uint32_t pointerPressEdges = 0;
     uint32_t pointerReleaseEdges = 0;
 
@@ -140,9 +142,9 @@ auto API FrameBegin(region_alloc &alloc) -> engine_frame
         case PlatformEventType::KeyDown:
             InputManager::HandlePressed(input_interface_type::Keyboard, uint32_t(event.key), frameStart);
             if (uint8_t bit = modBit(event.key))
-                g_engine->modMask |= bit;
+                engine->modMask |= bit;
             if (keyDownBuf.size + 1 < kKeyDownCap)
-                InlineVec::Append(keyDownBuf, key_event{.key = event.key, .mods = g_engine->modMask});
+                InlineVec::Append(keyDownBuf, key_event{.key = event.key, .mods = engine->modMask});
 #if !defined(NDEBUG)
             switch (event.key)
             {
@@ -181,39 +183,41 @@ auto API FrameBegin(region_alloc &alloc) -> engine_frame
         case PlatformEventType::KeyUp:
             InputManager::HandleReleased(input_interface_type::Keyboard, uint32_t(event.key), frameStart);
             if (uint8_t bit = modBit(event.key))
-                g_engine->modMask &= ~bit;
+                engine->modMask &= ~bit;
             break;
         case PlatformEventType::MousePress:
             InputManager::HandlePressed(input_interface_type::Mouse, event.mouse.code, frameStart);
-            g_engine->pointerX = event.mouse.x;
-            g_engine->pointerY = event.mouse.y;
+            engine->pointerX = event.mouse.x;
+            engine->pointerY = event.mouse.y;
             if (event.mouse.code >= 1 && event.mouse.code <= 32)
             {
                 uint32_t bit = 1u << (event.mouse.code - 1);
                 pointerPressEdges |= bit;
-                g_engine->pointerButtons |= bit;
+                engine->pointerButtons |= bit;
             }
             break;
         case PlatformEventType::MouseRelease:
             InputManager::HandleReleased(input_interface_type::Mouse, event.mouse.code, frameStart);
-            g_engine->pointerX = event.mouse.x;
-            g_engine->pointerY = event.mouse.y;
+            engine->pointerX = event.mouse.x;
+            engine->pointerY = event.mouse.y;
             if (event.mouse.code >= 1 && event.mouse.code <= 32)
             {
                 uint32_t bit = 1u << (event.mouse.code - 1);
                 pointerReleaseEdges |= bit;
-                g_engine->pointerButtons &= ~bit;
+                engine->pointerButtons &= ~bit;
             }
             break;
         case PlatformEventType::MouseMove:
-            g_engine->pointerX = event.mouse.x;
-            g_engine->pointerY = event.mouse.y;
+            engine->pointerX = event.mouse.x;
+            engine->pointerY = event.mouse.y;
             break;
-        case PlatformEventType::WinResize:
+        case PlatformEventType::WinResize: {
             Rhi::TriggerSwapchainRecreate();
+            engine->isWindowResized = true;
             break;
+        }
         case PlatformEventType::Quit:
-            g_engine->shouldExit = true;
+            engine->shouldExit = true;
             break;
         case PlatformEventType::TextInput:
         case PlatformEventType::Repaint:
@@ -243,14 +247,14 @@ auto API FrameBegin(region_alloc &alloc) -> engine_frame
         .dt = dt,
         .dtUs = dtUs,
         .frameStartUs = frameStart,
-        .fps = g_engine->fps,
+        .fps = engine->fps,
         .textChars = textChars,
         .keyDown = keyDown,
-        .pointerX = g_engine->pointerX,
-        .pointerY = g_engine->pointerY,
-        .pointerDx = g_engine->pointerX - pointerStartX,
-        .pointerDy = g_engine->pointerY - pointerStartY,
-        .pointerButtons = g_engine->pointerButtons,
+        .pointerX = engine->pointerX,
+        .pointerY = engine->pointerY,
+        .pointerDx = engine->pointerX - pointerStartX,
+        .pointerDy = engine->pointerY - pointerStartY,
+        .pointerButtons = engine->pointerButtons,
         .pointerPress = pointerPressEdges,
         .pointerRelease = pointerReleaseEdges,
     };
@@ -263,24 +267,33 @@ void API FrameEnd(region_alloc &alloc)
     Rhi::FrameEnd(alloc);
 
     const uint64_t frameEndUs = GetMonotonicTimeMicros();
-    const uint64_t frameDurationUs = frameEndUs - g_engine->lastFrameStartUs;
+    const uint64_t frameDurationUs = frameEndUs - engine->lastFrameStartUs;
 
-    if (g_engine->targetFrameDurationUs > frameDurationUs)
+    if (engine->targetFrameDurationUs > frameDurationUs)
     {
-        const uint64_t sleepForMillis = (g_engine->targetFrameDurationUs - frameDurationUs) / 1000;
+        const uint64_t sleepForMillis = (engine->targetFrameDurationUs - frameDurationUs) / 1000;
         if (sleepForMillis)
             Sleep(sleepForMillis);
     }
 }
 
+auto API IsWindowResized() -> bool
+{
+    if (engine->isWindowResized)
+    {
+        engine->isWindowResized = false;
+        return true;
+    }
+}
+
 auto API ShouldExit() -> bool
 {
-    return g_engine->shouldExit;
+    return engine->shouldExit;
 }
 
 void API RequestExit()
 {
-    g_engine->shouldExit = true;
+    engine->shouldExit = true;
 }
 
 } // namespace Engine

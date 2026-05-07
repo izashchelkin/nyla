@@ -282,6 +282,8 @@ void UserMain()
     uint32_t scrollOffset = 0; // lines viewport is scrolled up into scrollback
     bool showStats = false;
 
+    WinSetTitle("hello world!"_s);
+
     while (!Engine::ShouldExit())
     {
         engine_frame frame = Engine::FrameBegin(alloc);
@@ -295,8 +297,8 @@ void UserMain()
         MeshManager::Update(alloc, frame.cmd);
         TextureManager::Update(frame.cmd);
 
-        // Resize cells + pty to fit current window. Reserve the origin margin on each axis.
-        {
+        if (Engine::IsWindowResized())
+        { // Resize cells + pty to fit current window. Reserve the origin margin on each axis.
             PlatformWindowSize ws = WinGetSize();
             uint32_t cellW = CellRenderer::CellPxW();
             uint32_t cellH = CellRenderer::CellPxH();

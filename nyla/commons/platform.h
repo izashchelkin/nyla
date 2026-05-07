@@ -74,6 +74,7 @@ void API Sleep(uint64_t millis);
 auto API Spawn(span<const char *const> cmd) -> bool;
 auto API RunSync(span<const char *const> cmd, region_alloc &alloc, byteview &outLog) -> int32_t;
 void API WinOpen();
+void API WinSetTitle(byteview title);
 auto API WinGetSize() -> PlatformWindowSize;
 auto API WinPollEvent(PlatformEvent &outEvent) -> bool;
 

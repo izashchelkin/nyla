@@ -2,6 +2,9 @@
 
 #include <cstdint>
 
+#include "nyla/commons/keyboard.h"
+#include "nyla/commons/macros.h"
+
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
@@ -9,22 +12,18 @@
 #include <Xinput.h>
 #include <bcrypt.h>
 
-#include "nyla/commons/keyboard.h"
-
 namespace nyla
 {
 
-class WindowsPlatform
+namespace win32
 {
-  public:
-    static auto MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) -> LRESULT;
 
-    static auto GetHInstance() -> HINSTANCE;
-    static void SetHInstance(HINSTANCE hInstance);
+auto API GetHInstance() -> HINSTANCE;
+void API SetHInstance(HINSTANCE hInstance);
 
-    static auto WinGetHandle() -> HWND;
+auto API WinGetHandle() -> HWND;
+auto API ScanCodeToKeyPhysical(uint8_t scanCode, bool extended) -> KeyPhysical;
 
-    static auto ScanCodeToKeyPhysical(uint8_t scanCode, bool extended) -> KeyPhysical;
-};
+} // namespace win32
 
 } // namespace nyla

@@ -21,17 +21,22 @@ Top of list = next thing to work on. Trim to the top 5-7. Each item: rule/featur
 
 Active thrust: **Terminal neovim shakedown**. Pty, ANSI core, alt-screen, special-key emission, line/char ops, scrollback storage + viewport paint, dynamic resize, DCS/intermediate/colon-subparam parser coverage, low-latency present mode all shipped — captured neovim streams feed cleanly via offline replay; release build now interactive-smooth on a 60Hz panel. Remaining: in-window neovim usability check, signal forwarding, Windows pty validation, conformance pass.
 
-0. BUG TRACKER (maybe outdated):
-       windows terminal mouse scrolling doesn't work - page down, page up fine.
-       windows terminal resizing doesn't work.
-       input was reported broken in breakout (Linux fine). Needs Windows access; revisit before Windows pty work above.
+0. BUG TRACKER:
+       [windows] terminal private buffer is not cleared on exit (neovim)
+       [windows] terminal alt + arrow key input is broken
+       [windows] terminal mouse scrolling doesn't work - page down, page up fine.
+       [windows] terminal neovim !! quotes/braces teleport cursor wtf
+       [windows] set title function set's only first character wtf
+       [linux] set title is missing
 
 1. **Cleanup pass over `nyla/commons`** — invoke the `cleanup` skill; concrete pending instances live there. **Why:** slop accumulates faster than it gets fixed. **How:** `/cleanup`, sweep one tripwire at a time.
 
 2. Terminal — support for neovim is a must; keep it the gating concern when prioritizing terminal work.
+    * !! quotes/braces (any pair punctuation with highlight) + cursor seems to be annoyingly unreadable
     * part of neovim usability is emoji support, the same for some other applications
     * we have to come with terminal benchmarks (reuse existing) since hardware is quite powerful and we cannot really stresstest in normal scenarios.
     * terminal application might also be a good place to think about packing application builds. does it maybe work already fine enough?
+    * i would say mouse input is quite nice and probably not hard implement just not top priority
 
 3. **Neovim usability shakedown** — launch `nvim` inside the running terminal binary on Linux and fix what surfaces in actual use (paint glitches, cursor placement off-by-one, key sequence gaps, perceived hangs from missing replies). **Why:** offline parser replay is silent on captured nvim streams, but interactive correctness (rendering, key emission, modifier handling under DECCKM, mouse if engaged) is not yet observed end-to-end. **How:** `./bin/terminal`, `nvim`, exercise insert/normal/visual/command modes and `:help` scrolling. **Open:** visual mode highlighting in nvim — selection range not painted/tracked correctly (investigate SGR reverse vs. nvim's actual highlight protocol, possibly missing CSI handling); lag after `:q` (or any alt-screen app exit) before primary screen + new prompt are visible — paint loop runs every frame and reads cells fresh, so the delay is upstream: prime suspect is nvim emitting DSR/DA queries on shutdown and stalling on the missing reply (we swallow `c`/`n`/`t` finals); secondary suspect is shell-side IO scheduling. Escalate to actual emitter once measured; underline rendering (no atlas glyph yet — terminal_cell carries the bit but paint is a no-op).
 

@@ -722,6 +722,25 @@ void CreateSwapchain(region_alloc alloc)
 {
     void *allocMark = alloc.at;
 
+    VkSurfaceCapabilitiesKHR surfaceCapabilities;
+    VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(rhi->physDev, rhi->surface, &surfaceCapabilities));
+
+    auto surfaceExtent = [surfaceCapabilities] -> VkExtent2D {
+        if (surfaceCapabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
+            return surfaceCapabilities.currentExtent;
+
+        const PlatformWindowSize windowSize = WinGetSize();
+        return VkExtent2D{
+            .width = Clamp(windowSize.width, surfaceCapabilities.minImageExtent.width,
+                           surfaceCapabilities.maxImageExtent.width),
+            .height = Clamp(windowSize.height, surfaceCapabilities.minImageExtent.height,
+                            surfaceCapabilities.maxImageExtent.height),
+        };
+    }();
+
+    if (!surfaceExtent.height || !surfaceExtent.width)
+        return;
+
     VkSwapchainKHR oldSwapchain = rhi->swapchain;
 
     static bool logPresentModes = true;
@@ -776,9 +795,6 @@ void CreateSwapchain(region_alloc alloc)
         return bestMode;
     }();
 
-    VkSurfaceCapabilitiesKHR surfaceCapabilities;
-    VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(rhi->physDev, rhi->surface, &surfaceCapabilities));
-
     auto surfaceFormat = [&] -> VkSurfaceFormatKHR {
         uint32_t surfaceFormatCount;
         VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(rhi->physDev, rhi->surface, &surfaceFormatCount, nullptr));
@@ -794,19 +810,6 @@ void CreateSwapchain(region_alloc alloc)
         });
         ASSERT(it != surfaceFormats.end());
         return *it;
-    }();
-
-    auto surfaceExtent = [surfaceCapabilities] -> VkExtent2D {
-        if (surfaceCapabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
-            return surfaceCapabilities.currentExtent;
-
-        const PlatformWindowSize windowSize = WinGetSize();
-        return VkExtent2D{
-            .width = Clamp(windowSize.width, surfaceCapabilities.minImageExtent.width,
-                           surfaceCapabilities.maxImageExtent.width),
-            .height = Clamp(windowSize.height, surfaceCapabilities.minImageExtent.height,
-                            surfaceCapabilities.maxImageExtent.height),
-        };
     }();
 
     ASSERT(kRhiMaxNumSwapchainTextures >= surfaceCapabilities.minImageCount);
@@ -1443,8 +1446,8 @@ void Rhi::Bootstrap(region_alloc &alloc, const rhi_init_desc &rhiDesc)
 #else
         const VkWin32SurfaceCreateInfoKHR surfaceCreateInfo{
             .sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
-            .hinstance = WindowsPlatform::GetHInstance(),
-            .hwnd = WindowsPlatform::WinGetHandle(),
+            .hinstance = win32::GetHInstance(),
+            .hwnd = win32::WinGetHandle(),
         };
         vkCreateWin32SurfaceKHR(rhi->instance, &surfaceCreateInfo, rhi->vkAlloc, &rhi->surface);
 #endif

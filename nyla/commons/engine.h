@@ -60,6 +60,7 @@ namespace Engine
 void API Bootstrap(region_alloc &alloc, const engine_init_desc &desc);
 auto API FrameBegin(region_alloc &alloc) -> engine_frame;
 void API FrameEnd(region_alloc &alloc);
+auto API IsWindowResized() -> bool;
 auto API ShouldExit() -> bool;
 void API RequestExit();
 
