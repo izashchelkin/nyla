@@ -329,6 +329,58 @@ void API WinSetTitle(byteview title)
     SetWindowTextA(g_HWnd, Span::CStr(title));
 }
 
+auto API WinGetClipboard(region_alloc &alloc) -> byteview
+{
+    if (!OpenClipboard(g_HWnd))
+        return {};
+
+    HANDLE hData = GetClipboardData(CF_TEXT);
+    if (!hData)
+    {
+        CloseClipboard();
+        return {};
+    }
+
+    char *pszText = static_cast<char *>(GlobalLock(hData));
+    if (!pszText)
+    {
+        CloseClipboard();
+        return {};
+    }
+
+    uint64_t len = CStrLen(pszText, 1_MiB);
+    byteview ret = RegionAlloc::CopyByteView(alloc, byteview{(uint8_t *)pszText, len});
+
+    GlobalUnlock(hData);
+    CloseClipboard();
+    return ret;
+}
+
+void API WinSetClipboard(byteview text)
+{
+    if (!OpenClipboard(g_HWnd))
+        return;
+
+    EmptyClipboard();
+
+    HGLOBAL hGlob = GlobalAlloc(GMEM_MOVEABLE, text.size + 1);
+    if (!hGlob)
+    {
+        CloseClipboard();
+        return;
+    }
+
+    char *pszText = static_cast<char *>(GlobalLock(hGlob));
+    MemCpy(pszText, text.data, text.size);
+    pszText[text.size] = 0;
+    GlobalUnlock(hGlob);
+
+    if (!SetClipboardData(CF_TEXT, hGlob))
+        GlobalFree(hGlob);
+
+    CloseClipboard();
+}
+
 void API WinOpen()
 {
     if (!g_HWnd)
@@ -518,7 +570,7 @@ auto CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) ->
         return 0;
     }
 
-        // case WM_SYSKEYDOWN:
+    case WM_SYSKEYDOWN:
     case WM_KEYDOWN: {
         UINT scanCode = (UINT)((lParam >> 16) & 0xFF);
         bool extended = ((lParam >> 24) & 0x01) != 0;
@@ -535,6 +587,7 @@ auto CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) ->
         return 0;
     }
 
+    case WM_SYSCHAR:
     case WM_CHAR: {
         // TranslateMessage feeds WM_CHAR after WM_KEYDOWN. Surrogate pairs arrive as two messages
         // (high then low). We buffer the high surrogate and combine on the low.
@@ -590,7 +643,7 @@ auto CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) ->
         return 0;
     }
 
-        // case WM_SYSKEYUP:
+    case WM_SYSKEYUP:
     case WM_KEYUP: {
         UINT scanCode = (UINT)((lParam >> 16) & 0xFF);
         bool extended = ((lParam >> 24) & 0x01) != 0;
@@ -599,6 +652,17 @@ auto CALLBACK MainWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) ->
         InlineQueue::Write(g_EventsQueue, PlatformEvent{
                                               .type = PlatformEventType::KeyUp,
                                               .key = key,
+                                          });
+        return 0;
+    }
+
+    case WM_MOUSEWHEEL: {
+        // X11 parity: Up=button 4, Down=button 5.
+        int16_t delta = (int16_t)HIWORD(wParam);
+        uint32_t code = (delta > 0) ? 4u : 5u;
+        InlineQueue::Write(g_EventsQueue, PlatformEvent{
+                                              .type = PlatformEventType::MousePress,
+                                              .mouse = {.code = code},
                                           });
         return 0;
     }

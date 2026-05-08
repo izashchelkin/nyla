@@ -49,7 +49,7 @@ struct renderer_state
     pipeline_cache_handle Pipeline;
     inline_vec<draw_call, 256> DrawQueue;
 };
-renderer_state *renderer;
+renderer_state *manager;
 
 } // namespace
 
@@ -58,7 +58,7 @@ namespace Renderer
 
 void API Bootstrap(region_alloc &)
 {
-    renderer = &RegionAlloc::Alloc<renderer_state>(RegionAlloc::g_BootstrapAlloc);
+    manager = &RegionAlloc::Alloc<renderer_state>(RegionAlloc::g_BootstrapAlloc);
 
     array<rhi_vertex_attribute_desc, 3> vertexAttributes{
         rhi_vertex_attribute_desc{
@@ -101,22 +101,22 @@ void API Bootstrap(region_alloc &)
         .frontFace = rhi_front_face::CCW,
     };
 
-    renderer->Pipeline = PipelineCache::Acquire(0xA1B649BF9958EC11, 0xFE6E3D0D77673448, pipelineDesc);
+    manager->Pipeline = PipelineCache::Acquire(0xA1B649BF9958EC11, 0xFE6E3D0D77673448, pipelineDesc);
 }
 
 void API SetView(float4x4 m)
 {
-    renderer->View = m;
+    manager->View = m;
 }
 
 void API SetLookAtView(float3 eye, float3 center, float3 up)
 {
-    renderer->View = Mat::LookAt(eye, center, up);
+    manager->View = Mat::LookAt(eye, center, up);
 }
 
 void API SetProjection(float4x4 m)
 {
-    renderer->Proj = m;
+    manager->Proj = m;
 }
 
 void API SetOrthoProjection(uint32_t width, uint32_t height, float metersOnScreen)
@@ -130,7 +130,7 @@ void API SetOrthoProjection(uint32_t width, uint32_t height, float metersOnScree
     worldH = base;
     worldW = base * aspect;
 
-    renderer->Proj = Mat::Ortho(-worldW * .5f, worldW * .5f, worldH * .5f, -worldH * .5f, 0.f, 1.f);
+    manager->Proj = Mat::Ortho(-worldW * .5f, worldW * .5f, worldH * .5f, -worldH * .5f, 0.f, 1.f);
 }
 
 void API SetPerspectiveProjection(uint32_t width, uint32_t height, float fovDegrees, float nearPlane, float farPlane)
@@ -138,7 +138,7 @@ void API SetPerspectiveProjection(uint32_t width, uint32_t height, float fovDegr
     const float aspect = (float)width / (float)height;
     const float fovRadians = fovDegrees * (math::pi / 180.0f);
 
-    renderer->Proj = Mat::Perspective(fovRadians, aspect, nearPlane, farPlane);
+    manager->Proj = Mat::Perspective(fovRadians, aspect, nearPlane, farPlane);
 }
 
 void API Mesh(float3 pos, float3 scale, mesh_handle Mesh, texture_handle Texture)
@@ -154,7 +154,7 @@ void API Mesh(float3 pos, float3 scale, mesh_handle Mesh, texture_handle Texture
     if (!srv)
         return;
 
-    draw_call &drawCall = InlineVec::Append(renderer->DrawQueue, draw_call{.Mesh = Mesh});
+    draw_call &drawCall = InlineVec::Append(manager->DrawQueue, draw_call{.Mesh = Mesh});
     entity &entity = drawCall.Entity;
 
     Mat::Identity(entity.model);
@@ -168,9 +168,9 @@ void API Mesh(float3 pos, float3 scale, mesh_handle Mesh, texture_handle Texture
 
 void API CmdFlush(rhi_cmdlist cmd)
 {
-    Rhi::CmdBindGraphicsPipeline(cmd, PipelineCache::Resolve(renderer->Pipeline));
+    Rhi::CmdBindGraphicsPipeline(cmd, PipelineCache::Resolve(manager->Pipeline));
 
-    float4x4 vp = renderer->Proj * renderer->View;
+    float4x4 vp = manager->Proj * manager->View;
     float4x4 invVp = Mat::Inverse(vp);
     scene scene = {
         .vp = vp,
@@ -181,7 +181,7 @@ void API CmdFlush(rhi_cmdlist cmd)
 
     const uint32_t frameIndex = Rhi::GetFrameIndex();
 
-    for (const auto &drawCall : renderer->DrawQueue)
+    for (const auto &drawCall : manager->DrawQueue)
     {
         const auto &entity = drawCall.Entity;
         Rhi::SetDrawConstant(cmd, Span::ByteViewPtr(&entity));
@@ -189,7 +189,7 @@ void API CmdFlush(rhi_cmdlist cmd)
         MeshManager::CmdBindMesh(cmd, drawCall.Mesh);
         MeshManager::CmdDrawMesh(cmd, drawCall.Mesh);
     }
-    InlineVec::Clear(renderer->DrawQueue);
+    InlineVec::Clear(manager->DrawQueue);
 }
 
 } // namespace Renderer

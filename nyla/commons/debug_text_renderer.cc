@@ -19,8 +19,6 @@ namespace nyla
 namespace
 {
 
-pipeline_cache_handle m_Pipeline;
-
 struct draw_data
 {
     array<uint4, 17> words;
@@ -34,9 +32,10 @@ struct draw_data
 
 struct debug_text_renderer
 {
+    pipeline_cache_handle Pipeline;
     inline_vec<draw_data, 4> pendingDraws;
 };
-debug_text_renderer *renderer;
+debug_text_renderer *manager;
 
 } // namespace
 
@@ -45,7 +44,7 @@ namespace DebugTextRenderer
 
 void API Bootstrap(region_alloc &)
 {
-    renderer = &RegionAlloc::Alloc<debug_text_renderer>(RegionAlloc::g_BootstrapAlloc);
+    manager = &RegionAlloc::Alloc<debug_text_renderer>(RegionAlloc::g_BootstrapAlloc);
 
     rhi_texture_format colorFormat = rhi_texture_format::B8G8R8A8_sRGB;
     const rhi_graphics_pipeline_desc pipelineDesc{
@@ -53,7 +52,7 @@ void API Bootstrap(region_alloc &)
         .colorTargetFormats = {&colorFormat, 1},
         .depthFormat = rhi_texture_format::D32_Float_S8_UINT,
     };
-    m_Pipeline = PipelineCache::Acquire(0xF3624967BC396A3C, 0x040C5CF806D5A00D, pipelineDesc);
+    manager->Pipeline = PipelineCache::Acquire(0xF3624967BC396A3C, 0x040C5CF806D5A00D, pipelineDesc);
 }
 
 void API Text(int32_t x, int32_t y, byteview text)
@@ -80,25 +79,25 @@ void API Text(int32_t x, int32_t y, byteview text)
         drawData.words[i / 4][i % 4] = word;
     }
 
-    InlineVec::Append(renderer->pendingDraws, drawData);
+    InlineVec::Append(manager->pendingDraws, drawData);
 }
 
 void API CmdFlush(rhi_cmdlist cmd)
 {
-    if (renderer->pendingDraws.size == 0)
+    if (manager->pendingDraws.size == 0)
         return;
 
     const uint32_t frameIndex = Rhi::GetFrameIndex();
 
-    Rhi::CmdBindGraphicsPipeline(cmd, PipelineCache::Resolve(m_Pipeline));
+    Rhi::CmdBindGraphicsPipeline(cmd, PipelineCache::Resolve(manager->Pipeline));
 
-    for (const draw_data &drawData : renderer->pendingDraws)
+    for (const draw_data &drawData : manager->pendingDraws)
     {
         Rhi::SetLargeDrawConstant(cmd, Span::ByteViewPtr(&drawData));
         Rhi::CmdDraw(cmd, 3, 1, 0, 0);
     }
 
-    InlineVec::Clear(renderer->pendingDraws);
+    InlineVec::Clear(manager->pendingDraws);
 }
 
 } // namespace DebugTextRenderer

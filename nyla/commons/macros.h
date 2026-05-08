@@ -2,7 +2,7 @@
 
 #if (defined(__clang__) || defined(__GNUC__)) && !defined(_MSC_VER)
 
-#define INLINE static inline __attribute__((always_inline))
+#define INLINE inline __attribute__((always_inline))
 #define RESTRICT __restrict__
 #define NORETURN __attribute__((noreturn))
 #define TRAP() __builtin_trap()

@@ -20,6 +20,7 @@
 
 #include "nyla/commons/array_def.h"
 #include "nyla/commons/gamepad.h" // IWYU pragma: export
+#include "nyla/commons/inline_string.h"
 #include "nyla/commons/keyboard.h"
 #include "nyla/commons/platform.h"
 #include "nyla/commons/time.h" // IWYU pragma: export
@@ -47,7 +48,12 @@ namespace nyla
     X(wm_protocols, WM_PROTOCOLS)                                                                                      \
     X(wm_name, WM_NAME)                                                                                                \
     X(wm_state, WM_STATE)                                                                                              \
-    X(wm_take_focus, WM_TAKE_FOCUS)
+    X(wm_take_focus, WM_TAKE_FOCUS)                                                                                    \
+    X(net_wm_name, _NET_WM_NAME)                                                                                       \
+    X(net_wm_pid, _NET_WM_PID)                                                                                         \
+    X(utf8_string, UTF8_STRING)                                                                                        \
+    X(clipboard, CLIPBOARD)                                                                                            \
+    X(targets, TARGETS)
 // NOLINTEND
 
 struct x11_atoms
@@ -78,6 +84,8 @@ struct platform_state
         xkb_context *xkbCtx;
         xkb_keymap *xkbKeymap;
         xkb_state *xkbState;
+
+        inline_string<1_MiB> clipboardContent;
     } x11;
 };
 extern platform_state *platform;

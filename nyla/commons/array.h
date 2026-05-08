@@ -12,7 +12,7 @@ namespace nyla
 
 template <is_plain T, uint64_t Size>
 [[nodiscard]]
-auto array<T, Size>::operator[](uint64_t i) -> T &
+INLINE auto array<T, Size>::operator[](uint64_t i) -> T &
 {
     DASSERT(i < Size);
     return data[i];
@@ -20,7 +20,7 @@ auto array<T, Size>::operator[](uint64_t i) -> T &
 
 template <is_plain T, uint64_t Size>
 [[nodiscard]]
-auto array<T, Size>::operator[](uint64_t i) const -> const T &
+INLINE auto array<T, Size>::operator[](uint64_t i) const -> const T &
 {
     DASSERT(i < Size);
     return data[i];

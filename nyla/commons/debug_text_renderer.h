@@ -18,7 +18,7 @@ void API Bootstrap(region_alloc &alloc);
 
 void API Text(int32_t x, int32_t y, byteview text);
 
-INLINE void Fmt(int32_t x, int32_t y, byteview fmt, ...)
+inline void Fmt(int32_t x, int32_t y, byteview fmt, ...)
 {
     va_list args;
     va_start(args, fmt);

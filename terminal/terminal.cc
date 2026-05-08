@@ -44,7 +44,7 @@ namespace
 
 constexpr auto PackRGB(uint8_t r, uint8_t g, uint8_t b) -> uint32_t
 {
-    return (r << 16) | (g << 8) | b;
+    return (b << 16) | (g << 8) | r;
 }
 
 constexpr auto PackRGB(float3 rgb) -> uint32_t
@@ -55,9 +55,9 @@ constexpr auto PackRGB(float3 rgb) -> uint32_t
 
 constexpr void UnpackRGB(uint32_t color, uint8_t &r, uint8_t &g, uint8_t &b)
 {
-    r = (color >> 16) & 0xFF;
+    r = color & 0xFF;
     g = (color >> 8) & 0xFF;
-    b = color & 0xFF;
+    b = (color >> 16) & 0xFF;
 }
 
 constexpr auto UnpackRGBf(uint32_t color) -> float3
@@ -335,23 +335,110 @@ void UserMain()
             PlatformPty::Write(*pty, byteview{out, frame.textChars.size});
         }
 
-        // X11 wheel-up = button 4, wheel-down = button 5; Win32 mirrors via mouse_press code.
-        // Each click of the wheel scrolls a few lines into scrollback; clamped to ScrollbackCount.
         {
             constexpr uint32_t kWheelUpBit = 1u << 3;   // button 4
             constexpr uint32_t kWheelDownBit = 1u << 4; // button 5
             constexpr uint32_t kWheelStep = 3;
-            if (frame.pointerPress & kWheelUpBit)
+
+            terminal_mouse_mode mouseMode = TerminalScreen::MouseMode(*screen);
+            bool reportMouse = (mouseMode != terminal_mouse_mode::None);
+
+            if (!reportMouse)
             {
-                uint32_t cap = TerminalScreen::ScrollbackCount(*screen);
-                if (scrollOffset + kWheelStep > cap)
-                    scrollOffset = cap;
-                else
-                    scrollOffset += kWheelStep;
+                if (frame.pointerPress & kWheelUpBit)
+                {
+                    uint32_t cap = TerminalScreen::ScrollbackCount(*screen);
+                    if (scrollOffset + kWheelStep > cap)
+                        scrollOffset = cap;
+                    else
+                        scrollOffset += kWheelStep;
+                }
+                if (frame.pointerPress & kWheelDownBit)
+                {
+                    scrollOffset = (scrollOffset > kWheelStep) ? scrollOffset - kWheelStep : 0;
+                }
             }
-            if (frame.pointerPress & kWheelDownBit)
+        }
+
+        {
+            terminal_mouse_mode mouseMode = TerminalScreen::MouseMode(*screen);
+            terminal_mouse_format mouseFormat = TerminalScreen::MouseFormat(*screen);
+
+            if (mouseMode != terminal_mouse_mode::None)
             {
-                scrollOffset = (scrollOffset > kWheelStep) ? scrollOffset - kWheelStep : 0;
+                auto report = [&](uint32_t btn, bool press) {
+                    int32_t col = (frame.pointerX - kOriginPxX) / (int32_t)CellRenderer::CellPxW();
+                    int32_t row = (frame.pointerY - kOriginPxY) / (int32_t)CellRenderer::CellPxH();
+                    if (col < 0)
+                        col = 0;
+                    if (row < 0)
+                        row = 0;
+                    if (col >= (int32_t)curCols)
+                        col = (int32_t)curCols - 1;
+                    if (row >= (int32_t)curRows)
+                        row = (int32_t)curRows - 1;
+
+                    uint8_t buf[64];
+                    uint64_t len = 0;
+                    if (mouseFormat == terminal_mouse_format::Sgr)
+                    {
+                        len = StringWriteFmt(span<uint8_t>{buf, 64}, "\x1b[<%d;%d;%d%c"_s, btn, col + 1, row + 1,
+                                             press ? 'M' : 'm');
+                    }
+                    else
+                    {
+                        // Default X10/Normal format: CSI M <btn+32> <x+32> <y+32>
+                        buf[len++] = 0x1B;
+                        buf[len++] = '[';
+                        buf[len++] = 'M';
+                        buf[len++] = (uint8_t)(32 + btn);
+                        buf[len++] = (uint8_t)(32 + col + 1);
+                        buf[len++] = (uint8_t)(32 + row + 1);
+                    }
+                    PlatformPty::Write(*pty, byteview{buf, len});
+                };
+
+                // Pointer buttons: 1=Left, 2=Middle, 3=Right, 4=WheelUp, 5=WheelDown.
+                for (uint32_t b = 1; b <= 5; ++b)
+                {
+                    uint32_t bit = 1u << (b - 1);
+                    if (frame.pointerPress & bit)
+                    {
+                        uint32_t btn = (b <= 3) ? b - 1 : (b == 4) ? 64 : 65;
+                        report(btn, true);
+                    }
+                    if (frame.pointerRelease & bit)
+                    {
+                        if (mouseMode >= terminal_mouse_mode::Normal)
+                        {
+                            uint32_t btn = (b <= 3) ? b - 1 : (b == 4) ? 64 : 65;
+                            report(btn, false);
+                        }
+                    }
+                }
+
+                if (mouseMode >= terminal_mouse_mode::ButtonEvent)
+                {
+                    if (frame.pointerDx != 0 || frame.pointerDy != 0)
+                    {
+                        // Motion with button held.
+                        if (frame.pointerButtons & 0x7)
+                        {
+                            uint32_t btn = 32; // Motion flag
+                            if (frame.pointerButtons & 1)
+                                btn += 0;
+                            else if (frame.pointerButtons & 2)
+                                btn += 1;
+                            else if (frame.pointerButtons & 4)
+                                btn += 2;
+                            report(btn, true);
+                        }
+                        else if (mouseMode == terminal_mouse_mode::AnyEvent)
+                        {
+                            report(35, true); // Motion without buttons
+                        }
+                    }
+                }
             }
         }
 
@@ -363,6 +450,16 @@ void UserMain()
             if (ev.key == KeyPhysical::F8 && !(ev.mods & (KeyMod::Shift | KeyMod::Alt | KeyMod::Ctrl)))
             {
                 showStats = !showStats;
+                continue;
+            }
+
+            if (ev.key == KeyPhysical::V && (ev.mods & KeyMod::Ctrl) && (ev.mods & KeyMod::Shift))
+            {
+                region_alloc tmp = RegionAlloc::Create(1_MiB, 0);
+                byteview clip = WinGetClipboard(tmp);
+                if (clip.size > 0)
+                    PlatformPty::Write(*pty, clip);
+                RegionAlloc::Destroy(tmp);
                 continue;
             }
 
@@ -559,6 +656,15 @@ void UserMain()
             feedBytes += got;
             TerminalScreen::Feed(*screen, byteview{readBuf.data, got});
         }
+
+        byteview reply = TerminalScreen::PollReply(*screen);
+        if (reply.size > 0)
+            PlatformPty::Write(*pty, reply);
+
+        byteview title = TerminalScreen::PollTitle(*screen);
+        if (title.size > 0)
+            WinSetTitle(title);
+
         uint64_t feedUs = GetMonotonicTimeMicros() - feedStartUs;
         if (showStats)
             DebugTextRenderer::Fmt(500, 30, "pty=%dB feed=%dus"_s, (uint32_t)feedBytes, (uint32_t)feedUs);
@@ -589,25 +695,32 @@ void UserMain()
                     uint32_t curRow = TerminalScreen::CursorRow(*screen);
                     uint32_t curCol = TerminalScreen::CursorCol(*screen);
                     bool curVisible = TerminalScreen::CursorVisible(*screen);
+                    terminal_cursor_style curStyle = TerminalScreen::CursorStyle(*screen);
+                    if (curVisible && ((uint32_t)curStyle % 2 == 0))
+                        curVisible = (GetMonotonicTimeMillis() / 500) % 2 == 0;
 
                     uint32_t scrollbackCount = TerminalScreen::ScrollbackCount(*screen);
                     if (scrollOffset > scrollbackCount)
                         scrollOffset = scrollbackCount;
 
                     auto brighten = [](uint32_t rgba) -> uint32_t {
-                        // 1.4x toward white per channel; alpha preserved.
                         uint32_t a = rgba & 0xFF000000u;
-                        uint32_t r8 = (rgba >> 16) & 0xFFu;
+                        uint32_t r8 = rgba & 0xFFu;
                         uint32_t g8 = (rgba >> 8) & 0xFFu;
-                        uint32_t b8 = rgba & 0xFFu;
+                        uint32_t b8 = (rgba >> 16) & 0xFFu;
                         auto bump = [](uint32_t v) {
                             uint32_t x = (v * 7) / 5; // *1.4
                             return x > 255 ? 255 : x;
                         };
-                        r8 = bump(r8);
-                        g8 = bump(g8);
-                        b8 = bump(b8);
-                        return a | (r8 << 16) | (g8 << 8) | b8;
+                        return a | (bump(b8) << 16) | (bump(g8) << 8) | bump(r8);
+                    };
+
+                    auto dim = [](uint32_t rgba) -> uint32_t {
+                        uint32_t a = rgba & 0xFF000000u;
+                        uint32_t r8 = rgba & 0xFFu;
+                        uint32_t g8 = (rgba >> 8) & 0xFFu;
+                        uint32_t b8 = (rgba >> 16) & 0xFFu;
+                        return a | (((b8 * 2) / 3) << 16) | (((g8 * 2) / 3) << 8) | ((r8 * 2) / 3);
                     };
 
                     for (uint32_t r = 0; r < curRows; ++r)
@@ -626,22 +739,37 @@ void UserMain()
                             uint32_t bg = tc.bgRgba;
                             if (tc.attrs & TerminalAttr::Bold)
                                 fg = brighten(fg);
+                            if (tc.attrs & TerminalAttr::Dim)
+                                fg = dim(fg);
                             if (tc.attrs & TerminalAttr::Reverse)
                             {
                                 uint32_t tmp = fg;
                                 fg = bg;
                                 bg = tmp;
                             }
+                            uint16_t flags = 0;
+                            if (tc.attrs & TerminalAttr::Underline)
+                                flags |= 1; // CellFlag_Underline
+                            if (tc.attrs & TerminalAttr::Strike)
+                                flags |= 2; // CellFlag_Strike
+
                             if (inLive && curVisible && liveRow == curRow && c == curCol)
                             {
-                                uint32_t tmp = fg;
-                                fg = bg;
-                                bg = tmp;
+                                if (curStyle == terminal_cursor_style::BlinkingBlock ||
+                                    curStyle == terminal_cursor_style::SteadyBlock)
+                                    flags |= 4;
+                                else if (curStyle == terminal_cursor_style::BlinkingUnderline ||
+                                         curStyle == terminal_cursor_style::SteadyUnderline)
+                                    flags |= 8;
+                                else if (curStyle == terminal_cursor_style::BlinkingBar ||
+                                         curStyle == terminal_cursor_style::SteadyBar)
+                                    flags |= 12;
                             }
+
                             CellRenderer::PutCell(c, r,
                                                   cell_attr{
                                                       .glyphIndex = CellRenderer::GlyphForCodepoint(tc.codepoint),
-                                                      .flags = 0,
+                                                      .flags = flags,
                                                       .fgRgba = fg,
                                                       .bgRgba = bg,
                                                   });

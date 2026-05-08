@@ -65,6 +65,7 @@ Hand-written wiring (`target_link_libraries`, `find_package`, options) lives in 
 Wrapper exists in `nyla/commons` → use it. Wrappers keep platform/compiler quirks in one place. Bypass = drift.
 
 - math/intrinsics → `nyla/commons/intrin.h` over `<cmath>`/`<atomic>`/`<bit>`/`<cstdlib>`.
+- performance/inlining → Use `INLINE` macro from `nyla/commons/macros.h` for hot-path helpers instead of raw `inline` or `__attribute__((always_inline))`. Note: `INLINE` is compatible with both free and member functions.
 - pi → `math::pi` from `nyla/commons/math.h` (not `M_PI`).
 - mem ops → `nyla/commons/mem.h` over `<cstring>`.
 - spans/bytes → `nyla/commons/span.h` (`byteview`, `span<T>`) over `std::span`.

@@ -1,8 +1,12 @@
 #include "nyla/commons/terminal_screen.h"
 
+#include "nyla/commons/base64.h"
 #include "nyla/commons/fmt.h"
+#include "nyla/commons/inline_string.h"
+#include "nyla/commons/inline_vec.h"
 #include "nyla/commons/mem.h"
 #include "nyla/commons/mempage_pool.h"
+#include "nyla/commons/platform.h"
 #include "nyla/commons/region_alloc.h"
 
 namespace nyla
@@ -52,6 +56,9 @@ struct terminal_screen
     bool inAltScreen;
     bool applicationCursorKeys; // DECCKM (?1)
     bool cursorVisible;
+    terminal_cursor_style cursorStyle;
+    terminal_mouse_mode mouseMode;
+    terminal_mouse_format mouseFormat;
 
     // DECSTBM scrolling region (inclusive, 0-based). Default = full screen.
     uint32_t scrollTop;
@@ -86,6 +93,11 @@ struct terminal_screen
     // UTF-8 decoder state.
     uint32_t utf8Cp;
     uint8_t utf8Need;
+
+    inline_vec<uint8_t, 64> replyBuf;
+    inline_vec<uint8_t, 256> oscBuf;
+    inline_string<256> title;
+    bool titleDirty;
 };
 
 namespace TerminalScreen
@@ -101,7 +113,7 @@ INLINE auto Idx(const terminal_screen &s, uint32_t col, uint32_t row) -> uint32_
 
 void EraseRange(terminal_screen &s, uint32_t fromIdx, uint32_t toExclusive)
 {
-    terminal_cell blank{0x20, s.curFg, s.curBg, s.curAttrs};
+    terminal_cell blank{0x20, s.defaultFg, s.curBg, 0};
     for (uint32_t i = fromIdx; i < toExclusive; ++i)
         s.cells[i] = blank;
 }
@@ -169,12 +181,16 @@ INLINE auto FromIdx256(span<const uint32_t> palette, uint32_t idx) -> uint32_t
 {
     if (idx >= palette.size)
         idx = 7;
-    return 0xFF000000u | (palette[idx] & 0x00FFFFFFu);
+    uint32_t c = palette[idx];
+    uint32_t r = (c >> 16) & 0xFFu;
+    uint32_t g = (c >> 8) & 0xFFu;
+    uint32_t b = c & 0xFFu;
+    return 0xFF000000u | (b << 16) | (g << 8) | r;
 }
 
 INLINE auto FromRgb(uint32_t r, uint32_t g, uint32_t b) -> uint32_t
 {
-    return 0xFF000000u | ((r & 0xFFu) << 16) | ((g & 0xFFu) << 8) | (b & 0xFFu);
+    return 0xFF000000u | ((b & 0xFFu) << 16) | ((g & 0xFFu) << 8) | (r & 0xFFu);
 }
 
 void PutCodepoint(terminal_screen &s, uint32_t cp)
@@ -230,6 +246,16 @@ void ApplySgr(terminal_screen &s)
             s.curAttrs |= TerminalAttr::Bold;
             ++i;
         }
+        else if (p == 2)
+        {
+            s.curAttrs |= TerminalAttr::Dim;
+            ++i;
+        }
+        else if (p == 3)
+        {
+            s.curAttrs |= TerminalAttr::Italic;
+            ++i;
+        }
         else if (p == 4)
         {
             s.curAttrs |= TerminalAttr::Underline;
@@ -240,9 +266,19 @@ void ApplySgr(terminal_screen &s)
             s.curAttrs |= TerminalAttr::Reverse;
             ++i;
         }
+        else if (p == 9)
+        {
+            s.curAttrs |= TerminalAttr::Strike;
+            ++i;
+        }
         else if (p == 22)
         {
-            s.curAttrs &= ~TerminalAttr::Bold;
+            s.curAttrs &= ~(TerminalAttr::Bold | TerminalAttr::Dim);
+            ++i;
+        }
+        else if (p == 23)
+        {
+            s.curAttrs &= ~TerminalAttr::Italic;
             ++i;
         }
         else if (p == 24)
@@ -253,6 +289,11 @@ void ApplySgr(terminal_screen &s)
         else if (p == 27)
         {
             s.curAttrs &= ~TerminalAttr::Reverse;
+            ++i;
+        }
+        else if (p == 29)
+        {
+            s.curAttrs &= ~TerminalAttr::Strike;
             ++i;
         }
         else if (p >= 30 && p <= 37)
@@ -340,6 +381,10 @@ void EnterAltScreen(terminal_screen &s)
     s.inAltScreen = true;
     s.cells = s.alt;
     s.activeWrapped = s.altWrapped;
+
+    // Standard ?1049 clears the alt screen on entry.
+    MemZero(s.alt.data, s.alt.size * sizeof(terminal_cell));
+    MemZero(s.altWrapped.data, s.altWrapped.size * sizeof(uint8_t));
     for (uint32_t r = 0; r < s.rows; ++r)
         s.activeWrapped[r] = 0;
     EraseRange(s, 0, s.cols * s.rows);
@@ -445,10 +490,82 @@ void EraseChars(terminal_screen &s, uint32_t n)
         return;
     if (n > s.cols - s.cursorCol)
         n = s.cols - s.cursorCol;
-    uint32_t rowStart = Idx(s, 0, s.cursorRow);
-    terminal_cell blank{0x20, s.curFg, s.curBg, s.curAttrs};
-    for (uint32_t c = s.cursorCol; c < s.cursorCol + n; ++c)
-        s.cells[rowStart + c] = blank;
+    uint32_t start = Idx(s, s.cursorCol, s.cursorRow);
+    EraseRange(s, start, start + n);
+}
+
+void DispatchOsc(terminal_screen &s)
+{
+    // OSC P ; T ...
+    if (s.oscBuf.size < 2)
+    {
+        InlineVec::Clear(s.oscBuf);
+        return;
+    }
+
+    uint32_t p = 0;
+    uint32_t i = 0;
+    while (i < s.oscBuf.size && s.oscBuf[i] >= '0' && s.oscBuf[i] <= '9')
+    {
+        p = p * 10 + (s.oscBuf[i] - '0');
+        ++i;
+    }
+
+    if (i < s.oscBuf.size && s.oscBuf[i] == ';')
+    {
+        ++i;
+        if (p == 0 || p == 2)
+        {
+            InlineVec::Clear(s.title);
+            while (i < s.oscBuf.size && s.title.size < InlineVec::Capacity(s.title) - 1)
+            {
+                InlineVec::Append(s.title, s.oscBuf[i]);
+                ++i;
+            }
+            s.title.data[s.title.size] = 0; // null-terminate for Span::CStr
+            s.titleDirty = true;
+        }
+        else if (p == 52)
+        {
+            // OSC 52 ; selection ; base64
+            uint32_t j = i;
+            while (j < s.oscBuf.size && s.oscBuf[j] != ';')
+                ++j;
+            if (j < s.oscBuf.size)
+            {
+                byteview selection = {s.oscBuf.data.data + i, j - i};
+                ++j; // skip semicolon
+                byteview b64 = {s.oscBuf.data.data + j, (uint32_t)(s.oscBuf.size - j)};
+
+                region_alloc tmp = RegionAlloc::Create(1_MiB, 0);
+                if (b64.size == 1 && b64.data[0] == '?')
+                {
+                    byteview clip = WinGetClipboard(tmp);
+                    byteview encoded = Base64::Encode(tmp, clip);
+
+                    // Reply: OSC 52 ; selection ; encoded ST
+                    InlineVec::Append(s.replyBuf, 0x1B);
+                    InlineVec::Append(s.replyBuf, ']');
+                    InlineVec::Append(s.replyBuf, '5');
+                    InlineVec::Append(s.replyBuf, '2');
+                    InlineVec::Append(s.replyBuf, ';');
+                    for (uint32_t k = 0; k < selection.size; ++k)
+                        InlineVec::Append(s.replyBuf, selection.data[k]);
+                    InlineVec::Append(s.replyBuf, ';');
+                    for (uint32_t k = 0; k < encoded.size; ++k)
+                        InlineVec::Append(s.replyBuf, encoded.data[k]);
+                    InlineVec::Append(s.replyBuf, 0x07); // BEL as ST
+                }
+                else
+                {
+                    byteview decoded = Base64::Decode(tmp, b64);
+                    WinSetClipboard(decoded);
+                }
+                RegionAlloc::Destroy(tmp);
+            }
+        }
+    }
+    InlineVec::Clear(s.oscBuf);
 }
 
 void DispatchPrivateMode(terminal_screen &s, bool set)
@@ -471,16 +588,29 @@ void DispatchPrivateMode(terminal_screen &s, bool set)
             else
                 LeaveAltScreen(s);
             break;
-        // Modes we deliberately swallow without logging (parsed in the wild but not yet meaningful here).
-        case 7:    // DECAWM autowrap (we autowrap regardless)
-        case 12:   // cursor blink
-        case 1000: // mouse X10
-        case 1002: // mouse cell motion
-        case 1003: // mouse all motion
-        case 1004: // focus events
-        case 1005: // mouse utf8
-        case 1006: // mouse SGR
-        case 2004: // bracketed paste
+        case 1000:
+            s.mouseMode = set ? terminal_mouse_mode::Normal : terminal_mouse_mode::None;
+            break;
+        case 1002:
+            s.mouseMode = set ? terminal_mouse_mode::ButtonEvent : terminal_mouse_mode::None;
+            break;
+        case 1003:
+            s.mouseMode = set ? terminal_mouse_mode::AnyEvent : terminal_mouse_mode::None;
+            break;
+        case 1005:
+            s.mouseFormat = set ? terminal_mouse_format::Utf8 : terminal_mouse_format::Default;
+            break;
+        case 1006:
+            s.mouseFormat = set ? terminal_mouse_format::Sgr : terminal_mouse_format::Default;
+            break;
+        case 1015:
+            s.mouseFormat = set ? terminal_mouse_format::Urxvt : terminal_mouse_format::Default;
+            break;
+        case 1004: // focus events (swallow)
+        case 2004: // bracketed paste (swallow)
+            break;
+        case 7:  // DECAWM autowrap (we autowrap regardless)
+        case 12: // cursor blink (swallow)
             break;
         default:
             LOG("terminal_screen: unhandled DECSET/DECRST mode ?%d (set=%d)"_s, p, (uint32_t)set);
@@ -656,11 +786,51 @@ void DispatchCsi(terminal_screen &s, uint8_t final)
     // Quietly accept finals we don't act on but that real apps emit constantly.
     // 'c' DA, 'n' DSR (replies skipped — apps fall back), 't' XTWINOPS, 'q' DECSCUSR
     // (with ' ' intermediate; bare 'q' here has no defined effect).
-    case 'c':
-    case 'n':
-    case 't':
-    case 'q':
+    case 'c': {
+        // DA1: Device Attributes — report as "VT100 with Advanced Video Option" (canonical fallback)
+        byteview reply = "\x1b[?1;2c"_s;
+        for (uint64_t k = 0; k < reply.size; ++k)
+            InlineVec::Append(s.replyBuf, reply.data[k]);
         break;
+    }
+    case 'n': {
+        uint32_t p = GetParam(s, 0, 0);
+        if (p == 5)
+        {
+            // Device Status Report: OK
+            byteview reply = "\x1b[0n"_s;
+            for (uint64_t k = 0; k < reply.size; ++k)
+                InlineVec::Append(s.replyBuf, reply.data[k]);
+        }
+        else if (p == 6)
+        {
+            // Report Cursor Position: CSI <row+1>;<col+1>R
+            uint8_t buf[32];
+            uint64_t len = StringWriteFmt(span<uint8_t>{buf, 32}, "\x1b[%d;%dR"_s, s.cursorRow + 1, s.cursorCol + 1);
+            for (uint64_t k = 0; k < len; ++k)
+                InlineVec::Append(s.replyBuf, buf[k]);
+        }
+        break;
+    }
+    case 't':
+        break;
+    case 'q': {
+        // DECSCUSR: CSI Ps q. Intermediate ' ' is optional but canonical.
+        uint32_t p = GetParam(s, 0, 1);
+        if (p <= 1)
+            s.cursorStyle = terminal_cursor_style::BlinkingBlock;
+        else if (p == 2)
+            s.cursorStyle = terminal_cursor_style::SteadyBlock;
+        else if (p == 3)
+            s.cursorStyle = terminal_cursor_style::BlinkingUnderline;
+        else if (p == 4)
+            s.cursorStyle = terminal_cursor_style::SteadyUnderline;
+        else if (p == 5)
+            s.cursorStyle = terminal_cursor_style::BlinkingBar;
+        else if (p == 6)
+            s.cursorStyle = terminal_cursor_style::SteadyBar;
+        break;
+    }
     default:
         // Intermediate byte (0x20-0x2F) seen → CSI ' ' q, CSI '$' p etc; quietly swallow.
         if (s.csiIntermediate)
@@ -689,6 +859,11 @@ void HandleControl(terminal_screen &s, uint8_t b)
     case 0x08:
         if (s.cursorCol > 0)
             --s.cursorCol;
+        else if (s.cursorRow > 0 && s.activeWrapped[s.cursorRow - 1])
+        {
+            --s.cursorRow;
+            s.cursorCol = s.cols - 1;
+        }
         break;
     case 0x09: {
         uint32_t next = (s.cursorCol + 8) & ~7u;
@@ -838,6 +1013,9 @@ auto API Create(region_alloc &alloc, const terminal_screen_init_desc &desc) -> t
     self.inAltScreen = false;
     self.applicationCursorKeys = false;
     self.cursorVisible = true;
+    self.cursorStyle = terminal_cursor_style::BlinkingBlock;
+    self.mouseMode = terminal_mouse_mode::None;
+    self.mouseFormat = terminal_mouse_format::Default;
     for (uint32_t k = 0; k < 2; ++k)
     {
         self.savedCursorCol[k] = 0;
@@ -853,6 +1031,7 @@ auto API Create(region_alloc &alloc, const terminal_screen_init_desc &desc) -> t
     ResetCsi(self);
     self.utf8Cp = 0;
     self.utf8Need = 0;
+    self.titleDirty = false;
     return &self;
 }
 
@@ -1169,6 +1348,7 @@ void API Feed(terminal_screen &self, byteview bytes)
             }
             else if (b == ']')
             {
+                InlineVec::Clear(self.oscBuf);
                 self.state = parser_state::Osc;
             }
             else if (b == 'P')
@@ -1189,20 +1369,33 @@ void API Feed(terminal_screen &self, byteview bytes)
             break;
 
         case parser_state::Osc:
-            // Swallow OSC payload. Terminator is BEL (0x07) or ST (ESC \).
+            // Accumulate OSC payload. Terminator is BEL (0x07) or ST (ESC \).
             if (b == 0x07)
+            {
+                DispatchOsc(self);
                 self.state = parser_state::Ground;
+            }
             else if (b == 0x1B)
                 self.state = parser_state::OscEsc;
-            // else: keep swallowing
+            else
+            {
+                if (self.oscBuf.size < InlineVec::Capacity(self.oscBuf))
+                    InlineVec::Append(self.oscBuf, b);
+            }
             break;
 
         case parser_state::OscEsc:
             // Either '\\' completes ST, or any other byte aborts the OSC and re-enters Esc.
             if (b == '\\')
+            {
+                DispatchOsc(self);
                 self.state = parser_state::Ground;
+            }
             else
+            {
+                InlineVec::Clear(self.oscBuf);
                 self.state = parser_state::Osc;
+            }
             break;
 
         case parser_state::Dcs:
@@ -1292,9 +1485,38 @@ auto API CursorVisible(const terminal_screen &self) -> bool
 {
     return self.cursorVisible;
 }
+auto API CursorStyle(const terminal_screen &self) -> terminal_cursor_style
+{
+    return self.cursorStyle;
+}
 auto API ApplicationCursorKeys(const terminal_screen &self) -> bool
 {
     return self.applicationCursorKeys;
+}
+auto API MouseMode(const terminal_screen &self) -> terminal_mouse_mode
+{
+    return self.mouseMode;
+}
+auto API MouseFormat(const terminal_screen &self) -> terminal_mouse_format
+{
+    return self.mouseFormat;
+}
+
+auto API PollReply(terminal_screen &self) -> byteview
+{
+    if (self.replyBuf.size == 0)
+        return {};
+    byteview ret = InlineVec::AsSpan(self.replyBuf);
+    self.replyBuf.size = 0;
+    return ret;
+}
+
+auto API PollTitle(terminal_screen &self) -> byteview
+{
+    if (!self.titleDirty)
+        return {};
+    self.titleDirty = false;
+    return InlineVec::AsSpan(self.title);
 }
 
 auto API CellAt(const terminal_screen &self, uint32_t col, uint32_t row) -> terminal_cell

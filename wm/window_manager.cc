@@ -1,6 +1,7 @@
 #include "nyla/commons/array.h"
 #include "nyla/commons/binary_search.h"
 #include "nyla/commons/entrypoint.h"
+#include "nyla/commons/file.h"
 #include "nyla/commons/fmt.h"
 #include "nyla/commons/inline_string.h"
 #include "nyla/commons/inline_vec.h"
@@ -201,6 +202,7 @@ struct pending_property
 struct window_data_entry
 {
     xcb_window_t window;
+    uint32_t pid;
     uint32_t borderWidth;
     uint32_t maxWidth;
     uint32_t maxHeight;
@@ -298,6 +300,68 @@ auto GetActiveStack() -> window_stack &
     return wm->stacks[wm->activeStackIndex];
 }
 
+auto GetPidParent(uint32_t pid) -> uint32_t
+{
+    if (pid <= 1)
+        return 0;
+    uint8_t pathBuf[64];
+    uint64_t pathLen = StringWriteFmt(span<uint8_t>{pathBuf, 64}, "/proc/%u/stat"_s, pid);
+    file_handle f = FileOpen(byteview{pathBuf, pathLen}, FileOpenMode::Read);
+    if (!FileValid(f))
+        return 0;
+
+    uint8_t buf[1024];
+    uint32_t readLen = FileRead(f, 1024, buf);
+    FileClose(f);
+    if (readLen == 0)
+        return 0;
+
+    uint8_t *p = buf;
+    uint8_t *end = buf + readLen;
+    while (p < end && *p != ')')
+        p++;
+    if (p >= end)
+        return 0;
+    p += 2; // skip ") "
+    if (p >= end)
+        return 0;
+    p += 2; // skip "S " (state)
+    if (p >= end)
+        return 0;
+
+    uint32_t ppid = 0;
+    while (p < end && *p >= '0' && *p <= '9')
+    {
+        ppid = ppid * 10 + (*p - '0');
+        p++;
+    }
+    return ppid;
+}
+
+auto FindStackForPid(uint32_t pid) -> int
+{
+    if (pid == 0)
+        return -1;
+
+    for (uint32_t i = 0; i < wm->windowCount; ++i)
+    {
+        if (wm->data[i].pid == pid)
+        {
+            for (int s = 0; s < 9; ++s)
+            {
+                if (InlineVec::Find(wm->stacks[s].windows, wm->data[i].window))
+                    return s;
+            }
+        }
+    }
+
+    uint32_t ppid = GetPidParent(pid);
+    if (ppid > 1)
+        return FindStackForPid(ppid);
+
+    return -1;
+}
+
 // ─── Core operations ──────────────────────────────────────────────────────────
 
 void ApplyBorder(xcb_window_t window, Color color)
@@ -373,7 +437,7 @@ void FetchClientProperty(xcb_window_t clientWindow, window_data_entry &data, xcb
     case XCB_ATOM_WM_TRANSIENT_FOR:
         break;
     default:
-        if (property == X11GetAtoms().wm_protocols)
+        if (property == X11GetAtoms().wm_protocols || property == X11GetAtoms().net_wm_pid)
             break;
         return;
     }
@@ -416,6 +480,7 @@ void ManageClient(xcb_window_t clientWindow)
     FetchClientProperty(clientWindow, data, XCB_ATOM_WM_NAME);
     FetchClientProperty(clientWindow, data, XCB_ATOM_WM_TRANSIENT_FOR);
     FetchClientProperty(clientWindow, data, X11GetAtoms().wm_protocols);
+    FetchClientProperty(clientWindow, data, X11GetAtoms().net_wm_pid);
 
     InlineVec::Append(wm->pendingClients, clientWindow);
 }
@@ -1137,6 +1202,14 @@ void WmProcess(bool &isRunning)
                 }
                 break;
             }
+
+                if (property == X11GetAtoms().net_wm_pid)
+                {
+                    if (reply && xcb_get_property_value_length(reply) == (int)sizeof(uint32_t))
+                        data.pid = *static_cast<uint32_t *>(xcb_get_property_value(reply));
+                    break;
+                }
+                break;
             }
 
             free(reply);
@@ -1200,9 +1273,12 @@ void WmProcess(bool &isRunning)
             }
             else
             {
-                InlineVec::Append(stack.windows, clientWindow);
+                int stackIdx = FindStackForPid(idx->dataEntry->pid);
+                window_stack &targetStack = (stackIdx >= 0) ? wm->stacks[stackIdx] : stack;
+
+                InlineVec::Append(targetStack.windows, clientWindow);
                 AdoptPendingTransients(clientWindow);
-                if (!activated)
+                if (!activated && &targetStack == &stack)
                 {
                     Activate(stack, clientWindow, XCB_CURRENT_TIME);
                     activated = true;

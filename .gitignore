@@ -3,10 +3,11 @@
 *.dxil
 *.bin
 
+*.log
+
 /Testing
 
 /build
 /.vs
 /tags
 /.cache
-/compile_commands.json

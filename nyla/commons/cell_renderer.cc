@@ -75,7 +75,7 @@ struct cell_renderer_state
     uint32_t currentDrawByteOffset;
 };
 
-cell_renderer_state *cr;
+cell_renderer_state *manager;
 
 void BuildAtlas(byteview bdfData, uint8_t *rgbaPixels)
 {
@@ -84,11 +84,11 @@ void BuildAtlas(byteview bdfData, uint8_t *rgbaPixels)
 
     region_alloc tmp = RegionAlloc::Create(8_MiB, 0);
 
-    const uint32_t cellW = cr->desc.cellPxW;
-    const uint32_t cellH = cr->desc.cellPxH;
-    const uint32_t glyphsPerRow = cr->desc.atlasGlyphsPerRow;
-    const uint32_t maxGlyphs = cr->desc.atlasGlyphsPerRow * cr->desc.atlasGlyphsPerCol;
-    const uint32_t atlasW = cr->atlasPxW;
+    const uint32_t cellW = manager->desc.cellPxW;
+    const uint32_t cellH = manager->desc.cellPxH;
+    const uint32_t glyphsPerRow = manager->desc.atlasGlyphsPerRow;
+    const uint32_t maxGlyphs = manager->desc.atlasGlyphsPerRow * manager->desc.atlasGlyphsPerCol;
+    const uint32_t atlasW = manager->atlasPxW;
 
     void *allocMark = tmp.at;
     for (bdf_glyph glyph; BdfParser::NextGlyph(parser, tmp, glyph); RegionAlloc::Reset(tmp, allocMark))
@@ -99,7 +99,7 @@ void BuildAtlas(byteview bdfData, uint8_t *rgbaPixels)
             continue;
 
         const uint16_t glyphIdx = static_cast<uint16_t>(glyph.encoding);
-        cr->codepointToGlyph[glyph.encoding] = glyphIdx;
+        manager->codepointToGlyph[glyph.encoding] = glyphIdx;
 
         const uint32_t cellX = glyphIdx % glyphsPerRow;
         const uint32_t cellY = glyphIdx / glyphsPerRow;
@@ -138,22 +138,22 @@ namespace CellRenderer
 
 void API Bootstrap(region_alloc &, const cell_renderer_init_desc &desc)
 {
-    cr = &RegionAlloc::Alloc<cell_renderer_state>(RegionAlloc::g_BootstrapAlloc);
-    cr->desc = desc;
-    cr->atlasPxW = desc.atlasGlyphsPerRow * desc.cellPxW;
-    cr->atlasPxH = desc.atlasGlyphsPerCol * desc.cellPxH;
+    manager = &RegionAlloc::Alloc<cell_renderer_state>(RegionAlloc::g_BootstrapAlloc);
+    manager->desc = desc;
+    manager->atlasPxW = desc.atlasGlyphsPerRow * desc.cellPxW;
+    manager->atlasPxH = desc.atlasGlyphsPerCol * desc.cellPxH;
 
-    for (uint16_t &slot : cr->codepointToGlyph)
+    for (uint16_t &slot : manager->codepointToGlyph)
         slot = kInvalidGlyph;
 
     {
-        const uint32_t pixelBytes = cr->atlasPxW * cr->atlasPxH * 4u;
+        const uint32_t pixelBytes = manager->atlasPxW * manager->atlasPxH * 4u;
         const uint32_t totalBytes = sizeof(texture_blob_header) + pixelBytes;
 
         uint8_t *blob = RegionAlloc::Alloc(RegionAlloc::g_BootstrapAlloc, totalBytes, alignof(texture_blob_header));
         auto *header = reinterpret_cast<texture_blob_header *>(blob);
-        header->width = cr->atlasPxW;
-        header->height = cr->atlasPxH;
+        header->width = manager->atlasPxW;
+        header->height = manager->atlasPxH;
         header->format = 0;
         header->pixelOffset = sizeof(texture_blob_header);
 
@@ -164,20 +164,20 @@ void API Bootstrap(region_alloc &, const cell_renderer_init_desc &desc)
         BuildAtlas(bdfData, pixels);
 
         AssetManager::Set(kInternalAtlasGuid, byteview{blob, totalBytes});
-        cr->atlasTex = TextureManager::DeclareTexture(kInternalAtlasGuid);
+        manager->atlasTex = TextureManager::DeclareTexture(kInternalAtlasGuid);
     }
 
-    cr->bytesPerFrame = desc.maxCells * sizeof(gpu_cell);
-    cr->lastFrameIdx = ~0u;
-    cr->frameSliceByteOffset = 0;
+    manager->bytesPerFrame = desc.maxCells * sizeof(gpu_cell);
+    manager->lastFrameIdx = ~0u;
+    manager->frameSliceByteOffset = 0;
     const uint32_t numFrames = Rhi::GetNumFramesInFlight();
 
-    cr->instanceBuffer = Rhi::CreateBuffer(rhi_buffer_desc{
-        .size = uint64_t{cr->bytesPerFrame} * numFrames,
+    manager->instanceBuffer = Rhi::CreateBuffer(rhi_buffer_desc{
+        .size = uint64_t{manager->bytesPerFrame} * numFrames,
         .bufferUsage = rhi_buffer_usage::Vertex,
         .memoryUsage = rhi_memory_usage::CpuToGpu,
     });
-    Rhi::NameBuffer(cr->instanceBuffer, "CellRendererInstances"_s);
+    Rhi::NameBuffer(manager->instanceBuffer, "CellRendererInstances"_s);
 
     rhi_vertex_attribute_desc vertexAttribute{
         .binding = 0,
@@ -200,59 +200,60 @@ void API Bootstrap(region_alloc &, const cell_renderer_init_desc &desc)
         .depthFormat = rhi_texture_format::D32_Float_S8_UINT,
     };
 
-    cr->pipeline = PipelineCache::Acquire(ID_cell_renderer_vs, ID_cell_renderer_ps, pipelineDesc);
+    manager->pipeline = PipelineCache::Acquire(ID_cell_renderer_vs, ID_cell_renderer_ps, pipelineDesc);
 }
 
 void API Begin(int32_t originPxX, int32_t originPxY, uint32_t cols, uint32_t rows)
 {
-    cr->originPxX = originPxX;
-    cr->originPxY = originPxY;
-    cr->cols = cols;
-    cr->rows = rows;
-    cr->cellCount = 0;
-    cr->clipDepth = 1;
-    cr->clipStack[0] = clip_rect{0, 0, (int32_t)cols, (int32_t)rows};
+    manager->originPxX = originPxX;
+    manager->originPxY = originPxY;
+    manager->cols = cols;
+    manager->rows = rows;
+    manager->cellCount = 0;
+    manager->clipDepth = 1;
+    manager->clipStack[0] = clip_rect{0, 0, (int32_t)cols, (int32_t)rows};
 
     const uint32_t frameIdx = Rhi::GetFrameIndex();
-    if (frameIdx != cr->lastFrameIdx)
+    if (frameIdx != manager->lastFrameIdx)
     {
-        cr->lastFrameIdx = frameIdx;
-        cr->frameSliceByteOffset = 0;
+        manager->lastFrameIdx = frameIdx;
+        manager->frameSliceByteOffset = 0;
     }
 
-    cr->currentDrawByteOffset = cr->frameSliceByteOffset;
+    manager->currentDrawByteOffset = manager->frameSliceByteOffset;
 
-    const uint32_t bytesRemaining =
-        cr->frameSliceByteOffset < cr->bytesPerFrame ? cr->bytesPerFrame - cr->frameSliceByteOffset : 0u;
-    cr->cellCap = bytesRemaining / sizeof(gpu_cell);
-    if (cr->cellCap > cr->desc.maxCells)
-        cr->cellCap = cr->desc.maxCells;
+    const uint32_t bytesRemaining = manager->frameSliceByteOffset < manager->bytesPerFrame
+                                        ? manager->bytesPerFrame - manager->frameSliceByteOffset
+                                        : 0u;
+    manager->cellCap = bytesRemaining / sizeof(gpu_cell);
+    if (manager->cellCap > manager->desc.maxCells)
+        manager->cellCap = manager->desc.maxCells;
 
-    char *base = Rhi::MapBuffer(cr->instanceBuffer);
-    cr->frameCells =
-        reinterpret_cast<gpu_cell *>(base + uint64_t{frameIdx} * cr->bytesPerFrame + cr->currentDrawByteOffset);
+    char *base = Rhi::MapBuffer(manager->instanceBuffer);
+    manager->frameCells = reinterpret_cast<gpu_cell *>(base + uint64_t{frameIdx} * manager->bytesPerFrame +
+                                                       manager->currentDrawByteOffset);
 }
 
 auto API GlyphForCodepoint(uint32_t codepoint) -> uint16_t
 {
     if (codepoint >= kCodepointMapSize)
         return kInvalidGlyph;
-    return cr->codepointToGlyph[codepoint];
+    return manager->codepointToGlyph[codepoint];
 }
 
 auto API CellPxW() -> uint32_t
 {
-    return cr->desc.cellPxW;
+    return manager->desc.cellPxW;
 }
 auto API CellPxH() -> uint32_t
 {
-    return cr->desc.cellPxH;
+    return manager->desc.cellPxH;
 }
 
 void API PushClip(int32_t col, int32_t row, int32_t w, int32_t h)
 {
-    ASSERT(cr->clipDepth < kClipStackMax);
-    const clip_rect &top = cr->clipStack[cr->clipDepth - 1];
+    ASSERT(manager->clipDepth < kClipStackMax);
+    const clip_rect &top = manager->clipStack[manager->clipDepth - 1];
     int32_t x0 = col > top.x ? col : top.x;
     int32_t y0 = row > top.y ? row : top.y;
     int32_t x1 = col + w;
@@ -263,29 +264,29 @@ void API PushClip(int32_t col, int32_t row, int32_t w, int32_t h)
         x1 = topX1;
     if (y1 > topY1)
         y1 = topY1;
-    cr->clipStack[cr->clipDepth++] = clip_rect{x0, y0, x1 > x0 ? x1 - x0 : 0, y1 > y0 ? y1 - y0 : 0};
+    manager->clipStack[manager->clipDepth++] = clip_rect{x0, y0, x1 > x0 ? x1 - x0 : 0, y1 > y0 ? y1 - y0 : 0};
 }
 
 void API PopClip()
 {
-    ASSERT(cr->clipDepth > 1);
-    --cr->clipDepth;
+    ASSERT(manager->clipDepth > 1);
+    --manager->clipDepth;
 }
 
 void API PutCell(uint32_t col, uint32_t row, cell_attr cell)
 {
-    if (col >= cr->cols || row >= cr->rows)
+    if (col >= manager->cols || row >= manager->rows)
         return;
-    const clip_rect &clip = cr->clipStack[cr->clipDepth - 1];
+    const clip_rect &clip = manager->clipStack[manager->clipDepth - 1];
     if ((int32_t)col < clip.x || (int32_t)col >= clip.x + clip.w || (int32_t)row < clip.y ||
         (int32_t)row >= clip.y + clip.h)
         return;
-    if (cr->cellCount >= cr->cellCap)
+    if (manager->cellCount >= manager->cellCap)
         return;
     if (cell.glyphIndex == kInvalidGlyph)
         return;
 
-    gpu_cell &gc = cr->frameCells[cr->cellCount++];
+    gpu_cell &gc = manager->frameCells[manager->cellCount++];
     gc.packedXY = (row << 16) | (col & 0xFFFFu);
     gc.packedGlyph = (uint32_t{cell.flags} << 16) | uint32_t{cell.glyphIndex};
     gc.fgRgba = cell.fgRgba;
@@ -313,15 +314,16 @@ void API Text(uint32_t col, uint32_t row, byteview text, uint32_t fgRgba, uint32
 
 void API CmdFlush(rhi_cmdlist cmd)
 {
-    if (cr->cellCount == 0)
+    if (manager->cellCount == 0)
         return;
 
     const uint32_t frameIdx = Rhi::GetFrameIndex();
-    const uint32_t drawBytes = cr->cellCount * sizeof(gpu_cell);
-    Rhi::BufferMarkWritten(cr->instanceBuffer, frameIdx * cr->bytesPerFrame + cr->currentDrawByteOffset, drawBytes);
-    cr->frameSliceByteOffset = cr->currentDrawByteOffset + drawBytes;
+    const uint32_t drawBytes = manager->cellCount * sizeof(gpu_cell);
+    Rhi::BufferMarkWritten(manager->instanceBuffer, frameIdx * manager->bytesPerFrame + manager->currentDrawByteOffset,
+                           drawBytes);
+    manager->frameSliceByteOffset = manager->currentDrawByteOffset + drawBytes;
 
-    rhi_srv atlasSrv = TextureManager::GetSRV(cr->atlasTex);
+    rhi_srv atlasSrv = TextureManager::GetSRV(manager->atlasTex);
     if (!atlasSrv)
         return;
 
@@ -345,23 +347,23 @@ void API CmdFlush(rhi_cmdlist cmd)
     } passConst{
         .screenW = backbufferInfo.width,
         .screenH = backbufferInfo.height,
-        .originX = cr->originPxX,
-        .originY = cr->originPxY,
-        .cellW = cr->desc.cellPxW,
-        .cellH = cr->desc.cellPxH,
-        .atlasW = cr->atlasPxW,
-        .atlasH = cr->atlasPxH,
+        .originX = manager->originPxX,
+        .originY = manager->originPxY,
+        .cellW = manager->desc.cellPxW,
+        .cellH = manager->desc.cellPxH,
+        .atlasW = manager->atlasPxW,
+        .atlasH = manager->atlasPxH,
         .atlasSrvIndex = atlasSrv.index,
         .samplerIndex = uint32_t(sampler_type::NearestClamp),
     };
 
-    Rhi::CmdBindGraphicsPipeline(cmd, PipelineCache::Resolve(cr->pipeline));
+    Rhi::CmdBindGraphicsPipeline(cmd, PipelineCache::Resolve(manager->pipeline));
     Rhi::SetLargeDrawConstant(cmd, Span::ByteViewPtr(&passConst));
 
-    const uint64_t bufferOffset = uint64_t{frameIdx} * cr->bytesPerFrame + cr->currentDrawByteOffset;
-    Rhi::CmdBindVertexBuffers(cmd, 0, {&cr->instanceBuffer, 1}, {&bufferOffset, 1});
+    const uint64_t bufferOffset = uint64_t{frameIdx} * manager->bytesPerFrame + manager->currentDrawByteOffset;
+    Rhi::CmdBindVertexBuffers(cmd, 0, {&manager->instanceBuffer, 1}, {&bufferOffset, 1});
 
-    Rhi::CmdDraw(cmd, 6, cr->cellCount, 0, 0);
+    Rhi::CmdDraw(cmd, 6, manager->cellCount, 0, 0);
 }
 
 } // namespace CellRenderer

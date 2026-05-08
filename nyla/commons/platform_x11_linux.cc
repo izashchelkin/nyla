@@ -2,6 +2,7 @@
 #include "nyla/commons/platform_linux.h"
 
 #include <cstdlib>
+#include <unistd.h>
 
 #include "nyla/commons/array.h"
 #include "nyla/commons/fmt.h"
@@ -76,6 +77,18 @@ auto API X11CreateWin(uint32_t width, uint32_t height, bool overrideRedirect, xc
                       XCB_CW_OVERRIDE_REDIRECT | XCB_CW_EVENT_MASK, values.data);
 
     xcb_map_window(X11GetConn(), window);
+
+    uint32_t pid = (uint32_t)getpid();
+    xcb_change_property(X11GetConn(), XCB_PROP_MODE_REPLACE, window, X11GetAtoms().net_wm_pid, XCB_ATOM_CARDINAL, 32, 1,
+                        &pid);
+
+    char hostname[256];
+    if (gethostname(hostname, sizeof(hostname)) == 0)
+    {
+        xcb_change_property(X11GetConn(), XCB_PROP_MODE_REPLACE, window, XCB_ATOM_WM_CLIENT_MACHINE, XCB_ATOM_STRING, 8,
+                            (uint32_t)strlen(hostname), hostname);
+    }
+
     xcb_flush(X11GetConn());
 
     return window;

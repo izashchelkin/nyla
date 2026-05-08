@@ -284,6 +284,7 @@ auto API IsWindowResized() -> bool
         engine->isWindowResized = false;
         return true;
     }
+    return false;
 }
 
 auto API ShouldExit() -> bool

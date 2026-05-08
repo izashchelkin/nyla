@@ -27,9 +27,11 @@ struct VS_OUTPUT
 {
     float4 position : SV_Position;
     nointerpolation uint glyph_index : GLYPH;
+    nointerpolation uint flags : FLAGS;
     nointerpolation uint fg : FG;
     nointerpolation uint bg : BG;
     float2 atlas_uv : ATLAS_UV;
+    float2 local_uv : LOCAL_UV;
 };
 
 static const float2 corners[6] = {
@@ -41,6 +43,7 @@ VS_OUTPUT main(VS_INPUT input)
     uint cellX = input.cell_data.x & 0xFFFFu;
     uint cellY = (input.cell_data.x >> 16) & 0xFFFFu;
     uint glyphIndex = input.cell_data.y & 0xFFFFu;
+    uint flags = (input.cell_data.y >> 16) & 0xFFFFu;
 
     float2 corner = corners[input.vert_id];
 
@@ -59,8 +62,10 @@ VS_OUTPUT main(VS_INPUT input)
     VS_OUTPUT o;
     o.position = float4(ndc, 0.0f, 1.0f);
     o.glyph_index = glyphIndex;
+    o.flags = flags;
     o.fg = input.cell_data.z;
     o.bg = input.cell_data.w;
     o.atlas_uv = atlasPosPx / float2(pc.atlas_size_px);
+    o.local_uv = corner;
     return o;
 }

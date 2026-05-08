@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <type_traits>
 
+#include "nyla/commons/array.h"
 #include "nyla/commons/fmt.h"
 #include "nyla/commons/inline_vec_def.h"
 #include "nyla/commons/mem.h"
@@ -13,7 +14,7 @@ namespace nyla
 
 template <is_plain T, uint64_t Capacity>
 [[nodiscard]]
-auto inline_vec<T, Capacity>::operator[](uint64_t i) -> T &
+INLINE auto inline_vec<T, Capacity>::operator[](uint64_t i) -> T &
 {
     DASSERT(i < size);
     return data[i];
@@ -21,7 +22,7 @@ auto inline_vec<T, Capacity>::operator[](uint64_t i) -> T &
 
 template <is_plain T, uint64_t Capacity>
 [[nodiscard]]
-auto inline_vec<T, Capacity>::operator[](uint64_t i) const -> const T &
+INLINE auto inline_vec<T, Capacity>::operator[](uint64_t i) const -> const T &
 {
     DASSERT(i < size);
     return data[i];
