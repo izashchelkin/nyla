@@ -20,11 +20,10 @@ namespace
 
 constexpr inline uint32_t kMaxEntries = 64;
 constexpr inline uint32_t kMaxStack = 8;
-constexpr inline uint64_t kNameCap = 32;
 
 struct profile_entry
 {
-    inline_string<kNameCap> name;
+    inline_string<32> name;
     uint64_t startUs;
     uint64_t durationUs;
     uint8_t depth;
@@ -69,8 +68,6 @@ void API Bootstrap()
 
 void API FrameBegin()
 {
-    if (!manager)
-        return;
     manager->currentCount = 0;
     manager->stackDepth = 0;
     manager->overflowCount = 0;
@@ -79,9 +76,6 @@ void API FrameBegin()
 
 void API FrameEnd()
 {
-    if (!manager)
-        return;
-
     const uint64_t now = GetMonotonicTimeMicros();
     manager->lastFrameUs = now - manager->frameStartUs;
 
@@ -100,29 +94,27 @@ void API FrameEnd()
 
 void API BeginScope(byteview name)
 {
-    if (!manager)
-        return;
     if (manager->currentCount >= kMaxEntries || manager->stackDepth >= kMaxStack)
     {
         ++manager->overflowCount;
         return;
     }
 
-    const uint16_t idx = (uint16_t)manager->currentCount++;
-    auto &e = manager->current[idx];
-    InlineString::Assign(e.name, name);
-    e.startUs = GetMonotonicTimeMicros();
-    e.durationUs = 0;
-    e.depth = manager->stackDepth;
-    manager->stack[manager->stackDepth++] = idx;
+    const uint16_t i = (uint16_t)manager->currentCount++;
+    manager->stack[manager->stackDepth++] = i;
+
+    profile_entry &entry = manager->current[i];
+    MemZero(&entry);
+
+    InlineString::Assign(entry.name, name);
+    entry.startUs = GetMonotonicTimeMicros();
+    entry.durationUs = 0;
+    entry.depth = manager->stackDepth;
 }
 
 void API EndScope()
 {
-    if (!manager)
-        return;
-    if (manager->stackDepth == 0)
-        return;
+    ASSERT(manager->stackDepth);
 
     const uint16_t idx = manager->stack[--manager->stackDepth];
     auto &e = manager->current[idx];
@@ -131,19 +123,17 @@ void API EndScope()
 
 void API ToggleVisible()
 {
-    if (!manager)
-        return;
     manager->visible = !manager->visible;
 }
 
 auto API IsVisible() -> bool
 {
-    return manager && manager->visible;
+    return manager->visible;
 }
 
 void API CmdFlush(rhi_cmdlist cmd, int32_t originPxX, int32_t originPxY, uint32_t fps)
 {
-    if (!manager || !manager->visible)
+    if (!manager->visible)
         return;
 
     constexpr uint32_t kCols = 64;

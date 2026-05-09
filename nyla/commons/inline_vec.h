@@ -127,7 +127,7 @@ INLINE auto Append(inline_vec<T, Capacity> &self, const D &data) -> T &
 
 template <typename T, uint64_t Capacity> INLINE void Append(inline_vec<T, Capacity> &self, span<const T> data)
 {
-    DASSERT(self.size + data.size < Capacity);
+    DASSERT(self.size + data.size <= Capacity);
     MemCpy(self.data.data + self.size, data.data, Span::SizeBytes(data));
     self.size += data.size;
 }

@@ -1,3 +1,5 @@
+/compile_commands.json
+
 /.gdb_history
 *.spv
 *.dxil

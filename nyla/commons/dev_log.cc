@@ -21,7 +21,7 @@ constexpr inline uint32_t kRingSize = 32;
 
 struct dev_log_state
 {
-    platform_mutex *mutex;
+    mutex *mutex;
     inline_string<kLineCap> ring[kRingSize];
     uint32_t head;
     uint32_t count;

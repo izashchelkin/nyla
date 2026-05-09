@@ -78,7 +78,4 @@ void API WinSetTitle(byteview title);
 auto API WinGetSize() -> PlatformWindowSize;
 auto API WinPollEvent(PlatformEvent &outEvent) -> bool;
 
-auto API WinGetClipboard(region_alloc &alloc) -> byteview;
-void API WinSetClipboard(byteview text);
-
 } // namespace nyla

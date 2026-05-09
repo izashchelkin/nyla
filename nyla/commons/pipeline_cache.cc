@@ -80,10 +80,6 @@ auto BuildPipeline(pipeline_cache_entry &entry) -> rhi_graphics_pipeline
                 TokenParser::SkipLineWhitespace(p);
                 byteview val = TokenParser::ParseIdentifier(p);
 
-                // TODO: this is a mess. i would like to have a generic format for key value configs. on second thought
-                // it's not that bad because it doesn't do stupid things like copying strings that into dynamic data
-                // structures. so probably keep?
-
                 if (Span::Eq(key, "depth_test"_s))
                     entry.depthTestEnabled = Span::Eq(val, "true"_s);
                 else if (Span::Eq(key, "depth_write"_s))

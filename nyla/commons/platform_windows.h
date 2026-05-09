@@ -2,15 +2,9 @@
 
 #include <cstdint>
 
+#include "nyla/commons/headers_windows.h" // IWYU pragma: export
 #include "nyla/commons/keyboard.h"
 #include "nyla/commons/macros.h"
-
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <windows.h>
-
-#include <Xinput.h>
-#include <bcrypt.h>
 
 namespace nyla
 {

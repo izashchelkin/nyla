@@ -28,8 +28,6 @@ target_sources(${TARGET} PRIVATE
     sampler_manager.cc
     shader.cc
     spv_shader.cc
-    staging.cc
-    stringparser.cc
     terminal_screen.cc
     texture_manager.cc
     tunables.cc
@@ -45,6 +43,7 @@ target_sources(${TARGET} PUBLIC
     asset_import.h
     asset_manager.h
     audio.h
+    base64.h
     bdf.h
     binary_search.h
     bitenum.h
@@ -52,6 +51,7 @@ target_sources(${TARGET} PUBLIC
     byteparser.h
     cast.h
     cell_renderer.h
+    clipboard.h
     color.h
     complex.h
     concepts.h
@@ -95,9 +95,7 @@ target_sources(${TARGET} PUBLIC
     minmax.h
     pipeline_cache.h
     platform_audio.h
-    platform_condvar.h
     platform_dir_watch.h
-    platform_mutex.h
     platform_pty.h
     platform_thread.h
     platform.h
@@ -117,9 +115,9 @@ target_sources(${TARGET} PUBLIC
     spv_reader.h
     spv_shader_enums.h
     spv_shader.h
-    staging.h
     stb_image.h
     stringparser.h
+    sync.h
     terminal_screen.h
     texture_manager.h
     time.h
@@ -134,14 +132,16 @@ target_sources(${TARGET} PUBLIC
 )
 if (WIN32)
     target_sources(${TARGET} PRIVATE
+        clipboard_windows.cc
         file_windows.cc
         platform_audio_windows.cc
         platform_dir_watch_windows.cc
-        platform_mutex_windows.cc
         platform_pty_windows.cc
         platform_thread_windows.cc
         platform_windows.cc
         renderdoc_windows.cc
+        sync_windows.cc
+        time_windows.cc
     )
     target_sources(${TARGET} PUBLIC
         entrypoint_windows.h
@@ -151,14 +151,16 @@ if (WIN32)
     )
 else()
     target_sources(${TARGET} PRIVATE
+        clipboard_linux.cc
         platform_audio_linux.cc
         platform_dir_watch_linux.cc
         platform_linux.cc
-        platform_mutex_linux.cc
         platform_pty_linux.cc
         platform_thread_linux.cc
         platform_x11_linux.cc
         renderdoc_linux.cc
+        sync_linux.cc
+        time_linux.cc
     )
     target_sources(${TARGET} PUBLIC
         entrypoint_linux.h

@@ -40,7 +40,7 @@ struct audio_state
 {
     handle_pool<voice, voice_data, 64> voices;
     handle_pool<audio_clip_handle, clip_slot, 64> clips;
-    platform_mutex *mutex;
+    mutex *mutex;
     uint32_t deviceSampleRate;
     uint32_t deviceChannels;
     float masterVolume;

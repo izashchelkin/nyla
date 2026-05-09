@@ -13,7 +13,13 @@ namespace nyla
 
 INLINE auto IsHexDigit(uint8_t ch) -> bool
 {
-    return (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F');
+    if (ch >= '0' && ch <= '9')
+        return true;
+    if (ch >= 'a' && ch <= 'f')
+        return true;
+    if (ch >= 'A' && ch <= 'F')
+        return true;
+    return false;
 }
 
 INLINE auto IsIdentifierStart(uint8_t ch) -> bool
@@ -44,6 +50,7 @@ INLINE auto SkipLineComment(byte_parser &self, uint8_t commentChar = '#') -> boo
 {
     if (!ByteParser::HasNext(self) || ByteParser::Peek(self) != commentChar)
         return false;
+
     ByteParser::NextLine(self);
     return true;
 }

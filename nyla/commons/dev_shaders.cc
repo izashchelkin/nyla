@@ -67,7 +67,7 @@ struct dev_shaders_state
     inline_vec<dev_shader_root_entry, 16> roots;
     inline_vec<shader_file, kFilesCap> files;
 
-    platform_mutex *queueMutex;
+    mutex *queueMutex;
     platform_condvar *queueCv;
     inline_vec<compile_job, kQueueCap> queue;
 

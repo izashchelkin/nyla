@@ -47,9 +47,17 @@ enum ParseNumberResult
     Long,
 };
 
-// Defined in stringparser.cc. Linker drops it (and the libc strtod reference)
-// when no caller pulls ParseDecimal/ParseLong into the program.
-auto ParseDoubleFromBytes(const uint8_t *data, uint64_t size) -> double;
+inline auto ParseDoubleFromBytes(const uint8_t *data, uint64_t size) -> double
+{
+    char buf[1024];
+    ASSERT(size < sizeof(buf));
+
+    for (uint64_t i = 0; i < size; ++i)
+        buf[i] = (char)data[i];
+    buf[size] = '\0';
+
+    return ::strtod(buf, nullptr);
+}
 
 inline auto ParseDecimal(byte_parser &self, double &outDouble, int64_t &outLong) -> ParseNumberResult
 {

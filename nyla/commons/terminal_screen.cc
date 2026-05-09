@@ -1,6 +1,7 @@
 #include "nyla/commons/terminal_screen.h"
 
 #include "nyla/commons/base64.h"
+#include "nyla/commons/clipboard.h"
 #include "nyla/commons/fmt.h"
 #include "nyla/commons/inline_string.h"
 #include "nyla/commons/inline_vec.h"
@@ -540,7 +541,7 @@ void DispatchOsc(terminal_screen &s)
                 region_alloc tmp = RegionAlloc::Create(1_MiB, 0);
                 if (b64.size == 1 && b64.data[0] == '?')
                 {
-                    byteview clip = WinGetClipboard(tmp);
+                    byteview clip = Clipboard::Read(tmp);
                     byteview encoded = Base64::Encode(tmp, clip);
 
                     // Reply: OSC 52 ; selection ; encoded ST
@@ -559,7 +560,7 @@ void DispatchOsc(terminal_screen &s)
                 else
                 {
                     byteview decoded = Base64::Decode(tmp, b64);
-                    WinSetClipboard(decoded);
+                    Clipboard::Write(decoded);
                 }
                 RegionAlloc::Destroy(tmp);
             }
@@ -1469,34 +1470,42 @@ auto API Cols(const terminal_screen &self) -> uint32_t
 {
     return self.cols;
 }
+
 auto API Rows(const terminal_screen &self) -> uint32_t
 {
     return self.rows;
 }
+
 auto API CursorCol(const terminal_screen &self) -> uint32_t
 {
     return self.cursorCol;
 }
+
 auto API CursorRow(const terminal_screen &self) -> uint32_t
 {
     return self.cursorRow;
 }
+
 auto API CursorVisible(const terminal_screen &self) -> bool
 {
     return self.cursorVisible;
 }
+
 auto API CursorStyle(const terminal_screen &self) -> terminal_cursor_style
 {
     return self.cursorStyle;
 }
+
 auto API ApplicationCursorKeys(const terminal_screen &self) -> bool
 {
     return self.applicationCursorKeys;
 }
+
 auto API MouseMode(const terminal_screen &self) -> terminal_mouse_mode
 {
     return self.mouseMode;
 }
+
 auto API MouseFormat(const terminal_screen &self) -> terminal_mouse_format
 {
     return self.mouseFormat;

@@ -102,7 +102,6 @@ void API FileSeek(file_handle file, int64_t at, file_seek_mode mode)
     distanceToMove.QuadPart = at;
 
     DWORD moveMethod;
-    // NOLINTBEGIN(bugprone-branch-clone)
     switch (mode)
     {
     case file_seek_mode::Begin:
@@ -115,7 +114,6 @@ void API FileSeek(file_handle file, int64_t at, file_seek_mode mode)
         moveMethod = FILE_END;
         break;
     }
-    // NOLINTEND(bugprone-branch-clone)
 
     SetFilePointerEx(hFile, distanceToMove, nullptr, moveMethod);
 }

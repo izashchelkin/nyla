@@ -17,7 +17,6 @@
 #include "nyla/commons/region_alloc.h"
 #include "nyla/commons/region_alloc_def.h"
 #include "nyla/commons/span.h"
-#include "nyla/commons/time.h"
 
 namespace nyla
 {
@@ -45,53 +44,11 @@ inline_queue<PlatformEvent, 32> g_EventsQueue{};
 
 } // namespace
 
-namespace
-{
-
-auto GetPerformanceFreq() -> uint64_t
-{
-    static uint64_t freq = 0;
-    if (freq == 0)
-    {
-        LARGE_INTEGER freq;
-        QueryPerformanceFrequency(&freq);
-        return static_cast<uint64_t>(freq.QuadPart);
-    };
-    return freq;
-}
-
-auto GetPerformanceTicks() -> uint64_t
-{
-    LARGE_INTEGER counter;
-    QueryPerformanceCounter(&counter);
-    return static_cast<uint64_t>(counter.QuadPart);
-}
-
-auto TicksTo(uint64_t ticks, uint64_t scale) -> uint64_t
-{
-    uint64_t hi;
-    uint64_t lo = UMul128(ticks, scale, hi);
-    uint64_t rem;
-    return UDiv128(hi, lo, GetPerformanceFreq(), rem);
-}
-
-} // namespace
-
 auto API GenRandom64() -> uint64_t
 {
     uint64_t buf;
     BCryptGenRandom(nullptr, (uint8_t *)&buf, sizeof(buf), BCRYPT_USE_SYSTEM_PREFERRED_RNG);
     return buf;
-}
-
-auto API GetMonotonicTimeMillis() -> uint64_t
-{
-    return TicksTo(GetPerformanceTicks(), 1'000ULL);
-}
-
-auto API GetMonotonicTimeMicros() -> uint64_t
-{
-    return TicksTo(GetPerformanceTicks(), 1'000'000ULL);
 }
 
 void API Sleep(uint64_t millis)
@@ -327,58 +284,6 @@ auto win32::WinGetHandle() -> HWND
 void API WinSetTitle(byteview title)
 {
     SetWindowTextA(g_HWnd, Span::CStr(title));
-}
-
-auto API WinGetClipboard(region_alloc &alloc) -> byteview
-{
-    if (!OpenClipboard(g_HWnd))
-        return {};
-
-    HANDLE hData = GetClipboardData(CF_TEXT);
-    if (!hData)
-    {
-        CloseClipboard();
-        return {};
-    }
-
-    char *pszText = static_cast<char *>(GlobalLock(hData));
-    if (!pszText)
-    {
-        CloseClipboard();
-        return {};
-    }
-
-    uint64_t len = CStrLen(pszText, 1_MiB);
-    byteview ret = RegionAlloc::CopyByteView(alloc, byteview{(uint8_t *)pszText, len});
-
-    GlobalUnlock(hData);
-    CloseClipboard();
-    return ret;
-}
-
-void API WinSetClipboard(byteview text)
-{
-    if (!OpenClipboard(g_HWnd))
-        return;
-
-    EmptyClipboard();
-
-    HGLOBAL hGlob = GlobalAlloc(GMEM_MOVEABLE, text.size + 1);
-    if (!hGlob)
-    {
-        CloseClipboard();
-        return;
-    }
-
-    char *pszText = static_cast<char *>(GlobalLock(hGlob));
-    MemCpy(pszText, text.data, text.size);
-    pszText[text.size] = 0;
-    GlobalUnlock(hGlob);
-
-    if (!SetClipboardData(CF_TEXT, hGlob))
-        GlobalFree(hGlob);
-
-    CloseClipboard();
 }
 
 void API WinOpen()

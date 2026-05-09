@@ -129,8 +129,7 @@ auto API FrameBegin(region_alloc &alloc) -> engine_frame
 
         if (event.textLen > 0)
         {
-            // InlineVec::Append asserts size+n < Capacity (strict), so leave one slot unused.
-            uint64_t limit = kTextBufCap - 1;
+            uint64_t limit = kTextBufCap;
             uint64_t room = textBuf.size < limit ? limit - textBuf.size : 0;
             uint64_t take = event.textLen < room ? event.textLen : room;
             if (take > 0)
@@ -145,9 +144,9 @@ auto API FrameBegin(region_alloc &alloc) -> engine_frame
                 engine->modMask |= bit;
             if (keyDownBuf.size + 1 < kKeyDownCap)
                 InlineVec::Append(keyDownBuf, key_event{.key = event.key, .mods = engine->modMask});
-#if !defined(NDEBUG)
             switch (event.key)
             {
+#if !defined(NDEBUG)
             case KeyPhysical::F1:
                 Tunables::ToggleVisible();
                 break;
@@ -169,16 +168,13 @@ auto API FrameBegin(region_alloc &alloc) -> engine_frame
             case KeyPhysical::F7:
                 Profiler::ToggleVisible();
                 break;
+#endif
             case KeyPhysical::F11:
                 RenderDocTriggerCapture();
                 break;
             default:
                 break;
             }
-#else
-            if (event.key == KeyPhysical::F11)
-                RenderDocTriggerCapture();
-#endif
             break;
         case PlatformEventType::KeyUp:
             InputManager::HandleReleased(input_interface_type::Keyboard, uint32_t(event.key), frameStart);

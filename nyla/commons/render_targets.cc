@@ -22,10 +22,12 @@ void API GetTargets(render_targets &self, uint32_t width, uint32_t height, rhi_r
             Rhi::DestroyDepthStencilView(dsv);
         for (rhi_texture tex : self.DepthStencilTextures)
             Rhi::DestroyTexture(tex);
+
         InlineVec::Clear(self.Rtvs);
         InlineVec::Clear(self.ColorTextures);
         InlineVec::Clear(self.Dsvs);
         InlineVec::Clear(self.DepthStencilTextures);
+
         self.CachedWidth = width;
         self.CachedHeight = height;
     }
