@@ -15,14 +15,13 @@
 #include "nyla/commons/mem.h"
 #include "nyla/commons/mempage_pool.h"
 #include "nyla/commons/platform.h"
-#include "nyla/commons/platform_condvar.h"
 #include "nyla/commons/platform_dir_watch.h"
-#include "nyla/commons/platform_mutex.h"
-#include "nyla/commons/platform_thread.h"
 #include "nyla/commons/region_alloc.h"
 #include "nyla/commons/region_alloc_def.h"
 #include "nyla/commons/span.h"
 #include "nyla/commons/span_def.h"
+#include "nyla/commons/sync.h"
+#include "nyla/commons/thread.h"
 
 namespace nyla
 {
@@ -68,7 +67,7 @@ struct dev_shaders_state
     inline_vec<shader_file, kFilesCap> files;
 
     mutex *queueMutex;
-    platform_condvar *queueCv;
+    condvar *queueCv;
     inline_vec<compile_job, kQueueCap> queue;
 
     thread *worker;
@@ -142,15 +141,15 @@ void RunCompile(const compile_job &job)
 
 void WaitPopJob(compile_job &out)
 {
-    PlatformMutex::Lock(*manager->queueMutex);
+    Mutex::Lock(*manager->queueMutex);
     while (manager->queue.size == 0)
-        PlatformCondvar::Wait(*manager->queueCv, *manager->queueMutex);
+        CondVar::Wait(*manager->queueCv, *manager->queueMutex);
     out = manager->queue.data.data[0];
     if (manager->queue.size > 1)
         MemMove(manager->queue.data.data, manager->queue.data.data + 1,
                 (manager->queue.size - 1) * sizeof(compile_job));
     manager->queue.size -= 1;
-    PlatformMutex::Unlock(*manager->queueMutex);
+    Mutex::Unlock(*manager->queueMutex);
 }
 
 void WorkerMain(void *)
@@ -345,7 +344,7 @@ void EnqueueCompile(const shader_file &f)
     WriteCStr(pending.dirPath, f.root->srcDir);
     WriteCStr(pending.name, f.relPath);
 
-    PlatformMutex::Lock(*manager->queueMutex);
+    Mutex::Lock(*manager->queueMutex);
     bool dup = false;
     for (uint64_t i = 0; i < manager->queue.size; ++i)
     {
@@ -368,10 +367,10 @@ void EnqueueCompile(const shader_file &f)
         else
             dropped = true;
     }
-    PlatformMutex::Unlock(*manager->queueMutex);
+    Mutex::Unlock(*manager->queueMutex);
 
     if (pushed)
-        PlatformCondvar::Signal(*manager->queueCv);
+        CondVar::Signal(*manager->queueCv);
     if (dropped)
         LOG("dev_shaders: queue full, dropped " SV_FMT, SV_ARG(f.relPath));
 }
@@ -474,8 +473,8 @@ void API Bootstrap(span<const dev_shader_root> roots)
     manager->workerScratch = RegionAlloc::Create(MemPagePool::kChunkSize, 0);
     manager->scratch = RegionAlloc::Create(MemPagePool::kChunkSize, 0);
 
-    manager->queueMutex = PlatformMutex::Create(RegionAlloc::g_BootstrapAlloc);
-    manager->queueCv = PlatformCondvar::Create(RegionAlloc::g_BootstrapAlloc);
+    manager->queueMutex = Mutex::Create(RegionAlloc::g_BootstrapAlloc);
+    manager->queueCv = CondVar::Create(RegionAlloc::g_BootstrapAlloc);
 
     DirWatcher::Subscribe(".hlsl"_s, OnShaderEvent, nullptr);
     DirWatcher::Subscribe(".hlsli"_s, OnShaderEvent, nullptr);
@@ -514,8 +513,8 @@ void API Bootstrap(span<const dev_shader_root> roots)
 
     RegionAlloc::Reset(manager->scratch);
 
-    manager->worker = PlatformThread::Create(RegionAlloc::g_BootstrapAlloc, &WorkerMain, nullptr);
-    PlatformThread::SetName(*manager->worker, "nyla-shadercc");
+    manager->worker = Thread::Create(RegionAlloc::g_BootstrapAlloc, &WorkerMain, nullptr);
+    Thread::SetName(*manager->worker, "nyla_shadercc");
 
     LOG("dev_shaders: %" PRIu64 " roots watched, %" PRIu64 " files indexed, %" PRIu64 " missing spv enqueued",
         manager->roots.size, manager->files.size, missingCount);

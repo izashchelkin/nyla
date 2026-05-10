@@ -5,10 +5,10 @@
 #include "nyla/commons/inline_string.h"
 #include "nyla/commons/macros.h"
 #include "nyla/commons/minmax.h"
-#include "nyla/commons/platform_mutex.h"
 #include "nyla/commons/region_alloc.h"
 #include "nyla/commons/region_alloc_def.h"
 #include "nyla/commons/span_def.h"
+#include "nyla/commons/sync.h"
 
 namespace nyla
 {
@@ -37,7 +37,7 @@ namespace DevLog
 void API Bootstrap()
 {
     manager = &RegionAlloc::Alloc<dev_log_state>(RegionAlloc::g_BootstrapAlloc);
-    manager->mutex = PlatformMutex::Create(RegionAlloc::g_BootstrapAlloc);
+    manager->mutex = Mutex::Create(RegionAlloc::g_BootstrapAlloc);
     manager->head = 0;
     manager->count = 0;
 }
@@ -47,13 +47,13 @@ void API Push(byteview line)
     if (!manager)
         return;
 
-    PlatformMutex::Lock(*manager->mutex);
+    Mutex::Lock(*manager->mutex);
     auto &slot = manager->ring[manager->head];
     InlineString::Assign(slot, line);
     manager->head = (manager->head + 1) % kRingSize;
     if (manager->count < kRingSize)
         ++manager->count;
-    PlatformMutex::Unlock(*manager->mutex);
+    Mutex::Unlock(*manager->mutex);
 }
 
 auto API Snapshot(region_alloc &alloc, uint32_t maxLines) -> span<byteview>
@@ -61,7 +61,7 @@ auto API Snapshot(region_alloc &alloc, uint32_t maxLines) -> span<byteview>
     if (!manager)
         return span<byteview>{};
 
-    PlatformMutex::Lock(*manager->mutex);
+    Mutex::Lock(*manager->mutex);
 
     uint32_t n = Min<uint32_t>(maxLines, manager->count);
     span<byteview> out = RegionAlloc::AllocArray<byteview>(alloc, n);
@@ -72,7 +72,7 @@ auto API Snapshot(region_alloc &alloc, uint32_t maxLines) -> span<byteview>
         out.data[i] = RegionAlloc::CopyByteView(alloc, manager->ring[idx]);
     }
 
-    PlatformMutex::Unlock(*manager->mutex);
+    Mutex::Unlock(*manager->mutex);
     return out;
 }
 

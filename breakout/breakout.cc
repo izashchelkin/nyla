@@ -3,7 +3,7 @@
 #include "assets.h"
 #include "nyla/commons/array.h" // IWYU pragma: keep
 #include "nyla/commons/asset_manager.h"
-#include "nyla/commons/audio.h"
+#include "nyla/commons/audio_mixer.h"
 #include "nyla/commons/byteliterals.h"
 #include "nyla/commons/cell_renderer.h"
 #include "nyla/commons/color.h"

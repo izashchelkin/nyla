@@ -67,7 +67,7 @@ void FeederMain(void *)
 
 } // namespace
 
-namespace PlatformAudio
+namespace AudioBackend
 {
 
 void API Init(const audio_backend_settings &settings)
@@ -168,6 +168,6 @@ auto API GetChannels() -> uint32_t
     return manager->channels;
 }
 
-} // namespace PlatformAudio
+} // namespace AudioBackend
 
 } // namespace nyla

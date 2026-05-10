@@ -2,10 +2,10 @@
 
 #include "nyla/commons/array.h" // IWYU pragma: keep
 #include "nyla/commons/asset_manager.h"
+#include "nyla/commons/audio_backend.h"
 #include "nyla/commons/fmt.h"
 #include "nyla/commons/handle_pool.h"
 #include "nyla/commons/macros.h"
-#include "nyla/commons/platform_audio.h"
 #include "nyla/commons/region_alloc.h"
 #include "nyla/commons/sync.h"
 #include "nyla/commons/wave.h"
@@ -134,12 +134,12 @@ void API Bootstrap(uint32_t sampleRate, uint32_t channels, uint32_t latencyUs)
     manager->deviceChannels = channels;
     manager->masterVolume = 1.f;
 
-    PlatformAudio::Init({
+    AudioBackend::Init({
         .sampleRate = sampleRate,
         .channels = channels,
         .latencyUs = latencyUs,
         .callback = &MixCallback,
-        .user = nullptr,
+        .userdata = nullptr,
     });
 
     AssetManager::Subscribe(
@@ -164,7 +164,7 @@ void API Shutdown()
     if (!manager)
         return;
 
-    PlatformAudio::Destroy();
+    AudioBackend::Destroy();
     Mutex::Destroy(*manager->mutex);
 }
 
