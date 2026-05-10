@@ -25,7 +25,7 @@ struct platform_audio
     void *user;
     uint32_t sampleRate;
     uint32_t channels;
-    platform_thread *thread;
+    thread *thread;
     uint32_t running;
     int16_t scratch[kMaxFramesPerWrite * kMaxChannels];
 };

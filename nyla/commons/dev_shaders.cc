@@ -71,7 +71,7 @@ struct dev_shaders_state
     platform_condvar *queueCv;
     inline_vec<compile_job, kQueueCap> queue;
 
-    platform_thread *worker;
+    thread *worker;
 };
 
 dev_shaders_state *manager;

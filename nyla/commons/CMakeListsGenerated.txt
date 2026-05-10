@@ -1,7 +1,7 @@
 target_sources(${TARGET} PRIVATE
     asset_import.cc
     asset_manager.cc
-    audio.cc
+    audio_mixer.cc
     bdf.cc
     cell_renderer.cc
     debug_text_renderer.cc
@@ -42,7 +42,8 @@ target_sources(${TARGET} PUBLIC
     asset_file_format.h
     asset_import.h
     asset_manager.h
-    audio.h
+    audio_backend.h
+    audio_mixer.h
     base64.h
     bdf.h
     binary_search.h
@@ -94,10 +95,8 @@ target_sources(${TARGET} PUBLIC
     mesh_manager.h
     minmax.h
     pipeline_cache.h
-    platform_audio.h
     platform_dir_watch.h
     platform_pty.h
-    platform_thread.h
     platform.h
     profiler.h
     random.h
@@ -120,6 +119,7 @@ target_sources(${TARGET} PUBLIC
     sync.h
     terminal_screen.h
     texture_manager.h
+    thread.h
     time.h
     tokenparser.h
     tunables.h
@@ -132,15 +132,15 @@ target_sources(${TARGET} PUBLIC
 )
 if (WIN32)
     target_sources(${TARGET} PRIVATE
+        audio_backend_windows.cc
         clipboard_windows.cc
         file_windows.cc
-        platform_audio_windows.cc
         platform_dir_watch_windows.cc
         platform_pty_windows.cc
-        platform_thread_windows.cc
         platform_windows.cc
         renderdoc_windows.cc
         sync_windows.cc
+        thread_windows.cc
         time_windows.cc
     )
     target_sources(${TARGET} PUBLIC
@@ -151,15 +151,15 @@ if (WIN32)
     )
 else()
     target_sources(${TARGET} PRIVATE
+        audio_backend_linux.cc
         clipboard_linux.cc
-        platform_audio_linux.cc
         platform_dir_watch_linux.cc
         platform_linux.cc
         platform_pty_linux.cc
-        platform_thread_linux.cc
         platform_x11_linux.cc
         renderdoc_linux.cc
         sync_linux.cc
+        thread_linux.cc
         time_linux.cc
     )
     target_sources(${TARGET} PUBLIC

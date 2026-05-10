@@ -1,4 +1,4 @@
-#include "nyla/commons/audio.h"
+#include "nyla/commons/audio_mixer.h"
 
 #include "nyla/commons/array.h" // IWYU pragma: keep
 #include "nyla/commons/asset_manager.h"
@@ -6,8 +6,8 @@
 #include "nyla/commons/handle_pool.h"
 #include "nyla/commons/macros.h"
 #include "nyla/commons/platform_audio.h"
-#include "nyla/commons/platform_mutex.h"
 #include "nyla/commons/region_alloc.h"
+#include "nyla/commons/sync.h"
 #include "nyla/commons/wave.h"
 
 #include <cinttypes>
@@ -49,7 +49,7 @@ audio_state *manager;
 
 void MixCallback(void *, int16_t *out, uint32_t numFrames)
 {
-    PlatformMutex::Lock(*manager->mutex);
+    Mutex::Lock(*manager->mutex);
 
     const uint32_t outCh = manager->deviceChannels;
     const float master = manager->masterVolume;
@@ -116,7 +116,7 @@ void MixCallback(void *, int16_t *out, uint32_t numFrames)
         }
     }
 
-    PlatformMutex::Unlock(*manager->mutex);
+    Mutex::Unlock(*manager->mutex);
 }
 
 } // namespace
@@ -129,7 +129,7 @@ void API Bootstrap(uint32_t sampleRate, uint32_t channels, uint32_t latencyUs)
     ASSERT(!manager);
 
     manager = &RegionAlloc::Alloc<audio_state>(RegionAlloc::g_BootstrapAlloc);
-    manager->mutex = PlatformMutex::Create(RegionAlloc::g_BootstrapAlloc);
+    manager->mutex = Mutex::Create(RegionAlloc::g_BootstrapAlloc);
     manager->deviceSampleRate = sampleRate;
     manager->deviceChannels = channels;
     manager->masterVolume = 1.f;
@@ -165,7 +165,7 @@ void API Shutdown()
         return;
 
     PlatformAudio::Destroy();
-    PlatformMutex::Destroy(*manager->mutex);
+    Mutex::Destroy(*manager->mutex);
 }
 
 auto API LoadWav(byteview wavBlob) -> audio_clip
@@ -194,9 +194,9 @@ auto API Play(const audio_clip &clip, const AudioPlayDesc &desc) -> voice
         .loop = desc.loop,
     };
 
-    PlatformMutex::Lock(*manager->mutex);
+    Mutex::Lock(*manager->mutex);
     voice v = HandlePool::Acquire(manager->voices, data);
-    PlatformMutex::Unlock(*manager->mutex);
+    Mutex::Unlock(*manager->mutex);
     return v;
 }
 
@@ -218,36 +218,36 @@ auto API Play(audio_clip_handle h, const AudioPlayDesc &desc) -> voice
 
 void API Stop(voice v)
 {
-    PlatformMutex::Lock(*manager->mutex);
+    Mutex::Lock(*manager->mutex);
     handle_slot<voice_data> *slot;
     if (HandlePool::TryResolveSlot(manager->voices, v, slot))
         HandlePool::Free(*slot);
-    PlatformMutex::Unlock(*manager->mutex);
+    Mutex::Unlock(*manager->mutex);
 }
 
 void API SetVolume(voice v, float volume)
 {
-    PlatformMutex::Lock(*manager->mutex);
+    Mutex::Lock(*manager->mutex);
     handle_slot<voice_data> *slot;
     if (HandlePool::TryResolveSlot(manager->voices, v, slot))
         slot->data.volume = volume;
-    PlatformMutex::Unlock(*manager->mutex);
+    Mutex::Unlock(*manager->mutex);
 }
 
 auto API IsPlaying(voice v) -> bool
 {
-    PlatformMutex::Lock(*manager->mutex);
+    Mutex::Lock(*manager->mutex);
     handle_slot<voice_data> *slot;
     bool playing = HandlePool::TryResolveSlot(manager->voices, v, slot);
-    PlatformMutex::Unlock(*manager->mutex);
+    Mutex::Unlock(*manager->mutex);
     return playing;
 }
 
 void API SetMasterVolume(float volume)
 {
-    PlatformMutex::Lock(*manager->mutex);
+    Mutex::Lock(*manager->mutex);
     manager->masterVolume = volume;
-    PlatformMutex::Unlock(*manager->mutex);
+    Mutex::Unlock(*manager->mutex);
 }
 
 } // namespace Audio
