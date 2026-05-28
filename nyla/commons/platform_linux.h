@@ -70,6 +70,7 @@ struct platform_state
         xcb_connection_t *conn;
         xcb_screen_t *screen;
         uint32_t extensionXInput2MajorOpCode;
+        uint32_t extensionXRandRFirstEvent;
         int screenIndex;
 
         xcb_window_t win;
@@ -86,6 +87,12 @@ struct platform_state
         xkb_state *xkbState;
 
         inline_string<1_MiB> clipboardContent;
+
+        // Monitor tracking via RandR
+        int32_t monitorX;
+        int32_t monitorY;
+        uint32_t monitorWidth;
+        uint32_t monitorHeight;
     } x11;
 };
 extern platform_state *platform;
@@ -113,6 +120,18 @@ void API X11SendConfigureNotify(xcb_window_t window, xcb_window_t parent, int16_
 auto API X11ConvertKeyPhysicalIntoXkbName(KeyPhysical key) -> byteview;
 auto API X11KeyPhysicalToKeyCode(KeyPhysical key) -> uint32_t;
 auto API X11KeyCodeToKeyPhysical(uint32_t keyCode, KeyPhysical *outKeyPhysical) -> bool;
+
+// RandR monitor tracking
+void API X11RandRInit();
+auto API X11RandRGetEventOffset() -> uint32_t;
+auto API X11RandRRefreshMonitors() -> bool; // returns true if monitors changed
+auto API X11GetMonitorWidth() -> uint32_t;
+auto API X11GetMonitorHeight() -> uint32_t;
+auto API X11GetMonitorX() -> int32_t;
+auto API X11GetMonitorY() -> int32_t;
+
+// Rebuild keycode table after keyboard change
+void API X11RefreshKeyboardMapping();
 
 //
 } // namespace nyla

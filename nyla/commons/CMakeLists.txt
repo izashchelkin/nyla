@@ -58,6 +58,7 @@ target_link_libraries(${TARGET}
         xkbcommon
         xkbcommon-x11
         xcb-xinput
+        xcb-randr
         util
         PkgConfig::ALSA
 )

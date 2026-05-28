@@ -2,6 +2,7 @@
 
 #include "nyla/commons/mem.h"
 #include "nyla/commons/platform_windows.h" // IWYU pragma: keep
+#include "nyla/commons/region_alloc.h"
 
 namespace nyla
 {
@@ -9,9 +10,9 @@ namespace nyla
 namespace Clipboard
 {
 
-auto API Read(span<uint8_t> out) -> uint64_t
+auto API Read(region_alloc &alloc) -> byteview
 {
-    uint64_t len = 0;
+    byteview ret = {};
 
     if (OpenClipboard(win32::WinGetHandle()))
     {
@@ -21,8 +22,8 @@ auto API Read(span<uint8_t> out) -> uint64_t
             const char *data = (const char *)GlobalLock(hData);
             if (data)
             {
-                len = CStrLen(data, out.size);
-                MemCpy(out.data, data, len);
+                uint64_t len = CStrLen(data, 1_MiB);
+                ret = RegionAlloc::CopyByteView(alloc, byteview{(const uint8_t *)data, len});
                 GlobalUnlock(hData);
             }
         }
@@ -30,7 +31,7 @@ auto API Read(span<uint8_t> out) -> uint64_t
         CloseClipboard();
     }
 
-    return len;
+    return ret;
 }
 
 void API Write(byteview text)

@@ -157,6 +157,19 @@ template <typename T, uint64_t Capacity> INLINE void Erase(inline_vec<T, Capacit
     self.size = s.size;
 }
 
+template <typename T, uint64_t Capacity>
+INLINE auto Insert(inline_vec<T, Capacity> &self, T *pos, const T &val) -> T *
+    requires(!std::is_const_v<T>)
+{
+    DASSERT(self.size < Capacity);
+    uint64_t idx = (uint64_t)(pos - self.data.data);
+    DASSERT(idx <= self.size);
+    MemMove(self.data.data + idx + 1, self.data.data + idx, (self.size - idx) * sizeof(T));
+    self.data.data[idx] = val;
+    ++self.size;
+    return self.data.data + idx;
+}
+
 }; // namespace InlineVec
 
 } // namespace nyla

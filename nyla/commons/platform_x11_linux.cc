@@ -7,6 +7,8 @@
 #include "nyla/commons/array.h"
 #include "nyla/commons/fmt.h"
 
+#include <xcb/randr.h>
+
 namespace nyla
 {
 
@@ -339,6 +341,311 @@ auto API X11ConvertKeyPhysicalIntoXkbName(KeyPhysical key) -> byteview
     default:
         TRAP();
         UNREACHABLE();
+    }
+}
+
+// ─── RandR monitor configuration ────────────────────────────────────────────
+
+static auto IsExternalOutputName(const char *name, uint8_t nameLen) -> bool
+{
+    if (nameLen >= 3 && (name[0] == 'e' || name[0] == 'E') && (name[1] == 'D' || name[1] == 'd') &&
+        (name[2] == 'P' || name[2] == 'p'))
+        return false;
+    if (nameLen >= 4 && (name[0] == 'L' || name[0] == 'l') && (name[1] == 'V' || name[1] == 'v') &&
+        (name[2] == 'D' || name[2] == 'd') && (name[3] == 'S' || name[3] == 's'))
+        return false;
+    return true;
+}
+
+void API X11RandRInit()
+{
+    const xcb_query_extension_reply_t *ext = xcb_get_extension_data(X11GetConn(), &xcb_randr_id);
+    if (!ext || !ext->present)
+    {
+        platform->x11.monitorX = 0;
+        platform->x11.monitorY = 0;
+        platform->x11.monitorWidth = X11GetScreen()->width_in_pixels;
+        platform->x11.monitorHeight = X11GetScreen()->height_in_pixels;
+        platform->x11.extensionXRandRFirstEvent = 0;
+        return;
+    }
+
+    platform->x11.extensionXRandRFirstEvent = ext->first_event;
+
+    xcb_randr_select_input(X11GetConn(), X11GetRoot(),
+                           XCB_RANDR_NOTIFY_MASK_SCREEN_CHANGE | XCB_RANDR_NOTIFY_MASK_OUTPUT_CHANGE |
+                               XCB_RANDR_NOTIFY_MASK_CRTC_CHANGE);
+
+    X11RandRRefreshMonitors();
+}
+
+auto API X11RandRGetEventOffset() -> uint32_t
+{
+    return platform->x11.extensionXRandRFirstEvent;
+}
+
+// Pick the best mode for an output: highest resolution, then highest refresh rate.
+// Takes the screen resource mode list to look up mode dimensions.
+static auto PickBestMode(xcb_randr_get_output_info_reply_t *infoReply, xcb_randr_mode_info_t *resourceModes,
+                         int numResourceModes) -> xcb_randr_mode_t
+{
+    xcb_randr_mode_t *outputModes = xcb_randr_get_output_info_modes(infoReply);
+    int numModes = infoReply->num_modes;
+
+    xcb_randr_mode_t bestMode = XCB_NONE;
+    uint64_t bestPixels = 0;
+    float bestRefresh = 0.0f;
+
+    for (int mi = 0; mi < numModes; ++mi)
+    {
+        xcb_randr_mode_t modeId = outputModes[mi];
+
+        // Look up mode info in the resource mode list
+        xcb_randr_mode_info_t *modeInfo = nullptr;
+        for (int ri = 0; ri < numResourceModes; ++ri)
+        {
+            if (resourceModes[ri].id == modeId)
+            {
+                modeInfo = &resourceModes[ri];
+                break;
+            }
+        }
+        if (!modeInfo)
+            continue;
+
+        uint64_t pixels = (uint64_t)modeInfo->width * (uint64_t)modeInfo->height;
+        float refresh = 0.0f;
+        if (modeInfo->htotal > 0 && modeInfo->vtotal > 0)
+            refresh = (float)modeInfo->dot_clock / ((float)modeInfo->htotal * (float)modeInfo->vtotal);
+
+        if (pixels > bestPixels || (pixels == bestPixels && refresh > bestRefresh))
+        {
+            bestPixels = pixels;
+            bestRefresh = refresh;
+            bestMode = modeId;
+        }
+    }
+
+    return bestMode != XCB_NONE ? bestMode : *outputModes; // fallback to first mode
+}
+
+// Pick the best output and enable only it: prefer external (HDMI/DP) over internal (eDP/LVDS).
+// Disable all other outputs. Returns true if the active monitor geometry changed.
+auto API X11RandRRefreshMonitors() -> bool
+{
+    if (platform->x11.extensionXRandRFirstEvent == 0)
+        return false;
+
+    xcb_randr_get_screen_resources_cookie_t resCookie = xcb_randr_get_screen_resources(X11GetConn(), X11GetRoot());
+    xcb_randr_get_screen_resources_reply_t *resReply =
+        xcb_randr_get_screen_resources_reply(X11GetConn(), resCookie, nullptr);
+    if (!resReply)
+        return false;
+
+    int numOutputs = xcb_randr_get_screen_resources_outputs_length(resReply);
+    xcb_randr_output_t *outputs = xcb_randr_get_screen_resources_outputs(resReply);
+
+    // Collect resource modes for mode scoring
+    int numResourceModes = xcb_randr_get_screen_resources_modes_length(resReply);
+    xcb_randr_mode_info_t *resourceModes = xcb_randr_get_screen_resources_modes(resReply);
+
+    // Find the best output (external preferred, then internal), and its best mode
+    xcb_randr_output_t bestOutput = XCB_NONE;
+    xcb_randr_mode_t bestMode = XCB_NONE;
+
+    for (int pass = 0; pass < 2; ++pass)
+    {
+        bool wantExternal = (pass == 0);
+        for (int i = 0; i < numOutputs; ++i)
+        {
+            xcb_randr_get_output_info_cookie_t infoCookie =
+                xcb_randr_get_output_info(X11GetConn(), outputs[i], XCB_CURRENT_TIME);
+            xcb_randr_get_output_info_reply_t *infoReply =
+                xcb_randr_get_output_info_reply(X11GetConn(), infoCookie, nullptr);
+            if (!infoReply)
+                continue;
+
+            bool isExternal = IsExternalOutputName((const char *)xcb_randr_get_output_info_name(infoReply),
+                                                   xcb_randr_get_output_info_name_length(infoReply));
+            bool connected = (infoReply->connection == XCB_RANDR_CONNECTION_CONNECTED);
+
+            if (!connected || wantExternal != isExternal || infoReply->num_modes == 0)
+            {
+                free(infoReply);
+                continue;
+            }
+
+            bestOutput = outputs[i];
+            bestMode = PickBestMode(infoReply, resourceModes, numResourceModes);
+            free(infoReply);
+            break;
+        }
+        if (bestOutput != XCB_NONE)
+            break;
+    }
+
+    free(resReply);
+
+    if (bestOutput == XCB_NONE)
+        return false;
+
+    // Get fresh resources with the updated config_timestamp for the set_crtc calls
+    xcb_randr_get_screen_resources_cookie_t resCookie2 = xcb_randr_get_screen_resources(X11GetConn(), X11GetRoot());
+    xcb_randr_get_screen_resources_reply_t *resReply2 =
+        xcb_randr_get_screen_resources_reply(X11GetConn(), resCookie2, nullptr);
+    if (!resReply2)
+        return false;
+
+    int numOutputs2 = xcb_randr_get_screen_resources_outputs_length(resReply2);
+    xcb_randr_output_t *outputs2 = xcb_randr_get_screen_resources_outputs(resReply2);
+
+    // Disable CRTCs on all outputs except the chosen one.
+    // Must disable disconnected outputs too — they may still hold a CRTC
+    // that the chosen output needs (e.g. when HDMI is unplugged).
+    for (int i = 0; i < numOutputs2; ++i)
+    {
+        if (outputs2[i] == bestOutput)
+            continue;
+
+        xcb_randr_get_output_info_cookie_t infoCookie =
+            xcb_randr_get_output_info(X11GetConn(), outputs2[i], XCB_CURRENT_TIME);
+        xcb_randr_get_output_info_reply_t *infoReply =
+            xcb_randr_get_output_info_reply(X11GetConn(), infoCookie, nullptr);
+        if (infoReply)
+        {
+            if (infoReply->crtc != XCB_NONE)
+            {
+                xcb_randr_set_crtc_config(X11GetConn(), infoReply->crtc, XCB_CURRENT_TIME, resReply2->config_timestamp,
+                                          0, 0, XCB_NONE, XCB_RANDR_ROTATION_ROTATE_0, 0, nullptr);
+            }
+            free(infoReply);
+        }
+    }
+
+    // Enable the chosen output at the best mode.
+    // If the output's CRTC was freed (e.g. it was previously disabled),
+    // find an available CRTC from the screen resources.
+    xcb_randr_get_output_info_cookie_t bestInfoCookie =
+        xcb_randr_get_output_info(X11GetConn(), bestOutput, XCB_CURRENT_TIME);
+    xcb_randr_get_output_info_reply_t *bestInfoReply =
+        xcb_randr_get_output_info_reply(X11GetConn(), bestInfoCookie, nullptr);
+    if (bestInfoReply)
+    {
+        xcb_randr_crtc_t useCrtc = bestInfoReply->crtc;
+        if (useCrtc == XCB_NONE)
+        {
+            // Find an unused CRTC
+            int numCrtcs = xcb_randr_get_screen_resources_crtcs_length(resReply2);
+            xcb_randr_crtc_t *crtcs = xcb_randr_get_screen_resources_crtcs(resReply2);
+            for (int c = 0; c < numCrtcs; ++c)
+            {
+                xcb_randr_get_crtc_info_cookie_t crtcCookie =
+                    xcb_randr_get_crtc_info(X11GetConn(), crtcs[c], XCB_CURRENT_TIME);
+                xcb_randr_get_crtc_info_reply_t *crtcReply =
+                    xcb_randr_get_crtc_info_reply(X11GetConn(), crtcCookie, nullptr);
+                if (crtcReply)
+                {
+                    int n = xcb_randr_get_crtc_info_outputs_length(crtcReply);
+                    free(crtcReply);
+                    if (n == 0)
+                    {
+                        useCrtc = crtcs[c];
+                        break;
+                    }
+                }
+            }
+        }
+        if (useCrtc != XCB_NONE && bestMode != XCB_NONE)
+        {
+            xcb_randr_set_crtc_config(X11GetConn(), useCrtc, XCB_CURRENT_TIME, resReply2->config_timestamp, 0, 0,
+                                      bestMode, XCB_RANDR_ROTATION_ROTATE_0, 1, &bestOutput);
+        }
+        free(bestInfoReply);
+    }
+
+    X11Flush();
+
+    // Re-read the final geometry from the CRTC we just configured
+    xcb_randr_get_output_info_cookie_t finalInfoCookie =
+        xcb_randr_get_output_info(X11GetConn(), bestOutput, XCB_CURRENT_TIME);
+    xcb_randr_get_output_info_reply_t *finalInfoReply =
+        xcb_randr_get_output_info_reply(X11GetConn(), finalInfoCookie, nullptr);
+    bool changed = false;
+    if (finalInfoReply && finalInfoReply->crtc != XCB_NONE)
+    {
+        xcb_randr_get_crtc_info_cookie_t crtcCookie =
+            xcb_randr_get_crtc_info(X11GetConn(), finalInfoReply->crtc, XCB_CURRENT_TIME);
+        xcb_randr_get_crtc_info_reply_t *crtcReply = xcb_randr_get_crtc_info_reply(X11GetConn(), crtcCookie, nullptr);
+        if (crtcReply)
+        {
+            int32_t newX = crtcReply->x;
+            int32_t newY = crtcReply->y;
+            uint32_t newW = crtcReply->width;
+            uint32_t newH = crtcReply->height;
+            free(crtcReply);
+
+            if (newX != platform->x11.monitorX || newY != platform->x11.monitorY ||
+                newW != platform->x11.monitorWidth || newH != platform->x11.monitorHeight)
+            {
+                platform->x11.monitorX = newX;
+                platform->x11.monitorY = newY;
+                platform->x11.monitorWidth = newW;
+                platform->x11.monitorHeight = newH;
+                changed = true;
+            }
+        }
+    }
+    if (finalInfoReply)
+        free(finalInfoReply);
+    free(resReply2);
+    return changed;
+}
+
+auto API X11GetMonitorWidth() -> uint32_t
+{
+    return platform->x11.monitorWidth;
+}
+
+auto API X11GetMonitorHeight() -> uint32_t
+{
+    return platform->x11.monitorHeight;
+}
+
+auto API X11GetMonitorX() -> int32_t
+{
+    return platform->x11.monitorX;
+}
+
+auto API X11GetMonitorY() -> int32_t
+{
+    return platform->x11.monitorY;
+}
+
+void API X11RefreshKeyboardMapping()
+{
+    // When a keyboard is plugged/unplugged or xmodmap changes, X sends
+    // MappingNotify. Rebuild the xkb keymap and state from the new device
+    // topology, then remap our keycode table.
+    const int32_t deviceId = xkb_x11_get_core_keyboard_device_id(X11GetConn());
+    if (deviceId == -1)
+        return;
+
+    xkb_keymap_unref(platform->x11.xkbKeymap);
+    platform->x11.xkbKeymap =
+        xkb_x11_keymap_new_from_device(platform->x11.xkbCtx, X11GetConn(), deviceId, XKB_KEYMAP_COMPILE_NO_FLAGS);
+    if (!platform->x11.xkbKeymap)
+        return;
+
+    xkb_state_unref(platform->x11.xkbState);
+    platform->x11.xkbState = xkb_x11_state_new_from_device(platform->x11.xkbKeymap, X11GetConn(), deviceId);
+
+    for (uint32_t i = 1; i < static_cast<uint32_t>(KeyPhysical::Count); ++i)
+    {
+        const auto key = static_cast<KeyPhysical>(i);
+        byteview xkbName = X11ConvertKeyPhysicalIntoXkbName(key);
+        const xkb_keycode_t keycode = xkb_keymap_key_by_name(platform->x11.xkbKeymap, Span::CStr(xkbName));
+        if (xkb_keycode_is_legal_x11(keycode))
+            platform->x11.keyCodes[i] = keycode;
     }
 }
 

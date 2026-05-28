@@ -771,6 +771,8 @@ void PlatformInit1()
 
         platform->x11.extensionXInput2MajorOpCode = ext->major_opcode;
     }
+
+    X11RandRInit();
 }
 
 void PlatformTearDown()

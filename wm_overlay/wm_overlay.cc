@@ -15,7 +15,9 @@
 #include "nyla/commons/region_alloc.h"
 #include "nyla/commons/rhi.h"
 #include "nyla/commons/shader.h"
+#include "nyla/commons/shm_channel.h"
 #include "nyla/commons/time.h"
+#include "nyla/commons/wm_ipc.h"
 
 namespace nyla
 {
@@ -65,6 +67,10 @@ void UserMain()
     PipelineCache::Bootstrap();
     DebugTextRenderer::Bootstrap(alloc);
 
+    shm_channel *ipc = ShmChannel::OpenReader("nyla_wm", sizeof(wm_ipc_state), RegionAlloc::g_BootstrapAlloc);
+    wm_ipc_state ipcState{};
+    uint64_t lastGeneration = 0;
+
     for (;;)
     {
         RegionAlloc::Reset(alloc);
@@ -88,6 +94,19 @@ void UserMain()
         };
         processEvents();
 
+        // Check shm for updates after processing X11 events.
+        // The WM publishes new state after every event batch; checking here
+        // catches title changes within one poll wakeup instead of waiting
+        // for the 500ms fallback timer.
+        if (ShmChannel::TryRead(*ipc, &ipcState))
+        {
+            if (ipcState.updateGeneration != lastGeneration)
+            {
+                lastGeneration = ipcState.updateGeneration;
+                shouldRedraw = true;
+            }
+        }
+
         static uint64_t prevUs = GetMonotonicTimeMicros();
         if (!shouldRedraw)
         {
@@ -110,6 +129,19 @@ void UserMain()
                 if (pollRes > 0)
                 {
                     processEvents();
+
+                    // Check shm again — an X11 event (e.g. PropertyNotify for
+                    // WM_NAME) may have caused the WM to publish new state.
+                    if (ShmChannel::TryRead(*ipc, &ipcState))
+                    {
+                        if (ipcState.updateGeneration != lastGeneration)
+                        {
+                            lastGeneration = ipcState.updateGeneration;
+                            shouldRedraw = true;
+                            break;
+                        }
+                    }
+
                     if (shouldRedraw)
                         break;
                 }
@@ -117,10 +149,25 @@ void UserMain()
             }
         }
 
+        // Read latest state so the draw is always current
+        bool ipcOk = ShmChannel::TryRead(*ipc, &ipcState);
+        (void)ipcOk;
+
         time_t t = time(nullptr);
         struct tm *tm = localtime(&t);
-        DebugTextRenderer::Fmt(1, 1, "%02d:%02d:%02d %02d.%02d.%04d"_s, tm->tm_hour, tm->tm_min, tm->tm_sec,
-                               tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900);
+
+        if (ipcState.activeWindowTitle[0])
+        {
+            DebugTextRenderer::Fmt(1, 1, "%02d:%02d:%02d %02d.%02d.%04d  %s [%u]"_s, tm->tm_hour, tm->tm_min,
+                                   tm->tm_sec, tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900,
+                                   (const uint8_t *)ipcState.activeWindowTitle,
+                                   (uint32_t)ipcState.activeStackIndex + 1);
+        }
+        else
+        {
+            DebugTextRenderer::Fmt(1, 1, "%02d:%02d:%02d %02d.%02d.%04d"_s, tm->tm_hour, tm->tm_min, tm->tm_sec,
+                                   tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900);
+        }
 
         rhi_texture backbuffer = Rhi::GetTexture(Rhi::GetBackbufferView());
 

@@ -9,7 +9,7 @@ namespace nyla
 namespace Clipboard
 {
 
-auto API Read(span<uint8_t> out) -> uint64_t
+auto API Read(region_alloc &alloc) -> byteview
 {
     // TODO: this needs some love
 

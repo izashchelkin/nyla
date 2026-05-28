@@ -1,3 +1,5 @@
-target_sources(${TARGET} PRIVATE
+﻿target_sources(${TARGET} PRIVATE
     window_manager.cc
+)
+target_sources(${TARGET} PUBLIC
 )

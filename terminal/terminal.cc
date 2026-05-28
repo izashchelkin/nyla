@@ -6,6 +6,7 @@
 #include "nyla/commons/array.h" // IWYU pragma: keep
 #include "nyla/commons/asset_manager.h"
 #include "nyla/commons/cell_renderer.h"
+#include "nyla/commons/clipboard.h"
 #include "nyla/commons/debug_text_renderer.h"
 #include "nyla/commons/dev_assets.h"
 #include "nyla/commons/dev_shaders.h"
@@ -456,7 +457,7 @@ void UserMain()
             if (ev.key == KeyPhysical::V && (ev.mods & KeyMod::Ctrl) && (ev.mods & KeyMod::Shift))
             {
                 region_alloc tmp = RegionAlloc::Create(1_MiB, 0);
-                byteview clip = WinGetClipboard(tmp);
+                byteview clip = Clipboard::Read(tmp);
                 if (clip.size > 0)
                     PlatformPty::Write(*pty, clip);
                 RegionAlloc::Destroy(tmp);

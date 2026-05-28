@@ -22,4 +22,9 @@ constexpr auto CeilDiv(uint64_t a, uint64_t b) -> uint64_t
     return (a + b - 1) / b;
 }
 
+template <typename T> constexpr auto Abs(const T &val)
+{
+    return val < T(0) ? -val : val;
+}
+
 } // namespace nyla

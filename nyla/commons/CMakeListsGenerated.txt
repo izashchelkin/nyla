@@ -1,4 +1,4 @@
-target_sources(${TARGET} PRIVATE
+﻿target_sources(${TARGET} PRIVATE
     asset_import.cc
     asset_manager.cc
     audio_mixer.cc
@@ -23,8 +23,8 @@ target_sources(${TARGET} PRIVATE
     pipeline_cache.cc
     profiler.cc
     region_alloc.cc
-    render_targets.cc
     renderer.cc
+    render_targets.cc
     sampler_manager.cc
     shader.cc
     spv_shader.cc
@@ -37,8 +37,8 @@ target_sources(${TARGET} PRIVATE
 )
 target_sources(${TARGET} PUBLIC
     align.h
-    array_def.h
     array.h
+    array_def.h
     asset_file_format.h
     asset_import.h
     asset_manager.h
@@ -64,21 +64,21 @@ target_sources(${TARGET} PUBLIC
     elf.h
     engine.h
     entrypoint.h
-    file_utils.h
     file.h
+    file_utils.h
     fmt.h
     gamepad.h
     gltf.h
     gpu_upload.h
-    handle_pool.h
     handle.h
+    handle_pool.h
     hash.h
     hex.h
     inline_path.h
     inline_queue.h
     inline_string.h
-    inline_vec_def.h
     inline_vec.h
+    inline_vec_def.h
     input_manager.h
     intrin.h
     json_parser.h
@@ -95,25 +95,26 @@ target_sources(${TARGET} PUBLIC
     mesh_manager.h
     minmax.h
     pipeline_cache.h
+    platform.h
     platform_dir_watch.h
     platform_pty.h
-    platform.h
     profiler.h
     random.h
-    region_alloc_def.h
     region_alloc.h
-    render_targets.h
-    renderdoc_app.h
+    region_alloc_def.h
     renderdoc.h
+    renderdoc_app.h
     renderer.h
+    render_targets.h
     rhi.h
     sampler_manager.h
     shader.h
-    span_def.h
+    shm_channel.h
     span.h
+    span_def.h
     spv_reader.h
-    spv_shader_enums.h
     spv_shader.h
+    spv_shader_enums.h
     stb_image.h
     stringparser.h
     sync.h
@@ -128,6 +129,7 @@ target_sources(${TARGET} PUBLIC
     ui_imgui.h
     vec.h
     wave.h
+    wm_ipc.h
     word.h
 )
 if (WIN32)
@@ -139,6 +141,7 @@ if (WIN32)
         platform_pty_windows.cc
         platform_windows.cc
         renderdoc_windows.cc
+        shm_channel_windows.cc
         sync_windows.cc
         thread_windows.cc
         time_windows.cc
@@ -158,6 +161,7 @@ else()
         platform_pty_linux.cc
         platform_x11_linux.cc
         renderdoc_linux.cc
+        shm_channel_linux.cc
         sync_linux.cc
         thread_linux.cc
         time_linux.cc

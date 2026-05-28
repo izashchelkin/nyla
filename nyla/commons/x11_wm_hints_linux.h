@@ -85,13 +85,13 @@ inline void Initialize(X11WmHints &h)
         h.iconWindow = 0;
     }
 
-    if (!(h.iconX & X11WmHints::kIconPositionHint))
+    if (!(h.flags & X11WmHints::kIconPositionHint))
     {
         h.iconX = 0;
         h.iconY = 0;
     }
 
-    if (!(h.iconX & X11WmHints::kIconMaskHint))
+    if (!(h.flags & X11WmHints::kIconMaskHint))
     {
         h.iconMask = 0;
     }
