@@ -1,0 +1,10 @@
+scan-path=/home/ihorz
+root-title=Ihor Zashchelkin
+root-desc=public repositories
+css=/cgit.css
+clone-url=https://git.ihorzash.com/$CGIT_REPO_URL git@git.ihorzash.com:$CGIT_REPO_URL
+snapshots=tar.gz zip
+enable-index-owner=1
+readme=:README.md
+readme=:README
+max-stats=quarter

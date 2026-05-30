@@ -1,0 +1,29 @@
+ihorzash.com {
+    root * /var/www/ihorzash.com
+    file_server
+    encode gzip
+}
+
+git.ihorzash.com {
+    handle /cgit.css {
+        root * /var/www/cgit
+        file_server
+    }
+    handle /cgit.png {
+        root * /var/www/cgit
+        file_server
+    }
+    handle /cgit.js {
+        root * /var/www/cgit
+        file_server
+    }
+    handle /favicon.ico {
+        root * /var/www/cgit
+        file_server
+    }
+    handle {
+        reverse_proxy 127.0.0.1:8081 {
+            header_up Host git.ihorzash.com
+        }
+    }
+}
