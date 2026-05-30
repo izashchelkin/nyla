@@ -2,6 +2,7 @@
 
 #include "nyla/commons/mem.h"
 #include "nyla/commons/platform_linux.h" // IWYU pragma: keep
+#include "nyla/commons/region_alloc.h"
 
 namespace nyla
 {

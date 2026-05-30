@@ -88,6 +88,24 @@ struct window_stack
     static inline constexpr decltype(flags) FlagCenterScroll = 1 << 1;
 };
 
+// ─── NET WM constants ───────────────────────────────────────────────────────
+
+enum NetWmMoveresizeDirection : uint32_t
+{
+    MoveresizeSizeTopLeft = 0,
+    MoveresizeSizeTop = 1,
+    MoveresizeSizeTopRight = 2,
+    MoveresizeSizeRight = 3,
+    MoveresizeSizeBottomRight = 4,
+    MoveresizeSizeBottom = 5,
+    MoveresizeSizeBottomLeft = 6,
+    MoveresizeSizeLeft = 7,
+    MoveresizeMove = 8,
+    MoveresizeSizeKeyboard = 9,
+    MoveresizeMoveKeyboard = 10,
+    MoveresizeCancel = 11,
+};
+
 struct pending_property
 {
     xcb_atom_t atom;
@@ -100,7 +118,8 @@ struct window_data_entry
     uint32_t borderWidth;
     uint32_t maxWidth;
     uint32_t maxHeight;
-    uint32_t desiredWidth; // pixel width, capped to viewport width (default 1280)
+    uint32_t desiredWidth; // Current pixel width on screen
+    uint32_t baseWidth;    // Original 1× width, stable reference for tier computation
     Rect rect;             // Current on-screen position
     inline_string<64> name;
     inline_vec<xcb_window_t, 8> subwindows;
@@ -126,6 +145,8 @@ struct restore_entry
     xcb_window_t window;
     uint8_t stackIndex;
     uint8_t position; // index within the stack's windows list
+    uint32_t desiredWidth;
+    uint32_t baseWidth;
 };
 
 struct window_manager
@@ -138,8 +159,17 @@ struct window_manager
     bool restoreHasData; // true until deferred restore completes
 
     uint32_t barHeight;
+    uint64_t lastRandRRefreshMs;
     xcb_window_t lastEnteredWindow;
     xcb_get_input_focus_cookie_t focusCheckCookie;
+
+    // _NET_WM_MOVERESIZE grab state
+    bool moveresizeActive;
+    xcb_window_t moveresizeWindow;
+    int32_t moveresizeOrigPointerX;
+    uint32_t moveresizeOrigWidth;
+    uint32_t moveresizeSnappedWidth;
+    NetWmMoveresizeDirection moveresizeDirection;
 
     array<window_stack, 9> stacks;
     inline_vec<xcb_window_t, 64> pendingClients;
@@ -153,7 +183,7 @@ struct window_manager
     window_index_entry *index;
     window_data_entry *data;
 
-    shm_channel *ipcChannel;
+    shm_channel *ipcChannel = nullptr;
 };
 
 window_manager *wm;
@@ -318,6 +348,19 @@ void ManageClient(xcb_window_t clientWindow)
     if (FindIndex(clientWindow))
         return;
 
+    // Read existing window attributes to both (a) skip INPUT_ONLY windows
+    // that would appear as ghost slots (e.g. _NET_SUPPORTING_WM_CHECK) and
+    // (b) preserve the client's own event selections when we set the WM mask.
+    xcb_get_window_attributes_cookie_t attrCookie = xcb_get_window_attributes(X11GetConn(), clientWindow);
+    xcb_get_window_attributes_reply_t *attr = xcb_get_window_attributes_reply(X11GetConn(), attrCookie, nullptr);
+    if (!attr)
+        return;
+    if (attr->_class == XCB_WINDOW_CLASS_INPUT_ONLY)
+    {
+        free(attr);
+        return;
+    }
+
     if (wm->windowCount >= wm->capacity)
         IncreaseCapacity();
 
@@ -325,6 +368,7 @@ void ManageClient(xcb_window_t clientWindow)
     MemZero(&wm->data[i]);
     wm->data[i].window = clientWindow;
     wm->data[i].desiredWidth = kDefaultWindowWidth;
+    wm->data[i].baseWidth = kDefaultWindowWidth;
     uint64_t pos = BinarySearch::LowerBound(span<window_index_entry>{wm->index, (uint64_t)i}, clientWindow,
                                             [](const window_index_entry &e) { return e.window; });
     MemMove(&wm->index[pos + 1], &wm->index[pos], (i - pos) * sizeof(window_index_entry));
@@ -332,8 +376,11 @@ void ManageClient(xcb_window_t clientWindow)
     wm->index[pos].window = clientWindow;
     wm->index[pos].dataEntry = &wm->data[i];
 
-    const uint32_t eventMask =
-        XCB_EVENT_MASK_PROPERTY_CHANGE | XCB_EVENT_MASK_FOCUS_CHANGE | XCB_EVENT_MASK_ENTER_WINDOW;
+    // Set the WM event mask, preserving the client's own selections.
+    // Do NOT clobber the client's mask (e.g. Ghostty needs ButtonPress/PointerMotion).
+    uint32_t eventMask = XCB_EVENT_MASK_PROPERTY_CHANGE | XCB_EVENT_MASK_FOCUS_CHANGE | XCB_EVENT_MASK_ENTER_WINDOW |
+                         XCB_EVENT_MASK_LEAVE_WINDOW | attr->your_event_mask;
+    free(attr);
     xcb_change_window_attributes(X11GetConn(), clientWindow, XCB_CW_EVENT_MASK, &eventMask);
 
     // Hide off-screen immediately to prevent flash at wrong size
@@ -778,7 +825,13 @@ void ToggleFollow()
     wm->borderDirty = true;
 }
 
-void ResizeActive(int32_t delta)
+// Discrete width tiers (no wrap-around, stops at edges):
+//   0.75×  = baseWidth * 3/4
+//   1×     = baseWidth (default)
+//   1.5×   = baseWidth * 3/2  (skipped if >= 80% of viewport)
+//   full   = viewport width
+// Snaps to nearest tier first, then steps by one.
+void ResizeActive(int32_t direction)
 {
     window_stack &stack = GetActiveStack();
     if (!stack.activeWindow)
@@ -786,8 +839,41 @@ void ResizeActive(int32_t delta)
     window_index_entry *idx = FindIndex(stack.activeWindow);
     if (!idx)
         return;
-    int32_t v = (int32_t)idx->dataEntry->desiredWidth + delta;
-    idx->dataEntry->desiredWidth = (uint32_t)Clamp(v, 640, 3840);
+
+    uint32_t viewW = (uint32_t)X11GetMonitorWidth();
+    uint32_t base = idx->dataEntry->baseWidth;
+
+    uint32_t tiers[4];
+    uint32_t nTiers = 0;
+    tiers[nTiers++] = Max(base - base / 4, 320u);
+    tiers[nTiers++] = base;
+    uint32_t mid = Min(base + base / 2, viewW);
+    if (mid < viewW * 4 / 5)
+        tiers[nTiers++] = mid;
+    if (tiers[nTiers - 1] != viewW)
+        tiers[nTiers++] = viewW;
+
+    // Snap to nearest tier
+    int32_t best = 0;
+    {
+        uint32_t cur = idx->dataEntry->desiredWidth;
+        uint32_t bestD = cur < tiers[0] ? tiers[0] - cur : cur - tiers[0];
+        for (uint32_t i = 1; i < nTiers; ++i)
+        {
+            uint32_t d = cur < tiers[i] ? tiers[i] - cur : cur - tiers[i];
+            if (d < bestD)
+            {
+                bestD = d;
+                best = (int32_t)i;
+            }
+        }
+    }
+
+    int32_t next = best + direction;
+    if (next < 0 || next >= (int32_t)nTiers)
+        return;
+
+    idx->dataEntry->desiredWidth = tiers[(uint32_t)next];
     wm->layoutDirty = true;
 }
 
@@ -917,12 +1003,12 @@ void WmProcess(bool &isRunning)
             }
             if (meta && key == KeyPhysical::ArrowLeft)
             {
-                ResizeActive(-80);
+                ResizeActive(-1);
                 break;
             }
             if (meta && key == KeyPhysical::ArrowRight)
             {
-                ResizeActive(80);
+                ResizeActive(1);
                 break;
             }
             if (meta && key == KeyPhysical::Backspace)
@@ -950,6 +1036,50 @@ void WmProcess(bool &isRunning)
             break;
         }
 
+        case XCB_CLIENT_MESSAGE: {
+            auto *cm = reinterpret_cast<xcb_client_message_event_t *>(event);
+            if (cm->type == X11GetAtoms().net_wm_moveresize)
+            {
+                if (!wm->moveresizeActive)
+                {
+                    xcb_window_t clientWin = cm->window;
+                    window_index_entry *idx = FindIndex(clientWin);
+                    if (idx)
+                    {
+                        int32_t direction = cm->data.data32[2];
+                        if (direction == MoveresizeCancel)
+                            break;
+
+                        // Only handle horizontal resize edges
+                        if (direction == MoveresizeSizeRight || direction == MoveresizeSizeLeft ||
+                            direction == MoveresizeSizeTopRight || direction == MoveresizeSizeBottomRight ||
+                            direction == MoveresizeSizeTopLeft || direction == MoveresizeSizeBottomLeft)
+                        {
+                            wm->moveresizeActive = true;
+                            wm->moveresizeWindow = clientWin;
+                            wm->moveresizeDirection = static_cast<NetWmMoveresizeDirection>(direction);
+                            wm->moveresizeOrigWidth = idx->dataEntry->desiredWidth;
+                            wm->moveresizeSnappedWidth = ((idx->dataEntry->desiredWidth + 80) / 160) * 160;
+                            wm->moveresizeOrigPointerX = cm->data.data32[0];
+
+                            // Grab pointer — motion/button events go to WM
+                            xcb_grab_pointer_cookie_t grabCookie = xcb_grab_pointer(
+                                X11GetConn(), false, X11GetRoot(),
+                                XCB_EVENT_MASK_BUTTON_RELEASE | XCB_EVENT_MASK_POINTER_MOTION, XCB_GRAB_MODE_ASYNC,
+                                XCB_GRAB_MODE_ASYNC, X11GetRoot(), XCB_NONE, XCB_CURRENT_TIME);
+                            auto *grabReply = xcb_grab_pointer_reply(X11GetConn(), grabCookie, nullptr);
+                            if (grabReply && grabReply->status != XCB_GRAB_STATUS_SUCCESS)
+                                wm->moveresizeActive = false;
+                            free(grabReply);
+                        }
+                    }
+                }
+                break;
+            }
+            // Fall through to property notify for other client messages
+            [[fallthrough]];
+        }
+
         case XCB_PROPERTY_NOTIFY: {
             auto *pn = reinterpret_cast<xcb_property_notify_event_t *>(event);
             window_index_entry *idx = FindIndex(pn->window);
@@ -963,6 +1093,9 @@ void WmProcess(bool &isRunning)
             window_index_entry *idx = FindIndex(cr->window);
             if (idx)
             {
+                // For managed windows: request a synthetic ConfigureNotify at frame end.
+                // We don't honor resize-from-border requests (this is a tiling WM),
+                // but the client must get a reply or it blocks forever during interactive resize.
                 idx->flags |= window_index_entry::Flag_WantsConfigureNotify;
             }
             else
@@ -1039,6 +1172,44 @@ void WmProcess(bool &isRunning)
             break;
         }
 
+        case XCB_MOTION_NOTIFY: {
+            if (wm->moveresizeActive)
+            {
+                auto *mn = reinterpret_cast<xcb_motion_notify_event_t *>(event);
+                int32_t delta = (int32_t)(mn->root_x) - wm->moveresizeOrigPointerX;
+                bool fromLeft = wm->moveresizeDirection == MoveresizeSizeLeft ||
+                                wm->moveresizeDirection == MoveresizeSizeTopLeft ||
+                                wm->moveresizeDirection == MoveresizeSizeBottomLeft;
+                if (fromLeft)
+                    delta = -delta;
+
+                int32_t raw = (int32_t)wm->moveresizeOrigWidth + delta;
+                uint32_t snapped = (uint32_t)Clamp((raw + 80) / 160 * 160, 640, 3840);
+                if (snapped != wm->moveresizeSnappedWidth)
+                {
+                    window_index_entry *idx = FindIndex(wm->moveresizeWindow);
+                    if (idx)
+                    {
+                        idx->dataEntry->desiredWidth = snapped;
+                        wm->moveresizeSnappedWidth = snapped;
+                        wm->layoutDirty = true;
+                    }
+                }
+                break;
+            }
+            break;
+        }
+
+        case XCB_BUTTON_RELEASE: {
+            if (wm->moveresizeActive)
+            {
+                wm->moveresizeActive = false;
+                wm->moveresizeWindow = XCB_NONE;
+                xcb_ungrab_pointer(X11GetConn(), XCB_CURRENT_TIME);
+            }
+            break;
+        }
+
         case XCB_ENTER_NOTIFY: {
             wm->lastEnteredWindow = reinterpret_cast<xcb_enter_notify_event_t *>(event)->event;
             break;
@@ -1051,20 +1222,17 @@ void WmProcess(bool &isRunning)
         }
 
         default: {
-            // Handle RandR screen change and notify events (hotplug)
+            // Handle RandR screen change and notify events (hotplug).
+            // Debounce: Xephyr fires a flood of RandR events when the WM
+            // reconfigures CRTCs, creating a feedback loop. Only process
+            // RandR refreshes at most once per second.
             uint32_t randrBase = X11RandRGetEventOffset();
-            if (randrBase)
+            if (randrBase && (eventType == randrBase || eventType == randrBase + 1))
             {
-                if (eventType == randrBase)
+                uint64_t now = GetMonotonicTimeMillis();
+                if (now - wm->lastRandRRefreshMs >= 1000)
                 {
-                    LOG("randr: screen change notify");
-                    if (X11RandRRefreshMonitors())
-                        wm->layoutDirty = true;
-                }
-                else if (eventType == randrBase + 1)
-                {
-                    auto *ge = reinterpret_cast<xcb_ge_generic_event_t *>(event);
-                    LOG("randr: notify event subcode=%d", ge->event_type);
+                    wm->lastRandRRefreshMs = now;
                     if (X11RandRRefreshMonitors())
                         wm->layoutDirty = true;
                 }
@@ -1197,6 +1365,10 @@ void WmProcess(bool &isRunning)
                 if (!re)
                     continue;
 
+                // Restore saved widths
+                data.desiredWidth = re->desiredWidth;
+                data.baseWidth = re->baseWidth;
+
                 // Remove from current stack (if any)
                 window_stack &curStack = wm->stacks[wm->activeStackIndex];
                 xcb_window_t *pos = InlineVec::Find(curStack.windows, data.window);
@@ -1221,7 +1393,7 @@ void WmProcess(bool &isRunning)
                     continue;
 
                 // Collect current windows for this stack
-                inline_vec<xcb_window_t, 64> unsorted;
+                inline_vec<xcb_window_t, 64> unsorted{};
                 for (uint64_t j = 0; j < n; ++j)
                     InlineVec::Append(unsorted, stk.windows[j]);
 
@@ -1578,6 +1750,30 @@ void WmProcess(bool &isRunning)
         idx.flags &= ~window_index_entry::Flag_WantsConfigureNotify;
     }
 
+    // Re-assert WM event mask on all managed windows.
+    // GDK's gdk_x11_event_source_select_events calls XSelectInput which
+    // REPLACES the event mask. Can happen at any time (clipboard, DnD,
+    // subwindow setup), silently removing FOCUS_CHANGE etc. that the WM
+    // needs for focus tracking.
+    {
+        constexpr uint32_t kWmEventMask = XCB_EVENT_MASK_PROPERTY_CHANGE | XCB_EVENT_MASK_FOCUS_CHANGE |
+                                          XCB_EVENT_MASK_ENTER_WINDOW | XCB_EVENT_MASK_LEAVE_WINDOW;
+        for (uint32_t i = 0; i < wm->windowCount; ++i)
+        {
+            xcb_get_window_attributes_reply_t *ar = xcb_get_window_attributes_reply(
+                X11GetConn(), xcb_get_window_attributes(X11GetConn(), wm->index[i].window), nullptr);
+            if (ar)
+            {
+                if ((ar->your_event_mask & kWmEventMask) != kWmEventMask)
+                {
+                    uint32_t mask = kWmEventMask | ar->your_event_mask;
+                    xcb_change_window_attributes(X11GetConn(), wm->index[i].window, XCB_CW_EVENT_MASK, &mask);
+                }
+                free(ar);
+            }
+        }
+    }
+
     // Publish current state to the overlay via shared memory
     if (wm->ipcChannel)
     {
@@ -1607,7 +1803,7 @@ void WmProcess(bool &isRunning)
 
 static constexpr const char *kStateFilePath = "/tmp/nyla_wm_state";
 static constexpr uint32_t kStateMagic = 0x4E594C41; // "NYLA"
-static constexpr uint32_t kStateVersion = 2;
+static constexpr uint32_t kStateVersion = 3;
 
 // Write current WM state to disk so it can be restored on restart.
 // On error, leaves a clean empty state file so the next startup doesn't crash.
@@ -1639,6 +1835,20 @@ void WmSerialize()
         writeU8(winCount);
         for (uint64_t j = 0; j < stack.windows.size; ++j)
             writeU32((uint32_t)stack.windows[j]);
+        for (uint64_t j = 0; j < stack.windows.size; ++j)
+        {
+            window_index_entry *idx = FindIndex(stack.windows[j]);
+            if (idx)
+            {
+                writeU32(idx->dataEntry->desiredWidth);
+                writeU32(idx->dataEntry->baseWidth);
+            }
+            else
+            {
+                writeU32(kDefaultWindowWidth);
+                writeU32(kDefaultWindowWidth);
+            }
+        }
 
         uint8_t histCount = (uint8_t)stack.focusHistory.size;
         writeU8(histCount);
@@ -1736,8 +1946,28 @@ void WmDeserialize()
             xcb_window_t xid = (xcb_window_t)readU32();
             if (xid != 0 && InlineVec::Size(wm->restoreMap) < InlineVec::Capacity(wm->restoreMap))
             {
-                restore_entry e = {xid, (uint8_t)s, j};
+                restore_entry e = {xid, (uint8_t)s, j, kDefaultWindowWidth, kDefaultWindowWidth};
                 InlineVec::Append(wm->restoreMap, e);
+            }
+        }
+        // v3+: per-window desiredWidth and baseWidth
+        if (savedVersion >= 3)
+        {
+            for (uint8_t j = 0; j < winCount; ++j)
+            {
+                if (pos + 8 > len)
+                    return;
+                uint32_t w = readU32();
+                uint32_t b = readU32();
+                for (uint64_t k = 0; k < wm->restoreMap.size; ++k)
+                {
+                    if (wm->restoreMap[k].stackIndex == (uint8_t)s && wm->restoreMap[k].position == j)
+                    {
+                        wm->restoreMap[k].desiredWidth = w;
+                        wm->restoreMap[k].baseWidth = b;
+                        break;
+                    }
+                }
             }
         }
 
@@ -1766,6 +1996,13 @@ void WmDeserialize()
 
 void WmRestart()
 {
+    if (wm->moveresizeActive)
+    {
+        xcb_ungrab_pointer(X11GetConn(), XCB_CURRENT_TIME);
+        wm->moveresizeActive = false;
+        wm->moveresizeWindow = XCB_NONE;
+    }
+
     WmSerialize();
 
     // Release X11 grab and disconnect — the .xinitrc loop will restart us.
@@ -1782,6 +2019,8 @@ void WmRestart()
 
 void WmInit()
 {
+    fprintf(stderr, "[wm] WmInit begin\n");
+    fflush(stderr);
     wm->barHeight = 20;
 
     // Only apply defaults to stacks that weren't populated by WmDeserialize
@@ -1802,7 +2041,45 @@ void WmInit()
         ASSERT(false && "another wm is already running");
     }
 
-    X11Grab();
+    wm->moveresizeActive = false;
+
+    // ─── EWMH _NET_SUPPORTING_WM_CHECK ─────────────────────────────────────
+    // Create an invisible check window. Set its own atom to point to itself,
+    // and set the root atom to point to it. This is the standard EWMH
+    // WM detection protocol. Without this, GDK's
+    // gdk_x11_screen_supports_net_wm_hint() returns FALSE immediately.
+    {
+        xcb_window_t checkWin = xcb_generate_id(X11GetConn());
+        xcb_create_window(X11GetConn(), XCB_COPY_FROM_PARENT, checkWin, X11GetRoot(), 0, 0, 1, 1, 0,
+                          XCB_WINDOW_CLASS_INPUT_ONLY, XCB_COPY_FROM_PARENT, 0, nullptr);
+        xcb_map_window(X11GetConn(), checkWin);
+
+        // Set _NET_WM_NAME so tools can identify this WM
+        static const char k_WMName[] = "nyla-wm";
+        xcb_change_property(X11GetConn(), XCB_PROP_MODE_REPLACE, checkWin, X11GetAtoms().net_wm_name,
+                            X11GetAtoms().utf8_string, 8, sizeof(k_WMName) - 1, k_WMName);
+
+        // Self-referencing: checkWin._NET_SUPPORTING_WM_CHECK = checkWin
+        xcb_change_property(X11GetConn(), XCB_PROP_MODE_REPLACE, checkWin, X11GetAtoms().net_supporting_wm_check,
+                            XCB_ATOM_WINDOW, 32, 1, &checkWin);
+        // Root._NET_SUPPORTING_WM_CHECK = checkWin
+        xcb_change_property(X11GetConn(), XCB_PROP_MODE_REPLACE, X11GetRoot(), X11GetAtoms().net_supporting_wm_check,
+                            XCB_ATOM_WINDOW, 32, 1, &checkWin);
+    }
+
+    // ─── EWMH _NET_SUPPORTED ───────────────────────────────────────────────
+    // Advertise which EWMH features we implement.
+    {
+        const xcb_atom_t supportedAtoms[] = {X11GetAtoms().net_wm_moveresize};
+        xcb_change_property(X11GetConn(), XCB_PROP_MODE_REPLACE, X11GetRoot(), X11GetAtoms().net_supported,
+                            XCB_ATOM_ATOM, 32, sizeof(supportedAtoms) / sizeof(xcb_atom_t), supportedAtoms);
+    }
+
+    fprintf(stderr, "[wm] WmInit: X11Grab (skipped for test)\n");
+    fflush(stderr);
+    // X11Grab();
+    fprintf(stderr, "[wm] WmInit: X11Grab done, querying tree\n");
+    fflush(stderr);
 
     xcb_query_tree_reply_t *treeReply =
         xcb_query_tree_reply(X11GetConn(), xcb_query_tree(X11GetConn(), X11GetRoot()), nullptr);
@@ -1818,7 +2095,8 @@ void WmInit()
                 xcb_get_window_attributes_reply(X11GetConn(), xcb_get_window_attributes(X11GetConn(), w), nullptr);
             if (!attrReply)
                 continue;
-            bool skip = attrReply->override_redirect || attrReply->map_state == XCB_MAP_STATE_UNMAPPED;
+            bool skip = attrReply->override_redirect || attrReply->map_state == XCB_MAP_STATE_UNMAPPED ||
+                        attrReply->_class == XCB_WINDOW_CLASS_INPUT_ONLY;
             free(attrReply);
             if (skip)
                 continue;
@@ -1863,8 +2141,12 @@ void WmInit()
     grabKey(1, 0, 0, 0, KeyPhysical::ArrowRight);
     grabKey(1, 0, 0, 1, KeyPhysical::R);
 
+    fprintf(stderr, "[wm] WmInit: X11Flush\n");
+    fflush(stderr);
     X11Flush();
-    X11Ungrab();
+    // X11Ungrab();
+    fprintf(stderr, "[wm] WmInit: X11Ungrab done (skipped for test)\n");
+    fflush(stderr);
 }
 
 } // namespace
@@ -1886,41 +2168,57 @@ void UserMain()
     wm->data = (window_data_entry *)(wm->index + wm->capacity);
     CommitMemPages(wm->memory.data, (uint8_t *)(wm->data + wm->capacity) - wm->memory.data);
 
+    fprintf(stderr, "[wm] WmDeserialize start\n");
+    fflush(stderr);
     WmDeserialize();
+    fprintf(stderr, "[wm] WmDeserialize done\n");
+    fflush(stderr);
     WmInit();
+    fprintf(stderr, "[wm] WmInit returned, entering main loop\n");
+    fflush(stderr);
 
-    wm->ipcChannel = ShmChannel::CreateWriter("nyla_wm", sizeof(wm_ipc_state), RegionAlloc::g_BootstrapAlloc);
+    // IPC channel — suppressed when NYLA_WM_NO_DAEMONS=1 (test harness)
+    // to avoid the test WM writing to the host's /dev/shm/nyla_wm and
+    // corrupting the real wm_overlay's status bar.
+    if (!getenv("NYLA_WM_NO_DAEMONS"))
+        wm->ipcChannel = ShmChannel::CreateWriter("nyla_wm", sizeof(wm_ipc_state), RegionAlloc::g_BootstrapAlloc);
 
-    // Launch overlay (best-effort). Resolve wm_overlay path relative to wm binary.
-    (void)!system("pkill wm_overlay 2>/dev/null");
+    // Launch overlay and daemons (best-effort, non-blocking).
+    // Suppressed when NYLA_WM_NO_DAEMONS=1 (test harness).
+    if (!getenv("NYLA_WM_NO_DAEMONS"))
     {
-        char wmPath[256];
-        ssize_t len = readlink("/proc/self/exe", wmPath, sizeof(wmPath) - 1);
-        if (len > 0)
+        // Launch overlay. Resolve wm_overlay path relative to wm binary.
+        (void)!system("pkill wm_overlay 2>/dev/null");
         {
-            wmPath[len] = '\0';
-            // Find last '/' to get the directory
-            char *lastSlash = strrchr(wmPath, '/');
-            if (lastSlash)
+            char wmPath[256];
+            ssize_t len = readlink("/proc/self/exe", wmPath, sizeof(wmPath) - 1);
+            if (len > 0)
             {
-                *lastSlash = '\0';
-                char overlayPath[320];
-                snprintf(overlayPath, sizeof(overlayPath), "%s/wm_overlay", wmPath);
-                const char *const overlayCmd[] = {overlayPath, nullptr};
-                Spawn({overlayCmd, 2});
+                wmPath[len] = '\0';
+                // Find last '/' to get the directory
+                char *lastSlash = strrchr(wmPath, '/');
+                if (lastSlash)
+                {
+                    *lastSlash = '\0';
+                    char overlayPath[320];
+                    snprintf(overlayPath, sizeof(overlayPath), "%s/wm_overlay", wmPath);
+                    const char *const overlayCmd[] = {overlayPath, nullptr};
+                    Spawn({overlayCmd, 2});
+                }
             }
         }
-    }
 
-    // Launch startup daemons (best-effort, non-blocking).
-    (void)!system("pkill dunst 2>/dev/null");
-    {
-        const char *const dunstCmd[] = {"dunst", nullptr};
-        Spawn({dunstCmd, 2});
-    }
-    {
-        const char *const redshiftCmd[] = {"redshift", "-l", "49:8", nullptr};
-        Spawn({redshiftCmd, 4});
+        // Launch startup daemons.
+        (void)!system("pkill dunst 2>/dev/null");
+        {
+            const char *const dunstCmd[] = {"dunst", nullptr};
+            Spawn({dunstCmd, 2});
+        }
+        (void)!system("pkill redshift 2>/dev/null");
+        {
+            const char *const redshiftCmd[] = {"redshift", "-l", "49:8", nullptr};
+            Spawn({redshiftCmd, 4});
+        }
     }
 
     bool isRunning = true;

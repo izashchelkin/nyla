@@ -40,7 +40,7 @@ struct audio_state
 {
     handle_pool<voice, voice_data, 64> voices;
     handle_pool<audio_clip_handle, clip_slot, 64> clips;
-    mutex *mutex;
+    nyla::mutex *mtx;
     uint32_t deviceSampleRate;
     uint32_t deviceChannels;
     float masterVolume;
@@ -49,7 +49,7 @@ audio_state *manager;
 
 void MixCallback(void *, int16_t *out, uint32_t numFrames)
 {
-    Mutex::Lock(*manager->mutex);
+    Mutex::Lock(*manager->mtx);
 
     const uint32_t outCh = manager->deviceChannels;
     const float master = manager->masterVolume;
@@ -116,7 +116,7 @@ void MixCallback(void *, int16_t *out, uint32_t numFrames)
         }
     }
 
-    Mutex::Unlock(*manager->mutex);
+    Mutex::Unlock(*manager->mtx);
 }
 
 } // namespace
@@ -129,7 +129,7 @@ void API Bootstrap(uint32_t sampleRate, uint32_t channels, uint32_t latencyUs)
     ASSERT(!manager);
 
     manager = &RegionAlloc::Alloc<audio_state>(RegionAlloc::g_BootstrapAlloc);
-    manager->mutex = Mutex::Create(RegionAlloc::g_BootstrapAlloc);
+    manager->mtx = Mutex::Create(RegionAlloc::g_BootstrapAlloc);
     manager->deviceSampleRate = sampleRate;
     manager->deviceChannels = channels;
     manager->masterVolume = 1.f;
@@ -165,7 +165,7 @@ void API Shutdown()
         return;
 
     AudioBackend::Destroy();
-    Mutex::Destroy(*manager->mutex);
+    Mutex::Destroy(*manager->mtx);
 }
 
 auto API LoadWav(byteview wavBlob) -> audio_clip
@@ -194,9 +194,9 @@ auto API Play(const audio_clip &clip, const AudioPlayDesc &desc) -> voice
         .loop = desc.loop,
     };
 
-    Mutex::Lock(*manager->mutex);
+    Mutex::Lock(*manager->mtx);
     voice v = HandlePool::Acquire(manager->voices, data);
-    Mutex::Unlock(*manager->mutex);
+    Mutex::Unlock(*manager->mtx);
     return v;
 }
 
@@ -218,36 +218,36 @@ auto API Play(audio_clip_handle h, const AudioPlayDesc &desc) -> voice
 
 void API Stop(voice v)
 {
-    Mutex::Lock(*manager->mutex);
+    Mutex::Lock(*manager->mtx);
     handle_slot<voice_data> *slot;
     if (HandlePool::TryResolveSlot(manager->voices, v, slot))
         HandlePool::Free(*slot);
-    Mutex::Unlock(*manager->mutex);
+    Mutex::Unlock(*manager->mtx);
 }
 
 void API SetVolume(voice v, float volume)
 {
-    Mutex::Lock(*manager->mutex);
+    Mutex::Lock(*manager->mtx);
     handle_slot<voice_data> *slot;
     if (HandlePool::TryResolveSlot(manager->voices, v, slot))
         slot->data.volume = volume;
-    Mutex::Unlock(*manager->mutex);
+    Mutex::Unlock(*manager->mtx);
 }
 
 auto API IsPlaying(voice v) -> bool
 {
-    Mutex::Lock(*manager->mutex);
+    Mutex::Lock(*manager->mtx);
     handle_slot<voice_data> *slot;
     bool playing = HandlePool::TryResolveSlot(manager->voices, v, slot);
-    Mutex::Unlock(*manager->mutex);
+    Mutex::Unlock(*manager->mtx);
     return playing;
 }
 
 void API SetMasterVolume(float volume)
 {
-    Mutex::Lock(*manager->mutex);
+    Mutex::Lock(*manager->mtx);
     manager->masterVolume = volume;
-    Mutex::Unlock(*manager->mutex);
+    Mutex::Unlock(*manager->mtx);
 }
 
 } // namespace Audio

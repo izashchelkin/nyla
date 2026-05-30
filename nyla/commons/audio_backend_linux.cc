@@ -1,9 +1,9 @@
-#include "nyla/commons/platform_audio.h"
+#include "nyla/commons/audio_backend.h"
+#include "nyla/commons/thread.h"
 
 #include "nyla/commons/fmt.h"
 #include "nyla/commons/intrin.h"
 #include "nyla/commons/macros.h"
-#include "nyla/commons/platform_thread.h"
 #include "nyla/commons/region_alloc.h"
 
 #include <alsa/asoundlib.h>
@@ -21,56 +21,52 @@ constexpr uint32_t kMaxChannels = 8;
 struct platform_audio
 {
     snd_pcm_t *pcm;
-    PlatformAudioCallback callback;
-    void *user;
+    audio_backend_callback callback;
+    void *userdata;
     uint32_t sampleRate;
     uint32_t channels;
-    thread *thread;
+    thread *thrd;
     uint32_t running;
     int16_t scratch[kMaxFramesPerWrite * kMaxChannels];
 };
-platform_audio *audio;
+platform_audio *backend;
 
 void FeederMain(void *)
 {
-    while (AtomicLoad32(&audio->running))
+    while (AtomicLoad32(&backend->running))
     {
-        snd_pcm_sframes_t avail = snd_pcm_avail(audio->pcm);
+        snd_pcm_sframes_t avail = snd_pcm_avail(backend->pcm);
         if (avail < 0)
         {
-            int rc = snd_pcm_recover(audio->pcm, (int)avail, 1);
+            int rc = snd_pcm_recover(backend->pcm, (int)avail, 1);
             if (rc < 0)
                 break;
             continue;
         }
-
         if (avail == 0)
         {
-            int rc = snd_pcm_wait(audio->pcm, 100);
+            int rc = snd_pcm_wait(backend->pcm, 100);
             if (rc < 0)
             {
-                if (snd_pcm_recover(audio->pcm, rc, 1) < 0)
+                if (snd_pcm_recover(backend->pcm, rc, 1) < 0)
                     break;
             }
             continue;
         }
-
         uint32_t want = (uint32_t)avail;
         if (want > kMaxFramesPerWrite)
             want = kMaxFramesPerWrite;
+        backend->callback(backend->userdata, backend->scratch, want);
 
-        audio->callback(audio->user, audio->scratch, want);
-
-        const uint8_t *p = (const uint8_t *)audio->scratch;
+        const uint8_t *p = (const uint8_t *)backend->scratch;
         uint32_t framesLeft = want;
-        const uint32_t frameSize = audio->channels * sizeof(int16_t);
-
-        while (framesLeft > 0 && AtomicLoad32(&audio->running))
+        const uint32_t frameSize = backend->channels * sizeof(int16_t);
+        while (framesLeft > 0 && AtomicLoad32(&backend->running))
         {
-            snd_pcm_sframes_t written = snd_pcm_writei(audio->pcm, p, framesLeft);
+            snd_pcm_sframes_t written = snd_pcm_writei(backend->pcm, p, framesLeft);
             if (written < 0)
             {
-                if (snd_pcm_recover(audio->pcm, (int)written, 1) < 0)
+                if (snd_pcm_recover(backend->pcm, (int)written, 1) < 0)
                     return;
                 break;
             }
@@ -82,29 +78,29 @@ void FeederMain(void *)
 
 } // namespace
 
-namespace PlatformAudio
+namespace AudioBackend
 {
 
-void API Init(const PlatformAudioInitDesc &desc)
+void API Init(const audio_backend_settings &desc)
 {
-    ASSERT(!audio);
+    ASSERT(!backend);
     ASSERT(desc.channels <= kMaxChannels);
     ASSERT(desc.callback);
 
-    audio = &RegionAlloc::Alloc<platform_audio>(RegionAlloc::g_BootstrapAlloc);
-    audio->callback = desc.callback;
-    audio->user = desc.user;
-    audio->sampleRate = desc.sampleRate;
-    audio->channels = desc.channels;
+    backend = &RegionAlloc::Alloc<platform_audio>(RegionAlloc::g_BootstrapAlloc);
+    backend->callback = desc.callback;
+    backend->userdata = desc.userdata;
+    backend->sampleRate = desc.sampleRate;
+    backend->channels = desc.channels;
 
-    int res = snd_pcm_open(&audio->pcm, "default", SND_PCM_STREAM_PLAYBACK, 0);
+    int res = snd_pcm_open(&backend->pcm, "default", SND_PCM_STREAM_PLAYBACK, 0);
     if (res != 0)
     {
         LOG("snd_pcm_open: %s", snd_strerror(res));
         ASSERT(false);
     }
 
-    res = snd_pcm_set_params(audio->pcm, SND_PCM_FORMAT_S16_LE, SND_PCM_ACCESS_RW_INTERLEAVED, desc.channels,
+    res = snd_pcm_set_params(backend->pcm, SND_PCM_FORMAT_S16_LE, SND_PCM_ACCESS_RW_INTERLEAVED, desc.channels,
                              desc.sampleRate, 1, desc.latencyUs);
     if (res != 0)
     {
@@ -112,41 +108,36 @@ void API Init(const PlatformAudioInitDesc &desc)
         ASSERT(false);
     }
 
-    AtomicStore32(&audio->running, 1);
-    audio->thread = PlatformThread::Create(RegionAlloc::g_BootstrapAlloc, &FeederMain, nullptr);
-    PlatformThread::SetName(*audio->thread, "nyla-audio");
+    AtomicStore32(&backend->running, 1);
+    backend->thrd = Thread::Create(RegionAlloc::g_BootstrapAlloc, &FeederMain, nullptr);
+    Thread::SetName(*backend->thrd, "nyla-audio");
 }
 
 void API Destroy()
 {
-    if (!audio)
+    if (!backend)
         return;
-
-    AtomicStore32(&audio->running, 0);
-
-    if (audio->pcm)
-        snd_pcm_drop(audio->pcm);
-
-    if (audio->thread)
-        PlatformThread::Join(*audio->thread);
-
-    if (audio->pcm)
+    AtomicStore32(&backend->running, 0);
+    if (backend->pcm)
+        snd_pcm_drop(backend->pcm);
+    if (backend->thrd)
+        Thread::Join(*backend->thrd);
+    if (backend->pcm)
     {
-        snd_pcm_close(audio->pcm);
-        audio->pcm = nullptr;
+        snd_pcm_close(backend->pcm);
+        backend->pcm = nullptr;
     }
 }
 
 auto API GetSampleRate() -> uint32_t
 {
-    return audio->sampleRate;
+    return backend->sampleRate;
 }
-
 auto API GetChannels() -> uint32_t
 {
-    return audio->channels;
+    return backend->channels;
 }
 
-} // namespace PlatformAudio
+} // namespace AudioBackend
 
 } // namespace nyla

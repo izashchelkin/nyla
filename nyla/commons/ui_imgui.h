@@ -136,6 +136,11 @@ struct ui_state
     bool textWidgetFocused; // any TextInput owns focus this frame; gates global action keys
     byteview textChars;
 
+    // Wheel edge booleans — set in Begin from pointerPress bits (3=up, 4=down),
+    // consumed by the first scrollable child that reads them.
+    bool wheelEdgeUp;
+    bool wheelEdgeDn;
+
     uint32_t viewportCols;
     uint32_t viewportRows;
     int32_t cursorX, cursorY;
@@ -158,6 +163,11 @@ struct ui_state
     int32_t savedLineStartX;
     int32_t savedLineH;
     bool savedPointerSuppress;
+
+    // Child cursor restore — updated by BeginChild, consumed by EndChild.
+    // Separate from savedCursorX/Y (which belongs to window save/restore)
+    // so a child nested inside a window doesn't corrupt the window's own save.
+    int32_t childEndX, childEndY;
 
     // List pool. Slots only exist to thread prev-frame item ranges into BeginList for
     // focus-id → fIdx mapping; no persistent ui_state outside the slot.
@@ -228,7 +238,17 @@ struct ui_list_row_result
 //   kWindowFlagModal: while painted, this window is the active modal. Forces top z each
 //   frame, gates background widgets (nav/click suppressed), restricts focus cycling to
 //   widgets registered inside the window. Y/N edges flow through Ui::ModalConfirmCancel.
+//   kWindowFlagReposition: re-applies desc.initialX/Y every frame instead of only on first
+//   allocation. Use for windows whose position depends on dynamic layout (e.g. side panels
+//   that move when the viewport resizes).
 inline constexpr uint32_t kWindowFlagModal = 1u << 0;
+inline constexpr uint32_t kWindowFlagReposition = 1u << 1;
+
+// Button flag bits (per-Button, not window flags).
+//   kButtonFlagNoFocus: button stays out of the keyboard focus chain. Activates on
+//   pointer press (not focus-then-release). Use for action buttons that should not
+//   interfere with arrow-key navigation of adjacent lists/selectables.
+inline constexpr uint32_t kButtonFlagNoFocus = 1u << 0;
 
 // Window: persistent draggable panel. See BeginWindow doc inside Ui namespace below.
 struct ui_window_desc
@@ -282,7 +302,7 @@ auto API TextInput(ui_state &s, uint32_t localId, byteview prefix, uint8_t *buf,
 
 // Clickable button. Paints `[ label ]` at cursor with theme.bg + (focused ? theme.focusedFg : restingFg).
 // Registers in the focus chain like Selectable; returns true on the frame navActivate fires while focused.
-auto API Button(ui_state &s, uint32_t localId, byteview label, uint32_t restingFg) -> bool;
+auto API Button(ui_state &s, uint32_t localId, byteview label, uint32_t restingFg, uint32_t flags = 0) -> bool;
 
 // True if any TextInput claimed focus this frame. Use to gate letter-keyed global actions
 // (e.g. don't fire 'S = Save' while typing in a filter).
@@ -308,6 +328,27 @@ void API EndList(ui_state &s, const ui_list_scope &scope);
 // active (painted last frame). Caller drives the open/close lifecycle through their own
 // flag — paint the modal window when wanted, stop painting it on confirm/cancel.
 auto API ModalConfirmCancel(ui_state &s) -> ui_modal_result;
+
+// Child: scrollable sub-region inside a window. Dear ImGui–style BeginChild/EndChild.
+// Resets cursor to (cursorX, cursorY), pushes clip, optionally scrolls via wheel.
+// Caller paints content using the child's cursor. If scrollY is provided, the child
+// consumes wheel edges when pointer is over the child rect, clamps *scrollY to valid
+// range, and the caller iterates [scrollY, scrollY + visibleRows) for visible content.
+struct ui_child_desc
+{
+    int32_t w;            // width in cells; 0 = fill remaining window width
+    int32_t h;            // height in cells; 0 = fill remaining window height
+    uint32_t flags;       // ui_child_flags bitfield
+    uint32_t *scrollY;    // if non-null, region is scrollable; caller-owned
+    uint32_t contentRows; // total content rows; only meaningful when scrollY is set
+};
+
+inline constexpr uint32_t kChildFlagScrollable = 1u << 0;
+inline constexpr uint32_t kChildFlagBorder = 1u << 1;
+inline constexpr uint32_t kChildFlagAutoSizeH = 1u << 2;
+
+auto API BeginChild(ui_state &s, uint32_t localId, const ui_child_desc &desc) -> bool;
+void API EndChild(ui_state &s);
 
 } // namespace Ui
 

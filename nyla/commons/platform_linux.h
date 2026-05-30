@@ -51,6 +51,9 @@ namespace nyla
     X(wm_take_focus, WM_TAKE_FOCUS)                                                                                    \
     X(net_wm_name, _NET_WM_NAME)                                                                                       \
     X(net_wm_pid, _NET_WM_PID)                                                                                         \
+    X(net_supported, _NET_SUPPORTED)                                                                                   \
+    X(net_supporting_wm_check, _NET_SUPPORTING_WM_CHECK)                                                               \
+    X(net_wm_moveresize, _NET_WM_MOVERESIZE)                                                                           \
     X(utf8_string, UTF8_STRING)                                                                                        \
     X(clipboard, CLIPBOARD)                                                                                            \
     X(targets, TARGETS)

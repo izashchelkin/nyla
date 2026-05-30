@@ -1,0 +1,5 @@
+target_sources(${TARGET} PRIVATE
+    git_ui.cc
+)
+target_sources(${TARGET} PUBLIC
+)

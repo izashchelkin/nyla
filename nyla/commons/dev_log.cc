@@ -21,7 +21,7 @@ constexpr inline uint32_t kRingSize = 32;
 
 struct dev_log_state
 {
-    mutex *mutex;
+    nyla::mutex *mtx;
     inline_string<kLineCap> ring[kRingSize];
     uint32_t head;
     uint32_t count;
@@ -37,7 +37,7 @@ namespace DevLog
 void API Bootstrap()
 {
     manager = &RegionAlloc::Alloc<dev_log_state>(RegionAlloc::g_BootstrapAlloc);
-    manager->mutex = Mutex::Create(RegionAlloc::g_BootstrapAlloc);
+    manager->mtx = Mutex::Create(RegionAlloc::g_BootstrapAlloc);
     manager->head = 0;
     manager->count = 0;
 }
@@ -47,13 +47,13 @@ void API Push(byteview line)
     if (!manager)
         return;
 
-    Mutex::Lock(*manager->mutex);
+    Mutex::Lock(*manager->mtx);
     auto &slot = manager->ring[manager->head];
     InlineString::Assign(slot, line);
     manager->head = (manager->head + 1) % kRingSize;
     if (manager->count < kRingSize)
         ++manager->count;
-    Mutex::Unlock(*manager->mutex);
+    Mutex::Unlock(*manager->mtx);
 }
 
 auto API Snapshot(region_alloc &alloc, uint32_t maxLines) -> span<byteview>
@@ -61,7 +61,7 @@ auto API Snapshot(region_alloc &alloc, uint32_t maxLines) -> span<byteview>
     if (!manager)
         return span<byteview>{};
 
-    Mutex::Lock(*manager->mutex);
+    Mutex::Lock(*manager->mtx);
 
     uint32_t n = Min<uint32_t>(maxLines, manager->count);
     span<byteview> out = RegionAlloc::AllocArray<byteview>(alloc, n);
@@ -72,7 +72,7 @@ auto API Snapshot(region_alloc &alloc, uint32_t maxLines) -> span<byteview>
         out.data[i] = RegionAlloc::CopyByteView(alloc, manager->ring[idx]);
     }
 
-    Mutex::Unlock(*manager->mutex);
+    Mutex::Unlock(*manager->mtx);
     return out;
 }
 

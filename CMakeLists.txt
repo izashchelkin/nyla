@@ -76,6 +76,10 @@ file(GLOB_RECURSE NYLA_ALL_CXX_FILES
         "${PROJECT_SOURCE_DIR}/psf2_glsl/*.cc"
         "${PROJECT_SOURCE_DIR}/psf2_glsl/*.h"
         "${PROJECT_SOURCE_DIR}/psf2_glsl/*.hlsl"
+
+        "${PROJECT_SOURCE_DIR}/git_ui/*.cc"
+        "${PROJECT_SOURCE_DIR}/git_ui/*.h"
+        "${PROJECT_SOURCE_DIR}/git_ui/*.hlsl"
 )
 
 add_custom_target(format
@@ -97,3 +101,5 @@ add_subdirectory(wm)
 add_subdirectory(wm_overlay)
 add_subdirectory(screen_inhibitor)
 add_subdirectory(psf2_glsl)
+add_subdirectory(git_ui)
+add_subdirectory(tests/wm)

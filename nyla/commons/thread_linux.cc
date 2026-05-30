@@ -1,4 +1,4 @@
-#include "nyla/commons/platform_thread.h"
+#include "nyla/commons/thread.h"
 
 #include "nyla/commons/fmt.h"
 #include "nyla/commons/region_alloc.h"
@@ -8,14 +8,14 @@
 namespace nyla
 {
 
-struct platform_thread
+struct thread
 {
     pthread_t handle;
-    platform_thread_fn fn;
+    void (*fn)(void *userdata);
     void *userdata;
 };
 
-namespace PlatformThread
+namespace Thread
 {
 
 namespace
@@ -23,16 +23,16 @@ namespace
 
 auto Trampoline(void *arg) -> void *
 {
-    auto *self = static_cast<platform_thread *>(arg);
+    auto *self = static_cast<thread *>(arg);
     self->fn(self->userdata);
     return nullptr;
 }
 
 } // namespace
 
-auto API Create(region_alloc &alloc, platform_thread_fn fn, void *userdata) -> platform_thread *
+auto API Create(region_alloc &alloc, void (*fn)(void *userdata), void *userdata) -> thread *
 {
-    auto &self = RegionAlloc::Alloc<platform_thread>(alloc);
+    auto &self = RegionAlloc::Alloc<thread>(alloc);
     self.fn = fn;
     self.userdata = userdata;
 
@@ -42,17 +42,17 @@ auto API Create(region_alloc &alloc, platform_thread_fn fn, void *userdata) -> p
     return &self;
 }
 
-void API Join(platform_thread &self)
+void API Join(thread &self)
 {
     int res = pthread_join(self.handle, nullptr);
     ASSERT(res == 0);
 }
 
-void API SetName(platform_thread &self, const char *name)
+void API SetName(thread &self, const char *name)
 {
     pthread_setname_np(self.handle, name);
 }
 
-} // namespace PlatformThread
+} // namespace Thread
 
 } // namespace nyla

@@ -134,6 +134,7 @@ void API X11SendConfigureNotify(xcb_window_t window, xcb_window_t parent, int16_
 {
     const xcb_configure_notify_event_t event = {
         .response_type = XCB_CONFIGURE_NOTIFY,
+        .event = window,
         .window = window,
         .x = x,
         .y = y,

@@ -5,10 +5,44 @@
 #include "nyla/commons/hash.h"
 #include "nyla/commons/input_manager.h"
 #include "nyla/commons/keyboard.h"
+#include "nyla/commons/minmax.h"
 #include "nyla/commons/mem.h"
 #include "nyla/commons/tunables.h"
 
-namespace nyla::Ui
+namespace nyla
+{
+
+// ─── Paint backend shim ────────────────────────────────────────────────────
+// All widget painting routes through these functions.
+// Currently wraps CellRenderer; swapping to GPU-native means changing THIS block only.
+namespace UiPaint
+{
+INLINE void Text(uint32_t col, uint32_t row, byteview text, uint32_t fg, uint32_t bg)
+{
+    CellRenderer::Text(col, row, text, fg, bg);
+}
+INLINE void PutCell(uint32_t col, uint32_t row, cell_attr attr)
+{
+    CellRenderer::PutCell(col, row, attr);
+}
+INLINE void PushClip(int32_t col, int32_t row, int32_t w, int32_t h)
+{
+    CellRenderer::PushClip(col, row, w, h);
+}
+INLINE void PopClip()
+{
+    CellRenderer::PopClip();
+}
+// Fill a rectangular region with a solid color using background cells.
+INLINE void FillRect(int32_t col, int32_t row, int32_t w, int32_t h, uint32_t rgba)
+{
+    for (int32_t r = 0; r < h; ++r)
+        for (int32_t c = 0; c < w; ++c)
+            CellRenderer::Text((uint32_t)(col + c), (uint32_t)(row + r), " "_s, rgba, rgba);
+}
+} // namespace UiPaint
+
+namespace Ui
 {
 
 namespace
@@ -274,6 +308,11 @@ void Begin(ui_state &s, const ui_frame_input &in, uint32_t viewportCols, uint32_
     // activeId clear deferred to End(): widgets need s.activeId == id while they evaluate
     // clickActivate this frame; clearing here breaks click-release activation.
 
+    // Wheel edges from pointerPress bits 3 (button 4 = wheel up) and 4 (button 5 = wheel down).
+    // These are consumable — the first scrollable child to use them clears the edge.
+    s.wheelEdgeUp = (s.pointerPress & (1u << 3)) != 0;
+    s.wheelEdgeDn = (s.pointerPress & (1u << 4)) != 0;
+
     // Drag handling — must precede hovered-window compute so the dragged window stays under
     // the pointer. Drag clears on any frame where button 0 isn't held.
     if (s.draggingWindowId != 0)
@@ -426,7 +465,7 @@ void Text(ui_state &s, byteview text, uint32_t fg)
         maxW = 0;
     int32_t printable = text.size < (uint64_t)maxW ? (int32_t)text.size : maxW;
     if (printable > 0 && y >= 0 && y < (int32_t)s.viewportRows)
-        CellRenderer::Text((uint32_t)x, (uint32_t)y, byteview{text.data, (uint64_t)printable}, fg, s.theme.bg);
+        UiPaint::Text((uint32_t)x, (uint32_t)y, byteview{text.data, (uint64_t)printable}, fg, s.theme.bg);
     RecordItem(s, x, y, printable, 1);
     NewLine(s);
 }
@@ -476,9 +515,56 @@ auto SelectableHit(ui_state &s, uint32_t localId, int32_t x, int32_t y, int32_t 
     return r;
 }
 
-auto Button(ui_state &s, uint32_t localId, byteview label, uint32_t restingFg) -> bool
+auto Button(ui_state &s, uint32_t localId, byteview label, uint32_t restingFg, uint32_t flags) -> bool
 {
     uint32_t id = MakeId(s, localId);
+
+    // kButtonFlagNoFocus: skip focus chain registration, activate on press (not release).
+    // Use for action buttons that should stay keyboard-navigation-inert.
+    if (flags & kButtonFlagNoFocus)
+    {
+        int32_t x = s.cursorX;
+        int32_t y = s.cursorY;
+        int32_t maxW = (int32_t)s.viewportCols - x;
+        if (maxW <= 0)
+        {
+            RecordItem(s, x, y, 0, 1);
+            NewLine(s);
+            return false;
+        }
+
+        uint8_t line[128];
+        // Paint as colored background strip + label (no brackets).
+        uint64_t copy = label.size;
+        if (copy > sizeof(line) - 2)
+            copy = sizeof(line) - 2;
+        line[0] = ' ';
+        MemCpy(line + 1, label.data, copy);
+        line[1 + copy] = ' ';
+        uint32_t total = (uint32_t)(2 + copy);
+        if (total > (uint32_t)maxW)
+            total = (uint32_t)maxW;
+
+        bool hover = ItemHitTest(s, x, y, (int32_t)total, 1);
+        bool activated = hover && (s.pointerPress & 1u);
+        if (activated)
+            s.pointerPress &= ~1u;
+
+        if (total > 0 && y >= 0 && y < (int32_t)s.viewportRows)
+        {
+            uint32_t fg = restingFg;
+            uint32_t bg = hover ? restingFg : s.theme.bg;
+            // Fill background strip then paint label inverted on hover
+            UiPaint::Text((uint32_t)x, (uint32_t)y, byteview{line, total},
+                          hover ? s.theme.bg : restingFg,
+                          hover ? restingFg : s.theme.bg);
+        }
+        RecordItem(s, x, y, (int32_t)total, 1);
+        NewLine(s);
+        return activated;
+    }
+
+    // Normal (focusable) button — existing behavior.
     if (s.curCount < ui_state::kItemsMax)
         s.curItems[s.curCount++] = id;
 
@@ -492,15 +578,13 @@ auto Button(ui_state &s, uint32_t localId, byteview label, uint32_t restingFg) -
     uint8_t line[128];
     if (maxW > 0)
     {
-        line[0] = '[';
-        line[1] = ' ';
+        line[0] = ' ';
         uint64_t copy = label.size;
-        if (copy > sizeof(line) - 4)
-            copy = sizeof(line) - 4;
-        MemCpy(line + 2, label.data, copy);
-        line[2 + copy] = ' ';
-        line[3 + copy] = ']';
-        total = (uint32_t)(4 + copy);
+        if (copy > sizeof(line) - 2)
+            copy = sizeof(line) - 2;
+        MemCpy(line + 1, label.data, copy);
+        line[1 + copy] = ' ';
+        total = (uint32_t)(2 + copy);
         if (total > (uint32_t)maxW)
             total = (uint32_t)maxW;
     }
@@ -535,7 +619,7 @@ auto Button(ui_state &s, uint32_t localId, byteview label, uint32_t restingFg) -
         // Mirrors the asset_tool list-row visual so focus is unambiguous regardless of restingFg.
         uint32_t fg = focused ? s.theme.bg : restingFg;
         uint32_t bg = focused ? s.theme.focusedFg : s.theme.bg;
-        CellRenderer::Text((uint32_t)x, (uint32_t)y, byteview{line, total}, fg, bg);
+        UiPaint::Text((uint32_t)x, (uint32_t)y, byteview{line, total}, fg, bg);
     }
     RecordItem(s, x, y, (int32_t)total, 1);
     NewLine(s);
@@ -623,7 +707,7 @@ auto TextInput(ui_state &s, uint32_t localId, byteview prefix, uint8_t *buf, uin
             line[p + copy] = '_';
         uint32_t printable = (uint32_t)maxW < sizeof(line) ? (uint32_t)maxW : (uint32_t)sizeof(line);
         uint32_t fg = r.focused ? s.theme.focusedFg : restingFg;
-        CellRenderer::Text((uint32_t)x, (uint32_t)y, byteview{line, printable}, fg, s.theme.bg);
+        UiPaint::Text((uint32_t)x, (uint32_t)y, byteview{line, printable}, fg, s.theme.bg);
         paintedW = (int32_t)printable;
     }
     RecordItem(s, x, y, paintedW, 1);
@@ -682,6 +766,11 @@ auto BeginWindow(ui_state &s, uint32_t localId, const ui_window_desc &desc) -> b
     slot->flags = desc.flags;
     slot->w = desc.w;
     slot->h = desc.h;
+    if (desc.flags & kWindowFlagReposition)
+    {
+        slot->x = desc.initialX;
+        slot->y = desc.initialY;
+    }
     slot->openedJustNow = !slot->wasPresentLastFrame;
     slot->presentThisFrame = true;
     if (desc.flags & kWindowFlagModal)
@@ -726,7 +815,7 @@ auto BeginWindow(ui_state &s, uint32_t localId, const ui_window_desc &desc) -> b
         if (ty >= 0 && ty < (int32_t)s.viewportRows && endCol > startCol)
         {
             int32_t skip = startCol - tx;
-            CellRenderer::Text((uint32_t)startCol, (uint32_t)ty, byteview{line + skip, (uint64_t)(endCol - startCol)},
+            UiPaint::Text((uint32_t)startCol, (uint32_t)ty, byteview{line + skip, (uint64_t)(endCol - startCol)},
                                s.theme.bg, s.theme.focusedFg);
         }
     }
@@ -747,12 +836,12 @@ auto BeginWindow(ui_state &s, uint32_t localId, const ui_window_desc &desc) -> b
             if (row < 0 || row >= (int32_t)s.viewportRows)
                 continue;
             if (endCol > startCol)
-                CellRenderer::Text((uint32_t)startCol, (uint32_t)row,
+                UiPaint::Text((uint32_t)startCol, (uint32_t)row,
                                    byteview{line + skip, (uint64_t)(endCol - startCol)}, s.theme.focusedFg, s.theme.bg);
         }
     }
 
-    CellRenderer::PushClip(slot->x, slot->y + 1, slot->w, slot->h);
+    UiPaint::PushClip(slot->x, slot->y + 1, slot->w, slot->h);
 
     s.savedCursorX = s.cursorX;
     s.savedCursorY = s.cursorY;
@@ -786,7 +875,7 @@ void EndWindow(ui_state &s)
     // so keyboard nav lands inside the new content immediately.
     if (slot->openedJustNow && slot->curItemsEnd > slot->curItemsBegin)
         s.focusId = s.curItems[slot->curItemsBegin];
-    CellRenderer::PopClip();
+    UiPaint::PopClip();
     s.cursorX = s.savedCursorX;
     s.cursorY = s.savedCursorY;
     s.lineStartX = s.savedLineStartX;
@@ -866,7 +955,7 @@ auto BeginList(ui_state &s, uint32_t localId, const ui_list_desc &desc) -> ui_li
     scope.focusedFIdx = UINT32_MAX;
     scope.slotIdx = slot ? (uint32_t)(slot - s.lists) : UINT32_MAX;
 
-    CellRenderer::PushClip(scope.baseX, scope.baseY, desc.w, desc.visibleRows);
+    UiPaint::PushClip(scope.baseX, scope.baseY, desc.w, desc.visibleRows);
     if (slot)
         slot->curItemsBegin = s.curCount;
 
@@ -895,7 +984,7 @@ auto ListRow(ui_state &s, ui_list_scope &scope, uint32_t fIdx, uint32_t rowLocal
 
 void EndList(ui_state &s, const ui_list_scope &scope)
 {
-    CellRenderer::PopClip();
+    UiPaint::PopClip();
     if (scope.slotIdx != UINT32_MAX)
         s.lists[scope.slotIdx].curItemsEnd = s.curCount;
     s.cursorX = scope.baseX;
@@ -908,4 +997,130 @@ void EndList(ui_state &s, const ui_list_scope &scope)
     s.lastItemH = scope.visibleRows;
 }
 
-} // namespace nyla::Ui
+auto BeginChild(ui_state &s, uint32_t localId, const ui_child_desc &desc) -> bool
+{
+    // Save current cursor state; child will reset it. EndChild restores.
+    s.childEndX = s.cursorX;
+    s.childEndY = s.cursorY;
+    int32_t savedLineStartX = s.lineStartX;
+    int32_t savedLineH = s.lineH;
+
+    int32_t cx = desc.w == 0 ? (int32_t)s.viewportCols - s.cursorX : desc.w;
+    int32_t cy = desc.h == 0 ? (int32_t)s.viewportRows - s.cursorY : desc.h;
+    if (cx < 0)
+        cx = 0;
+    if (cy < 0)
+        cy = 0;
+
+    // Resolve child origin — use current cursor position.
+    int32_t ox = s.cursorX;
+    int32_t oy = s.cursorY;
+
+    // Borders consume 2 cells of space (1 left + 1 right, 1 top + 1 bottom).
+    int32_t borderPad = (desc.flags & kChildFlagBorder) ? 1 : 0;
+
+    // Compute visible content region.
+    int32_t contentW = cx - 2 * borderPad;
+    int32_t contentH = cy - 2 * borderPad;
+    if (contentW < 0)
+        contentW = 0;
+    if (contentH < 0)
+        contentH = 0;
+
+    // Push clip for content area.
+    UiPaint::PushClip(ox + borderPad, oy + borderPad, contentW, contentH);
+
+    // Reset cursor into the content area.
+    s.cursorX = ox + borderPad;
+    s.cursorY = oy + borderPad;
+    s.lineStartX = s.cursorX;
+    s.lineH = 0;
+
+    // Border (drawn after clip so it overlaps content edges).
+    if (borderPad && cx > 1 && cy > 1)
+    {
+        uint32_t fg = s.theme.focusedFg;
+
+        // Top/bottom rows
+        uint8_t hLine[256];
+        MemSet(hLine, 0xC4, Min((uint32_t)cx - 2, (uint32_t)sizeof(hLine)));
+        int32_t hLen = Min(cx - 2, (int32_t)sizeof(hLine));
+        if (hLen > 0)
+        {
+            if (oy >= 0 && oy < (int32_t)s.viewportRows)
+                UiPaint::Text(ox + 1, oy, byteview{hLine, (uint64_t)hLen}, fg, s.theme.bg);
+            int32_t botY = oy + cy - 1;
+            if (botY >= 0 && botY < (int32_t)s.viewportRows)
+                UiPaint::Text(ox + 1, botY, byteview{hLine, (uint64_t)hLen}, fg, s.theme.bg);
+        }
+
+        // Corners
+        auto corner = [&](int32_t x, int32_t y, uint8_t ch) {
+            if (y >= 0 && y < (int32_t)s.viewportRows && x >= 0 && x < (int32_t)s.viewportCols)
+                UiPaint::Text(x, y, byteview{&ch, 1}, fg, s.theme.bg);
+        };
+        corner(ox, oy, 0xDA);                   // ┌
+        corner(ox + cx - 1, oy, 0xBF);          // ┐
+        corner(ox, oy + cy - 1, 0xC0);          // └
+        corner(ox + cx - 1, oy + cy - 1, 0xD9); // ┘
+
+        // Vertical lines
+        for (int32_t r = 1; r < cy - 1; ++r)
+        {
+            int32_t row = oy + r;
+            if (row >= 0 && row < (int32_t)s.viewportRows)
+            {
+                uint8_t v = 0xB3; // │
+                UiPaint::Text(ox, row, byteview{&v, 1}, fg, s.theme.bg);
+                UiPaint::Text(ox + cx - 1, row, byteview{&v, 1}, fg, s.theme.bg);
+            }
+        }
+    }
+
+    // Scroll handling: consume wheel edges when pointer is over child rect.
+    if ((desc.flags & kChildFlagScrollable) && desc.scrollY && contentH > 0)
+    {
+        bool pointerOverChild =
+            s.pointerX >= ox && s.pointerX < ox + cx &&
+            s.pointerY >= oy && s.pointerY < oy + cy;
+
+        if (pointerOverChild)
+        {
+            if (s.wheelEdgeUp && *desc.scrollY > 0)
+            {
+                --*desc.scrollY;
+                s.wheelEdgeUp = false;
+            }
+            if (s.wheelEdgeDn)
+            {
+                ++*desc.scrollY;
+                s.wheelEdgeDn = false;
+            }
+        }
+
+        // Clamp
+        if (desc.contentRows <= (uint32_t)contentH)
+            *desc.scrollY = 0;
+        else if (*desc.scrollY + (uint32_t)contentH > desc.contentRows)
+            *desc.scrollY = desc.contentRows - (uint32_t)contentH;
+    }
+
+    (void)localId;
+    (void)savedLineStartX;
+    (void)savedLineH;
+    return true;
+}
+
+void EndChild(ui_state &s)
+{
+    UiPaint::PopClip();
+    // Restore cursor to what it was before BeginChild.
+    s.cursorX = s.childEndX;
+    s.cursorY = s.childEndY;
+    s.lineStartX = s.cursorX;
+    s.lineH = 0;
+}
+
+} // namespace Ui
+
+} // namespace nyla
