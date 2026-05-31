@@ -127,11 +127,6 @@ auto API X11KeyCodeToKeyPhysical(uint32_t keyCode, KeyPhysical *outKeyPhysical) 
 // RandR monitor tracking
 void API X11RandRInit();
 auto API X11RandRGetEventOffset() -> uint32_t;
-auto API X11RandRRefreshMonitors() -> bool; // returns true if monitors changed
-auto API X11GetMonitorWidth() -> uint32_t;
-auto API X11GetMonitorHeight() -> uint32_t;
-auto API X11GetMonitorX() -> int32_t;
-auto API X11GetMonitorY() -> int32_t;
 
 // Rebuild keycode table after keyboard change
 void API X11RefreshKeyboardMapping();

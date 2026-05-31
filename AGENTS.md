@@ -1,5 +1,11 @@
 # Nyla — AI Context File
 
+> **AI quickstart**: C++23, no STL, no exceptions, flat `.cc` files, trailing return types,
+> `#pragma once`, `span`/`inline_vec`/`array` over std containers, `ASSERT` over exceptions.
+> Build: `cmake --preset linux-debug && cmake --build build/linux-debug --target wm`.
+> Test: `./scripts/test_wm.sh`. Test on live hardware too — not all bugs reproduce in Xvfb.
+> Be honest about changes. Ask before implementing. Call out hallucinations.
+
 C++23 cross-platform application/game framework with custom engine core and multiple desktop apps. Cross-compiles Linux (clang++) + Windows (MSVC/clang-cl).
 
 ## Build
@@ -144,6 +150,34 @@ The WM uses standard X11/xcb — no server-specific calls. Test strategy:
   Stops at edges, no wrap. Mouse border drag snaps to 160px increments.
   baseWidth is stable — separate from desiredWidth — so tier computation always
   has a valid anchor.
+
+### RandR config_timestamp invalidation — DO NOT REORDER
+
+`xcb_randr_set_crtc_config()` requires a `config_timestamp` that matches the
+server's current configuration. Each `set_crtc_config` call CHANGES the config,
+invalidating any previously obtained timestamp.
+
+**Critical rule**: After a loop that calls `set_crtc_config()` (e.g. disabling
+all outputs except the chosen one), you MUST obtain a fresh `config_timestamp`
+via `xcb_randr_get_screen_resources()` before any subsequent `set_crtc_config()`
+calls. Using a stale timestamp causes the call to silently fail (server returns
+`BadConfig`), leaving the output disabled.
+
+This applies to any edit that touches RandR code — reordering the disable/enable
+sequence, adding intermediate round-trips, or inlining the function can all
+introduce timestamp staleness. The safe pattern is:
+
+```
+resources2 = get_screen_resources()  // timestamp A
+for each non-best output:            // each call changes config
+    set_crtc_config(..., timestamp_A) // timestamp A progressively invalidated
+resources3 = get_screen_resources()  // timestamp B (fresh)
+set_crtc_config(best_output, ..., timestamp_B) // uses fresh timestamp
+```
+
+**Never** move the `set_crtc_config` for the best output before the disable
+loop without also ensuring it uses a pre-disable timestamp, or it will fail
+when the CRTC is still claimed by another output.
 
 ## Style rules
 - `#pragma once` only (enforced by `scripts/check_pragma_once.sh`)

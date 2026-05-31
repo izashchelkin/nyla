@@ -1,7 +1,8 @@
-#include <unistd.h>
+// infinite strip tiling window manager for X11
 
 #include "nyla/commons/array.h" // IWYU pragma: keep
 #include "nyla/commons/binary_search.h"
+#include "nyla/commons/byteparser.h"
 #include "nyla/commons/entrypoint.h"
 #include "nyla/commons/file.h"
 #include "nyla/commons/inline_string.h"
@@ -21,11 +22,18 @@
 #include "nyla/commons/word.h"
 #include "nyla/commons/x11_wm_hints_linux.h"
 
+#include <unistd.h>
+#include <xcb/randr.h>
+
 namespace nyla
 {
 
 namespace
 {
+
+static constexpr uint32_t kBaseWindowWidth = 1280;
+static constexpr const char *kStateFilePath = "/tmp/nyla_wm_state";
+static constexpr uint32_t kStateMagic = DWordBE("NYLA");
 
 struct Rect
 {
@@ -34,7 +42,6 @@ struct Rect
     uint32_t width;
     uint32_t height;
 };
-static_assert(sizeof(Rect) == 16);
 
 enum class Color : uint32_t
 {
@@ -54,21 +61,25 @@ struct window_stack
     static inline constexpr decltype(flags) FlagCenterScroll = 1 << 1;
 };
 
-enum net_wm_moveresize_direction : uint32_t
+// _NET_WM_MOVERESIZE direction values we handle.
+static constexpr uint32_t kMoveresizeSizeRight = 3;
+static constexpr uint32_t kMoveresizeSizeLeft = 7;
+static constexpr uint32_t kMoveresizeCancel = 11;
+
+auto IsHorizontalResize(uint32_t direction) -> bool
 {
-    MoveresizeSizeTopLeft = 0,
-    MoveresizeSizeTop = 1,
-    MoveresizeSizeTopRight = 2,
-    MoveresizeSizeRight = 3,
-    MoveresizeSizeBottomRight = 4,
-    MoveresizeSizeBottom = 5,
-    MoveresizeSizeBottomLeft = 6,
-    MoveresizeSizeLeft = 7,
-    MoveresizeMove = 8,
-    MoveresizeSizeKeyboard = 9,
-    MoveresizeMoveKeyboard = 10,
-    MoveresizeCancel = 11,
-};
+    return direction != 1     // SizeTop
+           && direction != 5  // SizeBottom
+           && direction != 8  // Move
+           && direction <= 7; // not MoveKeyboard(10) or Cancel(11)
+}
+
+auto IsFromLeft(uint32_t direction) -> bool
+{
+    return direction == 7     // SizeLeft
+           || direction == 0  // SizeTopLeft
+           || direction == 6; // SizeBottomLeft
+}
 
 struct window_pending_property
 {
@@ -101,16 +112,6 @@ struct window_index_entry
     static inline constexpr decltype(flags) Flag_WantsConfigureNotify = 1 << 4;
     static inline constexpr decltype(flags) Flag_PendingParent = 1 << 5;
 };
-
-// Maps window XID → saved stack/position for WM restart recovery.
-struct restore_entry
-{
-    xcb_window_t window;
-    uint8_t stackIndex;
-    uint8_t position; // index within the stack's windows list
-    uint8_t tierIndex;
-};
-
 static constexpr uint32_t kTierCount = 4;
 
 struct window_manager
@@ -118,11 +119,15 @@ struct window_manager
     uint8_t activeStackIndex;
     bool layoutDirty;
     bool borderDirty;
+    bool shmDirty;
     bool follow;
     bool focusCheckPending;
-    bool restoreHasData; // true until deferred restore completes
 
     uint32_t barHeight;
+    int32_t monitorX;
+    int32_t monitorY;
+    uint32_t monitorWidth;
+    uint32_t monitorHeight;
     xcb_window_t lastEnteredWindow;
     xcb_get_input_focus_cookie_t focusCheckCookie;
 
@@ -130,13 +135,10 @@ struct window_manager
     xcb_window_t moveresizeWindow;
     int32_t moveresizeOrigPointerX;
     uint32_t moveresizeOrigWidth;
-    net_wm_moveresize_direction moveresizeDirection;
+    uint32_t moveresizeDirection;
 
     array<window_stack, 9> stacks;
     inline_vec<xcb_window_t, 64> pendingClients;
-    inline_vec<restore_entry, 576> restoreMap;
-    xcb_window_t savedActiveXids[9];
-    uint8_t restoreActiveStackIndex;
     array<uint32_t, kTierCount> tiers;
 
     span<uint8_t> memory;
@@ -146,13 +148,10 @@ struct window_manager
     window_data_entry *data;
 
     shm_channel *ipcChannel = nullptr;
+    uint64_t ipcGeneration;
 };
 
 window_manager *wm;
-static uint64_t sIpcGeneration;
-
-static constexpr uint32_t kWmEventMask = XCB_EVENT_MASK_PROPERTY_CHANGE | XCB_EVENT_MASK_FOCUS_CHANGE |
-                                         XCB_EVENT_MASK_ENTER_WINDOW | XCB_EVENT_MASK_LEAVE_WINDOW;
 
 // -- index helpers --
 
@@ -167,16 +166,6 @@ auto FindIndex(xcb_window_t w) -> window_index_entry *
 auto GetActiveStack() -> window_stack &
 {
     return wm->stacks[wm->activeStackIndex];
-}
-
-auto FindRestorePos(xcb_window_t w) -> restore_entry *
-{
-    for (uint64_t i = 0; i < wm->restoreMap.size; ++i)
-    {
-        if (wm->restoreMap[i].window == w)
-            return &wm->restoreMap[i];
-    }
-    return nullptr;
 }
 
 // -- core operations --
@@ -269,10 +258,6 @@ void FetchClientProperty(xcb_window_t clientWindow, window_data_entry &data, xcb
     pp = {property, cookie};
 }
 
-static constexpr uint32_t kDefaultWindowWidth = 1280;
-static constexpr const char *kStateFilePath = "/tmp/nyla_wm_state";
-static constexpr uint32_t kStateMagic = DWordBE("NYLA");
-
 auto DataBase(window_index_entry *idx, uint32_t cap) -> window_data_entry *
 {
     return (window_data_entry *)(idx + cap);
@@ -307,7 +292,9 @@ void ManageClient(xcb_window_t clientWindow)
     wm->index[pos].window = clientWindow;
     wm->index[pos].dataEntry = &wm->data[i];
 
-    xcb_change_window_attributes(X11GetConn(), clientWindow, XCB_CW_EVENT_MASK, &kWmEventMask);
+    uint32_t wmEventMask = XCB_EVENT_MASK_PROPERTY_CHANGE | XCB_EVENT_MASK_FOCUS_CHANGE | XCB_EVENT_MASK_ENTER_WINDOW |
+                           XCB_EVENT_MASK_LEAVE_WINDOW;
+    xcb_change_window_attributes(X11GetConn(), clientWindow, XCB_CW_EVENT_MASK, &wmEventMask);
 
     window_data_entry &data = wm->data[i];
     FetchClientProperty(clientWindow, data, XCB_ATOM_WM_HINTS);
@@ -362,6 +349,7 @@ void Activate(window_stack &stack, xcb_window_t clientWindow, xcb_timestamp_t ti
         ApplyBorder(stack.activeWindow, Color::KNone);
         stack.activeWindow = clientWindow;
         wm->layoutDirty = true;
+        wm->shmDirty = true;
     }
     Activate(stack, time);
 }
@@ -455,6 +443,7 @@ void MoveStack(xcb_timestamp_t time, auto computeIdx)
 
     window_stack &oldStack = wm->stacks[iold];
     wm->activeStackIndex = (uint8_t)inew;
+    wm->shmDirty = true;
     window_stack &newStack = wm->stacks[inew];
 
     if (wm->follow)
@@ -546,11 +535,10 @@ void MoveLocalPrev(xcb_timestamp_t time, bool clearZoom)
     MoveLocal(time, [](uint64_t idx) { return idx - 1; }, clearZoom);
 }
 
-// Recompute wm->tiers from current viewport width.
-void RefreshTiers()
+void RecalcTiers()
 {
-    uint32_t viewW = X11GetMonitorWidth();
-    uint32_t base = kDefaultWindowWidth;
+    uint32_t viewW = wm->monitorWidth;
+    uint32_t base = kBaseWindowWidth;
     uint32_t n = 0;
     wm->tiers[n++] = Max(base - base / 4, 320u);
     wm->tiers[n++] = base;
@@ -585,6 +573,198 @@ auto SnapToNearestTierIdx(uint32_t width) -> uint8_t
     return best;
 }
 
+// -- RandR output selection and CRTC configuration --
+
+auto IsExternalOutputName(const char *name, uint8_t nameLen) -> bool
+{
+    if (nameLen >= 3 && (name[0] == 'e' || name[0] == 'E') && (name[1] == 'D' || name[1] == 'd') &&
+        (name[2] == 'P' || name[2] == 'p'))
+        return false;
+    if (nameLen >= 4 && (name[0] == 'L' || name[0] == 'l') && (name[1] == 'V' || name[1] == 'v') &&
+        (name[2] == 'D' || name[2] == 'd') && (name[3] == 'S' || name[3] == 's'))
+        return false;
+    return true;
+}
+
+auto PickBestMode(xcb_randr_get_output_info_reply_t *infoReply, xcb_randr_mode_info_t *resourceModes,
+                  int numResourceModes) -> xcb_randr_mode_t
+{
+    xcb_randr_mode_t *outputModes = xcb_randr_get_output_info_modes(infoReply);
+    int numModes = infoReply->num_modes;
+    xcb_randr_mode_t bestMode = XCB_NONE;
+    uint64_t bestPixels = 0;
+    float bestRefresh = 0.0f;
+    for (int mi = 0; mi < numModes; ++mi)
+    {
+        xcb_randr_mode_t modeId = outputModes[mi];
+        xcb_randr_mode_info_t *modeInfo = nullptr;
+        for (int ri = 0; ri < numResourceModes; ++ri)
+        {
+            if (resourceModes[ri].id == modeId)
+            {
+                modeInfo = &resourceModes[ri];
+                break;
+            }
+        }
+        if (!modeInfo)
+            continue;
+        uint64_t pixels = (uint64_t)modeInfo->width * (uint64_t)modeInfo->height;
+        float refresh = 0.0f;
+        if (modeInfo->htotal > 0 && modeInfo->vtotal > 0)
+            refresh = (float)modeInfo->dot_clock / ((float)modeInfo->htotal * (float)modeInfo->vtotal);
+        if (pixels > bestPixels || (pixels == bestPixels && refresh > bestRefresh))
+        {
+            bestPixels = pixels;
+            bestRefresh = refresh;
+            bestMode = modeId;
+        }
+    }
+    return bestMode != XCB_NONE ? bestMode : *outputModes;
+}
+
+// Pick the best output (external preferred) and enable only it.
+// Returns true if the active monitor geometry changed.
+auto RandRRefresh() -> bool
+{
+    if (X11RandRGetEventOffset() == 0)
+        return false;
+
+    xcb_randr_get_screen_resources_cookie_t resCookie = xcb_randr_get_screen_resources(X11GetConn(), X11GetRoot());
+    xcb_randr_get_screen_resources_reply_t *resReply =
+        xcb_randr_get_screen_resources_reply(X11GetConn(), resCookie, nullptr);
+    if (!resReply)
+        return false;
+
+    int numOutputs = xcb_randr_get_screen_resources_outputs_length(resReply);
+    xcb_randr_output_t *outputs = xcb_randr_get_screen_resources_outputs(resReply);
+    int numResourceModes = xcb_randr_get_screen_resources_modes_length(resReply);
+    xcb_randr_mode_info_t *resourceModes = xcb_randr_get_screen_resources_modes(resReply);
+
+    xcb_randr_output_t bestOutput = XCB_NONE;
+    xcb_randr_mode_t bestMode = XCB_NONE;
+    for (int pass = 0; pass < 2; ++pass)
+    {
+        bool wantExternal = (pass == 0);
+        for (int i = 0; i < numOutputs; ++i)
+        {
+            xcb_randr_get_output_info_cookie_t ic =
+                xcb_randr_get_output_info(X11GetConn(), outputs[i], XCB_CURRENT_TIME);
+            xcb_randr_get_output_info_reply_t *ir = xcb_randr_get_output_info_reply(X11GetConn(), ic, nullptr);
+            if (!ir)
+                continue;
+            bool ext = IsExternalOutputName((const char *)xcb_randr_get_output_info_name(ir),
+                                            xcb_randr_get_output_info_name_length(ir));
+            bool ok = (ir->connection == XCB_RANDR_CONNECTION_CONNECTED) && wantExternal == ext && ir->num_modes > 0;
+            if (ok)
+            {
+                bestOutput = outputs[i];
+                bestMode = PickBestMode(ir, resourceModes, numResourceModes);
+            }
+            free(ir);
+            if (bestOutput != XCB_NONE)
+                break;
+        }
+        if (bestOutput != XCB_NONE)
+            break;
+    }
+    free(resReply);
+    if (bestOutput == XCB_NONE)
+        return false;
+
+    xcb_randr_get_screen_resources_cookie_t resCookie2 = xcb_randr_get_screen_resources(X11GetConn(), X11GetRoot());
+    xcb_randr_get_screen_resources_reply_t *resReply2 =
+        xcb_randr_get_screen_resources_reply(X11GetConn(), resCookie2, nullptr);
+    if (!resReply2)
+        return false;
+    int numOutputs2 = xcb_randr_get_screen_resources_outputs_length(resReply2);
+    xcb_randr_output_t *outputs2 = xcb_randr_get_screen_resources_outputs(resReply2);
+
+    for (int i = 0; i < numOutputs2; ++i)
+    {
+        if (outputs2[i] == bestOutput)
+            continue;
+        xcb_randr_get_output_info_cookie_t ic = xcb_randr_get_output_info(X11GetConn(), outputs2[i], XCB_CURRENT_TIME);
+        xcb_randr_get_output_info_reply_t *ir = xcb_randr_get_output_info_reply(X11GetConn(), ic, nullptr);
+        if (ir)
+        {
+            if (ir->crtc != XCB_NONE)
+                xcb_randr_set_crtc_config(X11GetConn(), ir->crtc, XCB_CURRENT_TIME, resReply2->config_timestamp, 0, 0,
+                                          XCB_NONE, XCB_RANDR_ROTATION_ROTATE_0, 0, nullptr);
+            free(ir);
+        }
+    }
+
+    // Fresh timestamp after disable loop -- each set_crtc_config invalidates the old one.
+    xcb_randr_get_screen_resources_cookie_t resCookie3 = xcb_randr_get_screen_resources(X11GetConn(), X11GetRoot());
+    xcb_randr_get_screen_resources_reply_t *resReply3 =
+        xcb_randr_get_screen_resources_reply(X11GetConn(), resCookie3, nullptr);
+    if (!resReply3)
+    {
+        free(resReply2);
+        return false;
+    }
+    free(resReply2);
+
+    xcb_randr_get_output_info_cookie_t bic = xcb_randr_get_output_info(X11GetConn(), bestOutput, XCB_CURRENT_TIME);
+    xcb_randr_get_output_info_reply_t *bir = xcb_randr_get_output_info_reply(X11GetConn(), bic, nullptr);
+    if (bir)
+    {
+        xcb_randr_crtc_t useCrtc = bir->crtc;
+        if (useCrtc == XCB_NONE)
+        {
+            int numCrtcs = xcb_randr_get_screen_resources_crtcs_length(resReply3);
+            xcb_randr_crtc_t *crtcs = xcb_randr_get_screen_resources_crtcs(resReply3);
+            for (int c = 0; c < numCrtcs; ++c)
+            {
+                xcb_randr_get_crtc_info_cookie_t cc = xcb_randr_get_crtc_info(X11GetConn(), crtcs[c], XCB_CURRENT_TIME);
+                xcb_randr_get_crtc_info_reply_t *cr = xcb_randr_get_crtc_info_reply(X11GetConn(), cc, nullptr);
+                if (cr)
+                {
+                    if (xcb_randr_get_crtc_info_outputs_length(cr) == 0)
+                    {
+                        useCrtc = crtcs[c];
+                        free(cr);
+                        break;
+                    }
+                    free(cr);
+                }
+            }
+        }
+        if (useCrtc != XCB_NONE && bestMode != XCB_NONE)
+            xcb_randr_set_crtc_config(X11GetConn(), useCrtc, XCB_CURRENT_TIME, resReply3->config_timestamp, 0, 0,
+                                      bestMode, XCB_RANDR_ROTATION_ROTATE_0, 1, &bestOutput);
+        free(bir);
+    }
+    X11Flush();
+
+    xcb_randr_get_output_info_cookie_t fic = xcb_randr_get_output_info(X11GetConn(), bestOutput, XCB_CURRENT_TIME);
+    xcb_randr_get_output_info_reply_t *fir = xcb_randr_get_output_info_reply(X11GetConn(), fic, nullptr);
+    bool changed = false;
+    if (fir && fir->crtc != XCB_NONE)
+    {
+        xcb_randr_get_crtc_info_cookie_t cc = xcb_randr_get_crtc_info(X11GetConn(), fir->crtc, XCB_CURRENT_TIME);
+        xcb_randr_get_crtc_info_reply_t *cr = xcb_randr_get_crtc_info_reply(X11GetConn(), cc, nullptr);
+        if (cr)
+        {
+            int32_t nx = cr->x, ny = cr->y;
+            uint32_t nw = cr->width, nh = cr->height;
+            free(cr);
+            if (nx != wm->monitorX || ny != wm->monitorY || nw != wm->monitorWidth || nh != wm->monitorHeight)
+            {
+                wm->monitorX = nx;
+                wm->monitorY = ny;
+                wm->monitorWidth = nw;
+                wm->monitorHeight = nh;
+                changed = true;
+            }
+        }
+    }
+    if (fir)
+        free(fir);
+    free(resReply3);
+    return changed;
+}
+
 void ResizeActive(int32_t direction)
 {
     window_stack &stack = GetActiveStack();
@@ -600,6 +780,63 @@ void ResizeActive(int32_t direction)
         return;
     idx->dataEntry->tierIndex = (uint8_t)next;
     wm->layoutDirty = true;
+}
+void WmShutdown(bool &isRunning)
+{
+    if (wm->moveresizeActive)
+    {
+        xcb_ungrab_pointer(X11GetConn(), XCB_CURRENT_TIME);
+        wm->moveresizeActive = false;
+        wm->moveresizeWindow = XCB_NONE;
+    }
+
+    X11Grab();
+    X11Flush();
+
+    {
+        uint8_t buf[4096];
+        // Serialization format -- see WmInit for deserialization
+        uint32_t pos = 0;
+        auto writeU32 = [&](uint32_t v) {
+            MemCpy(buf + pos, &v, 4);
+            pos += 4;
+        };
+        auto writeU8 = [&](uint8_t v) { buf[pos++] = v; };
+        writeU32(kStateMagic);
+        writeU8(wm->activeStackIndex);
+        writeU8(wm->follow ? 1 : 0);
+        for (int s = 0; s < 9; ++s)
+        {
+            const window_stack &stk = wm->stacks[s];
+            writeU8((uint8_t)(stk.flags & 0xFF));
+            writeU8((uint8_t)(stk.flags >> 8));
+            for (uint64_t j = 0; j < stk.windows.size; ++j)
+            {
+                xcb_window_t w = stk.windows[j];
+                window_index_entry *ix = FindIndex(w);
+                writeU32((uint32_t)w);
+                writeU8(ix ? ix->dataEntry->tierIndex : 1);
+                writeU8(w == stk.activeWindow ? 1 : 0);
+            }
+            writeU32(0);
+        }
+        file_handle f = FileOpen({(uint8_t *)kStateFilePath, CStrLen(kStateFilePath, 32)}, FileOpenMode::Write);
+        if (FileValid(f))
+        {
+            FileWrite(f, pos, buf);
+            FileClose(f);
+        }
+    }
+
+    X11Ungrab();
+    X11Flush();
+    xcb_disconnect(X11GetConn());
+    if (wm->ipcChannel)
+    {
+        ShmChannel::Close(*wm->ipcChannel);
+        wm->ipcChannel = nullptr;
+    }
+    isRunning = false;
 }
 
 void WmProcess(bool &isRunning)
@@ -646,57 +883,7 @@ void WmProcess(bool &isRunning)
 
             if (meta && shift && key == KeyPhysical::R)
             {
-                if (wm->moveresizeActive)
-                {
-                    xcb_ungrab_pointer(X11GetConn(), XCB_CURRENT_TIME);
-                    wm->moveresizeActive = false;
-                    wm->moveresizeWindow = XCB_NONE;
-                }
-                {
-                    uint8_t buf[4096];
-                    // Serialization format — keep in sync with WmDeserialize
-                    uint32_t pos = 0;
-                    auto writeU32 = [&](uint32_t v) {
-                        MemCpy(buf + pos, &v, 4);
-                        pos += 4;
-                    };
-                    auto writeU8 = [&](uint8_t v) { buf[pos++] = v; };
-                    writeU32(kStateMagic);
-                    writeU8(wm->activeStackIndex);
-                    writeU8(wm->follow ? 1 : 0);
-                    for (int s = 0; s < 9; ++s)
-                    {
-                        const window_stack &stk = wm->stacks[s];
-                        writeU8(0);
-                        writeU8((uint8_t)(stk.flags & 0xFF));
-                        writeU8((uint8_t)(stk.flags >> 8));
-                        uint8_t winCount = (uint8_t)stk.windows.size;
-                        writeU8(winCount);
-                        for (uint64_t j = 0; j < stk.windows.size; ++j)
-                            writeU32((uint32_t)stk.windows[j]);
-                        for (uint64_t j = 0; j < stk.windows.size; ++j)
-                        {
-                            window_index_entry *ix = FindIndex(stk.windows[j]);
-                            writeU32(ix ? ix->dataEntry->tierIndex : 1);
-                        }
-                        writeU32((uint32_t)stk.activeWindow);
-                    }
-                    file_handle f =
-                        FileOpen({(uint8_t *)kStateFilePath, CStrLen(kStateFilePath, 32)}, FileOpenMode::Write);
-                    if (FileValid(f))
-                    {
-                        FileWrite(f, pos, buf);
-                        FileClose(f);
-                    }
-                }
-                X11Ungrab();
-                xcb_disconnect(X11GetConn());
-                if (wm->ipcChannel)
-                {
-                    ShmChannel::Close(*wm->ipcChannel);
-                    wm->ipcChannel = nullptr;
-                }
-                isRunning = false;
+                WmShutdown(isRunning);
                 break;
             }
 
@@ -825,21 +1012,17 @@ void WmProcess(bool &isRunning)
                     if (idx)
                     {
                         int32_t direction = cm->data.data32[2];
-                        if (direction == MoveresizeCancel)
+                        if (direction == kMoveresizeCancel)
                             break;
 
-                        // Only handle horizontal resize edges
-                        if (direction == MoveresizeSizeRight || direction == MoveresizeSizeLeft ||
-                            direction == MoveresizeSizeTopRight || direction == MoveresizeSizeBottomRight ||
-                            direction == MoveresizeSizeTopLeft || direction == MoveresizeSizeBottomLeft)
+                        if (IsHorizontalResize((uint32_t)direction))
                         {
                             wm->moveresizeActive = true;
                             wm->moveresizeWindow = clientWin;
-                            wm->moveresizeDirection = static_cast<net_wm_moveresize_direction>(direction);
+                            wm->moveresizeDirection = (uint32_t)direction;
                             wm->moveresizeOrigWidth = TierWidth(idx->dataEntry->tierIndex);
                             wm->moveresizeOrigPointerX = cm->data.data32[0];
 
-                            // Grab pointer — motion/button events go to WM
                             xcb_grab_pointer_cookie_t grabCookie = xcb_grab_pointer(
                                 X11GetConn(), false, X11GetRoot(),
                                 XCB_EVENT_MASK_BUTTON_RELEASE | XCB_EVENT_MASK_POINTER_MOTION, XCB_GRAB_MODE_ASYNC,
@@ -853,8 +1036,7 @@ void WmProcess(bool &isRunning)
                 }
                 break;
             }
-            // Fall through to property notify for other client messages
-            [[fallthrough]];
+            break;
         }
 
         case XCB_PROPERTY_NOTIFY: {
@@ -870,9 +1052,6 @@ void WmProcess(bool &isRunning)
             window_index_entry *idx = FindIndex(cr->window);
             if (idx)
             {
-                // For managed windows: request a synthetic ConfigureNotify at frame end.
-                // We don't honor resize-from-border requests (this is a tiling WM),
-                // but the client must get a reply or it blocks forever during interactive resize.
                 idx->flags |= window_index_entry::Flag_WantsConfigureNotify;
             }
             else
@@ -959,9 +1138,7 @@ void WmProcess(bool &isRunning)
             {
                 auto *mn = reinterpret_cast<xcb_motion_notify_event_t *>(event);
                 int32_t delta = (int32_t)(mn->root_x) - wm->moveresizeOrigPointerX;
-                bool fromLeft = wm->moveresizeDirection == MoveresizeSizeLeft ||
-                                wm->moveresizeDirection == MoveresizeSizeTopLeft ||
-                                wm->moveresizeDirection == MoveresizeSizeBottomLeft;
+                bool fromLeft = IsFromLeft(wm->moveresizeDirection);
                 if (fromLeft)
                     delta = -delta;
 
@@ -1003,9 +1180,9 @@ void WmProcess(bool &isRunning)
             uint32_t randrBase = X11RandRGetEventOffset();
             if (randrBase && (eventType == randrBase || eventType == randrBase + 1))
             {
-                if (X11RandRRefreshMonitors())
+                if (RandRRefresh())
                 {
-                    RefreshTiers();
+                    RecalcTiers();
                     wm->layoutDirty = true;
                 }
             }
@@ -1078,6 +1255,7 @@ void WmProcess(bool &isRunning)
     }
 
     // Dispatch pending property replies
+    inline_vec<xcb_window_t, 16> inputOnlyWindows{};
     for (uint32_t i = 0; i < wm->windowCount; ++i)
     {
         window_index_entry &idx = wm->index[i];
@@ -1128,6 +1306,8 @@ void WmProcess(bool &isRunning)
                 uint64_t copyLen = Min((uint64_t)len, (uint64_t)63);
                 InlineString::Assign(data.name,
                                      byteview{static_cast<uint8_t *>(xcb_get_property_value(reply)), copyLen});
+                if (idx.window == GetActiveStack().activeWindow)
+                    wm->shmDirty = true;
                 break;
             }
 
@@ -1167,93 +1347,20 @@ void WmProcess(bool &isRunning)
         }
 
         InlineVec::Clear(data.pendingCookies);
-    }
 
-    // Deferred restore: rearrange windows to their saved stacks/positions
-    // and activate saved active windows. Uses XIDs directly — they survive
-    // a WM restart since X11 keeps running.
-    if (wm->restoreHasData && wm->pendingClients.size == 0)
-    {
+        if (data.pendingAttrCookie.sequence)
         {
-            // Move windows to their saved stacks (append only — order is fixed below)
-            for (uint32_t i = 0; i < wm->windowCount; ++i)
-            {
-                window_data_entry &data = wm->data[i];
-                restore_entry *re = FindRestorePos(data.window);
-                if (!re)
-                    continue;
-
-                // Restore saved tier
-                data.tierIndex = re->tierIndex;
-
-                // Remove from current stack (if any)
-                window_stack &curStack = wm->stacks[wm->activeStackIndex];
-                xcb_window_t *pos = InlineVec::Find(curStack.windows, data.window);
-                if (pos)
-                    InlineVec::Erase(curStack.windows, pos);
-
-                // Add to saved stack
-                window_stack &savedStack = wm->stacks[re->stackIndex];
-                if (!InlineVec::Find(savedStack.windows, data.window))
-                    InlineVec::Append(savedStack.windows, data.window);
-            }
-
-            // Reorder each stack's windows to match saved positions.
-            // The append loop above places windows in data-iteration order,
-            // which does not match the saved layout order. We rebuild each
-            // stack by position so the left-to-right visual order is preserved.
-            for (int s = 0; s < 9; ++s)
-            {
-                window_stack &stk = wm->stacks[s];
-                uint64_t n = stk.windows.size;
-                if (n <= 1)
-                    continue;
-
-                // Collect current windows for this stack
-                inline_vec<xcb_window_t, 64> unsorted{};
-                for (uint64_t j = 0; j < n; ++j)
-                    InlineVec::Append(unsorted, stk.windows[j]);
-
-                InlineVec::Clear(stk.windows);
-                // For each position 0..n-1, find the window that belongs there
-                for (uint64_t pos = 0; pos < n; ++pos)
-                {
-                    for (uint64_t j = 0; j < unsorted.size; ++j)
-                    {
-                        xcb_window_t w = unsorted[j];
-                        restore_entry *re = FindRestorePos(w);
-                        if (re && re->position == pos)
-                        {
-                            InlineVec::Append(stk.windows, w);
-                            break;
-                        }
-                    }
-                }
-            }
-
-            // Apply saved active stack index — must happen before activation
-            // so the correct active window gets X11 focus.
-            wm->activeStackIndex = wm->restoreActiveStackIndex;
-
-            // Activate saved active windows on each stack
-            for (int s = 0; s < 9; ++s)
-            {
-                xcb_window_t savedWin = wm->savedActiveXids[s];
-                if (!savedWin || !FindIndex(savedWin))
-                    continue;
-                wm->stacks[s].activeWindow = savedWin;
-                if (s == wm->activeStackIndex)
-                    Activate(wm->stacks[s], savedWin, XCB_CURRENT_TIME);
-            }
-
-            wm->layoutDirty = true;
-            wm->follow = false;
-
-            // Clear restore data so it doesn't affect windows spawned later.
-            wm->restoreHasData = false;
-            InlineVec::Clear(wm->restoreMap);
+            xcb_get_window_attributes_reply_t *ar =
+                xcb_get_window_attributes_reply(X11GetConn(), data.pendingAttrCookie, nullptr);
+            data.pendingAttrCookie.sequence = 0;
+            if (ar && ar->_class == XCB_WINDOW_CLASS_INPUT_ONLY)
+                InlineVec::Append(inputOnlyWindows, data.window);
+            free(ar);
         }
     }
+
+    for (uint64_t i = 0; i < inputOnlyWindows.size; ++i)
+        UnmanageClient(inputOnlyWindows[i]);
 
     window_stack &stack = GetActiveStack();
 
@@ -1318,8 +1425,6 @@ void WmProcess(bool &isRunning)
             }
 
             {
-                // Insert new windows adjacent to the active window (after it)
-                // so they appear local to the viewport instead of at the end.
                 xcb_window_t *insertPos = nullptr;
                 if (targetStack == &stack && stack.activeWindow)
                 {
@@ -1340,8 +1445,7 @@ void WmProcess(bool &isRunning)
         }
 
         InlineVec::Clear(wm->pendingClients);
-        if (!wm->restoreHasData)
-            wm->follow = false;
+        wm->follow = false;
         wm->layoutDirty = true;
     }
 
@@ -1358,7 +1462,6 @@ void WmProcess(bool &isRunning)
             ConfigureClientIfNeeded(clientWindow, *idx, data, hideRect, data.borderWidth);
         };
 
-        // Hide inactive stacks' windows
         for (uint32_t istack = 0; istack < 9; ++istack)
         {
             if (istack != wm->activeStackIndex)
@@ -1370,7 +1473,7 @@ void WmProcess(bool &isRunning)
         }
 
         bool zoomed = !!(stack.flags & window_stack::FlagZoom);
-        Rect screenRect = {X11GetMonitorX(), X11GetMonitorY(), X11GetMonitorWidth(), X11GetMonitorHeight()};
+        Rect screenRect = {wm->monitorX, wm->monitorY, wm->monitorWidth, wm->monitorHeight};
         if (!zoomed && screenRect.height > wm->barHeight)
             screenRect = {screenRect.x, static_cast<int32_t>(screenRect.y + wm->barHeight), screenRect.width,
                           screenRect.height - wm->barHeight};
@@ -1410,7 +1513,7 @@ void WmProcess(bool &isRunning)
             {
                 xcb_window_t cw = stack.windows[j];
                 window_index_entry *cix = FindIndex(cw);
-                uint32_t w = cix ? TierWidth(cix->dataEntry->tierIndex) : kDefaultWindowWidth;
+                uint32_t w = cix ? TierWidth(cix->dataEntry->tierIndex) : kBaseWindowWidth;
                 uint32_t capW = Min(w, (uint32_t)viewW);
                 if (cix && cix->dataEntry->maxWidth)
                     capW = Min(capW, cix->dataEntry->maxWidth);
@@ -1434,14 +1537,14 @@ void WmProcess(bool &isRunning)
             else
             {
                 for (uint32_t i = 0; i < n; ++i)
-                    winX[i] += 40;
-                contentEnd += 40;
+                    winX[i] += 20;
+                contentEnd += 20;
             }
 
             int32_t winLeft = winX[activeIndex];
             int32_t winRight = winLeft + (int32_t)winW[activeIndex];
 
-            int32_t gap = 40;
+            int32_t gap = 20;
             int32_t maxScroll = Max(0, contentEnd + gap - viewW);
             int32_t scroll = stack.scrollOffset;
 
@@ -1453,7 +1556,7 @@ void WmProcess(bool &isRunning)
             {
                 int32_t lo = winRight - (viewW - gap);
                 int32_t hi = winLeft - gap;
-                if (lo <= hi)
+                if (lo < hi)
                     scroll = Clamp(scroll, lo, hi);
                 else
                     scroll = winLeft + (int32_t)winW[activeIndex] / 2 - viewW / 2;
@@ -1510,7 +1613,6 @@ void WmProcess(bool &isRunning)
         }();
         ApplyBorder(stack.activeWindow, color);
 
-        // Clear inactive borders
         for (uint64_t i = 0; i < stack.windows.size; ++i)
         {
             if (stack.windows[i] != stack.activeWindow)
@@ -1532,28 +1634,13 @@ void WmProcess(bool &isRunning)
         idx.flags &= ~window_index_entry::Flag_WantsConfigureNotify;
     }
 
-    // GDK may replace our event mask via XSelectInput (clipboard, DnD, etc.)
+    if (wm->ipcChannel && wm->shmDirty)
     {
-        for (uint32_t i = 0; i < wm->windowCount; ++i)
-        {
-            xcb_get_window_attributes_reply_t *ar = xcb_get_window_attributes_reply(
-                X11GetConn(), xcb_get_window_attributes(X11GetConn(), wm->index[i].window), nullptr);
-            if (ar)
-            {
-                if ((ar->your_event_mask & kWmEventMask) != kWmEventMask)
-                    xcb_change_window_attributes(X11GetConn(), wm->index[i].window, XCB_CW_EVENT_MASK, &kWmEventMask);
-                free(ar);
-            }
-        }
-    }
-
-    // Publish state to overlay via shared memory
-    if (wm->ipcChannel)
-    {
+        wm->shmDirty = false;
         wm_ipc_state *ipc = static_cast<wm_ipc_state *>(ShmChannel::BeginWrite(*wm->ipcChannel));
         MemZero(ipc, sizeof(wm_ipc_state));
         ipc->activeStackIndex = wm->activeStackIndex;
-        ipc->updateGeneration = ++sIpcGeneration;
+        ipc->updateGeneration = ++wm->ipcGeneration;
 
         const window_stack &activeStack = GetActiveStack();
         if (activeStack.activeWindow)
@@ -1570,258 +1657,11 @@ void WmProcess(bool &isRunning)
 
         ShmChannel::EndWrite(*wm->ipcChannel);
     }
-
-    // Check pending window-attributes (INPUT_ONLY) cookies.
-    // ManageClient flushes the request immediately, so the reply is
-    // already waiting — _reply returns without blocking.
-    {
-        inline_vec<xcb_window_t, 16> inputOnlyWindows{};
-        for (uint32_t i = 0; i < wm->windowCount; ++i)
-        {
-            window_data_entry &d = wm->data[i];
-            if (!d.pendingAttrCookie.sequence)
-                continue;
-            xcb_get_window_attributes_reply_t *ar =
-                xcb_get_window_attributes_reply(X11GetConn(), d.pendingAttrCookie, nullptr);
-            d.pendingAttrCookie.sequence = 0;
-            if (ar)
-            {
-                if (ar->_class == XCB_WINDOW_CLASS_INPUT_ONLY)
-                    InlineVec::Append(inputOnlyWindows, d.window);
-                free(ar);
-            }
-        }
-        for (uint64_t i = 0; i < inputOnlyWindows.size; ++i)
-            UnmanageClient(inputOnlyWindows[i]);
-    }
 }
 
 // -- init --
 
-void WmDeserialize()
-{
-    file_handle f = FileOpen({(uint8_t *)kStateFilePath, CStrLen(kStateFilePath, 32)}, FileOpenMode::Read);
-    if (!FileValid(f))
-        return;
-
-    uint8_t buf[4096];
-    // Deserialization format — keep in sync with serialization in WmRestart
-    uint32_t len = FileRead(f, 4096, buf);
-    FileClose(f);
-
-    // State is now in memory — delete the file so it doesn't leak
-    // across boots or fresh sessions.
-    unlink(kStateFilePath);
-
-    if (len < 6) // magic + activeStackIndex + follow
-        return;
-
-    uint32_t pos = 0;
-    auto readU32 = [&]() -> uint32_t {
-        if (pos + 4 > len)
-            return 0;
-        uint32_t v;
-        MemCpy(&v, buf + pos, 4);
-        pos += 4;
-        return v;
-    };
-    auto readU8 = [&]() -> uint8_t {
-        if (pos >= len)
-            return 0;
-        return buf[pos++];
-    };
-
-    if (readU32() != kStateMagic)
-        return;
-
-    uint8_t savedActiveStackIndex = readU8();
-    uint8_t savedFollow = readU8();
-
-    // Bounds-check the active stack index
-    if (savedActiveStackIndex >= 9)
-        return;
-
-    // Defer activeStackIndex — only applied in the restore block if windows
-    // actually matched (genuine restart). A stale state file from a previous
-    // boot has no matching windows and must not shift the active stack.
-    wm->restoreActiveStackIndex = savedActiveStackIndex;
-    wm->follow = (savedFollow != 0);
-
-    for (int s = 0; s < 9; ++s)
-    {
-        // Per-stack header: layout (v1 only, now ignored), flags_lo, flags_hi, win_count
-        if (pos + 4 > len)
-            return;
-        readU8(); // layout byte — ignored, always infinite strip now
-        uint8_t flagsLo = readU8();
-        uint8_t flagsHi = readU8();
-        uint8_t winCount = readU8();
-
-        // Bounds-check window count
-        if (winCount > 64)
-            return;
-
-        // Apply saved flags (overriding WmInit defaults)
-        wm->stacks[s].flags = (uint16_t)flagsLo | ((uint16_t)flagsHi << 8);
-
-        for (uint8_t j = 0; j < winCount; ++j)
-        {
-            if (pos + 4 > len)
-                return;
-            xcb_window_t xid = (xcb_window_t)readU32();
-            if (xid != 0 && InlineVec::Size(wm->restoreMap) < InlineVec::Capacity(wm->restoreMap))
-            {
-                restore_entry e = {xid, (uint8_t)s, j, 1};
-                InlineVec::Append(wm->restoreMap, e);
-            }
-        }
-        // per-window tier indices
-        for (uint8_t j = 0; j < winCount; ++j)
-        {
-            if (pos + 4 > len)
-                return;
-            uint8_t ti = (uint8_t)readU32();
-            for (uint64_t k = 0; k < wm->restoreMap.size; ++k)
-            {
-                if (wm->restoreMap[k].stackIndex == (uint8_t)s && wm->restoreMap[k].position == j)
-                {
-                    wm->restoreMap[k].tierIndex = ti;
-                    break;
-                }
-            }
-        }
-
-        // activeWindow XID
-        if (pos + 4 > len)
-            return;
-        wm->savedActiveXids[s] = (xcb_window_t)readU32();
-    }
-
-    wm->restoreHasData = true;
-}
-
-void WmInit()
-{
-    wm->barHeight = 20;
-    RefreshTiers();
-
-    // Only apply defaults to stacks that weren't populated by WmDeserialize
-    if (!wm->restoreHasData)
-    {
-        for (auto &s : wm->stacks)
-        {
-            s.flags |= window_stack::FlagCenterScroll;
-        }
-    }
-
-    if (xcb_request_check(X11GetConn(),
-                          xcb_change_window_attributes_checked(
-                              X11GetConn(), X11GetRoot(), XCB_CW_EVENT_MASK,
-                              (uint32_t[]){XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT | XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY |
-                                           XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_FOCUS_CHANGE})))
-    {
-        ASSERT(false && "another wm is already running");
-    }
-
-    wm->moveresizeActive = false;
-
-    // EWMH _NET_SUPPORTING_WM_CHECK detection protocol
-    {
-        xcb_window_t checkWin = xcb_generate_id(X11GetConn());
-        xcb_create_window(X11GetConn(), XCB_COPY_FROM_PARENT, checkWin, X11GetRoot(), 0, 0, 1, 1, 0,
-                          XCB_WINDOW_CLASS_INPUT_ONLY, XCB_COPY_FROM_PARENT, 0, nullptr);
-        xcb_map_window(X11GetConn(), checkWin);
-
-        // Set _NET_WM_NAME so tools can identify this WM
-        static const char k_WMName[] = "nyla-wm";
-        xcb_change_property(X11GetConn(), XCB_PROP_MODE_REPLACE, checkWin, X11GetAtoms().net_wm_name,
-                            X11GetAtoms().utf8_string, 8, sizeof(k_WMName) - 1, k_WMName);
-
-        // Self-referencing: checkWin._NET_SUPPORTING_WM_CHECK = checkWin
-        xcb_change_property(X11GetConn(), XCB_PROP_MODE_REPLACE, checkWin, X11GetAtoms().net_supporting_wm_check,
-                            XCB_ATOM_WINDOW, 32, 1, &checkWin);
-        // Root._NET_SUPPORTING_WM_CHECK = checkWin
-        xcb_change_property(X11GetConn(), XCB_PROP_MODE_REPLACE, X11GetRoot(), X11GetAtoms().net_supporting_wm_check,
-                            XCB_ATOM_WINDOW, 32, 1, &checkWin);
-    }
-
-    // Advertise EWMH features
-    {
-        const xcb_atom_t supportedAtoms[] = {X11GetAtoms().net_wm_moveresize};
-        xcb_change_property(X11GetConn(), XCB_PROP_MODE_REPLACE, X11GetRoot(), X11GetAtoms().net_supported,
-                            XCB_ATOM_ATOM, 32, sizeof(supportedAtoms) / sizeof(xcb_atom_t), supportedAtoms);
-    }
-
-    X11Grab();
-
-    xcb_query_tree_reply_t *treeReply =
-        xcb_query_tree_reply(X11GetConn(), xcb_query_tree(X11GetConn(), X11GetRoot()), nullptr);
-    if (treeReply)
-    {
-        xcb_window_t *children = xcb_query_tree_children(treeReply);
-        int numChildren = xcb_query_tree_children_length(treeReply);
-
-        for (int i = 0; i < numChildren; ++i)
-        {
-            xcb_window_t w = children[i];
-            xcb_get_window_attributes_reply_t *attrReply =
-                xcb_get_window_attributes_reply(X11GetConn(), xcb_get_window_attributes(X11GetConn(), w), nullptr);
-            if (!attrReply)
-                continue;
-            bool skip = attrReply->override_redirect || attrReply->map_state == XCB_MAP_STATE_UNMAPPED ||
-                        attrReply->_class == XCB_WINDOW_CLASS_INPUT_ONLY;
-            free(attrReply);
-            if (skip)
-                continue;
-            ManageClient(w);
-        }
-
-        free(treeReply);
-    }
-
-    auto grabKey = [](int meta, int alt, int ctrl, int shift, KeyPhysical key) {
-        uint32_t mod = 0;
-        if (meta)
-            mod |= XCB_MOD_MASK_4;
-        if (alt)
-            mod |= XCB_MOD_MASK_1;
-        if (ctrl)
-            mod |= XCB_MOD_MASK_CONTROL;
-        if (shift)
-            mod |= XCB_MOD_MASK_SHIFT;
-        uint32_t keycode = X11KeyPhysicalToKeyCode(key);
-        const xcb_generic_error_t *err =
-            xcb_request_check(X11GetConn(), xcb_grab_key_checked(X11GetConn(), 1, X11GetRoot(), mod, keycode,
-                                                                 XCB_GRAB_MODE_ASYNC, XCB_GRAB_MODE_ASYNC));
-        ASSERT(!err);
-    };
-
-    grabKey(1, 0, 0, 0, KeyPhysical::Backspace);
-    grabKey(0, 1, 0, 0, KeyPhysical::F4);
-    grabKey(1, 0, 0, 0, KeyPhysical::S);
-    grabKey(1, 0, 0, 0, KeyPhysical::D);
-    grabKey(1, 0, 0, 0, KeyPhysical::E);
-    grabKey(1, 0, 0, 0, KeyPhysical::R);
-    grabKey(1, 0, 0, 0, KeyPhysical::F);
-    grabKey(0, 1, 0, 1, KeyPhysical::Tab);
-    grabKey(0, 1, 0, 0, KeyPhysical::Tab);
-    grabKey(1, 0, 0, 0, KeyPhysical::G);
-    grabKey(1, 0, 0, 0, KeyPhysical::V);
-    grabKey(1, 0, 0, 0, KeyPhysical::T);
-    grabKey(1, 0, 1, 0, KeyPhysical::ArrowLeft);
-    grabKey(1, 0, 1, 0, KeyPhysical::ArrowRight);
-    grabKey(1, 0, 0, 0, KeyPhysical::ArrowLeft);
-    grabKey(1, 0, 0, 0, KeyPhysical::ArrowRight);
-    grabKey(1, 0, 0, 1, KeyPhysical::R);
-
-    X11Flush();
-    X11Ungrab();
-    X11Flush();
-}
-
 } // namespace
-
-// -- entry point --
 
 void UserMain()
 {
@@ -1838,21 +1678,238 @@ void UserMain()
     wm->data = DataBase(wm->index, wm->capacity);
     CommitMemPages(wm->memory.data, (uint8_t *)(wm->data + wm->capacity) - wm->memory.data);
 
-    WmDeserialize();
-    WmInit();
-    LOG("[wm] init done");
+    wm->moveresizeActive = false;
+    wm->barHeight = 20;
+    wm->monitorX = 0;
+    wm->monitorY = 0;
+    wm->monitorWidth = X11GetScreen()->width_in_pixels;
+    wm->monitorHeight = X11GetScreen()->height_in_pixels;
+    wm->shmDirty = true;
+    for (auto &s : wm->stacks)
+        s.flags |= window_stack::FlagCenterScroll;
 
-    // IPC channel — suppressed when NYLA_WM_NO_DAEMONS=1 (test harness)
-    // to avoid the test WM writing to the host's /dev/shm/nyla_wm and
-    // corrupting the real wm_overlay's status bar.
-    if (!getenv("NYLA_WM_NO_DAEMONS"))
-        wm->ipcChannel = ShmChannel::CreateWriter("nyla_wm", sizeof(wm_ipc_state), RegionAlloc::g_BootstrapAlloc);
+    if (xcb_request_check(X11GetConn(),
+                          xcb_change_window_attributes_checked(
+                              X11GetConn(), X11GetRoot(), XCB_CW_EVENT_MASK,
+                              (uint32_t[]){XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT | XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY |
+                                           XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_FOCUS_CHANGE})))
+    {
+        ASSERT(false && "another wm is already running");
+    }
+
+    // EWMH _NET_SUPPORTING_WM_CHECK detection protocol
+    {
+        xcb_window_t checkWin = xcb_generate_id(X11GetConn());
+        xcb_create_window(X11GetConn(), XCB_COPY_FROM_PARENT, checkWin, X11GetRoot(), 0, 0, 1, 1, 0,
+                          XCB_WINDOW_CLASS_INPUT_ONLY, XCB_COPY_FROM_PARENT, 0, nullptr);
+        xcb_map_window(X11GetConn(), checkWin);
+
+        static const char k_WMName[] = "nyla-wm";
+        xcb_change_property(X11GetConn(), XCB_PROP_MODE_REPLACE, checkWin, X11GetAtoms().net_wm_name,
+                            X11GetAtoms().utf8_string, 8, sizeof(k_WMName) - 1, k_WMName);
+
+        xcb_change_property(X11GetConn(), XCB_PROP_MODE_REPLACE, checkWin, X11GetAtoms().net_supporting_wm_check,
+                            XCB_ATOM_WINDOW, 32, 1, &checkWin);
+        xcb_change_property(X11GetConn(), XCB_PROP_MODE_REPLACE, X11GetRoot(), X11GetAtoms().net_supporting_wm_check,
+                            XCB_ATOM_WINDOW, 32, 1, &checkWin);
+    }
+
+    // Advertise EWMH features
+    {
+        const xcb_atom_t supportedAtoms[] = {X11GetAtoms().net_wm_moveresize};
+        xcb_change_property(X11GetConn(), XCB_PROP_MODE_REPLACE, X11GetRoot(), X11GetAtoms().net_supported,
+                            XCB_ATOM_ATOM, 32, sizeof(supportedAtoms) / sizeof(xcb_atom_t), supportedAtoms);
+    }
+
+    RandRRefresh();
+    RecalcTiers();
+
+    X11Grab();
+    X11Flush();
+    {
+        xcb_query_tree_reply_t *treeReply =
+            xcb_query_tree_reply(X11GetConn(), xcb_query_tree(X11GetConn(), X11GetRoot()), nullptr);
+        if (treeReply)
+        {
+            xcb_window_t *children = xcb_query_tree_children(treeReply);
+            int numChildren = xcb_query_tree_children_length(treeReply);
+
+            for (int i = 0; i < numChildren; ++i)
+            {
+                xcb_window_t w = children[i];
+                xcb_get_window_attributes_reply_t *attrReply =
+                    xcb_get_window_attributes_reply(X11GetConn(), xcb_get_window_attributes(X11GetConn(), w), nullptr);
+                if (!attrReply)
+                    continue;
+                bool skip = attrReply->override_redirect || attrReply->map_state == XCB_MAP_STATE_UNMAPPED ||
+                            attrReply->_class == XCB_WINDOW_CLASS_INPUT_ONLY;
+                free(attrReply);
+                if (skip)
+                    continue;
+                ManageClient(w);
+            }
+
+            free(treeReply);
+        }
+
+        if (wm->pendingClients.size > 0)
+        {
+            for (uint64_t i = 0; i < wm->pendingClients.size; ++i)
+            {
+                xcb_window_t cw = wm->pendingClients[i];
+                window_index_entry *idx = FindIndex(cw);
+                if (!idx || !idx->parent)
+                    continue;
+                for (int j = 0; j < 10; ++j)
+                {
+                    window_index_entry *p = FindIndex(idx->parent);
+                    if (!p || !p->parent)
+                        break;
+                    idx->parent = p->parent;
+                }
+                if (!FindIndex(idx->parent))
+                    idx->flags |= window_index_entry::Flag_PendingParent;
+            }
+
+            bool activated = false;
+            for (uint64_t i = 0; i < wm->pendingClients.size; ++i)
+            {
+                xcb_window_t cw = wm->pendingClients[i];
+                window_index_entry *idx = FindIndex(cw);
+                if (!idx)
+                    continue;
+                bool knownTransient = idx->parent && !(idx->flags & window_index_entry::Flag_PendingParent);
+                window_stack *ts = &wm->stacks[wm->activeStackIndex];
+                if (knownTransient)
+                {
+                    for (uint32_t s = 0; s < 9; ++s)
+                    {
+                        if (InlineVec::Find(wm->stacks[s].windows, idx->parent))
+                        {
+                            ts = &wm->stacks[s];
+                            break;
+                        }
+                    }
+                }
+                InlineVec::Append(ts->windows, cw);
+                if (!activated)
+                {
+                    ts->activeWindow = cw;
+                    activated = true;
+                }
+            }
+            InlineVec::Clear(wm->pendingClients);
+        }
+
+        {
+            file_handle f = FileOpen({(uint8_t *)kStateFilePath, CStrLen(kStateFilePath, 32)}, FileOpenMode::Read);
+            if (FileValid(f))
+            {
+                uint8_t buf[4096];
+                uint32_t len = FileRead(f, 4096, buf);
+                FileClose(f);
+                unlink(kStateFilePath);
+
+                if (len >= 6)
+                {
+                    byte_parser p;
+                    ByteParser::Init(p, buf, len);
+                    auto read8 = [&]() { return ByteParser::ReadOrDefault(p, 0); };
+                    auto read32 = [&]() { return ByteParser::BytesLeft(p) >= 4 ? ByteParser::Read<uint32_t>(p) : 0u; };
+
+                    if (read32() == kStateMagic)
+                    {
+                        wm->activeStackIndex = read8();
+                        if (wm->activeStackIndex < 9)
+                        {
+                            wm->follow = (read8() != 0);
+                            for (int s = 0; s < 9; ++s)
+                            {
+                                uint8_t fl = read8();
+                                uint8_t fh = read8();
+                                wm->stacks[s].flags = (uint16_t)fl | ((uint16_t)fh << 8);
+                                for (;;)
+                                {
+                                    xcb_window_t xid = (xcb_window_t)read32();
+                                    if (!xid)
+                                        break;
+                                    uint8_t ti = read8();
+                                    bool isActive = (read8() != 0);
+                                    window_index_entry *ix = FindIndex(xid);
+                                    if (!ix)
+                                        continue;
+                                    ix->dataEntry->tierIndex = ti;
+                                    for (uint32_t cs = 0; cs < 9; ++cs)
+                                    {
+                                        xcb_window_t *wp = InlineVec::Find(wm->stacks[cs].windows, xid);
+                                        if (wp)
+                                        {
+                                            InlineVec::Erase(wm->stacks[cs].windows, wp);
+                                            break;
+                                        }
+                                    }
+                                    InlineVec::Append(wm->stacks[s].windows, xid);
+                                    if (isActive)
+                                    {
+                                        wm->stacks[s].activeWindow = xid;
+                                        if (s == wm->activeStackIndex)
+                                            Activate(wm->stacks[s], xid, XCB_CURRENT_TIME);
+                                    }
+                                }
+                            }
+                        }
+                        wm->layoutDirty = true;
+                    }
+                }
+            }
+        }
+
+        auto grabKey = [](int meta, int alt, int ctrl, int shift, KeyPhysical key) {
+            uint32_t mod = 0;
+            if (meta)
+                mod |= XCB_MOD_MASK_4;
+            if (alt)
+                mod |= XCB_MOD_MASK_1;
+            if (ctrl)
+                mod |= XCB_MOD_MASK_CONTROL;
+            if (shift)
+                mod |= XCB_MOD_MASK_SHIFT;
+            uint32_t keycode = X11KeyPhysicalToKeyCode(key);
+            const xcb_generic_error_t *err =
+                xcb_request_check(X11GetConn(), xcb_grab_key_checked(X11GetConn(), 1, X11GetRoot(), mod, keycode,
+                                                                     XCB_GRAB_MODE_ASYNC, XCB_GRAB_MODE_ASYNC));
+            ASSERT(!err);
+        };
+
+        grabKey(1, 0, 0, 0, KeyPhysical::Backspace);
+        grabKey(0, 1, 0, 0, KeyPhysical::F4);
+        grabKey(1, 0, 0, 0, KeyPhysical::S);
+        grabKey(1, 0, 0, 0, KeyPhysical::D);
+        grabKey(1, 0, 0, 0, KeyPhysical::E);
+        grabKey(1, 0, 0, 0, KeyPhysical::R);
+        grabKey(1, 0, 0, 0, KeyPhysical::F);
+        grabKey(0, 1, 0, 1, KeyPhysical::Tab);
+        grabKey(0, 1, 0, 0, KeyPhysical::Tab);
+        grabKey(1, 0, 0, 0, KeyPhysical::G);
+        grabKey(1, 0, 0, 0, KeyPhysical::V);
+        grabKey(1, 0, 0, 0, KeyPhysical::T);
+        grabKey(1, 0, 1, 0, KeyPhysical::ArrowLeft);
+        grabKey(1, 0, 1, 0, KeyPhysical::ArrowRight);
+        grabKey(1, 0, 0, 0, KeyPhysical::ArrowLeft);
+        grabKey(1, 0, 0, 0, KeyPhysical::ArrowRight);
+        grabKey(1, 0, 0, 1, KeyPhysical::R);
+    }
+    X11Ungrab();
+    X11Flush();
+
+    LOG("[wm] init done");
 
     // Launch overlay and daemons (best-effort, non-blocking).
     // Suppressed when NYLA_WM_NO_DAEMONS=1 (test harness).
     if (!getenv("NYLA_WM_NO_DAEMONS"))
     {
-        // Launch overlay. Resolve wm_overlay path relative to wm binary.
+        wm->ipcChannel = ShmChannel::CreateWriter("nyla_wm", sizeof(wm_ipc_state), RegionAlloc::g_BootstrapAlloc);
+
         (void)!system("pkill wm_overlay 2>/dev/null");
         {
             char wmPath[256];
@@ -1860,7 +1917,6 @@ void UserMain()
             if (len > 0)
             {
                 wmPath[len] = '\0';
-                // Find last '/' to get the directory
                 char *lastSlash = strrchr(wmPath, '/');
                 if (lastSlash)
                 {
