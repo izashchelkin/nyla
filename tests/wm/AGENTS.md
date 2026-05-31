@@ -3,7 +3,7 @@
 Integration tests (`test_wm.cc`) that run the real WM binary against Xvfb.
 
 ```
-tests/wm/test_wm.cc    ← single-file test harness (~1700 lines)
+tests/wm/test_wm.cc    ← single-file test harness (~1900 lines)
 tests/wm/AGENTS.md      ← this file
 ```
 
@@ -22,35 +22,18 @@ cmake --build build/linux-debug --target wm wm_test
 cd build/linux-debug && ctest -R wm_test --output-on-failure
 ```
 
-## Xvfb server grab deadlock — THE critical invariant
+## X11 server grab during WmInit
 
-**Do NOT share an XCB connection or its fd with the WM process.** The root cause of the original hang was Xvfb failing to multiplex connections after a `xcb_grab_server()` / `xcb_ungrab_server()` cycle via `SUBSTRUCTURE_REDIRECT`.
+The WM brackets `WmInit()` with `X11Grab()`/`X11Ungrab()` + explicit `X11Flush()` after each. The grab prevents other X11 clients from racing with WM initialization (window tree query, key grabs). The ungrab must be flushed to the socket — without the flush, the ungrab sits in XCB's output buffer and the event loop deadlocks in `poll()` because no events arrive while the server is still grabbed.
 
-The workaround in `WmInit()` is to **skip** `X11Grab()`/`X11Ungrab()` entirely. The WM debug output confirms this:
+The test handles this by:
+1. Interning all X11 atoms **before** starting the WM (so no X11 ops are needed during the grab)
+2. Sleeping 2s after WM fork to let `WmInit` + ungrab complete
+3. Only then connecting to the X server
 
-```
-[wm] WmInit: X11Grab (skipped for test)
-[wm] WmInit: X11Ungrab done (skipped for test)
-```
+## FD_CLOEXEC for serialization restart
 
-**Important:** The invariant is still enforced at connection level. The test client's `conn` **must not exist** at the time the WM `fork()`s:
-
-1. `Setup()` forks Xvfb :98
-2. `Setup()` calls `StartWm()` — **no XCB connection exists yet**; the fork can't inherit one
-3. WM finishes `WmInit()` (2 sec sleep)
-4. `Setup()` now creates `xcb_connect(":98")` — fresh connection, never exposed to fork or grab
-
-If you ever need to start a second WM instance mid-test (like the serialization restart test), mark the test's xcb fd as `FD_CLOEXEC` before forking to prevent socket inheritance — see "Serialization restart" below.
-
-## `xcb_poll_for_reply` does NOT work for core protocol
-
-`xcb_poll_for_reply` was added in xcb 1.13 for **extension** replies. It silently drops core protocol replies. Always use blocking `xcb_get_*_reply()` for core requests. The time it takes is negligible in tests.
-
-## `xcb_disconnect` destroys all windows owned by the connection
-
-Disconnecting an XCB connection tells the X server to destroy every window created on that connection. This is a hard X11 protocol rule.
-
-In the serialization restart test, the test creates windows `w0` and `w1`, then the WM restarts. The test must keep those windows alive across the restart so the new WM can find and re-manage them. The fix is **FD_CLOEXEC**, not disconnect:
+**Do NOT share an XCB connection fd with a forked WM process.** When the serialization restart test forks a new WM instance, the test's xcb socket must be marked `FD_CLOEXEC` to prevent the child from inheriting it:
 
 ```c
 // Mark fd as close-on-exec so fork'd WM doesn't inherit the socket.
@@ -63,6 +46,12 @@ if (flags != -1)
 // Now safe to fork a new WM. Our conn and windows survive.
 StartWm(display);
 ```
+
+`xcb_disconnect` destroys all windows owned by that connection — a hard X11 protocol rule. FD_CLOEXEC is the correct approach.
+
+## `xcb_poll_for_reply` — use blocking replies instead
+
+`xcb_poll_for_reply` returns 1 if the reply is ready, 0 if not (non-blocking poll). In older xcb (<1.13) it only matched extension request sequence numbers correctly. For reliability across xcb versions, always use blocking `xcb_get_*_reply()` for core protocol requests. The time cost is negligible in tests.
 
 ## `NYLA_WM_NO_DAEMONS` — isolation from host WM
 

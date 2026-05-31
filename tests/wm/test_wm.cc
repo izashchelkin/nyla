@@ -1872,8 +1872,7 @@ int main()
     TestOverrideRedirectNotManaged();
     TestTransientWindowPosition();
 
-    // RandR monitor hotplug — disabled pending Xephyr ghosting fix.
-    // TestRandRResolutionChange();
+    // RandR monitor hotplug — removed (no WM RandR handling).
 
     // Serialization/restart — must run LAST because it restarts the WM.
     TestSerializationRestart();

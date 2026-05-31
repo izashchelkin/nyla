@@ -5,8 +5,8 @@
 #include "nyla/commons/hash.h"
 #include "nyla/commons/input_manager.h"
 #include "nyla/commons/keyboard.h"
-#include "nyla/commons/minmax.h"
 #include "nyla/commons/mem.h"
+#include "nyla/commons/minmax.h"
 #include "nyla/commons/tunables.h"
 
 namespace nyla
@@ -555,8 +555,7 @@ auto Button(ui_state &s, uint32_t localId, byteview label, uint32_t restingFg, u
             uint32_t fg = restingFg;
             uint32_t bg = hover ? restingFg : s.theme.bg;
             // Fill background strip then paint label inverted on hover
-            UiPaint::Text((uint32_t)x, (uint32_t)y, byteview{line, total},
-                          hover ? s.theme.bg : restingFg,
+            UiPaint::Text((uint32_t)x, (uint32_t)y, byteview{line, total}, hover ? s.theme.bg : restingFg,
                           hover ? restingFg : s.theme.bg);
         }
         RecordItem(s, x, y, (int32_t)total, 1);
@@ -816,7 +815,7 @@ auto BeginWindow(ui_state &s, uint32_t localId, const ui_window_desc &desc) -> b
         {
             int32_t skip = startCol - tx;
             UiPaint::Text((uint32_t)startCol, (uint32_t)ty, byteview{line + skip, (uint64_t)(endCol - startCol)},
-                               s.theme.bg, s.theme.focusedFg);
+                          s.theme.bg, s.theme.focusedFg);
         }
     }
 
@@ -836,8 +835,8 @@ auto BeginWindow(ui_state &s, uint32_t localId, const ui_window_desc &desc) -> b
             if (row < 0 || row >= (int32_t)s.viewportRows)
                 continue;
             if (endCol > startCol)
-                UiPaint::Text((uint32_t)startCol, (uint32_t)row,
-                                   byteview{line + skip, (uint64_t)(endCol - startCol)}, s.theme.focusedFg, s.theme.bg);
+                UiPaint::Text((uint32_t)startCol, (uint32_t)row, byteview{line + skip, (uint64_t)(endCol - startCol)},
+                              s.theme.focusedFg, s.theme.bg);
         }
     }
 
@@ -1080,9 +1079,7 @@ auto BeginChild(ui_state &s, uint32_t localId, const ui_child_desc &desc) -> boo
     // Scroll handling: consume wheel edges when pointer is over child rect.
     if ((desc.flags & kChildFlagScrollable) && desc.scrollY && contentH > 0)
     {
-        bool pointerOverChild =
-            s.pointerX >= ox && s.pointerX < ox + cx &&
-            s.pointerY >= oy && s.pointerY < oy + cy;
+        bool pointerOverChild = s.pointerX >= ox && s.pointerX < ox + cx && s.pointerY >= oy && s.pointerY < oy + cy;
 
         if (pointerOverChild)
         {
