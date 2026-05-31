@@ -273,6 +273,11 @@ static constexpr uint32_t kDefaultWindowWidth = 1280;
 static constexpr const char *kStateFilePath = "/tmp/nyla_wm_state";
 static constexpr uint32_t kStateMagic = DWordBE("NYLA");
 
+auto DataBase(window_index_entry *idx, uint32_t cap) -> window_data_entry *
+{
+    return (window_data_entry *)(idx + cap);
+}
+
 void ManageClient(xcb_window_t clientWindow)
 {
     if (FindIndex(clientWindow))
@@ -281,7 +286,7 @@ void ManageClient(xcb_window_t clientWindow)
     if (wm->windowCount >= wm->capacity)
     {
         uint32_t newCap = wm->capacity * 2;
-        window_data_entry *newData = (window_data_entry *)(wm->index + newCap);
+        window_data_entry *newData = DataBase(wm->index, newCap);
         CommitMemPages(wm->memory.data, (uint8_t *)(newData + newCap) - wm->memory.data);
         window_data_entry *oldData = wm->data;
         MemMove(newData, oldData, wm->windowCount * sizeof(window_data_entry));
@@ -649,6 +654,7 @@ void WmProcess(bool &isRunning)
                 }
                 {
                     uint8_t buf[4096];
+                    // Serialization format — keep in sync with WmDeserialize
                     uint32_t pos = 0;
                     auto writeU32 = [&](uint32_t v) {
                         MemCpy(buf + pos, &v, 4);
@@ -1033,7 +1039,7 @@ void WmProcess(bool &isRunning)
                             if (!qr)
                             {
                                 Activate(ftStack, XCB_CURRENT_TIME);
-                                goto focus_check_done;
+                                goto focus_check_done; // skip post-walk: foreign window
                             }
                             xcb_window_t par = qr->parent;
                             free(qr);
@@ -1399,40 +1405,34 @@ void WmProcess(bool &isRunning)
 
             inline_vec<int32_t, 64> winX{};
             inline_vec<uint32_t, 64> winW{};
+            int32_t xc = 0;
+            for (uint32_t j = 0; j < n; ++j)
             {
-                uint32_t nw = (uint32_t)stack.windows.size;
-                int32_t xc = 0;
-                for (uint32_t j = 0; j < nw; ++j)
-                {
-                    xcb_window_t cw = stack.windows[j];
-                    window_index_entry *cix = FindIndex(cw);
-                    uint32_t w = cix ? TierWidth(cix->dataEntry->tierIndex) : kDefaultWindowWidth;
-                    uint32_t capW = Min(w, (uint32_t)viewW);
-                    if (cix && cix->dataEntry->maxWidth)
-                        capW = Min(capW, cix->dataEntry->maxWidth);
-                    capW = Max(capW, 100u);
-                    InlineVec::Append(winX, xc);
-                    InlineVec::Append(winW, capW);
-                    xc += (int32_t)capW;
-                }
+                xcb_window_t cw = stack.windows[j];
+                window_index_entry *cix = FindIndex(cw);
+                uint32_t w = cix ? TierWidth(cix->dataEntry->tierIndex) : kDefaultWindowWidth;
+                uint32_t capW = Min(w, (uint32_t)viewW);
+                if (cix && cix->dataEntry->maxWidth)
+                    capW = Min(capW, cix->dataEntry->maxWidth);
+                capW = Max(capW, 100u);
+                InlineVec::Append(winX, xc);
+                InlineVec::Append(winW, capW);
+                xc += (int32_t)capW;
             }
 
             int32_t contentEnd = InlineVec::Back(winX) + (int32_t)InlineVec::Back(winW);
-            int32_t contentWidth = contentEnd;
 
-            // When the strip fits within the viewport, center it by shifting
-            // all window positions. This avoids negative scroll values that
-            // X11 ConfigureWindow can't represent.
-            if (contentWidth <= viewW)
+            // When center-scroll is on and the strip fits, center the whole
+            // strip. Otherwise offset by 40px for the leftmost gap.
+            if ((stack.flags & window_stack::FlagCenterScroll) && contentEnd <= viewW)
             {
-                int32_t centerOffset = (viewW - contentWidth) / 2;
+                int32_t centerOffset = (viewW - contentEnd) / 2;
                 for (uint32_t i = 0; i < n; ++i)
                     winX[i] += centerOffset;
                 contentEnd += centerOffset;
             }
             else
             {
-                // Offset entire strip by 40px so the leftmost window has a gap.
                 for (uint32_t i = 0; i < n; ++i)
                     winX[i] += 40;
                 contentEnd += 40;
@@ -1449,10 +1449,10 @@ void WmProcess(bool &isRunning)
             {
                 scroll = winLeft + (int32_t)winW[activeIndex] / 2 - viewW / 2;
             }
-            else if (contentWidth > viewW)
+            else
             {
-                int32_t lo = winRight - (viewW - gap); // min scroll (right edge in bounds)
-                int32_t hi = winLeft - gap;            // max scroll (left edge in bounds)
+                int32_t lo = winRight - (viewW - gap);
+                int32_t hi = winLeft - gap;
                 if (lo <= hi)
                     scroll = Clamp(scroll, lo, hi);
                 else
@@ -1605,6 +1605,7 @@ void WmDeserialize()
         return;
 
     uint8_t buf[4096];
+    // Deserialization format — keep in sync with serialization in WmRestart
     uint32_t len = FileRead(f, 4096, buf);
     FileClose(f);
 
@@ -1834,7 +1835,7 @@ void UserMain()
     wm->memory = MemPagePool::AcquireChunk();
     wm->capacity = 16;
     wm->index = (window_index_entry *)wm->memory.data;
-    wm->data = (window_data_entry *)(wm->index + wm->capacity);
+    wm->data = DataBase(wm->index, wm->capacity);
     CommitMemPages(wm->memory.data, (uint8_t *)(wm->data + wm->capacity) - wm->memory.data);
 
     WmDeserialize();
