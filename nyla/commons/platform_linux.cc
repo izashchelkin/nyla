@@ -89,8 +89,15 @@ auto API FileOpen(byteview path, FileOpenMode mode) -> file_handle
         }
     }
 
+    // Null-terminate inline -- caller may not have done so, and a stale terminator
+    // (e.g. from arena corruption by third-party parsers) triggers DASSERT in CStr().
+    uint8_t pathBuf[4096];
+    uint32_t copyLen = path.size < sizeof(pathBuf) - 1 ? path.size : sizeof(pathBuf) - 1;
+    MemCpy(pathBuf, path.data, copyLen);
+    pathBuf[copyLen] = 0;
+
     // NOLINTNEXTLINE(performance-no-int-to-ptr)
-    return (void *)(int64_t)open(Span::CStr(path), flag, 0666);
+    return (void *)(int64_t)open((const char *)pathBuf, flag, 0666);
 }
 
 void API FileClose(file_handle file)

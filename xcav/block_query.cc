@@ -29,9 +29,10 @@ auto IsStructuralType(const char *t) -> bool
 {
     return StrEq(t, "function_definition") || StrEq(t, "function_declaration") || StrEq(t, "method_declaration") ||
            StrEq(t, "method_definition") || StrEq(t, "struct_specifier") || StrEq(t, "class_specifier") ||
-           StrEq(t, "class_declaration") || StrEq(t, "enum_specifier") || StrEq(t, "enum_declaration") ||
-           StrEq(t, "union_specifier") || StrEq(t, "declaration") || StrEq(t, "template_declaration") ||
-           StrEq(t, "comment") || StrEq(t, "preproc_include") || StrEq(t, "namespace_definition") ||
+           StrEq(t, "class_declaration") || StrEq(t, "constructor_declaration") || StrEq(t, "enum_specifier") ||
+           StrEq(t, "enum_declaration") || StrEq(t, "union_specifier") || StrEq(t, "declaration") ||
+           StrEq(t, "template_declaration") || StrEq(t, "comment") || StrEq(t, "preproc_include") ||
+           StrEq(t, "namespace_definition") ||
            // TypeScript/JavaScript
            StrEq(t, "generator_function_declaration") || StrEq(t, "arrow_function") || StrEq(t, "class") ||
            StrEq(t, "interface_declaration") || StrEq(t, "type_alias_declaration") || StrEq(t, "export_statement") ||
@@ -39,19 +40,13 @@ auto IsStructuralType(const char *t) -> bool
            StrEq(t, "abstract_class_declaration") || StrEq(t, "ambient_declaration");
 }
 
-auto IsInnerBlockType(const char *t) -> bool
-{
-    return StrEq(t, "compound_statement") || StrEq(t, "if_statement") || StrEq(t, "for_statement") ||
-           StrEq(t, "while_statement") || StrEq(t, "do_statement") || StrEq(t, "switch_statement") ||
-           StrEq(t, "case_statement");
-}
-
 // ─── BlockTypeLabel ─────────────────────────────────────────────────────────
 
 auto BlockTypeLabel(const char *t) -> const char *
 {
     if (StrEq(t, "function_definition") || StrEq(t, "function_declaration") || StrEq(t, "method_definition") ||
-        StrEq(t, "method_declaration") || StrEq(t, "generator_function_declaration") || StrEq(t, "arrow_function"))
+        StrEq(t, "method_declaration") || StrEq(t, "constructor_declaration") ||
+        StrEq(t, "generator_function_declaration") || StrEq(t, "arrow_function"))
         return "func";
     if (StrEq(t, "struct_specifier"))
         return "struct";
@@ -190,10 +185,14 @@ auto NodeName(TSNode node, byteview source) -> inline_string<128>
     {
         TSNode child = ts_node_child(node, i);
         const char *typeStr = ts_node_type(child);
-        // For template_declaration, class_specifier, struct_specifier, enum_specifier:
-        // the name is in a child container, recurse to find it.
+        // For container nodes (declarations, specifiers, export statements):
+        // the name is nested inside, recurse to find it.
         if (StrEq(typeStr, "template_declaration") || StrEq(typeStr, "class_specifier") ||
-            StrEq(typeStr, "struct_specifier") || StrEq(typeStr, "enum_specifier"))
+            StrEq(typeStr, "struct_specifier") || StrEq(typeStr, "enum_specifier") ||
+            StrEq(typeStr, "function_declaration") || StrEq(typeStr, "function_definition") ||
+            StrEq(typeStr, "method_definition") || StrEq(typeStr, "variable_declarator") ||
+            StrEq(typeStr, "lexical_declaration") || StrEq(typeStr, "variable_declaration") ||
+            StrEq(typeStr, "export_statement"))
         {
             auto innerName = NodeName(child, source);
             if (innerName.size > 0)
@@ -238,10 +237,156 @@ auto NodeName(TSNode node, byteview source) -> inline_string<128>
     return name;
 }
 
+// ─── ExtractMethodSignature ─────────────────────────────────────────────────
+// Build a method/constructor signature for display in xcav blocks output.
+// Extracts modifiers, return type (methods only), name, parameters, and
+// throws clause directly from the tree-sitter CST — zero semantic analysis.
+// Returns empty string for non-method blocks.
+
+auto ExtractMethodSignature(TSNode node, byteview source) -> inline_string<512>
+{
+    inline_string<512> sig{};
+
+    const char *nodeType = ts_node_type(node);
+    bool isConstructor = StrEq(nodeType, "constructor_declaration");
+    bool isMethod = StrEq(nodeType, "method_declaration");
+
+    if (!isConstructor && !isMethod)
+        return sig;
+
+    // ── Modifiers (skip annotations) ──
+    // modifiers are anonymous keyword tokens ('public', 'static', 'final', etc.)
+    // mixed with named annotation/marker_annotation nodes.
+    uint32_t childCount = ts_node_child_count(node);
+    for (uint32_t i = 0; i < childCount; ++i)
+    {
+        TSNode child = ts_node_child(node, i);
+        if (!StrEq(ts_node_type(child), "modifiers"))
+            continue;
+
+        uint32_t mc = ts_node_child_count(child);
+        bool first = true;
+        for (uint32_t mi = 0; mi < mc; ++mi)
+        {
+            TSNode mnode = ts_node_child(child, mi);
+            // Skip annotations (named nodes). Modifier keywords are anonymous.
+            if (ts_node_is_named(mnode))
+                continue;
+
+            if (!first && sig.size > 0)
+                InlineVec::Append(sig, (uint8_t)' ');
+            first = false;
+
+            node_range r = NodeRange(mnode);
+            for (uint32_t k = r.startByte; k < r.endByte && sig.size < 511; ++k)
+                InlineVec::Append(sig, source.data[k]);
+        }
+        if (sig.size > 0)
+            InlineVec::Append(sig, (uint8_t)' ');
+        break; // only one modifiers node
+    }
+
+    // ── Return type (methods only, not constructors) ──
+    if (!isConstructor)
+    {
+        TSNode retType = ts_node_child_by_field_name(node, "type", 4);
+        if (!ts_node_is_null(retType))
+        {
+            node_range r = NodeRange(retType);
+            for (uint32_t k = r.startByte; k < r.endByte && sig.size < 511; ++k)
+                InlineVec::Append(sig, source.data[k]);
+            InlineVec::Append(sig, (uint8_t)' ');
+        }
+    }
+
+    // ── Method name ──
+    TSNode nameNode = ts_node_child_by_field_name(node, "name", 4);
+    if (!ts_node_is_null(nameNode))
+    {
+        node_range r = NodeRange(nameNode);
+        for (uint32_t k = r.startByte; k < r.endByte && sig.size < 511; ++k)
+            InlineVec::Append(sig, source.data[k]);
+    }
+
+    // ── Parameters ──
+    InlineVec::Append(sig, (uint8_t)'(');
+    TSNode params = ts_node_child_by_field_name(node, "parameters", 10);
+    if (!ts_node_is_null(params))
+    {
+        uint32_t pc = ts_node_child_count(params);
+        bool first = true;
+        for (uint32_t i = 0; i < pc; ++i)
+        {
+            TSNode p = ts_node_child(params, i);
+            if (!ts_node_is_named(p))
+                continue;
+            const char *pt = ts_node_type(p);
+
+            if (!first)
+            {
+                InlineVec::Append(sig, (uint8_t)',');
+                InlineVec::Append(sig, (uint8_t)' ');
+            }
+            first = false;
+
+            if (StrEq(pt, "spread_parameter"))
+            {
+                // varargs: use full text (type + '...' + name)
+                node_range r = NodeRange(p);
+                for (uint32_t k = r.startByte; k < r.endByte && sig.size < 511; ++k)
+                    InlineVec::Append(sig, source.data[k]);
+            }
+            else if (StrEq(pt, "formal_parameter"))
+            {
+                TSNode pType = ts_node_child_by_field_name(p, "type", 4);
+                TSNode pName = ts_node_child_by_field_name(p, "name", 4);
+                if (!ts_node_is_null(pType))
+                {
+                    node_range r = NodeRange(pType);
+                    for (uint32_t k = r.startByte; k < r.endByte && sig.size < 511; ++k)
+                        InlineVec::Append(sig, source.data[k]);
+                }
+                if (!ts_node_is_null(pName))
+                {
+                    InlineVec::Append(sig, (uint8_t)' ');
+                    node_range r = NodeRange(pName);
+                    for (uint32_t k = r.startByte; k < r.endByte && sig.size < 511; ++k)
+                        InlineVec::Append(sig, source.data[k]);
+                }
+            }
+            else
+            {
+                // receiver_parameter, inferred_parameters, etc.
+                node_range r = NodeRange(p);
+                for (uint32_t k = r.startByte; k < r.endByte && sig.size < 511; ++k)
+                    InlineVec::Append(sig, source.data[k]);
+            }
+        }
+    }
+    InlineVec::Append(sig, (uint8_t)')');
+
+    // ── Throws clause ──
+    // throws is an unnamed child of method_declaration / constructor_declaration.
+    for (uint32_t i = 0; i < childCount; ++i)
+    {
+        TSNode child = ts_node_child(node, i);
+        if (StrEq(ts_node_type(child), "throws"))
+        {
+            InlineVec::Append(sig, (uint8_t)' ');
+            node_range r = NodeRange(child);
+            for (uint32_t k = r.startByte; k < r.endByte && sig.size < 511; ++k)
+                InlineVec::Append(sig, source.data[k]);
+            break;
+        }
+    }
+
+    return sig;
+}
+
 // ─── CollectBlockNodes ──────────────────────────────────────────────────────
 
-void CollectBlockNodes(TSNode node, inline_vec<block_info, 256> &result, int depth, bool recurse,
-                       byteview source, source_language lang)
+void CollectBlockNodes(TSNode node, inline_vec<block_info, 256> &result, int depth, bool recurse, byteview source,
+                       source_language lang)
 {
     uint32_t childCount = ts_node_child_count(node);
     for (uint32_t i = 0; i < childCount; ++i)
@@ -256,12 +401,11 @@ void CollectBlockNodes(TSNode node, inline_vec<block_info, 256> &result, int dep
         // Java: recurse into class/interface/enum bodies to find methods.
         // Tree-sitter Java may expose method_declaration as children of both
         // the declaration and the body node, so we deduplicate by position.
-        bool isJavaContainer = (lang == source_language::Java) && recurse &&
-                               (StrEq(typeStr, "class_declaration") || StrEq(typeStr, "interface_declaration") ||
-                                StrEq(typeStr, "enum_declaration") ||
-                                StrEq(typeStr, "class_body") || StrEq(typeStr, "interface_body") ||
-                                StrEq(typeStr, "enum_body") ||
-                                StrEq(typeStr, "enum_body_declarations"));
+        bool isJavaContainer =
+            (lang == source_language::Java) && recurse &&
+            (StrEq(typeStr, "class_declaration") || StrEq(typeStr, "interface_declaration") ||
+             StrEq(typeStr, "enum_declaration") || StrEq(typeStr, "class_body") || StrEq(typeStr, "interface_body") ||
+             StrEq(typeStr, "enum_body") || StrEq(typeStr, "enum_body_declarations"));
         if (isJavaContainer)
             CollectBlockNodes(child, result, depth, true, source, lang);
 
@@ -269,9 +413,11 @@ void CollectBlockNodes(TSNode node, inline_vec<block_info, 256> &result, int dep
         {
             CollectBlockNodes(child, result, depth, true, source, lang);
         }
-        else if (IsStructuralType(typeStr) && !StrEq(typeStr, "comment"))
+        else if (IsStructuralType(typeStr) && !StrEq(typeStr, "comment") && !StrEq(typeStr, "preproc_include") &&
+                 !StrEq(typeStr, "import_statement"))
         {
             node_range r = NodeRange(child);
+
             inline_string<128> typeName{};
             while (*typeCopy && typeName.size < 127)
             {
@@ -279,24 +425,67 @@ void CollectBlockNodes(TSNode node, inline_vec<block_info, 256> &result, int dep
                 ++typeCopy;
             }
 
-            inline_string<128> name{};
-            if (StrEq(typeStr, "preproc_include"))
+            inline_string<128> name = NodeName(child, source);
+
+            // Extract method signature for Java method-like blocks.
+            inline_string<512> signature{};
+            if (lang == source_language::Java)
+                signature = ExtractMethodSignature(child, source);
+
+            // Filter nameless single-line declarations (forward decls,
+            // trivial variable declarations) -- never useful targets.
+            if (StrEq(typeStr, "declaration") && r.startRow == r.endRow && name.size == 0)
+                continue;
+            // Collect Java annotations from modifiers/annotation children.
+            inline_string<64> annotation{};
+            if (lang == source_language::Java)
             {
-                uint32_t len = r.endByte - r.startByte;
-                name = IncludePath(byteview{source.data + r.startByte, len});
+                uint32_t ac = ts_node_child_count(child);
+                for (uint32_t ai = 0; ai < ac; ++ai)
+                {
+                    TSNode anode = ts_node_child(child, ai);
+                    if (!ts_node_is_named(anode))
+                        continue;
+                    const char *aType = ts_node_type(anode);
+                    if (StrEq(aType, "modifiers"))
+                    {
+                        uint32_t mc = ts_node_child_count(anode);
+                        for (uint32_t mi = 0; mi < mc; ++mi)
+                        {
+                            TSNode mnode = ts_node_child(anode, mi);
+                            if (!ts_node_is_named(mnode))
+                                continue;
+                            const char *mType = ts_node_type(mnode);
+                            if (StrEq(mType, "annotation") || StrEq(mType, "marker_annotation"))
+                            {
+                                node_range ar = NodeRange(mnode);
+                                if (annotation.size > 0)
+                                    InlineVec::Append(annotation, (uint8_t)' ');
+                                for (uint32_t ak = ar.startByte; ak < ar.endByte && annotation.size < 63; ++ak)
+                                    InlineVec::Append(annotation, source.data[ak]);
+                            }
+                        }
+                    }
+                    else if (StrEq(aType, "annotation") || StrEq(aType, "marker_annotation"))
+                    {
+                        node_range ar = NodeRange(anode);
+                        if (annotation.size > 0)
+                            InlineVec::Append(annotation, (uint8_t)' ');
+                        for (uint32_t ak = ar.startByte; ak < ar.endByte && annotation.size < 63; ++ak)
+                            InlineVec::Append(annotation, source.data[ak]);
+                    }
+                }
             }
-            else
-            {
-                name = NodeName(child, source);
-            }            // Deduplicate: Java tree-sitter may expose the same block via
+
+            // Deduplicate: Java tree-sitter may expose the same block via
             // both the declaration and its body node.
             bool duplicate = false;
             for (uint64_t j = 0; j < result.size; ++j)
             {
                 block_info &existing = result.data.data[j];
                 if (existing.startLine == r.startRow && existing.endLine == r.endRow &&
-                existing.type.size == typeName.size &&
-                MemEq(existing.type.data.data, typeName.data.data, typeName.size))
+                    existing.type.size == typeName.size &&
+                    MemEq(existing.type.data.data, typeName.data.data, typeName.size))
                 {
                     // Same position: keep the one with a better name (non-empty).
                     if (name.size > 0 && existing.name.size == 0)
@@ -310,6 +499,8 @@ void CollectBlockNodes(TSNode node, inline_vec<block_info, 256> &result, int dep
                 InlineVec::Append(result, block_info{
                                               .type = typeName,
                                               .name = name,
+                                              .signature = signature,
+                                              .annotation = annotation,
                                               .startLine = r.startRow,
                                               .endLine = r.endRow,
                                               .startByte = r.startByte,
@@ -416,8 +607,17 @@ auto ReadBlock(byteview filePath, uint32_t line, region_alloc &alloc, bool raw) 
     result.startByte = bl.range.startByte;
     result.endByte = bl.range.endByte;
 
-    uint32_t blockLen = bl.range.endByte - bl.range.startByte;
-    byteview blockText{source.data + bl.range.startByte, blockLen};
+    // Round to line boundaries: read always outputs whole lines.
+    uint32_t lineStartByte = bl.range.startByte;
+    while (lineStartByte > 0 && source.data[lineStartByte - 1] != '\n')
+        --lineStartByte;
+    uint32_t lineEndByte = bl.range.endByte;
+    while (lineEndByte < source.size && source.data[lineEndByte] != '\n')
+        ++lineEndByte;
+    if (lineEndByte < source.size)
+        ++lineEndByte; // include the newline
+    uint32_t blockLen = lineEndByte - lineStartByte;
+    byteview blockText{source.data + lineStartByte, blockLen};
 
     if (raw)
     {
@@ -429,11 +629,7 @@ auto ReadBlock(byteview filePath, uint32_t line, region_alloc &alloc, bool raw) 
     }
 
     // Extract and un-indent the block text.
-    uint32_t lineStartByte = bl.range.startByte;
-    while (lineStartByte > 0 && source.data[lineStartByte - 1] != '\n')
-        --lineStartByte;
     uint32_t firstLineIndent = bl.range.startByte - lineStartByte;
-
     uint32_t minIndent = firstLineIndent;
     {
         uint32_t pos = 0;

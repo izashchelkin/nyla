@@ -29,11 +29,6 @@ void TreeDelete(TSTree *tree)
 
 // ─── Node info ──────────────────────────────────────────────────────────────
 
-auto NodeType(const TSNode &node) -> const char *
-{
-    return ts_node_type(node);
-}
-
 auto NodeRange(const TSNode &node) -> node_range
 {
     return node_range{
@@ -44,40 +39,7 @@ auto NodeRange(const TSNode &node) -> node_range
     };
 }
 
-auto NodeIsNamed(const TSNode &node) -> bool
-{
-    return ts_node_is_named(node);
-}
 
-auto NodeHasError(const TSNode &node) -> bool
-{
-    return ts_node_has_error(node);
-}
-
-auto NodeChildCount(const TSNode &node) -> uint32_t
-{
-    return ts_node_child_count(node);
-}
-
-auto NodeChild(const TSNode &node, uint32_t index) -> TSNode
-{
-    return ts_node_child(node, index);
-}
-
-auto NodeNamedChild(const TSNode &node, uint32_t index) -> TSNode
-{
-    return ts_node_named_child(node, index);
-}
-
-auto NodeParent(const TSNode &node) -> TSNode
-{
-    return ts_node_parent(node);
-}
-
-auto NodeNextSibling(const TSNode &node) -> TSNode
-{
-    return ts_node_next_sibling(node);
-}
 
 // ─── Descendant queries ─────────────────────────────────────────────────────
 
@@ -132,59 +94,6 @@ auto NodeAtLine(const TSNode &root, uint32_t targetLine, byteview source) -> TSN
     return best;
 }
 
-auto CollectNodesOfType(const TSNode &root, const char *nodeType, TSNode *out, uint32_t maxCount) -> uint32_t
-{
-    uint32_t count = 0;
 
-    struct stack_entry
-    {
-        TSNode node;
-        uint32_t nextChild;
-    };
-
-    inline_vec<stack_entry, 256> stack{};
-    InlineVec::Append(stack, stack_entry{root, 0});
-
-    while (stack.size > 0 && count < maxCount)
-    {
-        stack_entry &top = InlineVec::Back(stack);
-
-        if (top.nextChild == 0)
-        {
-            if (ts_node_is_named(top.node) && !ts_node_is_error(top.node))
-            {
-                const char *type = ts_node_type(top.node);
-                const char *a = type;
-                const char *b = nodeType;
-                bool match = true;
-                while (*a && *b)
-                {
-                    if (*a != *b)
-                    {
-                        match = false;
-                        break;
-                    }
-                    ++a;
-                    ++b;
-                }
-                if (match && *a == 0 && *b == 0)
-                    out[count++] = top.node;
-            }
-        }
-
-        if (top.nextChild < ts_node_child_count(top.node))
-        {
-            TSNode child = ts_node_child(top.node, top.nextChild);
-            ++top.nextChild;
-            InlineVec::Append(stack, stack_entry{child, 0});
-        }
-        else
-        {
-            InlineVec::PopBack(stack);
-        }
-    }
-
-    return count;
-}
 
 } // namespace nyla

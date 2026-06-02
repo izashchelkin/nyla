@@ -17,10 +17,12 @@ namespace nyla
 
 struct block_info
 {
-    inline_string<128> type; // e.g. "function_definition", "if_statement"
-    inline_string<128> name; // block name (e.g. "DetectLanguage"), empty if unnamed
-    uint32_t startLine;      // 0-indexed
-    uint32_t endLine;        // 0-indexed
+    inline_string<128> type;      // e.g. "function_definition", "if_statement"
+    inline_string<128> name;      // block name (e.g. "DetectLanguage"), empty if unnamed
+    inline_string<512> signature; // method signature (Java: "int add(int a, int b)"), empty if none
+    inline_string<64> annotation; // Java annotations (e.g. "@Override"), empty if none
+    uint32_t startLine;           // 0-indexed
+    uint32_t endLine;             // 0-indexed
     uint32_t startByte;
     uint32_t endByte;
 };
@@ -58,7 +60,6 @@ auto BlockTypeLabel(const char *type) -> const char *;
 
 auto IsContainerType(const char *type) -> bool;
 auto IsStructuralType(const char *t) -> bool;
-auto IsInnerBlockType(const char *t) -> bool;
 
 // ─── Queries ────────────────────────────────────────────────────────────────
 
@@ -73,8 +74,8 @@ auto LocateBlock(byteview filePath, uint32_t line, region_alloc &alloc) -> block
 auto NodeName(TSNode node, byteview source) -> inline_string<128>;
 
 // Collect all top-level named blocks from the parsed tree into result.
-void CollectBlockNodes(TSNode node, inline_vec<block_info, 256> &result, int depth, bool recurse,
-                       byteview source, source_language lang = source_language::Unknown);
+void CollectBlockNodes(TSNode node, inline_vec<block_info, 256> &result, int depth, bool recurse, byteview source,
+                       source_language lang = source_language::Unknown);
 
 // Parse a file and retrieve all top-level named blocks.
 auto ListBlocks(byteview filePath, region_alloc &alloc) -> inline_vec<block_info, 256>;

@@ -9,32 +9,32 @@
 > Be honest about changes. Ask before implementing. Call out hallucinations.
 > **Tools**:
 > - **Default**: use plain `read` and `edit` for most operations.
-> - **xcav_edit**: use for ALL edits to C/C++/Java/TS/JS files. Tree-sitter validated,
->   auto-re-indents, whitespace-insensitive matching (lax mode handles
->   xcav_read un-indentation directly). Prefer over plain `edit`. Supports `--dry-run`
->   to preview matches without writing. Unicode normalization:
->   em-dash→`--`, arrows→`->`/`<-`, smart quotes→ASCII.
-> - **xcav_read**: works on ALL files — code files get structural mode (paths,
->   un-indented), non-code files get plain text with offset/limit.
->   `--raw` flag outputs exact indentation, `--numbers` includes line numbers.
+> - **xcav_edit**: use for ALL file edits. It replaces the regular edit tool.
+>   For C/C++/Java/TS/JS: line-based matching that copies indentation from
+>   matched lines to the replacement. Whitespace-insensitive matching.
+>   Unicode normalization: em-dash→`--`, arrows→`->`/`<-`, smart quotes→ASCII.
+>   **oldText from `xcav_read` is directly pasteable into `xcav_edit`.**
+>   `xcav_read` outputs pure code (no headers) on whole lines — no `--raw` needed.
+>   On match failure, shows what it was looking for + partial match hints.
+>   For non-C/C++/Java/TS/JS files: plain string replacement.
+>   For whole-function/struct/class replacements, use `xcav_replace` instead.
+> - **xcav_read**: works on ALL files — prints entire file un-indented by default.
+>   `<line>` reads a specific structural block (C/C++/Java/TS/JS).
+>   `--name` finds a block by name. `--offset`/`--limit` for line ranges.
+>   Large files (>500 lines, >50KB) auto-truncated with a warning.
+>   `--raw` flag preserves exact indentation, `--numbers` includes line numbers.
 > - **xcav_move**: use instead of manual cut-paste when moving a block within a file.
-> - **xcav_move_into**: use for cross-file block moves. Supports `--copy-includes`.
 > - **xcav_delete**: use to safely delete a whole function/struct/class/include block.
 >   Cleans up surrounding blank lines and preceding `//` doc comments.
+>   **NEVER batch multiple xcav_delete calls on the same file** — line numbers shift
+>   after each delete. Always run `xcav_blocks` between sequential deletes.
 > - **xcav_replace**: use to replace an entire function/struct/class with new code.
 >   Atomic C++ implementation — no delete/insert race, safe for last-block-in-namespace.
 > - **xcav_undo**: undo the last xcav operation on a file. Multi-level (up to 20).
 >   Reports remaining undo levels on each restore.
 > - **xcav_blocks**: survey file structure before a move/delete. Now supports
 >   directory paths to list blocks across all files in a directory.
-> - **xcav_tidy**: re-indent a file via brace-counting + whitespace cleanup.
->   Use when indentation is broken after refactoring.
-> - **xcav_extract**: move a block to a new file, creating #pragma once,
->   namespace wrapper, and adding #include in the source. Use for splitting
->   files during refactoring.
-> - **xcav_inline**: inline a simple single-return function call into the call site.
->   Wraps in a `{ }` block for scoping. Parameters are substituted. Return values
->   are NOT captured — agent must fix result assignments after inlining.
+>   **Does not show include/import lines** (filtered as noise).
 > - **Everything else**: plain `edit`. Adding new code, modifying within a function,
 >   small text changes — xcav adds no value and introduces auto-indentation that
 >   can break follow-up edits. When in doubt, use plain `edit`.

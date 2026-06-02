@@ -3,7 +3,7 @@
 
 
 int foo(int x) {
- return x + 42;
+    return x + 42;
 }
 
 

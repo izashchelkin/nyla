@@ -21,8 +21,10 @@ auto LineIndent(byteview source, uint32_t lineStart) -> uint32_t;
 // C-string equality check.
 auto StrEq(const char *a, const char *b) -> bool;
 
+// byteview to C-string comparison (used for CLI flag matching).
+auto ByteviewEq(byteview a, const char *b) -> bool;
+
 // Extract the include path ("..." or <...>) from a #include / import block.
-auto IncludePath(byteview blockText) -> inline_string<128>;
 
 // Normalize Unicode punctuation in-place:
 // em-dash → "--", en-dash → "-", arrows → "->"/"<-", smart quotes → ASCII.

@@ -1,7 +1,6 @@
 // Test fixture for xcav -- nested structures (namespace, class, enum, template)
 
 namespace math {
-;
 
 template<typename T>
 class Calculator {

@@ -18,7 +18,6 @@ auto Distance(Point a, Point b) -> double {
     return sqrt(dx * dx + dy * dy);
 }
 
-
 auto Midpoint(Point a, Point b) -> Point {
     return {(a.x + b.x) / 2, (a.y + b.y) / 2};
 }

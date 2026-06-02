@@ -6,22 +6,22 @@
  *
  * Tools:
  *   xcav_blocks     — list structural blocks
- *   xcav_read       — read files (structural or plain)
+ *   xcav_read       — read files (entire file un-indented, or structural with --line/--name)
  *   xcav_move       — move a block within a file
  *   xcav_move_into  — move a block across files
  *   xcav_delete     — delete a block
  *   xcav_replace    — replace a block with new content
  *   xcav_undo       — restore from backup (up to 20 levels)
- *   xcav_tidy       — re-indent a file
- *   xcav_extract    -- move a block to a new file
-  *   xcav_inline     -- inline a function call at a line
-  */
+ *   xcav_edit       — safe edit (tree-sitter validated for C/C++/Java/TS/JS, plain for others)
+ */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { execSync } from "node:child_process";
-import { existsSync, writeFileSync, mkdirSync, unlinkSync } from "node:fs";
-import { resolve, join } from "node:path";
+import { existsSync, writeFileSync, mkdirSync, unlinkSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { resolve, join, extname } from "node:path";
+import { randomBytes } from "node:crypto";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -37,6 +37,43 @@ function xcav(args: string[]): { output: string; ok: boolean } {
     const err = (e.stderr?.toString() ?? e.message ?? "unknown error").trim();
     return { output: [out, err].filter(Boolean).join("\n"), ok: false };
   }
+}
+
+/** Format tool args for display in output. Shows exactly what the model provided. */
+function fmtArgs(toolName: string, params: Record<string, unknown>): string {
+  const entries = Object.entries(params)
+    .filter(([, v]) => v !== undefined && v !== null)
+    .map(([k, v]) => {
+      if (typeof v === "string") {
+        // Truncate long string params (e.g. xcav_replace content) to avoid noise
+        if (v.length > 80) return `${k}="${v.slice(0, 77)}..."`;
+        return `${k}="${v}"`;
+      }
+      return `${k}=${v}`;
+    });
+  return `${toolName}(${entries.join(", ")})`;
+}
+
+/** Wrap raw xcav output with args header so the agent sees what was passed. */
+function wrapOutput(toolName: string, params: Record<string, unknown>, rawOutput: string): string {
+  const header = fmtArgs(toolName, params);
+  if (!rawOutput) return header;
+  return `${header}\n────────────────────────────────────────────────\n${rawOutput}`;
+}
+
+const C_CPP_JAVA_EXTS = new Set([
+  ".c", ".h", ".cc", ".cpp", ".cxx", ".hpp", ".hxx", ".hh", ".java",
+  ".js", ".jsx", ".mjs", ".cjs",
+  ".ts", ".tsx", ".mts", ".cts",
+]);
+
+function isCppOrJava(filePath: string): boolean {
+  const ext = extname(filePath).toLowerCase();
+  return C_CPP_JAVA_EXTS.has(ext);
+}
+
+function tmpPath(): string {
+  return join(tmpdir(), `xcav_${randomBytes(8).toString("hex")}`);
 }
 
 // ─── Tools ─────────────────────────────────────────────────────────────────
@@ -66,7 +103,7 @@ export default function (pi: ExtensionAPI) {
         return { content: [{ type: "text", text: `File not found: ${params.file}` }] };
       }
       const r = xcav(["blocks", absPath]);
-      return { content: [{ type: "text", text: r.output || "(no blocks)" }] };
+      return { content: [{ type: "text", text: wrapOutput("xcav_blocks", params, r.output || "(no blocks)") }] };
     },
   });
 
@@ -76,17 +113,19 @@ export default function (pi: ExtensionAPI) {
     name: "xcav_read",
     label: "xcav read",
     description:
-      "Read files. For C/C++/Java/TypeScript/JavaScript: structural mode shows blocks with paths (e.g. 'Point::GetX'), " +
-      "un-indents code to save tokens, supports --name/--all/--numbers. " +
-      "For all files: plain mode with offset/limit like a regular file reader. " +
-      "Structural params (line, name, all) trigger tree-sitter parsing on C/C++/Java/TS/JS; " +
-      "offset/limit trigger plain reading on any file type.",
+      "Read files. Default (no flags) prints the entire file un-indented. " +
+      "--all also prints the entire file. --line reads a specific block (C/C++/Java/TS/JS). " +
+      "--name finds a block by structural name. --offset/--limit for line ranges. " +
+      "--raw for exact indentation. --numbers for line numbers. " +
+      "Large files (>500 lines or >50KB) are auto-truncated with a warning.",
     promptSnippet: "xcav_read(file, line?, name?, all?, numbers?, offset?, limit?) — read files",
     promptGuidelines: [
       "Use xcav_read for all file reading. It replaces the regular read tool.",
-      "For C/C++/Java/TypeScript/JavaScript: use line/name/all for structural reading (shows function paths, un-indents).",
+      "Default output (no flags) prints the entire file un-indented. Use --raw for exact indentation.",
+      "For C/C++/Java/TypeScript/JavaScript: use line/name for structural reading (shows function paths, un-indents).",
       "Un-indented output can be used directly as oldText for xcav_edit — leading whitespace is auto-matched.",
       "For any file: use offset/limit for plain reading (like the regular read tool).",
+      "Large files (>500 lines, >50KB) are auto-truncated. Use --offset/--limit to read beyond the first 500 lines.",
       "Line numbers are 1-indexed (as shown by xcav_blocks).",
       "Use --numbers when you need to reference specific lines in subsequent move/delete operations.",
     ],
@@ -94,7 +133,7 @@ export default function (pi: ExtensionAPI) {
       file:    Type.String({ description: "Path to the file to read (relative or absolute)" }),
       line:    Type.Optional(Type.Number({ description: "Line number (1-indexed) of the block to read structurally (C/C++/Java/TS/JS only)" })),
       name:    Type.Optional(Type.String({ description: "Structural name to find, e.g. 'foo' or 'Point::GetX' (C/C++/Java/TS/JS only)" })),
-      all:     Type.Optional(Type.Boolean({ description: "Dump all structural blocks with code (C/C++/Java/TS/JS only)", default: false })),
+      all:     Type.Optional(Type.Boolean({ description: "Print entire file content (same as default). For large files, auto-truncates to 500 lines.", default: false })),
       numbers: Type.Optional(Type.Boolean({ description: "Include original line numbers in output", default: false })),
       offset:  Type.Optional(Type.Number({ description: "Line number to start reading from (1-indexed, plain mode)" })),
       limit:   Type.Optional(Type.Number({ description: "Maximum number of lines to read (plain mode)" })),
@@ -126,7 +165,7 @@ export default function (pi: ExtensionAPI) {
       }
 
       const r = xcav(args);
-      return { content: [{ type: "text", text: r.output || "(no output)" }] };
+      return { content: [{ type: "text", text: wrapOutput("xcav_read", params, r.output || "(no output)") }] };
     },
   });
 
@@ -155,7 +194,7 @@ export default function (pi: ExtensionAPI) {
         return { content: [{ type: "text", text: `File not found: ${params.file}` }] };
       }
       const r = xcav(["move", absPath, String(params.line), String(params.destLine)]);
-      return { content: [{ type: "text", text: r.output || "Move succeeded." }] };
+      return { content: [{ type: "text", text: wrapOutput("xcav_move", params, r.output || "Move succeeded.") }] };
     },
   });
 
@@ -192,7 +231,7 @@ export default function (pi: ExtensionAPI) {
       const args = ["move-into", srcAbs, String(params.srcLine), dstAbs, String(params.dstLine)];
       if (params.copyIncludes) args.push("--copy-includes");
       const r = xcav(args);
-      return { content: [{ type: "text", text: r.output || "Move-into succeeded." }] };
+      return { content: [{ type: "text", text: wrapOutput("xcav_move_into", params, r.output || "Move-into succeeded.") }] };
     },
   });
 
@@ -219,7 +258,7 @@ export default function (pi: ExtensionAPI) {
         return { content: [{ type: "text", text: `File not found: ${params.file}` }] };
       }
       const r = xcav(["delete", absPath, String(params.line)]);
-      return { content: [{ type: "text", text: r.output || "Delete succeeded." }] };
+      return { content: [{ type: "text", text: wrapOutput("xcav_delete", params, r.output || "Delete succeeded.") }] };
     },
   });
 
@@ -254,7 +293,7 @@ export default function (pi: ExtensionAPI) {
       writeFileSync(tmpPath, params.content, "utf-8");
       const r = xcav(["replace-block", absPath, String(params.line), tmpPath]);
       try { unlinkSync(tmpPath); } catch {}
-      return { content: [{ type: "text", text: r.output || "Replace succeeded." }] };
+      return { content: [{ type: "text", text: wrapOutput("xcav_replace", params, r.output || "Replace succeeded.") }] };
     },
   });
 
@@ -277,89 +316,183 @@ export default function (pi: ExtensionAPI) {
     async execute(_toolCallId, params) {
       const absPath = resolve(params.file);
       const r = xcav(["undo", absPath]);
-      return { content: [{ type: "text", text: r.output || "Undo succeeded." }] };
+      return { content: [{ type: "text", text: wrapOutput("xcav_undo", params, r.output || "Undo succeeded.") }] };
     },
   });
 
-  // ── xcav_tidy ───────────────────────────────────────────────────────────
+  // ── xcav_edit ─────────────────────────────────────────────────────────
 
   pi.registerTool({
-    name: "xcav_tidy",
-    label: "xcav tidy",
+    name: "xcav_edit",
+    label: "xcav edit",
     description:
-      "Re-indent every structural block in a file via brace-counting + whitespace cleanup. " +
-      "Use when indentation is broken after refactoring.",
-    promptSnippet: "xcav_tidy(file) — re-indent a file",
+      "Safely edit files. For C/C++/Java/TypeScript/JavaScript: line-based matching that " +
+      "copies indentation from matched file lines to the replacement. Whitespace-insensitive. " +
+      "Unicode normalization (em-dash→--, arrows→->/<-, smart quotes→ASCII). " +
+      "For all other files: plain string replacement (sequential, matched against current file state). " +
+      "Same API as regular edit tool. Replaces the built-in edit tool for all file types.",
+    promptSnippet:
+      "xcav_edit(file, edits) -- safe edit (line-based matching for C/C++/Java/TS/JS, plain for others)",
     promptGuidelines: [
-      "Use xcav_tidy when indentation is broken after refactoring.",
+      "Use xcav_edit for ALL file edits. It replaces the regular edit tool.",
+      "For C/C++/Java/TypeScript/JavaScript files, xcav_edit does whitespace-insensitive line matching.",
+      "For non-C/C++/Java/TypeScript/JavaScript files, xcav_edit does plain string replacement.",
+      "Use xcav_edit for all edits -- even single-line changes.",
+      "For whole-function/struct/class replacements, use xcav_replace instead of xcav_edit.",
     ],
     parameters: Type.Object({
-      file: Type.String({ description: "Path to the file to re-indent" }),
-    }),
-    async execute(_toolCallId, params) {
-      const absPath = resolve(params.file);
-      if (!existsSync(absPath)) {
-        return { content: [{ type: "text", text: `File not found: ${params.file}` }] };
-      }
-      const r = xcav(["tidy", absPath]);
-      return { content: [{ type: "text", text: r.output || "Tidy succeeded." }] };
-    },
-  });
-
-  // ── xcav_extract ────────────────────────────────────────────────────────
-
-  pi.registerTool({
-    name: "xcav_extract",
-    label: "xcav extract",
-    description:
-      "Move a structural block to a new file. Creates #pragma once, namespace wrapping, " +
-      "and adds #include in the source file.",
-    promptSnippet: "xcav_extract(srcFile, srcLine, newFile) — move block to a new file",
-    promptGuidelines: [
-      "Use xcav_extract for splitting files during refactoring.",
-    ],
-    parameters: Type.Object({
-      srcFile: Type.String({ description: "Path to the source file" }),
-      srcLine: Type.Number({ description: "Line number of the block to extract (1-indexed)" }),
-      newFile: Type.String({ description: "Path for the new file to create" }),
-    }),
-    async execute(_toolCallId, params) {
-      const srcAbs = resolve(params.srcFile);
-      const newAbs = resolve(params.newFile);
-      if (!existsSync(srcAbs)) {
-        return { content: [{ type: "text", text: `Source file not found: ${params.srcFile}` }] };
-      }
-            const r = xcav(["extract", srcAbs, String(params.srcLine), newAbs]);
-            return { content: [{ type: "text", text: r.output || "Extract succeeded." }] };
-          },
-        });
-
-        // ── xcav_inline ─────────────────────────────────────────────────────────
-
-        pi.registerTool({
-          name: "xcav_inline",
-          label: "xcav inline",
-          description:
-            "Inline a simple single-return function call at a line into the call site. " +
-            "The inlined body is wrapped in a { } block. Parameters are substituted with arguments. " +
-            "Return values are NOT captured -- the agent must fix result assignments manually.",
-          promptSnippet: "xcav_inline(file, line) -- inline a function call",
-          promptGuidelines: [
-            "Use xcav_inline for simple single-return functions only. Multi-statement bodies are rejected.",
-            "After inlining, manually fix any result variable assignment (return values are not captured).",
-            "Use xcav_undo to recover if the inline produces incorrect code.",
-          ],
-          parameters: Type.Object({
-            file: Type.String({ description: "Path to the source file" }),
-            line: Type.Number({ description: "Line number of the function call to inline (1-indexed)" }),
+      file: Type.String({ description: "Path to the file to edit (relative or absolute)" }),
+      edits: Type.Array(
+        Type.Object({
+          oldText: Type.String({
+            description:
+              "Exact text for one targeted replacement. It must be unique in the original file " +
+              "and must not overlap with any other edits[].oldText in the same call.",
           }),
-          async execute(_toolCallId, params) {
-            const absPath = resolve(params.file);
-            if (!existsSync(absPath)) {
-              return { content: [{ type: "text", text: `File not found: ${params.file}` }] };
-            }
-            const r = xcav(["inline", absPath, String(params.line)]);
-            return { content: [{ type: "text", text: r.output || "Inline succeeded." }] };
-          },
-        });
+          newText: Type.String({ description: "Replacement text for this targeted edit." }),
+        }),
+        {
+          description:
+            "One or more targeted replacements. Each edit is matched against the original file, " +
+            "not incrementally. Do not include overlapping or nested edits.",
+        }
+      ),
+    }),
+    async execute(_toolCallId, params, _signal) {
+      const { file, edits } = params;
+
+      if (!existsSync(file)) {
+        return {
+          content: [{ type: "text", text: `xcav_edit: file not found: ${file}` }],
+          isError: true,
+          details: {},
+        };
       }
+
+      const absPath = resolve(file);
+
+      // ── Non-C/C++/Java: plain string replacement ─────────────────────
+      if (!isCppOrJava(file)) {
+        let source = readFileSync(absPath, "utf-8");
+        const results: string[] = [];
+        let allOk = true;
+
+        for (let i = 0; i < edits.length; i++) {
+          const { oldText, newText } = edits[i];
+
+          let count = 0;
+          let matchPos = -1;
+          let idx = 0;
+          while ((idx = source.indexOf(oldText, idx)) !== -1) {
+            matchPos = idx;
+            count++;
+            idx += oldText.length;
+          }
+
+          if (count === 0) {
+            allOk = false;
+            results.push(`Edit ${i + 1}/${edits.length} FAILED: oldText not found in file`);
+            break;
+          }
+          if (count > 1) {
+            allOk = false;
+            results.push(
+              `Edit ${i + 1}/${edits.length} FAILED: oldText found ${count} times -- ambiguous, use more context`
+            );
+            break;
+          }
+          source =
+            source.slice(0, matchPos) +
+            newText +
+            source.slice(matchPos + oldText.length);
+          results.push(`Edit ${i + 1}/${edits.length}: applied.`);
+        }
+
+        if (allOk) {
+          writeFileSync(absPath, source, "utf-8");
+        }
+
+        return {
+          content: [{ type: "text", text: results.join("\n") }],
+          isError: !allOk,
+          details: {},
+        };
+      }
+
+      // ── C/C++/Java/TS/JS: line-based matching via xcav binary ─────
+      // Falls back to plain text replacement if xcav line matching fails
+      // (e.g. grammar mismatch for .h files with C++ features, or raw string
+      // literals that confuse the C parser).
+
+      const results: string[] = [];
+      let allOk = true;
+
+      for (let i = 0; i < edits.length; i++) {
+        const { oldText, newText } = edits[i];
+
+        const oldFile = tmpPath();
+        const newFile = tmpPath();
+
+        try {
+          writeFileSync(oldFile, oldText, "utf-8");
+          writeFileSync(newFile, newText, "utf-8");
+
+          const stdout = execSync(
+            `${XCAV_BIN} edit "${absPath}" "${oldFile}" "${newFile}"`,
+            {
+              encoding: "utf-8",
+              stdio: ["pipe", "pipe", "pipe"],
+              timeout: 30000,
+            }
+          );
+
+          results.push(`Edit ${i + 1}/${edits.length}: ${stdout.trim()}`);
+        } catch (err: any) {
+          const stderr = err.stderr?.toString() || err.message;
+
+          // ── Fallback: xcav line matching failed, retry with plain string match
+          const source = readFileSync(absPath, "utf-8");
+          let count = 0;
+          let matchPos = -1;
+          let idx = 0;
+          while ((idx = source.indexOf(oldText, idx)) !== -1) {
+            matchPos = idx;
+            count++;
+            idx += oldText.length;
+          }
+
+          if (count === 0) {
+            allOk = false;
+            results.push(
+              `Edit ${i + 1}/${edits.length} FAILED: oldText not found in file (both xcav and plain text)`
+            );
+          } else if (count > 1) {
+            allOk = false;
+            results.push(
+              `Edit ${i + 1}/${edits.length} FAILED: oldText found ${count} times in file (both xcav and plain text) -- ambiguous`
+            );
+          } else {
+            const newSource =
+              source.slice(0, matchPos) +
+              newText +
+              source.slice(matchPos + oldText.length);
+            writeFileSync(absPath, newSource, "utf-8");
+            const xcavMsg = stderr.trim().split("\n")[0];
+            results.push(
+              `Edit ${i + 1}/${edits.length}: applied via plain text (xcav edit: ${xcavMsg})`
+            );
+          }
+        } finally {
+          try { unlinkSync(oldFile); } catch {}
+          try { unlinkSync(newFile); } catch {}
+        }
+      }
+
+      return {
+        content: [{ type: "text", text: results.join("\n") }],
+        isError: !allOk,
+        details: {},
+      };
+    },
+  });
+}

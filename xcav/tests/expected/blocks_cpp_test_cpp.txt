@@ -1,3 +1,2 @@
-xcav/tests/fixtures/cpp_test.cpp (2 blocks)
-     2-   3 include iostream>
+cpp_test.cpp (1 blocks)
      4-   7 func main

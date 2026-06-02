@@ -1,5 +1,4 @@
-xcav/tests/fixtures/funcs.c (5 blocks)
-     2-   3 include stdio.h>
+funcs.c (4 blocks)
      4-   6 func foo
      8-  10 func bar
     12-  14 func baz

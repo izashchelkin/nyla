@@ -1,11 +1,16 @@
 target_sources(${TARGET} PRIVATE
     backup.cc
     block_query.cc
+    copy.cc
+    delete.cc
     edit_ops.cc
-    inline.cc
+    edit_safe.cc
     language.cc
     main.cc
+    move.cc
+    move_into.cc
     onboard.inl
+    replace.cc
     text_util.cc
     tree_sitter_util.cc
 )

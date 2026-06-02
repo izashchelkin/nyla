@@ -24,5 +24,4 @@ auto Execute(Operation op, int a, int b) -> int {
     return a - b;
 }
 
-
 } // namespace math

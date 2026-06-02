@@ -63,25 +63,6 @@ auto StrEq(const char *a, const char *b) -> bool
 
 // ─── IncludePath ────────────────────────────────────────────────────────────
 
-auto IncludePath(byteview blockText) -> inline_string<128>
-{
-    inline_string<128> result{};
-    uint32_t i = 0;
-    while (i < blockText.size && blockText.data[i] != '"' && blockText.data[i] != '<')
-        ++i;
-    if (i < blockText.size)
-    {
-        uint8_t delim = blockText.data[i];
-        ++i;
-        while (i < blockText.size && blockText.data[i] != delim && blockText.data[i] != '\n' && result.size < 127)
-        {
-            InlineVec::Append(result, blockText.data[i]);
-            ++i;
-        }
-    }
-    return result;
-}
-
 // ─── NormalizeText ──────────────────────────────────────────────────────────
 
 void NormalizeText(inline_vec<uint8_t, 65536> &buf)
@@ -162,5 +143,16 @@ void NormalizeText(inline_vec<uint8_t, 65536> &buf)
     for (uint32_t i = 0; i < out.size; ++i)
         InlineVec::Append(buf, out.data[i]);
 }
-
+auto ByteviewEq(byteview a, const char *b) -> bool
+{
+    while (*b)
+    {
+        if (a.size == 0 || a.data[0] != (uint8_t)*b)
+            return false;
+        a.data++;
+        a.size--;
+        b++;
+    }
+    return a.size == 0;
+}
 } // namespace nyla

@@ -11,6 +11,20 @@ EXPECTED="$SCRIPT_DIR/expected"
 TMP_ROOT="${TMPDIR:-/tmp}"
 TMPDIR="${XCAV_TEST_TMPDIR:-$TMP_ROOT/xcav_tests_$$}"
 
+# Build xcav if needed
+if [ ! -f "$REPO_ROOT/build/linux-debug/bin/xcav" ]; then
+    echo "Building xcav..."
+    cmake --build "$REPO_ROOT/build/linux-debug" --target xcav || exit 1
+    echo ""
+fi
+
+# Install xcav (so tests exercise the installed binary path too)
+if [ -z "${XC_BIN:-}" ]; then
+    echo "Installing xcav..."
+    "$REPO_ROOT/scripts/install_xcav.sh" || true
+    echo ""
+fi
+
 # Use the build binary, not the system-installed one
 XC="${XC_BIN:-$REPO_ROOT/build/linux-debug/bin/xcav}"
 
@@ -74,10 +88,8 @@ test_blocks_repo_path() {
     local path="$2"
     local out="$TMPDIR/${name}_out.txt"
 
-    set +e
-    (cd "$REPO_ROOT" && "$XC" blocks "$path" > "$out" 2>&1)
-    local rc=$?
-    set -e
+    local rc=0
+    (cd "$REPO_ROOT" && "$XC" blocks "$path" > "$out" 2>&1) || rc=$?
 
     if [ "$rc" -eq 0 ] && grep -q "MoveBlock" "$out"; then
         pass "$name"
@@ -156,35 +168,6 @@ test_edit() {
     fi
 }
 
-test_edit_rejected() {
-    local name="$1"
-    local fixture="$2"
-    local old_text="$3"
-    local new_text="$4"
-
-    local ext="${fixture##*.}"
-    local tmp="$TMPDIR/${name}_file.${ext}"
-    cp "$fixture" "$tmp"
-
-    local oldf="$TMPDIR/${name}_old.txt"
-    local newf="$TMPDIR/${name}_new.txt"
-    echo -n "$old_text" > "$oldf"
-    echo -n "$new_text" > "$newf"
-
-    set +e
-    "$XC" edit "$tmp" "$oldf" "$newf" > /dev/null 2>&1
-    local rc=$?
-    set -e
-
-    if diff -q "$tmp" "$fixture" > /dev/null 2>&1; then
-        pass "$name"
-    else
-        fail "$name" "file was modified — edit should have been rejected"
-        echo "    rc=$rc"
-        echo "    diff fixture vs actual:"
-        diff "$fixture" "$tmp" | sed 's/^/    /'
-    fi
-}
 
 test_edit_stdin_long_oldtext_dry_run() {
     local name="$1"
@@ -274,38 +257,6 @@ test_replace() {
     fi
 }
 
-test_extract() {
-    local name="$1"
-    local fixture="$2"
-    local line="$3"
-    local new_file="$4"
-    local expected_src="$5"
-    local expected_new="$6"
-
-    local ext="${fixture##*.}"
-    local tmp="$TMPDIR/${name}_src.${ext}"
-    cp "$fixture" "$tmp"
-    local new_path="$TMPDIR/$new_file"
-
-    "$XC" extract "$tmp" "$line" "$new_path" > /dev/null 2>&1
-
-    local all_ok=true
-    if ! diff -q "$tmp" "$expected_src" > /dev/null 2>&1; then
-        fail "$name" "source file mismatch after extract"
-        echo "    diff expected source vs actual:"
-        diff "$expected_src" "$tmp" | sed 's/^/    /'
-        all_ok=false
-    fi
-    if ! diff -q "$new_path" "$expected_new" > /dev/null 2>&1; then
-        fail "$name" "new file mismatch after extract"
-        echo "    diff expected new file vs actual:"
-        diff "$expected_new" "$new_path" | sed 's/^/    /'
-        all_ok=false
-    fi
-    if $all_ok; then
-        pass "$name"
-    fi
-}
 
 test_backup_gitignore() {
     local name="$1"
@@ -391,8 +342,8 @@ test_blocks "blocks (Java)" \
     "$FIXTURES/methods.java" \
     "$EXPECTED/blocks_methods_java.txt"
 
-test_blocks_repo_path "blocks repo-relative C++ path" "xcav/edit_ops.cc"
-test_blocks_repo_path "blocks dot-relative C++ path" "./xcav/edit_ops.cc"
+test_blocks_repo_path "blocks repo-relative C++ path" "xcav/move.cc"
+test_blocks_repo_path "blocks dot-relative C++ path" "./xcav/move.cc"
 
 # ─── move (C) ──────────────────────────────────────────────────────────────
 
@@ -482,16 +433,6 @@ test_replace "replace in add body (Java)" \
     "a + b + offset" \
     "$EXPECTED/java_replace_add_body.java"
 
-test_edit_rejected "reject unbalanced braces (Java)" \
-    "$FIXTURES/calculator.java" \
-    "public int add(int a, int b) {" \
-    "public int add(int a, int b) {{"
-
-test_extract "extract getBaseValue (Java)" \
-    "$FIXTURES/calculator.java" 34 \
-    "getBaseValue.java" \
-    "$EXPECTED/java_extract_getbasevalue.java" \
-    "$EXPECTED/java_extract_newfile.java"
 
 # ─── edit ─────────────────────────────────────────────────────────────────
 
@@ -509,33 +450,19 @@ test_edit "edit comment" \
     "// Test fixture for xcav — C FUNCTIONS" \
     "$EXPECTED/c_edit_comment.c"
 
-# ─── edit rejection ────────────────────────────────────────────────────────
-
-echo -e "\n${YELLOW}─── edit rejection ───${NC}"
-
-test_edit_rejected "reject unbalanced braces" \
-    "$FIXTURES/funcs.c" \
-    "int foo(int x) {" \
-    "int foo(int x) {{"
-
-test_edit_rejected "reject missing semicolon" \
-    "$FIXTURES/funcs.c" \
-    "return x + 1;" \
-    "return x + 1"
-
 # ─── read ─────────────────────────────────────────────────────────────────
 
 echo -e "\n${YELLOW}─── read ───${NC}"
 
 read_out="$("$XC" read "$FIXTURES/funcs.c" 4 2>&1)"
-if echo "$read_out" | grep -q "foo (function_definition"; then
+if echo "$read_out" | grep -q "int foo"; then
     pass "read C function"
 else
     fail "read C function" "unexpected output: $read_out"
 fi
 
 read_out2="$("$XC" read "$FIXTURES/structs.cc" 4 2>&1)"
-if echo "$read_out2" | grep -q "Point (struct_specifier"; then
+if echo "$read_out2" | grep -q "struct Point"; then
     pass "read C++ struct"
 else
     fail "read C++ struct" "unexpected output: $read_out2"
@@ -543,7 +470,7 @@ fi
 
 # --name mode
 read_name="$("$XC" read "$FIXTURES/funcs.c" --name baz 2>&1)"
-if echo "$read_name" | grep -q "baz (function_definition"; then
+if echo "$read_name" | grep -q "int baz"; then
     pass "read --name baz"
 else
     fail "read --name baz" "unexpected output: $read_name"
@@ -551,7 +478,7 @@ fi
 
 # --all mode
 read_all="$("$XC" read "$FIXTURES/funcs.c" --all 2>&1)"
-if echo "$read_all" | grep -q "foo (function_definition" && echo "$read_all" | grep -q "qux (function_definition"; then
+if echo "$read_all" | grep -q "int foo" && echo "$read_all" | grep -q "int qux"; then
     pass "read --all"
 else
     fail "read --all" "unexpected output: $read_all"
@@ -803,32 +730,21 @@ else
     fail "delete (file not found)" "expected 'cannot open': $del_err2"
 fi
 
-# ─── edit (auto-fix pipeline) ────────────────────────────────────────────
+# ─── edit (tab handling) ──────────────────────────────────────────────────
 
-echo -e "\n${YELLOW}─── edit (auto-fix) ───${NC}"
+echo -e "\n${YELLOW}─── edit (tab handling) ───${NC}"
 
-test_edit "edit with tab→space cleanup" \
+test_edit "edit with tab characters" \
     "$FIXTURES/whitespace.c" \
     "	return x + 1;   " \
     "	return x + 42;" \
     "$EXPECTED/c_edit_whitespace_cleanup.c"
 
-# Edit with blank line collapsing (newText has extra blank lines — should be collapsed)
-cp "$FIXTURES/funcs.c" "$TMPDIR/edit_blank.c"
-echo -n '    return x + 1;' > "$TMPDIR/edit_blank_old.txt"
-printf '\n\n    return x + 999;\n\n' > "$TMPDIR/edit_blank_new.txt"
-"$XC" edit "$TMPDIR/edit_blank.c" "$TMPDIR/edit_blank_old.txt" "$TMPDIR/edit_blank_new.txt" 2>&1 > /dev/null
-if grep -q "x + 999" "$TMPDIR/edit_blank.c"; then
-    pass "edit (blank line collapse)"
-else
-    fail "edit (blank line collapse)" "edit not applied"
-fi
+# ─── edit (various source files) ─────────────────────────────────────────
 
-# ─── edit (pre-existing error tolerance) ─────────────────────────────────
+echo -e "\n${YELLOW}─── edit (various files) ───${NC}"
 
-echo -e "\n${YELLOW}─── edit (pre-existing errors) ───${NC}"
-
-test_edit "edit in file with pre-existing errors" \
+test_edit "edit in file with unusual syntax" \
     "$FIXTURES/preexisting_error.cpp" \
     "return 0" \
     "return 42" \
@@ -921,31 +837,6 @@ fi
 test_edit_stdin_long_oldtext_dry_run "edit stdin dry-run long oldText"
 test_edit_stdin_large_source_dry_run "edit stdin dry-run large source"
 
-# ─── edit (--force flag) ─────────────────────────────────────────────────
-
-echo -e "\n${YELLOW}─── edit (--force) ───${NC}"
-
-# --force bypasses validation (unbalanced braces)
-cp "$FIXTURES/funcs.c" "$TMPDIR/edit_force.c"
-echo -n 'int foo(int x) {' > "$TMPDIR/edit_force_old.txt"
-echo -n 'int foo(int x) {{' > "$TMPDIR/edit_force_new.txt"
-"$XC" edit "$TMPDIR/edit_force.c" "$TMPDIR/edit_force_old.txt" "$TMPDIR/edit_force_new.txt" --force 2>&1 > /dev/null
-if diff -q "$TMPDIR/edit_force.c" "$EXPECTED/c_edit_force.c" > /dev/null 2>&1; then
-    pass "edit (--force bypasses validation)"
-else
-    fail "edit (--force bypasses validation)" "force edit mismatch"
-fi
-
-# --force on valid edit still works
-cp "$FIXTURES/funcs.c" "$TMPDIR/edit_force_valid.c"
-echo -n '    return x + 1;' > "$TMPDIR/edit_force_valid_old.txt"
-echo -n '    return x + 999;' > "$TMPDIR/edit_force_valid_new.txt"
-"$XC" edit "$TMPDIR/edit_force_valid.c" "$TMPDIR/edit_force_valid_old.txt" "$TMPDIR/edit_force_valid_new.txt" --force 2>&1 > /dev/null
-if grep -q "x + 999" "$TMPDIR/edit_force_valid.c"; then
-    pass "edit (--force on valid edit)"
-else
-    fail "edit (--force on valid edit)" "force edit not applied"
-fi
 
 # ─── read (extended) ─────────────────────────────────────────────────────
 
@@ -953,7 +844,7 @@ echo -e "\n${YELLOW}─── read (extended) ───${NC}"
 
 # --name with struct name
 read_suffix="$("$XC" read "$FIXTURES/structs.cc" --name Point 2>&1)"
-if echo "$read_suffix" | grep -q "Point (struct_specifier"; then
+if echo "$read_suffix" | grep -q "struct Point"; then
     pass "read --name struct"
 else
     fail "read --name struct" "unexpected: $read_suffix"
@@ -1020,7 +911,7 @@ fi
 
 # TS read by line
 ts_read="$("$XC" read "$FIXTURES/typescript.ts" 23 2>&1)"
-if echo "$ts_read" | grep -q "distance (function_declaration"; then
+if echo "$ts_read" | grep -q "function distance"; then
     pass "read TS function"
 else
     fail "read TS function" "unexpected: $ts_read"
@@ -1040,7 +931,7 @@ echo -e "\n${YELLOW}─── read (Java) ───${NC}"
 
 # Java read by line (add method)
 java_read="$("$XC" read "$FIXTURES/calculator.java" 16 2>&1)"
-if echo "$java_read" | grep -q "Calculator::add (method_declaration"; then
+if echo "$java_read" | grep -q "public int add"; then
     pass "read Java method by line"
 else
     fail "read Java method by line" "unexpected: $java_read"
@@ -1048,7 +939,7 @@ fi
 
 # Java read --name
 java_name="$("$XC" read "$FIXTURES/calculator.java" --name divide 2>&1)"
-if echo "$java_name" | grep -q "Calculator::divide (method_declaration"; then
+if echo "$java_name" | grep -q "public double divide"; then
     pass "read Java --name"
 else
     fail "read Java --name" "unexpected: $java_name"
@@ -1056,7 +947,7 @@ fi
 
 # Java read --name with class name
 java_class="$("$XC" read "$FIXTURES/calculator.java" --name Calculator 2>&1)"
-if echo "$java_class" | grep -q "Calculator (class_declaration"; then
+if echo "$java_class" | grep -q "public class Calculator"; then
     pass "read Java --name class"
 else
     fail "read Java --name class" "unexpected: $java_class"
@@ -1064,7 +955,7 @@ fi
 
 # Java read --all
 java_all="$("$XC" read "$FIXTURES/calculator.java" --all 2>&1)"
-if echo "$java_all" | grep -q "Calculator::add" && echo "$java_all" | grep -q "Calculator::divide"; then
+if echo "$java_all" | grep -q "public int add" && echo "$java_all" | grep -q "public double divide"; then
     pass "read Java --all"
 else
     fail "read Java --all" "unexpected: $java_all"
@@ -1092,7 +983,7 @@ fi
 
 # Exact match on simple names still works
 read_exact="$("$XC" read "$FIXTURES/funcs.c" --name bar 2>&1)"
-if echo "$read_exact" | grep -q "bar (function_definition"; then
+if echo "$read_exact" | grep -q "int bar"; then
     pass "read --name exact match (bar)"
 else
     fail "read --name exact match (bar)" "unexpected: $read_exact"

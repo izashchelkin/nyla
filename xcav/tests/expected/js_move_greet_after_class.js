@@ -2,7 +2,6 @@
 import { helper } from './utils';
 
 
-
 const add = (a, b) => a + b;
 
 class Calculator {

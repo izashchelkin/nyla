@@ -1,5 +1,5 @@
 xcav/tests/fixtures/methods.java (4 blocks)
-     4-   6 func add
-     8-  10 func subtract
-    12-  14 func multiply
+     4-   6 func public int add(int a, int b)
+     8-  10 func public int subtract(int a, int b)
+    12-  14 func public int multiply(int a, int b)
      2-  15 class Calculator

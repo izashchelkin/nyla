@@ -29,15 +29,7 @@ struct node_range
     uint32_t endRow;   // 0-indexed (line of the last character)
 };
 
-auto NodeType(const TSNode &node) -> const char *;
 auto NodeRange(const TSNode &node) -> node_range;
-auto NodeIsNamed(const TSNode &node) -> bool;
-auto NodeHasError(const TSNode &node) -> bool;
-auto NodeChildCount(const TSNode &node) -> uint32_t;
-auto NodeChild(const TSNode &node, uint32_t index) -> TSNode;
-auto NodeNamedChild(const TSNode &node, uint32_t index) -> TSNode;
-auto NodeParent(const TSNode &node) -> TSNode;
-auto NodeNextSibling(const TSNode &node) -> TSNode;
 
 // ─── Descendant queries ─────────────────────────────────────────────────────
 
@@ -47,6 +39,6 @@ auto NodeAtLine(const TSNode &root, uint32_t line, byteview source) -> TSNode;
 
 // Collect all named descendant nodes matching `nodeType` (e.g. "function_definition").
 // Writes up to `maxCount` nodes into `out`; returns the count written.
-auto CollectNodesOfType(const TSNode &root, const char *nodeType, TSNode *out, uint32_t maxCount) -> uint32_t;
+
 
 } // namespace nyla

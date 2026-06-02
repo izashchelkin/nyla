@@ -7,8 +7,6 @@
 //   xcav edit <file> <old-file> <new-file>  — safe replace with tree-sitter validation
 //
 // Uses tree-sitter for structural parsing (tolerates syntax errors).
-
-#include "nyla/commons/byteparser.h"
 #include "nyla/commons/entrypoint.h"
 #include "nyla/commons/file.h"
 #include "nyla/commons/file_utils.h"
@@ -25,7 +23,7 @@
 
 #include "xcav/backup.h"
 #include "xcav/editor.h"
-#include "xcav/inline.h"
+#include "xcav/text_util.h"
 
 #include <unistd.h> // _exit
 
@@ -67,19 +65,6 @@ auto ParseArgs(region_alloc &alloc) -> cli_args
 
 // ─── String matching ────────────────────────────────────────────────────────
 
-static auto ByteviewEq(byteview a, const char *b) -> bool
-{
-    while (*b)
-    {
-        if (a.size == 0 || a.data[0] != (uint8_t)*b)
-            return false;
-        a.data++;
-        a.size--;
-        b++;
-    }
-    return a.size == 0;
-}
-
 static auto MakeCStringPath(byteview path, region_alloc &alloc) -> byteview
 {
     span<uint8_t> buf = RegionAlloc::AllocArray<uint8_t>(alloc, path.size + 1);
@@ -88,30 +73,46 @@ static auto MakeCStringPath(byteview path, region_alloc &alloc) -> byteview
     return byteview{buf.data, path.size};
 }
 
-static void PrintBlockLine(block_info const &block)
-{
-    char typeBuf[129];
-    uint32_t typeSize = (uint32_t)block.type.size > 128 ? 128 : (uint32_t)block.type.size;
-    MemCpy(typeBuf, block.type.data.data, typeSize);
-    typeBuf[typeSize] = 0;
-
-    char const *label = BlockTypeLabel(typeBuf);
-    if (block.name.size > 0)
-        FileWriteFmt(GetStdout(), "  %4u-%4u %s %.*s\n"_s, block.startLine + 1, block.endLine + 1, label,
-                     (int)block.name.size, block.name.data.data);
-    else
-        FileWriteFmt(GetStdout(), "  %4u-%4u %s\n"_s, block.startLine + 1, block.endLine + 1, label);
-}
-
 static void PrintBlockList(byteview displayPath, inline_vec<block_info, 256> const &blocks)
 {
     FileWriteFmt(GetStdout(), "%.*s (%llu blocks)\n"_s, (int)displayPath.size, displayPath.data,
                  (unsigned long long)blocks.size);
 
     for (uint64_t i = 0; i < blocks.size; ++i)
-        PrintBlockLine(blocks.data.data[i]);
-}
+    {
+        block_info const &block = blocks.data.data[i];
+        char typeBuf[129];
+        uint32_t typeSize = (uint32_t)block.type.size > 128 ? 128 : (uint32_t)block.type.size;
+        MemCpy(typeBuf, block.type.data.data, typeSize);
+        typeBuf[typeSize] = 0;
 
+        char const *label = BlockTypeLabel(typeBuf);
+
+        // Emit annotation prefix (e.g. "@Override") before the type label.
+        // Show signature (method details) when available, else fall back to name.
+        byteview displayName = block.signature.size > 0 ? byteview{block.signature.data.data, block.signature.size}
+                                                        : byteview{block.name.data.data, block.name.size};
+
+        if (block.annotation.size > 0)
+        {
+            FileWriteFmt(GetStdout(), "  %4u-%4u %.*s %s %.*s\n"_s, block.startLine + 1, block.endLine + 1,
+                         (int)block.annotation.size, block.annotation.data.data, label, (int)displayName.size,
+                         displayName.data);
+        }
+        else if (displayName.size > 0)
+            FileWriteFmt(GetStdout(), "  %4u-%4u %s %.*s\n"_s, block.startLine + 1, block.endLine + 1, label,
+                         (int)displayName.size, displayName.data);
+        else
+            FileWriteFmt(GetStdout(), "  %4u-%4u %s\n"_s, block.startLine + 1, block.endLine + 1, label);
+    }
+}
+static void ShowFileBlocks(byteview filePath, region_alloc &alloc)
+{
+    byteview safePath = MakeCStringPath(filePath, alloc);
+    auto blocks = ListBlocks(safePath, alloc);
+    if (blocks.size > 0)
+        PrintBlockList(filePath, blocks);
+}
 // ─── Command handlers ───────────────────────────────────────────────────────
 
 void CmdBlocks(region_alloc &alloc, const cli_args &args)
@@ -215,6 +216,10 @@ void CmdMove(region_alloc &alloc, const cli_args &args)
         s_exitCode = 1;
         // MoveBlock already logged specific error
     }
+    else
+    {
+        ShowFileBlocks(filePath, alloc);
+    }
 }
 
 void CmdMoveInto(region_alloc &alloc, const cli_args &args)
@@ -253,22 +258,20 @@ void CmdMoveInto(region_alloc &alloc, const cli_args &args)
             copyIncludes = true;
     }
 
-    // Null-terminate paths
-    auto safePath = [&](byteview p) -> byteview {
-        span<uint8_t> buf = RegionAlloc::AllocArray<uint8_t>(alloc, p.size + 1);
-        MemCpy(buf.data, p.data, p.size);
-        buf.data[p.size] = 0;
-        return byteview{buf.data, p.size};
-    };
-
     uint32_t srcLine = (uint32_t)(srcLineVal - 1);
     uint32_t dstLine = (uint32_t)(dstLineVal - 1);
 
-    bool ok = MoveBlockInto(safePath(srcFilePath), srcLine, safePath(dstFilePath), dstLine, copyIncludes, alloc);
+    bool ok = MoveBlockInto(MakeCStringPath(srcFilePath, alloc), srcLine, MakeCStringPath(dstFilePath, alloc), dstLine,
+                            copyIncludes, alloc);
     if (!ok)
     {
         s_exitCode = 1;
         // MoveBlockInto already logged specific error
+    }
+    else
+    {
+        ShowFileBlocks(srcFilePath, alloc);
+        ShowFileBlocks(dstFilePath, alloc);
     }
 }
 
@@ -307,29 +310,32 @@ void CmdDelete(region_alloc &alloc, const cli_args &args)
         s_exitCode = 1;
         // DeleteBlock already logged specific error
     }
+    else
+    {
+        ShowFileBlocks(filePath, alloc);
+    }
 }
 
 void CmdEdit(region_alloc &alloc, const cli_args &args)
 {
     if (args.positional.size < 2)
     {
-        LOG("Usage: xcav edit <file> <old-file> <new-file> [--force] [--dry-run]");
-        LOG("       xcav edit <file> --stdin [--force] [--dry-run]");
-        LOG("  Replaces oldText (full lines only) with newText in the target file.");
-        LOG("  oldText must span complete lines — use 'xcav read --raw' to get exact text.");
-        LOG("  --stdin mode reads oldText and newText from stdin, separated by a line");
-        LOG("  containing only '---XCAV_EDIT_SEPARATOR---'.");
-        LOG("  --force skips tree-sitter validation and re-indentation.");
+        LOG("Usage: xcav edit <file> <old-file> <new-file> [--dry-run]");
+        LOG("       xcav edit <file> --stdin [--dry-run]");
+        LOG("  Replaces oldText with newText using line-based matching.");
+        LOG("  Lines are matched by content (whitespace ignored). The indentation");
+        LOG("  from the matched lines is copied to the replacement text.");
+        LOG("  Use 'xcav read <file> <line>' to get oldText -- the un-indented");
+        LOG("  output works directly as oldText input.");
+        LOG("  --stdin mode reads oldText then newText from stdin, separated by");
+        LOG("  a line containing only '---XCAV_EDIT_SEPARATOR---'.");
         LOG("  --dry-run shows what would match without modifying the file.");
-        LOG("  --diff (always on) print structural block diff (added/removed/modified blocks).");
         return;
     }
 
     // Scan for flags first, then collect file path and text file args.
     bool stdinMode = false;
-    bool force = false;
     bool dryRun = false;
-    bool diff = false;
     byteview filePath{};
     byteview oldFile{};
     byteview newFile{};
@@ -343,12 +349,8 @@ void CmdEdit(region_alloc &alloc, const cli_args &args)
         byteview arg = args.positional.data.data[i];
         if (ByteviewEq(arg, "--stdin"))
             stdinMode = true;
-        else if (ByteviewEq(arg, "--force"))
-            force = true;
         else if (ByteviewEq(arg, "--dry-run"))
             dryRun = true;
-        else if (ByteviewEq(arg, "--diff"))
-            diff = true;
         else if (filePath.size == 0)
             filePath = arg;
         else if (oldFile.size == 0)
@@ -375,12 +377,12 @@ void CmdEdit(region_alloc &alloc, const cli_args &args)
         uint32_t sepLen = 25;
 
         uint32_t pid = (uint32_t)getpid();
-        stdinFile.size = StringWriteFmt(span<uint8_t>{stdinPathBuf, sizeof(stdinPathBuf) - 1},
-                                        "/tmp/xcav_edit_%u_stdin.txt"_s, pid);
-        oldFile.size = StringWriteFmt(span<uint8_t>{oldPathBuf, sizeof(oldPathBuf) - 1},
-                                      "/tmp/xcav_edit_%u_old.txt"_s, pid);
-        newFile.size = StringWriteFmt(span<uint8_t>{newPathBuf, sizeof(newPathBuf) - 1},
-                                      "/tmp/xcav_edit_%u_new.txt"_s, pid);
+        stdinFile.size =
+            StringWriteFmt(span<uint8_t>{stdinPathBuf, sizeof(stdinPathBuf) - 1}, "/tmp/xcav_edit_%u_stdin.txt"_s, pid);
+        oldFile.size =
+            StringWriteFmt(span<uint8_t>{oldPathBuf, sizeof(oldPathBuf) - 1}, "/tmp/xcav_edit_%u_old.txt"_s, pid);
+        newFile.size =
+            StringWriteFmt(span<uint8_t>{newPathBuf, sizeof(newPathBuf) - 1}, "/tmp/xcav_edit_%u_new.txt"_s, pid);
         stdinPathBuf[stdinFile.size] = 0;
         oldPathBuf[oldFile.size] = 0;
         newPathBuf[newFile.size] = 0;
@@ -468,15 +470,8 @@ void CmdEdit(region_alloc &alloc, const cli_args &args)
         }
     }
 
-    // Ensure all paths are null-terminated (CopyByteView from arena isn't;
-    // FileOpen → CStr asserts null termination).
-    auto safePath = [&](byteview p) -> byteview {
-        span<uint8_t> buf = RegionAlloc::AllocArray<uint8_t>(alloc, p.size + 1);
-        MemCpy(buf.data, p.data, p.size);
-        buf.data[p.size] = 0;
-        return byteview{buf.data, p.size};
-    };
-    bool ok = EditSafe(safePath(filePath), safePath(oldFile), safePath(newFile), alloc, force, dryRun, diff);
+    bool ok = EditSafe(MakeCStringPath(filePath, alloc), MakeCStringPath(oldFile, alloc),
+                       MakeCStringPath(newFile, alloc), alloc, dryRun);
     if (stdinMode)
     {
         unlink(Span::CStr(stdinFile));
@@ -488,177 +483,116 @@ void CmdEdit(region_alloc &alloc, const cli_args &args)
         s_exitCode = 1;
         // EditSafe already logged a specific error
     }
+    else
+    {
+        ShowFileBlocks(filePath, alloc);
+    }
 }
-
 void CmdHelp()
 {
-    LOG("xcav — structural code-moving tool with tree-sitter validation");
+    LOG("xcav — structural code mover for agents");
     LOG("");
     LOG("USAGE");
     LOG("  xcav <command> [args...]");
     LOG("");
+    LOG("CORE WORKFLOWS");
+    LOG("");
+    LOG("  Survey → Read → Edit");
+    LOG("    xcav blocks <file>              # see what's there");
+    LOG("    xcav read <file> <line>         # get code (un-indented, ready for edit)");
+    LOG("    xcav edit <file> <old> <new>    # replace lines (accepts xcav_read output)");
+    LOG("");
+    LOG("  Restructure within a file");
+    LOG("    xcav blocks <file>              # survey");
+    LOG("    xcav move <file> <line> <dest>  # move block");
+    LOG("    xcav delete <file> <line>       # delete block");
+    LOG("    xcav undo <file>                # recover");
+    LOG("");
+    LOG("  Restructure across files");
+    LOG("    xcav blocks <src>; xcav blocks <dst>     # survey both");
+    LOG("    xcav move-into <src> <ln> <dst> <ln>     # cross-file move");
+    LOG("    xcav copy <src> <ln> <dst> <ln>          # cross-file copy");
+    LOG("");
+    LOG("  Extract to new file (copy + delete)");
+    LOG("    xcav copy <src> <ln> <new> 0             # copy to new file");
+    LOG("    xcav delete <src> <ln>                   # remove from source");
+    LOG("");
+    LOG("  Replace a block");
+    LOG("    xcav replace <file> <ln> <old> <new>     # scoped within block");
+    LOG("    xcav replace-block <file> <ln> <new>     # replace entire block");
+    LOG("");
     LOG("COMMANDS");
     LOG("");
     LOG("  xcav blocks <file|directory>");
-    LOG("    List structural blocks in a C/C++/Java/TS/JS source file.");
-    LOG("    If <file> is a directory, lists blocks for all source files (non-recursive).");
-    LOG("    Each file's blocks are preceded by a header line with the filename.");
-    LOG("    Output format: START-END KIND name (compact, one per line).");
-    LOG("    Kinds: include, struct, enum, func, decl.");
-    LOG("    Comments are excluded. Line numbers are 1-indexed.");
-    LOG("    Recurses into namespaces but not classes/structs/enums");
-    LOG("    (those are treated as opaque blocks).");
-    LOG("    Language is detected by file extension: .c/.h → C, .cc/.cpp/.cxx/.hpp/.hxx/.hh → C++,");
-    LOG("    .java → Java, .js/.mjs/.cjs → JavaScript, .ts/.mts/.cts → TypeScript,");
-    LOG("    .jsx/.tsx → TSX.");
+    LOG("    List structural blocks with 1-indexed line ranges and names.");
+    LOG("    Directory mode: lists blocks for all source files (non-recursive).");
+    LOG("    Block types: func, struct, class, enum, decl, namespace, template,");
+    LOG("    interface, export, var, and more.");
+    LOG("    Java annotations are shown inline (e.g. '@Override add').");
     LOG("    Examples:");
-    LOG("      xcav blocks file.cc         — blocks in a single file");
-    LOG("      xcav blocks .               — blocks in all files in current directory");
+    LOG("      xcav blocks file.cc");
+    LOG("      xcav blocks .                    # current directory");
+    LOG("");
+    LOG("  xcav read <file> [<line>] [flags]");
+    LOG("    Read code in agent-friendly format — un-indented, annotates the");
+    LOG("    structural path. Output is directly usable as oldText for xcav edit.");
+    LOG("      xcav read <file> <line>            — block at line");
+    LOG("      xcav read <file> <line> --numbers  — with line numbers");
+    LOG("      xcav read <file> --name <path>     — find by structural name");
+    LOG("      xcav read <file> --all             — dump all blocks");
+    LOG("      xcav read <file> --offset N --limit M — line range, un-indented");
+    LOG("    --name supports suffix matching: 'GetX' matches 'Point::GetX'.");
+    LOG("    --raw: output exact text with original indentation.");
+    LOG("    Non-code files default to printing the whole file.");
+    LOG("");
+    LOG("  xcav edit <file> <old-file> <new-file> [--dry-run]");
+    LOG("  xcav edit <file> --stdin [--dry-run]");
+    LOG("    Line-based replacement. Matches oldText to the file by comparing");
+    LOG("    line content (ignoring leading/trailing whitespace per line).");
+    LOG("    Copies indentation from the matched lines to the replacement text.");
+    LOG("    Accepts 'xcav read' output directly as oldText.");
+    LOG("    --stdin: read oldText then newText from stdin, separated by");
+    LOG("            a line containing '---XCAV_EDIT_SEPARATOR---'.");
+    LOG("    --dry-run: report what would match without modifying the file.");
     LOG("");
     LOG("  xcav move <file> <line> <dest-line>");
     LOG("    Move the structural block containing <line> to after <dest-line>.");
-    LOG("    Both line numbers are 1-indexed (as shown by 'xcav blocks').");
-    LOG("    The block is re-indented to match the destination's indentation level.");
-    LOG("    The block must not contain the destination line.");
-    LOG("    Destination must be a block boundary (closing brace, file start/end).");
-    LOG("    Picking a line inside a function body inserts the block there.");
-    LOG("    Examples:");
-    LOG("      xcav move file.cc 45 20   — move block at line 45 to after line 20");
-    LOG("      xcav move file.cc 45 1    — move block to top of file");
+    LOG("    Re-indents to match destination. Dest must be a block boundary.");
     LOG("");
-    LOG("  xcav move-into <src-file> <src-line> <dst-file> <dst-line> [--copy-includes]");
-    LOG("    Move the structural block at <src-line> in <src-file> to after");
-    LOG("    <dst-line> in <dst-file>. Both line numbers are 1-indexed.");
-    LOG("    Same block-detection and re-indentation rules as 'move'.");
-    LOG("    --copy-includes: copy #include/import lines from source to dest");
-    LOG("    (deduplicated against existing dest includes).");
-    LOG("    Examples:");
-    LOG("      xcav move-into a.cc 45 b.cc 20");
-    LOG("      xcav move-into a.cc 45 b.cc 20 --copy-includes");
-    LOG("");
-    LOG("  xcav extract <src-file> <line> <new-file>");
-    LOG("    Move the structural block at <line> to a new file.");
-    LOG("    For C/C++: adds #pragma once, namespace wrapping, and copies #includes.");
-    LOG("    For Java/TS/JS: copies imports. No pragma/namespace generation.");
-    LOG("    The block's includes/imports are copied to the new file (deduplicated).");
-    LOG("    Example:");
-    LOG("      xcav extract file.cc 45 new_feature.h");
-    LOG("      xcav extract App.java 10 SubFeature.java");
-    LOG("");
-    LOG("  xcav inline <file> <line>");
-    LOG("    Inline a simple single-return function at <line> into the call site.");
-    LOG("    Substitutes parameters with arguments. Saves backup (xcav undo).");
-    LOG("    Example:");
-    LOG("      xcav inline file.c 12");
-    LOG("");
-    LOG("  xcav replace-block <file> <line> <new-file>");
-    LOG("    Replace the structural block containing <line> with content from <new-file>.");
-    LOG("    The new content is re-indented to match the old block's indentation level.");
-    LOG("    Atomic operation — no risk of content landing outside namespaces.");
-    LOG("    Example:");
-    LOG("      xcav replace-block file.cc 32 /tmp/new.txt");
+    LOG("  xcav move-into <src> <src-line> <dst> <dst-line> [--copy-includes]");
+    LOG("    Cross-file move. --copy-includes copies #include/import lines.");
+    LOG("    The 'static' keyword is auto-stripped from moved functions.");
     LOG("");
     LOG("  xcav delete <file> <line>");
-    LOG("    Delete the structural block containing <line>.");
-    LOG("    <line> is 1-indexed. Cleans up surrounding blank lines");
-    LOG("    and orphaned comments (except file-level ones).");
-    LOG("    Example:");
-    LOG("      xcav delete file.cc 32    — delete the function/struct at line 32");
-    LOG("");
-    LOG("  xcav read <file> [<line>] [flags]");
-    LOG("    Read structural blocks in an agent-friendly format.");
-    LOG("    Modes:");
-    LOG("      xcav read <file> <line>            — block at line (no numbers)");
-    LOG("      xcav read <file> <line> --numbers  — block at line with line numbers");
-    LOG("      xcav read <file> <line> --raw      — exact text, no un-indent");
-    LOG("      xcav read <file> --name <path>     — find by structural name");
-    LOG("      xcav read <file> --all             — dump all blocks");
-    LOG("      xcav read <file> --all --numbers   — all blocks with line numbers");
-    LOG("      xcav read <file> --offset N --limit M — line range with un-indent");
-    LOG("    Output shows a header comment with the structural path");
-    LOG("    (e.g. 'Point::GetX') and un-indented code to save tokens.");
-    LOG("    --offset/--limit mode reads a line range within a block:");
-    LOG("    computes min-indent from visible lines (not whole block), so");
-    LOG("    deep slices come out compact. Works with --numbers.");
-    LOG("    --name supports suffix matching: 'GetX' matches 'Point::GetX'.");
-    LOG("    --raw skips un-indenting — outputs exact text with original indent.");
-    LOG("    Examples:");
-    LOG("      xcav read file.cc 45                     — function at line 45");
-    LOG("      xcav read file.cc 45 --numbers           — same, with line numbers");
-    LOG("      xcav read file.cc 45 --raw               — exact text, original indent");
-    LOG("      xcav read file.cc --name foo             — find function 'foo'");
-    LOG("      xcav read file.cc --all --numbers        — dump entire file structure");
-    LOG("      xcav read file.cc --offset 120 --limit 8 — 8 lines starting at line 120, un-indented");
-    LOG("      xcav read file.sh --offset 10 --limit 5 --raw — exact text for non-code files");
+    LOG("    Delete the structural block at <line>. Cleans up blank lines,");
+    LOG("    orphaned comments, and trailing semicolons from type declarations.");
     LOG("");
     LOG("  xcav replace <file> <line> <old-file> <new-file>");
-    LOG("    Replace text within a specific structural block (scope-safe).");
-    LOG("    Like 'edit' but scoped to the block containing <line>, so oldText");
-    LOG("    doesn't need to be globally unique. No tree-sitter validation.");
-    LOG("    Normalizes Unicode punctuation (em-dash → --, arrows → ASCII)");
-    LOG("    in both oldText and newText before matching.");
-    LOG("    Example:");
-    LOG("      xcav replace file.cc 32 /tmp/old.txt /tmp/new.txt");
+    LOG("    Scoped replace — oldText only needs to be unique within the block");
+    LOG("    containing <line>. No tree-sitter validation.");
+    LOG("");
+    LOG("  xcav replace-block <file> <line> <new-file>");
+    LOG("    Replace the entire structural block containing <line> with content");
+    LOG("    from <new-file>. Atomic — no risk of content outside namespaces.");
+    LOG("");
+    LOG("  xcav copy <src> <src-line> <dst> <dst-line> [--copy-includes] [--show-returns]");
+    LOG("    Copy a block cross-file. Source is unaffected.");
+    LOG("    --show-returns: print line numbers of return statements in the copy.");
     LOG("");
     LOG("  xcav undo <file>");
-    LOG("    Restore <file> from its most recent backup in .xcav_backups/.");
-    LOG("    Backups are created automatically before every move/delete/edit/replace/replace-block/tidy/extract.");
-    LOG("    .xcav_backups/.gitignore is created automatically so backup payloads stay out of commits.");
-    LOG("    Supports multiple undo levels (one backup per operation version).");
-    LOG("    Example:");
-    LOG("      xcav undo file.cc          — undo the last mutation on file.cc");
+    LOG("    Restore from most recent backup. Multi-level (up to 20).");
+    LOG("    Backups created automatically on every mutation.");
     LOG("");
-    LOG("  xcav edit <file> <old-file> <new-file> [--dry-run] [--force]");
-    LOG("  xcav edit <file> --stdin [--dry-run] [--force]");
-    LOG("    Safe edit with tree-sitter validation (full lines only).");
-    LOG("    Replaces oldText (contents of <old-file>) with newText (contents of");
-    LOG("    <new-file>) in the target <file>. oldText must span complete lines —");
-    LOG("    use 'xcav read <file> <line> --raw' to get the exact text to replace.");
-    LOG("    The oldText must be unique in the file. If tree-sitter finds syntax");
-    LOG("    errors after the edit, auto-fixes are attempted (re-indentation,");
-    LOG("    whitespace cleanup, tab→space normalization, blank line collapse).");
-    LOG("    If the result still has errors, the edit is rejected and the file is");
-    LOG("    left unchanged.");
-    LOG("    Normalizes Unicode punctuation (em-dash → --, arrows → ASCII)");
-    LOG("    in both oldText and newText before matching.");
-    LOG("    --stdin mode reads oldText and newText from stdin, separated by a");
-    LOG("    line containing only '---XCAV_EDIT_SEPARATOR---'.");
-    LOG("    --dry-run: validate and report matches, but do not write to file.");
-    LOG("    --force: skip tree-sitter validation and re-indentation.");
-    LOG("    --diff: (always on) structural block diff is shown automatically.");
-    LOG("    Examples:");
-    LOG("      xcav edit file.cc /tmp/old.txt /tmp/new.txt");
-    LOG("      xcav edit file.cc /tmp/old.txt /tmp/new.txt --diff");
-    LOG("      xcav edit file.cc /tmp/old.txt /tmp/new.txt --dry-run");
-    LOG("      xcav edit file.cc /tmp/old.txt /tmp/new.txt --force");
-    LOG("      echo -e 'old\\n---XCAV_EDIT_SEPARATOR---\\nnew' | xcav edit file.cc --stdin");
+    LOG("  xcav help / xcav onboard");
+    LOG("    Print help text or agent onboarding guide.");
     LOG("");
-    LOG("  xcav tidy <file>");
-    LOG("    Re-indent every structural block in the file.");
-    LOG("    Computes correct indentation from tree-sitter nesting depth");
-    LOG("    (namespaces → 0, struct/class → +4, enum → +4, function → +8, etc.).");
-    LOG("    Also cleans up trailing whitespace, normalizes tabs→spaces,");
-    LOG("    and collapses consecutive blank lines.");
-    LOG("    Example:");
-    LOG("      xcav tidy file.cc");
-    LOG("");
-    LOG("  xcav onboard");
-    LOG("    Print the agent onboarding guide (used by Pi coding agent).");
-    LOG("");
-    LOG("  xcav help");
-    LOG("    Print this help text.");
-    LOG("");
-    LOG("OUTPUT");
-    LOG("  Data (block lists, read code) → stdout.");
-    LOG("  Errors and diagnostics → stderr.");
-    LOG("");
-    LOG("EXIT CODES");
-    LOG("  0 — success");
-    LOG("  non-zero — assertion failure or operation failed");
+    LOG("UNICODE NORMALIZATION");
+    LOG("  xcav edit normalizes Unicode: em-dash→'--', arrows→'->'/'<-',");
+    LOG("  smart quotes→ASCII. Prevents 'oldText not found' from LLM output.");
     LOG("");
     LOG("LANGUAGES");
     LOG("  C, C++, Java, JavaScript, TypeScript, TSX. Detected by file extension.");
-    LOG("  Uses vendored tree-sitter grammars (tolerant of syntax errors).");
+    LOG("  Uses tree-sitter for structural parsing (tolerant of syntax errors).");
 }
 void CmdUndo(region_alloc &alloc, const cli_args &args)
 {
@@ -677,6 +611,7 @@ void CmdUndo(region_alloc &alloc, const cli_args &args)
     pathBuf.data[filePath.size] = 0;
 
     RestoreBackup(byteview{pathBuf.data, filePath.size}, alloc);
+    ShowFileBlocks(filePath, alloc);
 }
 
 void CmdRead(region_alloc &alloc, const cli_args &args)
@@ -688,8 +623,11 @@ void CmdRead(region_alloc &alloc, const cli_args &args)
         LOG("  xcav read <file> <line> --numbers  — include line numbers");
         LOG("  xcav read <file> <line> --raw      — exact text, no un-indent");
         LOG("  xcav read <file> --name <path>     — find block by structural name");
-        LOG("  xcav read <file> --all             — dump all blocks with code");
-        LOG("  Flags: --numbers, --raw, --name, --all, --fix");
+        LOG("  xcav read <file> --all             — print entire file (un-indented)");
+        LOG("  xcav read <file> --offset N --limit M — line range, falls back to plain");
+        LOG("                                         reading for non-block regions");
+        LOG("  xcav read <file>                   — print entire file (un-indented)");
+        LOG("  Flags: --numbers, --raw, --name, --all, --offset, --limit, --fix");
         LOG("  --fix  write corrected indentation back to disk");
         return;
     }
@@ -773,10 +711,6 @@ void CmdRead(region_alloc &alloc, const cli_args &args)
 
     // Helper to print a single block
     auto printBlock = [&](const read_block_info &info) {
-        // Header
-        FileWriteFmt(GetStdout(), "// %.*s (%.*s, lines %u-%u)\n"_s, (int)info.path.size, info.path.data.data,
-                     (int)info.type.size, info.type.data.data, info.startLine + 1, info.endLine + 1);
-
         if (showNumbers)
         {
             uint32_t lineNum = info.startLine + 1;
@@ -801,119 +735,116 @@ void CmdRead(region_alloc &alloc, const cli_args &args)
         }
     };
 
-    // ── --all mode ──
-    if (allMode)
+    // ── Default / --all mode: print entire file ──
+    if (allMode || (nameFilter.size == 0 && !hasOffset && !hasLine))
     {
-        source_language lang = DetectLanguage(safePath);
-        if (lang == source_language::Unknown)
+        file_handle fh = FileOpen(safePath, FileOpenMode::Read);
+        if (!FileValid(fh))
         {
-            // Unsupported file type — output entire file as one block
-            file_handle fh = FileOpen(safePath, FileOpenMode::Read);
-            if (!FileValid(fh))
+            LOG("ERROR: cannot open file");
+            return;
+        }
+        byteview text = FileReadFully(alloc, fh);
+        FileClose(fh);
+        if (text.size == 0)
+        {
+            LOG("ERROR: empty file");
+            return;
+        }
+
+        // Split into lines
+        inline_vec<byteview, 4096> lines{};
+        {
+            uint32_t p = 0;
+            while (p < text.size)
             {
-                LOG("ERROR: cannot open file");
-                return;
+                uint32_t ls = p;
+                while (p < text.size && text.data[p] != '\n')
+                    ++p;
+                InlineVec::Append(lines, byteview{text.data + ls, p - ls});
+                if (p < text.size && text.data[p] == '\n')
+                    ++p;
             }
-            byteview text = FileReadFully(alloc, fh);
-            FileClose(fh);
-            if (text.size == 0)
+        }
+
+        // Large file prevention: truncate to kMaxLines with a warning
+        const uint32_t kMaxLines = 500;
+        const uint64_t kMaxBytes = 50000;
+        uint32_t outputLines = lines.size;
+        bool truncated = false;
+        if (lines.size > kMaxLines || text.size > kMaxBytes)
+        {
+            outputLines = kMaxLines;
+            truncated = true;
+        }
+
+        if (rawMode)
+        {
+            // Exact output, no un-indent
+            uint32_t byteEnd = 0;
+            for (uint32_t li = 0; li < outputLines; ++li)
             {
-                LOG("ERROR: empty file");
-                return;
+                if (showNumbers)
+                    FileWriteFmt(GetStdout(), "%4u: "_s, li + 1);
+                byteview line = lines.data.data[li];
+                FileWriteFmt(GetStdout(), "%.*s\n"_s, (int)line.size, line.data);
             }
-            FileWriteFmt(GetStdout(), "// %.*s (plain file, %llu bytes)\n"_s, (int)filePath.size,
-                         filePath.data, (unsigned long long)text.size);
-            if (!rawMode)
+        }
+        else
+        {
+            // Un-indent: find minimum leading whitespace across non-blank lines
+            uint32_t minIndent = 0xFFFFFFFF;
+            for (uint32_t li = 0; li < outputLines; ++li)
             {
-                // Un-indent like a normal block
-                uint32_t minIndent = 0xFFFFFFFF;
-                {
-                    uint32_t p = 0;
-                    while (p < text.size)
+                byteview line = lines.data.data[li];
+                uint32_t indent = 0;
+                while (indent < line.size && (line.data[indent] == ' ' || line.data[indent] == '\t'))
+                    ++indent;
+                bool hasContent = false;
+                for (uint32_t c = indent; c < line.size; ++c)
+                    if (line.data[c] != ' ' && line.data[c] != '\t')
                     {
-                        uint32_t indent = 0;
-                        while (p + indent < text.size &&
-                               (text.data[p + indent] == ' ' || text.data[p + indent] == '\t'))
-                            ++indent;
-                        bool hasContent = false;
-                        uint32_t cs = p + indent;
-                        while (cs < text.size && text.data[cs] != '\n')
-                        {
-                            if (text.data[cs] != ' ' && text.data[cs] != '\t')
-                            { hasContent = true; break; }
-                            ++cs;
-                        }
-                        if (hasContent && indent < minIndent)
-                            minIndent = indent;
-                        while (p < text.size && text.data[p] != '\n')
-                            ++p;
-                        if (p < text.size)
-                            ++p;
+                        hasContent = true;
+                        break;
                     }
-                }
-                if (minIndent == 0xFFFFFFFF)
-                    minIndent = 0;
-                uint32_t p = 0;
-                while (p < text.size)
-                {
-                    uint32_t strip = 0;
-                    while (p < text.size && strip < minIndent &&
-                           (text.data[p] == ' ' || text.data[p] == '\t'))
-                    { ++p; ++strip; }
-                    while (p < text.size && text.data[p] != '\n')
-                        FileWriteFmt(GetStdout(), "%c"_s, text.data[p++]);
-                    FileWriteFmt(GetStdout(), "\n"_s);
-                    if (p < text.size)
-                        ++p;
-                }
+                if (hasContent && indent < minIndent)
+                    minIndent = indent;
             }
-            else
+            if (minIndent == 0xFFFFFFFF)
+                minIndent = 0;
+
+            for (uint32_t li = 0; li < outputLines; ++li)
             {
-                FileWriteFmt(GetStdout(), "%.*s"_s, (int)text.size, text.data);
-                if (text.size == 0 || text.data[text.size - 1] != '\n')
-                    FileWriteFmt(GetStdout(), "\n"_s);
-            }
-            return;
-        }
-
-        auto blocks = ListBlocks(safePath, alloc);
-        if (blocks.size == 0)
-        {
-            LOG("ERROR: no blocks found");
-            return;
-        }
-        uint64_t printedCount = 0;
-        for (uint64_t i = 0; i < blocks.size; ++i)
-        {
-            // Skip root-level container nodes (translation_unit, program)
-            block_info &b = blocks.data.data[i];
-            if (b.type.size >= 16 && b.type.data[0] == 't')
-                continue; // translation_unit
-            if (b.type.size >= 7 && b.type.data[0] == 'p')
-                continue; // program
-
-            read_block_info info = ReadBlock(safePath, b.startLine, alloc, rawMode);
-                        if (info.text.size > 0 && info.path.size > 0)
-                        {
-                            if (printedCount > 0)
-                                FileWriteFmt(GetStdout(), "\n"_s);
-                            printBlock(info);
-                ++printedCount;
+                byteview line = lines.data.data[li];
+                uint32_t strip = minIndent;
+                uint32_t p = 0;
+                while (p < line.size && strip > 0 && (line.data[p] == ' ' || line.data[p] == '\t'))
+                {
+                    ++p;
+                    --strip;
+                }
+                if (showNumbers)
+                    FileWriteFmt(GetStdout(), "%4u: "_s, li + 1);
+                FileWriteFmt(GetStdout(), "%.*s\n"_s, (int)(line.size - p), line.data + p);
             }
         }
-        if (printedCount == 0)
-            LOG("ERROR: no blocks found");
+
+        if (truncated)
+            FileWriteFmt(GetStdout(),
+                         "\n[Truncated to first %u of %llu lines (%llu bytes). Use --offset/--limit to read more.]\n"_s,
+                         kMaxLines, (unsigned long long)lines.size, (unsigned long long)text.size);
         return;
     }
-
     // ── --name mode ──
     if (nameFilter.size > 0)
     {
         auto blocks = ListBlocks(safePath, alloc);
+        read_block_info firstMatch{};
+        uint32_t matchCount = 0;
         for (uint64_t i = 0; i < blocks.size; ++i)
         {
             read_block_info info = ReadBlock(safePath, blocks.data.data[i].startLine, alloc, rawMode);
-                        if (info.text.size > 0)
+            if (info.text.size > 0)
             {
                 // Compare paths: allow partial match (e.g. "GetX" matches "Point::GetX")
                 bool match = false;
@@ -940,23 +871,59 @@ void CmdRead(region_alloc &alloc, const cli_args &args)
                 }
                 if (match)
                 {
-                    printBlock(info);
-                    return;
+                    ++matchCount;
+                    if (matchCount == 1)
+                    {
+                        firstMatch = info;
+                    }
+                    else
+                    {
+                        // When names collide (e.g. class and constructor share a name),
+                        // prefer container types (class, struct, enum, interface) over
+                        // methods/constructors.
+                        auto isContainer = [](const read_block_info &ri) -> bool {
+                            char typeBuf[128];
+                            uint32_t ts = ri.type.size > 127 ? 127 : (uint32_t)ri.type.size;
+                            MemCpy(typeBuf, ri.type.data.data, ts);
+                            typeBuf[ts] = 0;
+                            return StrEq(typeBuf, "class_declaration") || StrEq(typeBuf, "class_specifier") ||
+                                   StrEq(typeBuf, "struct_specifier") || StrEq(typeBuf, "interface_declaration") ||
+                                   StrEq(typeBuf, "enum_declaration") || StrEq(typeBuf, "enum_specifier");
+                        };
+                        if (isContainer(info) && !isContainer(firstMatch))
+                            firstMatch = info;
+                    }
                 }
             }
         }
-        s_exitCode = 1;
-        LOG("ERROR: no block matching '%.*s'", (int)nameFilter.size, nameFilter.data);
+        if (matchCount == 0)
+        {
+            s_exitCode = 1;
+            LOG("ERROR: no block matching '%.*s'", (int)nameFilter.size, nameFilter.data);
+            return;
+        }
+        if (matchCount > 1)
+            LOG("WARNING: --name '%.*s' matches %u blocks (using first match)", (int)nameFilter.size, nameFilter.data,
+                matchCount);
+        printBlock(firstMatch);
         return;
     }
 
     // ── Helper: plain file reading (non-code files) ──
     auto printPlainFile = [&](uint32_t startLine, uint32_t maxLines, bool raw) {
         file_handle fh = FileOpen(safePath, FileOpenMode::Read);
-        if (!FileValid(fh)) { LOG("ERROR: cannot open file"); return; }
+        if (!FileValid(fh))
+        {
+            LOG("ERROR: cannot open file");
+            return;
+        }
         byteview text = FileReadFully(alloc, fh);
         FileClose(fh);
-        if (text.size == 0) { LOG("ERROR: empty file"); return; }
+        if (text.size == 0)
+        {
+            LOG("ERROR: empty file");
+            return;
+        }
 
         // Split into lines
         inline_vec<byteview, 4096> lines{};
@@ -965,15 +932,22 @@ void CmdRead(region_alloc &alloc, const cli_args &args)
             while (p < text.size)
             {
                 uint32_t ls = p;
-                while (p < text.size && text.data[p] != '\n') ++p;
+                while (p < text.size && text.data[p] != '\n')
+                    ++p;
                 InlineVec::Append(lines, byteview{text.data + ls, p - ls});
-                if (p < text.size && text.data[p] == '\n') ++p;
+                if (p < text.size && text.data[p] == '\n')
+                    ++p;
             }
         }
 
         uint32_t endLine = startLine + maxLines;
-        if (endLine > lines.size) endLine = lines.size;
-        if (startLine >= lines.size) { LOG("ERROR: offset %u exceeds file length (%llu lines)", startLine + 1, (unsigned long long)lines.size); return; }
+        if (endLine > lines.size)
+            endLine = lines.size;
+        if (startLine >= lines.size)
+        {
+            LOG("ERROR: offset %u exceeds file length (%llu lines)", startLine + 1, (unsigned long long)lines.size);
+            return;
+        }
 
         if (raw)
         {
@@ -981,7 +955,8 @@ void CmdRead(region_alloc &alloc, const cli_args &args)
             for (uint32_t li = startLine; li < endLine; ++li)
             {
                 byteview line = lines.data.data[li];
-                if (showNumbers) FileWriteFmt(GetStdout(), "%4u: "_s, li + 1);
+                if (showNumbers)
+                    FileWriteFmt(GetStdout(), "%4u: "_s, li + 1);
                 FileWriteFmt(GetStdout(), "%.*s\n"_s, (int)line.size, line.data);
             }
         }
@@ -993,21 +968,33 @@ void CmdRead(region_alloc &alloc, const cli_args &args)
             {
                 byteview line = lines.data.data[li];
                 uint32_t indent = 0;
-                while (indent < line.size && (line.data[indent] == ' ' || line.data[indent] == '\t')) ++indent;
+                while (indent < line.size && (line.data[indent] == ' ' || line.data[indent] == '\t'))
+                    ++indent;
                 bool hasContent = false;
                 for (uint32_t c = indent; c < line.size; ++c)
-                    if (line.data[c] != ' ' && line.data[c] != '\t') { hasContent = true; break; }
-                if (hasContent && indent < minIndent) minIndent = indent;
+                    if (line.data[c] != ' ' && line.data[c] != '\t')
+                    {
+                        hasContent = true;
+                        break;
+                    }
+                if (hasContent && indent < minIndent)
+                    minIndent = indent;
             }
-            if (minIndent == 0xFFFFFFFF) minIndent = 0;
+            if (minIndent == 0xFFFFFFFF)
+                minIndent = 0;
 
             for (uint32_t li = startLine; li < endLine; ++li)
             {
                 byteview line = lines.data.data[li];
                 uint32_t strip = minIndent;
                 uint32_t p = 0;
-                while (p < line.size && strip > 0 && (line.data[p] == ' ' || line.data[p] == '\t')) { ++p; --strip; }
-                if (showNumbers) FileWriteFmt(GetStdout(), "%4u: "_s, li + 1);
+                while (p < line.size && strip > 0 && (line.data[p] == ' ' || line.data[p] == '\t'))
+                {
+                    ++p;
+                    --strip;
+                }
+                if (showNumbers)
+                    FileWriteFmt(GetStdout(), "%4u: "_s, li + 1);
                 FileWriteFmt(GetStdout(), "%.*s\n"_s, (int)(line.size - p), line.data + p);
             }
         }
@@ -1015,7 +1002,8 @@ void CmdRead(region_alloc &alloc, const cli_args &args)
         uint64_t totalLines = lines.size;
         bool truncated = (endLine - startLine > 2000) || (text.size > 50000);
         if (truncated)
-            FileWriteFmt(GetStdout(), "\n[Truncated: %u lines. Use --offset/--limit to narrow.]\n"_s, endLine - startLine);
+            FileWriteFmt(GetStdout(), "\n[Truncated: %u lines. Use --offset/--limit to narrow.]\n"_s,
+                         endLine - startLine);
     };
 
     // ── offset mode (slice with re-unindent) ──
@@ -1038,8 +1026,10 @@ void CmdRead(region_alloc &alloc, const cli_args &args)
         read_block_info info = ReadBlock(safePath, offsetVal - 1, alloc, rawMode);
         if (info.text.size == 0)
         {
-            s_exitCode = 1;
-            LOG("ERROR: no block found at offset %u", offsetVal);
+            // No structural block at this offset — fall back to plain line reading.
+            // This handles regions between blocks (e.g. includes area, namespace-level
+            // types/helpers before the first function).
+            printPlainFile(offsetVal - 1, hasLimit ? limitVal : 0xFFFFFFFFu, rawMode);
             return;
         }
 
@@ -1142,8 +1132,7 @@ void CmdRead(region_alloc &alloc, const cli_args &args)
         span<uint8_t> newBuf = RegionAlloc::AllocArray<uint8_t>(alloc, newSize);
         MemCpy(newBuf.data, fileContent.data, info.startByte);
         MemCpy(newBuf.data + info.startByte, info.text.data, info.text.size);
-        MemCpy(newBuf.data + info.startByte + info.text.size,
-               fileContent.data + info.endByte,
+        MemCpy(newBuf.data + info.startByte + info.text.size, fileContent.data + info.endByte,
                fileContent.size - info.endByte);
 
         file_handle fh3 = FileOpen(safePath, FileOpenMode::Write);
@@ -1162,13 +1151,13 @@ void CmdRead(region_alloc &alloc, const cli_args &args)
     };
 
     // ── line mode (default) ──
+    // Should not be reached without a line -- defaults are handled above.
     if (!hasLine)
     {
         s_exitCode = 1;
         LOG("ERROR: expected a line number, --name, --all, or --offset");
         return;
     }
-
     // --fix forces non-raw mode (we need un-indented text to write back)
     source_language lineLang = DetectLanguage(safePath);
     if (lineLang == source_language::Unknown)
@@ -1245,6 +1234,10 @@ void CmdReplace(region_alloc &alloc, const cli_args &args)
         s_exitCode = 1;
         // ReplaceInBlock already logged a specific error
     }
+    else
+    {
+        ShowFileBlocks(filePath, alloc);
+    }
 }
 
 void CmdReplaceBlock(region_alloc &alloc, const cli_args &args)
@@ -1284,6 +1277,10 @@ void CmdReplaceBlock(region_alloc &alloc, const cli_args &args)
         s_exitCode = 1;
         // ReplaceBlock already logged a specific error
     }
+    else
+    {
+        ShowFileBlocks(filePath, alloc);
+    }
 }
 
 void CmdOnboard()
@@ -1295,94 +1292,59 @@ void CmdOnboard()
 
 // ─── Entry point ────────────────────────────────────────────────────────────
 
-void CmdExtract(region_alloc &alloc, const cli_args &args)
+// ─── CmdCopy ────────────────────────────────────────────────────────────
+
+void CmdCopy(region_alloc &alloc, const cli_args &args)
 {
-    if (args.positional.size < 4)
+    if (args.positional.size < 5)
     {
-        LOG("Usage: xcav extract <src-file> <line> <new-file>");
-        LOG("  Moves the structural block at <line> to a new file.");
-        LOG("  Creates <new-file> with #pragma once and namespace wrapper.");
-        LOG("  Copies #include lines from source to new file.");
-        LOG("  Adds #include for new file in source.");
-        LOG("  Lines are 1-indexed (as shown by 'xcav blocks').");
+        LOG("Usage: xcav copy <src-file> <src-line> <dst-file> <dst-line> [--copy-includes] [--show-returns]");
         return;
     }
 
     byteview srcFilePath = args.positional.data.data[1];
     byteview dstFilePath = args.positional.data.data[3];
 
-    byte_parser lineParser{};
-    ByteParser::Init(lineParser, args.positional.data.data[2].data, args.positional.data.data[2].size);
-    int64_t lineVal = StringParser::ParseLong(lineParser);
+    byte_parser srcParser{};
+    byte_parser dstParser{};
+    ByteParser::Init(srcParser, args.positional.data.data[2].data, args.positional.data.data[2].size);
+    ByteParser::Init(dstParser, args.positional.data.data[4].data, args.positional.data.data[4].size);
 
-    if (lineVal < 1)
+    int64_t srcLineVal = StringParser::ParseLong(srcParser);
+    int64_t dstLineVal = StringParser::ParseLong(dstParser);
+
+    if (srcLineVal < 1 || dstLineVal < 1)
     {
-        LOG("ERROR: line number must be >= 1 — use 'xcav blocks' to see line numbers");
+        LOG("ERROR: line numbers must be >= 1");
+        s_exitCode = 1;
         return;
     }
 
-    // Null-terminate paths
-    auto safePath = [&](byteview p) -> byteview {
-        span<uint8_t> buf = RegionAlloc::AllocArray<uint8_t>(alloc, p.size + 1);
-        MemCpy(buf.data, p.data, p.size);
-        buf.data[p.size] = 0;
-        return byteview{buf.data, p.size};
-    };
-
-    bool ok = BlockExtract(safePath(srcFilePath), (uint32_t)(lineVal - 1), safePath(dstFilePath), alloc);
-    if (!ok)
+    bool copyIncludes = false;
+    bool showReturns = false;
+    for (uint64_t i = 5; i < args.positional.size; ++i)
     {
+        if (ByteviewEq(args.positional.data.data[i], "--copy-includes"))
+            copyIncludes = true;
+        else if (ByteviewEq(args.positional.data.data[i], "--show-returns"))
+            showReturns = true;
+    }
+
+    CopyResult result =
+        CopyBlock(MakeCStringPath(srcFilePath, alloc), (uint32_t)(srcLineVal - 1), MakeCStringPath(dstFilePath, alloc),
+                  (uint32_t)(dstLineVal - 1), showReturns, copyIncludes, alloc);
+    if (!result.ok)
+    {
+        LOG("ERROR: copy failed -- %s", result.error);
         s_exitCode = 1;
-        // BlockExtract already logged specific error
+    }
+    else
+    {
+        ShowFileBlocks(dstFilePath, alloc);
     }
 }
 
-void CmdTidy(region_alloc &alloc, const cli_args &args)
-{
-    if (args.positional.size < 2)
-    {
-        LOG("Usage: xcav tidy <file>");
-        LOG("  Re-indents every structural block based on tree-sitter nesting depth.");
-        LOG("  Also cleans up trailing whitespace, tabs→spaces, blank line collapse.");
-        return;
-    }
-
-    byteview filePath = args.positional.data.data[1];
-    span<uint8_t> pathBuf = RegionAlloc::AllocArray<uint8_t>(alloc, filePath.size + 1);
-    MemCpy(pathBuf.data, filePath.data, filePath.size);
-    pathBuf.data[filePath.size] = 0;
-
-    bool ok = TidyFile(byteview{pathBuf.data, filePath.size}, alloc);
-    if (!ok)
-    {
-                s_exitCode = 1;
-                // TidyFile already logged specific error
-            }
-        }
-
-        // ─── CmdInline ───────────────────────────────────────────────────────────
-
-        void CmdInline(region_alloc &alloc, const cli_args &args)
-        {
-            if (args.positional.size < 3)
-            {
-                LOG("Usage: xcav inline <file> <line>");
-                return;
-            }
-            byteview filePath = args.positional.data.data[1];
-            byte_parser lp{};
-            ByteParser::Init(lp, args.positional.data.data[2].data, args.positional.data.data[2].size);
-            int64_t lineVal = StringParser::ParseLong(lp);
-            if (lineVal < 1) { LOG("ERROR: line number must be >= 1"); s_exitCode = 1; return; }
-            span<uint8_t> pathBuf = RegionAlloc::AllocArray<uint8_t>(alloc, filePath.size + 1);
-            MemCpy(pathBuf.data, filePath.data, filePath.size);
-            pathBuf.data[filePath.size] = 0;
-            auto result = InlineFunctionCall(byteview{pathBuf.data, filePath.size}, (uint32_t)lineVal, alloc);
-            if (!result.ok) { LOG("ERROR: inline failed -- %s", result.error); s_exitCode = 1; }
-            else { LOG("OK: inlined function call at line %lld", (long long)lineVal); }
-        }
-
-        void Run(region_alloc &alloc)
+void Run(region_alloc &alloc)
 {
     cli_args args = ParseArgs(alloc);
 
@@ -1402,21 +1364,20 @@ void CmdTidy(region_alloc &alloc, const cli_args &args)
             " _L  ((|_L_|      code refactoring,\n"
             "(/)\\(__(____)     but the git diff has a blast radius\n",
         };
-        uint32_t pick = 0;  // deterministic: could be seeded from PID or time
+        uint32_t pick = 0; // deterministic: could be seeded from PID or time
         LOG("%s", quotes[pick]);
         LOG("Usage: xcav <command> [args...]");
         LOG("Commands:");
-        LOG("  blocks <file>             List structural blocks");
-        LOG("  read <file> <line>        Print block with structural path");
-        LOG("  move <file> <line> <to>   Move a block");
-        LOG("  move-into <src> <ln> <dst> <ln> [--copy-includes] Cross-file move");
-        LOG("  delete <file> <line>      Delete a block");
-        LOG("  edit <file> <old> <new>   Safe global edit (tree-sitter validated)");
+        LOG("  blocks <file|dir>          List structural blocks");
+        LOG("  read <file> <line>         Print block (un-indented, agent-friendly)");
+        LOG("  move <file> <line> <to>    Move a block within file");
+        LOG("  move-into <src> <ln> <dst> <ln> [--copy-includes]");
+        LOG("  delete <file> <line>       Delete a block");
+        LOG("  edit <file> <old> <new>    Line-based replacement (ignores indent)");
         LOG("  replace <file> <ln> <o> <n> Scoped replace within a block");
-        LOG("  replace-block <file> <ln> <new> Replace block with file content");
-        LOG("  undo <file>               Restore from .xcav_backup");
-        LOG("  extract <file> <ln> <new>  Move block to new file + #include");
-        LOG("  tidy <file>               Re-indent file via tree-sitter");
+        LOG("  replace-block <file> <ln> <new> Replace entire block");
+        LOG("  copy <src> <ln> <dst> <ln> Copy block between files");
+        LOG("  undo <file>                Restore from backup");
         LOG("  help                      Print detailed help");
         LOG("  onboard                   Print agent onboarding guide");
         return;
@@ -1440,12 +1401,8 @@ void CmdTidy(region_alloc &alloc, const cli_args &args)
         CmdReplaceBlock(alloc, args);
     else if (ByteviewEq(args.command, "undo"))
         CmdUndo(alloc, args);
-    else if (ByteviewEq(args.command, "extract"))
-        CmdExtract(alloc, args);
-    else if (ByteviewEq(args.command, "tidy"))
-        CmdTidy(alloc, args);
-    else if (ByteviewEq(args.command, "inline"))
-        CmdInline(alloc, args);
+    else if (ByteviewEq(args.command, "copy"))
+        CmdCopy(alloc, args);
     else if (ByteviewEq(args.command, "help"))
         CmdHelp();
     else if (ByteviewEq(args.command, "onboard"))

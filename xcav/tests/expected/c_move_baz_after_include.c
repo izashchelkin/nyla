@@ -12,7 +12,6 @@ int bar(int x) {
 }
 
 
-
 int qux(int x) {
     return x / 2;
 }
