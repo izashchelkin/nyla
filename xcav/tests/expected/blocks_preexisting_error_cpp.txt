@@ -1,0 +1,2 @@
+xcav/tests/fixtures/preexisting_error.cpp (1 blocks)
+     2-   4 func main

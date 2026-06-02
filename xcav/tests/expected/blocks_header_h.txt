@@ -1,0 +1,3 @@
+xcav/tests/fixtures/header.h (2 blocks)
+     4-   4 decl add
+     6-   6 decl multiply

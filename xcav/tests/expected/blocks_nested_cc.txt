@@ -1,0 +1,4 @@
+xcav/tests/fixtures/nested.cc (3 blocks)
+     5-   9 enum Operation
+    11-  21 template Calculator
+    23-  26 func Execute

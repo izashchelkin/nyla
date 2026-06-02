@@ -5,6 +5,7 @@
 #include "nyla/commons/byteparser.h"
 #include "nyla/commons/entrypoint.h"
 #include "nyla/commons/file.h"
+#include "nyla/commons/fmt.h"
 #include "nyla/commons/inline_string.h"
 #include "nyla/commons/inline_vec.h"
 #include "nyla/commons/keyboard.h"
@@ -15,10 +16,8 @@
 #include "nyla/commons/platform.h"
 #include "nyla/commons/platform_linux.h"
 #include "nyla/commons/region_alloc.h"
-#include "nyla/commons/shm_channel.h"
 #include "nyla/commons/span.h" // IWYU pragma: keep
 #include "nyla/commons/time.h"
-#include "nyla/commons/wm_ipc.h"
 #include "nyla/commons/word.h"
 #include "nyla/commons/x11_wm_hints_linux.h"
 
@@ -34,6 +33,112 @@ namespace
 static constexpr uint32_t kBaseWindowWidth = 1280;
 static constexpr const char *kStateFilePath = "/tmp/nyla_wm_state";
 static constexpr uint32_t kStateMagic = DWordBE("NYLA");
+
+// ─── Font data ───
+// 8x16 monospace glyphs, 96 chars (0x20-0x7F).
+// clang-format off
+static constexpr uint32_t kFontData[96][4] = {
+    {0x00000000, 0x00000000, 0x00000000, 0x00000000},
+    {0x00001010, 0x10101010, 0x10001010, 0x00000000},
+    {0x00242424, 0x00000000, 0x00000000, 0x00000000},
+    {0x00002424, 0x247E2424, 0x7E242424, 0x00000000},
+    {0x0010107C, 0x9290907C, 0x1212927C, 0x10100000},
+    {0x00006494, 0x68081010, 0x202C524C, 0x00000000},
+    {0x00001824, 0x2418304A, 0x4444443A, 0x00000000},
+    {0x00101010, 0x00000000, 0x00000000, 0x00000000},
+    {0x00000810, 0x20202020, 0x20201008, 0x00000000},
+    {0x00002010, 0x08080808, 0x08081020, 0x00000000},
+    {0x00000000, 0x0024187E, 0x18240000, 0x00000000},
+    {0x00000000, 0x0010107C, 0x10100000, 0x00000000},
+    {0x00000000, 0x00000000, 0x00001010, 0x20000000},
+    {0x00000000, 0x0000007E, 0x00000000, 0x00000000},
+    {0x00000000, 0x00000000, 0x00001010, 0x00000000},
+    {0x00000404, 0x08081010, 0x20204040, 0x00000000},
+    {0x00003C42, 0x42464A52, 0x6242423C, 0x00000000},
+    {0x00000818, 0x28080808, 0x0808083E, 0x00000000},
+    {0x00003C42, 0x42020408, 0x1020407E, 0x00000000},
+    {0x00003C42, 0x42021C02, 0x0242423C, 0x00000000},
+    {0x00000206, 0x0A122242, 0x7E020202, 0x00000000},
+    {0x00007E40, 0x40407C02, 0x0202423C, 0x00000000},
+    {0x00001C20, 0x40407C42, 0x4242423C, 0x00000000},
+    {0x00007E02, 0x02040408, 0x08101010, 0x00000000},
+    {0x00003C42, 0x42423C42, 0x4242423C, 0x00000000},
+    {0x00003C42, 0x4242423E, 0x02020438, 0x00000000},
+    {0x00000000, 0x00101000, 0x00001010, 0x00000000},
+    {0x00000000, 0x00101000, 0x00001010, 0x20000000},
+    {0x00000004, 0x08102040, 0x20100804, 0x00000000},
+    {0x00000000, 0x007E0000, 0x7E000000, 0x00000000},
+    {0x00000040, 0x20100804, 0x08102040, 0x00000000},
+    {0x00003C42, 0x42420408, 0x08000808, 0x00000000},
+    {0x00007C82, 0x9EA2A2A2, 0xA69A807E, 0x00000000},
+    {0x00003C42, 0x4242427E, 0x42424242, 0x00000000},
+    {0x00007C42, 0x42427C42, 0x4242427C, 0x00000000},
+    {0x00003C42, 0x42404040, 0x4042423C, 0x00000000},
+    {0x00007844, 0x42424242, 0x42424478, 0x00000000},
+    {0x00007E40, 0x40407840, 0x4040407E, 0x00000000},
+    {0x00007E40, 0x40407840, 0x40404040, 0x00000000},
+    {0x00003C42, 0x4240404E, 0x4242423C, 0x00000000},
+    {0x00004242, 0x42427E42, 0x42424242, 0x00000000},
+    {0x00003810, 0x10101010, 0x10101038, 0x00000000},
+    {0x00000E04, 0x04040404, 0x04444438, 0x00000000},
+    {0x00004244, 0x48506060, 0x50484442, 0x00000000},
+    {0x00004040, 0x40404040, 0x4040407E, 0x00000000},
+    {0x000082C6, 0xAA928282, 0x82828282, 0x00000000},
+    {0x00004242, 0x4262524A, 0x46424242, 0x00000000},
+    {0x00003C42, 0x42424242, 0x4242423C, 0x00000000},
+    {0x00007C42, 0x4242427C, 0x40404040, 0x00000000},
+    {0x00003C42, 0x42424242, 0x42424A3C, 0x02000000},
+    {0x00007C42, 0x4242427C, 0x50484442, 0x00000000},
+    {0x00003C42, 0x40403C02, 0x0242423C, 0x00000000},
+    {0x0000FE10, 0x10101010, 0x10101010, 0x00000000},
+    {0x00004242, 0x42424242, 0x4242423C, 0x00000000},
+    {0x00004242, 0x42424224, 0x24241818, 0x00000000},
+    {0x00008282, 0x82828282, 0x92AAC682, 0x00000000},
+    {0x00004242, 0x24241818, 0x24244242, 0x00000000},
+    {0x00008282, 0x44442810, 0x10101010, 0x00000000},
+    {0x00007E02, 0x02040810, 0x2040407E, 0x00000000},
+    {0x00003820, 0x20202020, 0x20202038, 0x00000000},
+    {0x00004040, 0x20201010, 0x08080404, 0x00000000},
+    {0x00003808, 0x08080808, 0x08080838, 0x00000000},
+    {0x00102844, 0x00000000, 0x00000000, 0x00000000},
+    {0x00000000, 0x00000000, 0x00000000, 0x007E0000},
+    {0x10080000, 0x00000000, 0x00000000, 0x00000000},
+    {0x00000000, 0x003C023E, 0x4242423E, 0x00000000},
+    {0x00004040, 0x407C4242, 0x4242427C, 0x00000000},
+    {0x00000000, 0x003C4240, 0x4040423C, 0x00000000},
+    {0x00000202, 0x023E4242, 0x4242423E, 0x00000000},
+    {0x00000000, 0x003C4242, 0x7E40403C, 0x00000000},
+    {0x00000E10, 0x107C1010, 0x10101010, 0x00000000},
+    {0x00000000, 0x003E4242, 0x4242423E, 0x02023C00},
+    {0x00004040, 0x407C4242, 0x42424242, 0x00000000},
+    {0x00001010, 0x00301010, 0x10101038, 0x00000000},
+    {0x00000404, 0x000C0404, 0x04040404, 0x44443800},
+    {0x00004040, 0x40424448, 0x70484442, 0x00000000},
+    {0x00003010, 0x10101010, 0x10101038, 0x00000000},
+    {0x00000000, 0x00FC9292, 0x92929292, 0x00000000},
+    {0x00000000, 0x007C4242, 0x42424242, 0x00000000},
+    {0x00000000, 0x003C4242, 0x4242423C, 0x00000000},
+    {0x00000000, 0x007C4242, 0x4242427C, 0x40404000},
+    {0x00000000, 0x003E4242, 0x4242423E, 0x02020200},
+    {0x00000000, 0x005E6040, 0x40404040, 0x00000000},
+    {0x00000000, 0x003E4040, 0x3C02027C, 0x00000000},
+    {0x00001010, 0x107C1010, 0x1010100E, 0x00000000},
+    {0x00000000, 0x00424242, 0x4242423E, 0x00000000},
+    {0x00000000, 0x00424242, 0x24241818, 0x00000000},
+    {0x00000000, 0x00828292, 0x9292927C, 0x00000000},
+    {0x00000000, 0x00424224, 0x18244242, 0x00000000},
+    {0x00000000, 0x00424242, 0x4242423E, 0x02023C00},
+    {0x00000000, 0x007E0408, 0x1020407E, 0x00000000},
+    {0x00000C10, 0x10102010, 0x1010100C, 0x00000000},
+    {0x00001010, 0x10101010, 0x10101010, 0x00000000},
+    {0x00003008, 0x08080408, 0x08080830, 0x00000000},
+    {0x0062928C, 0x00000000, 0x00000000, 0x00000000},
+    {0x08100000, 0x00000000, 0x00000000, 0x00000000},
+};
+// clang-format on
+
+static constexpr uint32_t kGlyphWidth = 8;
+static constexpr uint32_t kGlyphHeight = 16;
 
 struct Rect
 {
@@ -119,7 +224,7 @@ struct window_manager
     uint8_t activeStackIndex;
     bool layoutDirty;
     bool borderDirty;
-    bool shmDirty;
+    bool barDirty;
     bool follow;
     bool focusCheckPending;
 
@@ -141,14 +246,16 @@ struct window_manager
     inline_vec<xcb_window_t, 64> pendingClients;
     array<uint32_t, kTierCount> tiers;
 
+    // ─── Bar rendering ───
+    xcb_window_t barWindow;
+    xcb_pixmap_t barPixmap;
+    xcb_gcontext_t barGC;
+
     span<uint8_t> memory;
     uint32_t capacity;
     uint32_t windowCount;
     window_index_entry *index;
     window_data_entry *data;
-
-    shm_channel *ipcChannel = nullptr;
-    uint64_t ipcGeneration;
 };
 
 window_manager *wm;
@@ -349,7 +456,7 @@ void Activate(window_stack &stack, xcb_window_t clientWindow, xcb_timestamp_t ti
         ApplyBorder(stack.activeWindow, Color::KNone);
         stack.activeWindow = clientWindow;
         wm->layoutDirty = true;
-        wm->shmDirty = true;
+        wm->barDirty = true;
     }
     Activate(stack, time);
 }
@@ -443,7 +550,7 @@ void MoveStack(xcb_timestamp_t time, auto computeIdx)
 
     window_stack &oldStack = wm->stacks[iold];
     wm->activeStackIndex = (uint8_t)inew;
-    wm->shmDirty = true;
+    wm->barDirty = true;
     window_stack &newStack = wm->stacks[inew];
 
     if (wm->follow)
@@ -831,14 +938,98 @@ void WmShutdown(bool &isRunning)
     X11Ungrab();
     X11Flush();
     xcb_disconnect(X11GetConn());
-    if (wm->ipcChannel)
-    {
-        ShmChannel::Close(*wm->ipcChannel);
-        wm->ipcChannel = nullptr;
-    }
     isRunning = false;
 }
 
+// ─── Bar rendering ───
+
+auto BarRedraw() -> void
+{
+    uint32_t barW = wm->monitorWidth;
+    uint32_t barH = wm->barHeight;
+
+    // Clear to background — match border color in follow mode
+    {
+        uint32_t bgColor = wm->follow ? (uint32_t)Color::KActiveFollow : 0x1A1A1A;
+        xcb_change_gc(X11GetConn(), wm->barGC, XCB_GC_FOREGROUND, &bgColor);
+        xcb_rectangle_t bgRect = {0, 0, (uint16_t)barW, (uint16_t)barH};
+        xcb_poly_fill_rectangle(X11GetConn(), wm->barPixmap, wm->barGC, 1, &bgRect);
+    }
+
+    // Build text line
+    uint8_t lineBuf[512];
+    int textLen = 0;
+    {
+        wall_clock_time wc = GetWallClockTime();
+        const window_stack &activeStack = GetActiveStack();
+        if (activeStack.activeWindow)
+        {
+            window_index_entry *activeIdx = FindIndex(activeStack.activeWindow);
+            if (activeIdx && activeIdx->dataEntry->name.size > 0)
+            {
+                textLen = (int)StringWriteFmt({lineBuf, sizeof(lineBuf)}, "%02d:%02d:%02d %02d.%02d.%04d  %.*s [%u]"_s,
+                                              wc.hour, wc.minute, wc.second, wc.day, wc.month, wc.year,
+                                              activeIdx->dataEntry->name.size, activeIdx->dataEntry->name.data.data,
+                                              (uint32_t)wm->activeStackIndex + 1);
+            }
+            else
+            {
+                textLen = (int)StringWriteFmt({lineBuf, sizeof(lineBuf)}, "%02d:%02d:%02d %02d.%02d.%04d"_s, wc.hour,
+                                              wc.minute, wc.second, wc.day, wc.month, wc.year);
+            }
+        }
+        else
+        {
+            textLen = (int)StringWriteFmt({lineBuf, sizeof(lineBuf)}, "%02d:%02d:%02d %02d.%02d.%04d"_s, wc.hour,
+                                          wc.minute, wc.second, wc.day, wc.month, wc.year);
+        }
+    }
+
+    // Set foreground color (light gray) and draw glyphs via batched points
+    if (textLen > 0)
+    {
+        uint32_t fgColor = wm->follow ? 0x1A1A1A : 0xC8C8C8;
+        xcb_change_gc(X11GetConn(), wm->barGC, XCB_GC_FOREGROUND, &fgColor);
+
+        xcb_point_t points[256];
+        uint32_t pointCount = 0;
+        auto flush = [&] {
+            if (pointCount == 0)
+                return;
+            xcb_poly_point(X11GetConn(), XCB_COORD_MODE_ORIGIN, wm->barPixmap, wm->barGC, pointCount, points);
+            pointCount = 0;
+        };
+
+        uint32_t startX = 4;
+        for (int ci = 0; ci < textLen; ++ci)
+        {
+            uint8_t ch = (uint8_t)lineBuf[ci];
+            if (ch < 0x20 || ch > 0x7F)
+                continue;
+            uint32_t glyphIdx = ch - 0x20;
+            uint32_t baseX = startX + (uint32_t)ci * kGlyphWidth;
+            for (uint32_t gy = 0; gy < kGlyphHeight && gy < barH; ++gy)
+            {
+                uint32_t rowGroup = gy / 4;
+                uint32_t rowIdx = 3 - (gy % 4);
+                uint32_t rowByte = (kFontData[glyphIdx][rowGroup] >> (8 * rowIdx)) & 0xFF;
+                for (uint32_t gx = 0; gx < kGlyphWidth; ++gx)
+                {
+                    if ((rowByte >> (7 - gx)) & 1)
+                    {
+                        points[pointCount++] = {(int16_t)(baseX + gx), (int16_t)(gy + 2)};
+                        if (pointCount == 256)
+                            flush();
+                    }
+                }
+            }
+        }
+        flush();
+    }
+
+    xcb_copy_area(X11GetConn(), wm->barPixmap, wm->barWindow, wm->barGC, 0, 0, 0, 0, (uint16_t)barW, (uint16_t)barH);
+    X11Flush();
+}
 void WmProcess(bool &isRunning)
 {
     while (isRunning)
@@ -945,6 +1136,7 @@ void WmProcess(bool &isRunning)
                     }
                 }
                 wm->borderDirty = true;
+                wm->barDirty = true;
                 break;
             }
 
@@ -1170,6 +1362,13 @@ void WmProcess(bool &isRunning)
             break;
         }
 
+        case XCB_EXPOSE: {
+            auto *exp = reinterpret_cast<xcb_expose_event_t *>(event);
+            if (exp->window == wm->barWindow && exp->count == 0)
+                BarRedraw();
+            break;
+        }
+
         case 0: {
             auto *err = reinterpret_cast<xcb_generic_error_t *>(event);
             LOG("xcb error: %d, sequence: %d", err->error_code, err->sequence);
@@ -1307,7 +1506,7 @@ void WmProcess(bool &isRunning)
                 InlineString::Assign(data.name,
                                      byteview{static_cast<uint8_t *>(xcb_get_property_value(reply)), copyLen});
                 if (idx.window == GetActiveStack().activeWindow)
-                    wm->shmDirty = true;
+                    wm->barDirty = true;
                 break;
             }
 
@@ -1634,28 +1833,10 @@ void WmProcess(bool &isRunning)
         idx.flags &= ~window_index_entry::Flag_WantsConfigureNotify;
     }
 
-    if (wm->ipcChannel && wm->shmDirty)
+    if (wm->barDirty)
     {
-        wm->shmDirty = false;
-        wm_ipc_state *ipc = static_cast<wm_ipc_state *>(ShmChannel::BeginWrite(*wm->ipcChannel));
-        MemZero(ipc, sizeof(wm_ipc_state));
-        ipc->activeStackIndex = wm->activeStackIndex;
-        ipc->updateGeneration = ++wm->ipcGeneration;
-
-        const window_stack &activeStack = GetActiveStack();
-        if (activeStack.activeWindow)
-        {
-            window_index_entry *activeIdx = FindIndex(activeStack.activeWindow);
-            if (activeIdx)
-            {
-                inline_string<64> &name = activeIdx->dataEntry->name;
-                uint64_t n = Min<uint64_t>(name.size, sizeof(ipc->activeWindowTitle) - 1);
-                if (n)
-                    MemCpy(ipc->activeWindowTitle, name.data.data, n);
-            }
-        }
-
-        ShmChannel::EndWrite(*wm->ipcChannel);
+        wm->barDirty = false;
+        BarRedraw();
     }
 }
 
@@ -1684,7 +1865,7 @@ void UserMain()
     wm->monitorY = 0;
     wm->monitorWidth = X11GetScreen()->width_in_pixels;
     wm->monitorHeight = X11GetScreen()->height_in_pixels;
-    wm->shmDirty = true;
+    wm->barDirty = true;
     for (auto &s : wm->stacks)
         s.flags |= window_stack::FlagCenterScroll;
 
@@ -1904,31 +2085,29 @@ void UserMain()
 
     LOG("[wm] init done");
 
-    // Launch overlay and daemons (best-effort, non-blocking).
+    // ─── Create bar window ───
+    {
+        uint32_t barW = wm->monitorWidth;
+        uint32_t barH = wm->barHeight;
+        wm->barWindow = xcb_generate_id(X11GetConn());
+        xcb_create_window(X11GetConn(), XCB_COPY_FROM_PARENT, wm->barWindow, X11GetRoot(), 0, 0, (uint16_t)barW,
+                          (uint16_t)barH, 0, XCB_WINDOW_CLASS_INPUT_OUTPUT, X11GetScreen()->root_visual,
+                          XCB_CW_OVERRIDE_REDIRECT | XCB_CW_EVENT_MASK, (uint32_t[]){1, XCB_EVENT_MASK_EXPOSURE});
+        xcb_configure_window(X11GetConn(), wm->barWindow, XCB_CONFIG_WINDOW_STACK_MODE,
+                             (uint32_t[]){XCB_STACK_MODE_BELOW});
+        xcb_map_window(X11GetConn(), wm->barWindow);
+
+        wm->barPixmap = xcb_generate_id(X11GetConn());
+        xcb_create_pixmap(X11GetConn(), X11GetScreen()->root_depth, wm->barPixmap, X11GetRoot(), (uint16_t)barW,
+                          (uint16_t)barH);
+        wm->barGC = xcb_generate_id(X11GetConn());
+        xcb_create_gc(X11GetConn(), wm->barGC, wm->barPixmap, 0, nullptr);
+    }
+
+    // Launch daemons (best-effort, non-blocking).
     // Suppressed when NYLA_WM_NO_DAEMONS=1 (test harness).
     if (!getenv("NYLA_WM_NO_DAEMONS"))
     {
-        wm->ipcChannel = ShmChannel::CreateWriter("nyla_wm", sizeof(wm_ipc_state), RegionAlloc::g_BootstrapAlloc);
-
-        (void)!system("pkill wm_overlay 2>/dev/null");
-        {
-            char wmPath[256];
-            ssize_t len = readlink("/proc/self/exe", wmPath, sizeof(wmPath) - 1);
-            if (len > 0)
-            {
-                wmPath[len] = '\0';
-                char *lastSlash = strrchr(wmPath, '/');
-                if (lastSlash)
-                {
-                    *lastSlash = '\0';
-                    byteview overlayPath = StringWriteFmt("%s/wm_overlay"_s, (uint8_t *)wmPath);
-                    const char *const overlayCmd[] = {(const char *)overlayPath.data, nullptr};
-                    Spawn({overlayCmd, 2});
-                }
-            }
-        }
-
-        // Launch startup daemons (only if not already running).
         if (system("pgrep -x dunst >/dev/null 2>&1") != 0)
         {
             const char *const dunstCmd[] = {"dunst", nullptr};
@@ -1948,16 +2127,25 @@ void UserMain()
             .fd = xcb_get_file_descriptor(X11GetConn()),
             .events = POLLIN,
         };
-        if (poll(&fd, 1, -1) == -1)
+        int pollRes = poll(&fd, 1, 500);
+        if (pollRes == -1)
         {
             if (errno == EINTR)
                 continue;
             LOG("poll(): %s", strerror(errno));
             continue;
         }
-        if (fd.revents & POLLIN)
+        if (pollRes > 0 && (fd.revents & POLLIN))
         {
             WmProcess(isRunning);
+        }
+        // Redraw bar periodically for clock
+        static uint64_t lastBarTime = 0;
+        uint64_t now = GetMonotonicTimeMillis();
+        if (now - lastBarTime >= 500)
+        {
+            lastBarTime = now;
+            BarRedraw();
         }
         X11Flush();
     }

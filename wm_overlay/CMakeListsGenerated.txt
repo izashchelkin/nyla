@@ -1,5 +1,0 @@
-﻿target_sources(${TARGET} PRIVATE
-    wm_overlay.cc
-)
-target_sources(${TARGET} PUBLIC
-)

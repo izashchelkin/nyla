@@ -155,7 +155,7 @@ PS_OUTPUT main(PS_INPUT input)
     uint ch = (word >> byte_shift) & 0xFFu;
 
     o.color = textLine.bg;
-    if (ch >= 0x20 && ch && 0x7F)
+    if (ch >= 0x20 && ch <= 0x7F)
     {
         if (GlyphPixel(ch - 0x20u, uint(gx), uint(top_left_pos.y)))
             o.color = textLine.fg;

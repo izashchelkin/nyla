@@ -53,4 +53,18 @@ auto API GetMonotonicTimeNanos() -> uint64_t
     return TicksTo(GetPerformanceTicks(), 1'000'000'000ULL);
 }
 
+auto API GetWallClockTime() -> wall_clock_time
+{
+    SYSTEMTIME st;
+    GetLocalTime(&st);
+    return {
+        .year = (int)st.wYear,
+        .month = (int)st.wMonth,
+        .day = (int)st.wDay,
+        .hour = (int)st.wHour,
+        .minute = (int)st.wMinute,
+        .second = (int)st.wSecond,
+    };
+}
+
 } // namespace nyla

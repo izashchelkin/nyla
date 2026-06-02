@@ -109,7 +109,6 @@ target_sources(${TARGET} PUBLIC
     rhi.h
     sampler_manager.h
     shader.h
-    shm_channel.h
     span.h
     span_def.h
     spv_reader.h
@@ -129,7 +128,6 @@ target_sources(${TARGET} PUBLIC
     ui_imgui.h
     vec.h
     wave.h
-    wm_ipc.h
     word.h
 )
 if (WIN32)
@@ -141,7 +139,6 @@ if (WIN32)
         platform_pty_windows.cc
         platform_windows.cc
         renderdoc_windows.cc
-        shm_channel_windows.cc
         sync_windows.cc
         thread_windows.cc
         time_windows.cc
@@ -161,7 +158,6 @@ else()
         platform_pty_linux.cc
         platform_x11_linux.cc
         renderdoc_linux.cc
-        shm_channel_linux.cc
         sync_linux.cc
         thread_linux.cc
         time_linux.cc

@@ -1,0 +1,13 @@
+target_sources(${TARGET} PRIVATE
+    backup.cc
+    block_query.cc
+    edit_ops.cc
+    inline.cc
+    language.cc
+    main.cc
+    onboard.inl
+    text_util.cc
+    tree_sitter_util.cc
+)
+target_sources(${TARGET} PUBLIC
+)

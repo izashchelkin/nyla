@@ -1,0 +1,6 @@
+xcav/tests/fixtures/typescript.ts (5 blocks)
+     2-   2 import
+     4-   7 interface Shape
+     9-   9 type Point
+    11-  21 class Circle
+    23-  25 func distance

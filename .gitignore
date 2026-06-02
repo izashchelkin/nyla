@@ -14,3 +14,7 @@
 /tags
 /.cache
 /.pi
+!.pi/extensions/
+*.xcav_backup
+.xcav_backups/
+/vendor/

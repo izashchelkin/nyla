@@ -4,7 +4,40 @@
 > `#pragma once`, `span`/`inline_vec`/`array` over std containers, `ASSERT` over exceptions.
 > Build: `cmake --preset linux-debug && cmake --build build/linux-debug --target wm`.
 > Test: `./scripts/test_wm.sh`. Test on live hardware too — not all bugs reproduce in Xvfb.
+> xcav changes: run `./scripts/install_xcav.sh` before `./xcav/tests/run_tests.sh`;
+> use `XC_BIN=/usr/local/bin/xcav ./xcav/tests/run_tests.sh` to test the installed binary.
 > Be honest about changes. Ask before implementing. Call out hallucinations.
+> **Tools**:
+> - **Default**: use plain `read` and `edit` for most operations.
+> - **xcav_edit**: use for ALL edits to C/C++/Java/TS/JS files. Tree-sitter validated,
+>   auto-re-indents, whitespace-insensitive matching (lax mode handles
+>   xcav_read un-indentation directly). Prefer over plain `edit`. Supports `--dry-run`
+>   to preview matches without writing. Unicode normalization:
+>   em-dash→`--`, arrows→`->`/`<-`, smart quotes→ASCII.
+> - **xcav_read**: works on ALL files — code files get structural mode (paths,
+>   un-indented), non-code files get plain text with offset/limit.
+>   `--raw` flag outputs exact indentation, `--numbers` includes line numbers.
+> - **xcav_move**: use instead of manual cut-paste when moving a block within a file.
+> - **xcav_move_into**: use for cross-file block moves. Supports `--copy-includes`.
+> - **xcav_delete**: use to safely delete a whole function/struct/class/include block.
+>   Cleans up surrounding blank lines and preceding `//` doc comments.
+> - **xcav_replace**: use to replace an entire function/struct/class with new code.
+>   Atomic C++ implementation — no delete/insert race, safe for last-block-in-namespace.
+> - **xcav_undo**: undo the last xcav operation on a file. Multi-level (up to 20).
+>   Reports remaining undo levels on each restore.
+> - **xcav_blocks**: survey file structure before a move/delete. Now supports
+>   directory paths to list blocks across all files in a directory.
+> - **xcav_tidy**: re-indent a file via brace-counting + whitespace cleanup.
+>   Use when indentation is broken after refactoring.
+> - **xcav_extract**: move a block to a new file, creating #pragma once,
+>   namespace wrapper, and adding #include in the source. Use for splitting
+>   files during refactoring.
+> - **xcav_inline**: inline a simple single-return function call into the call site.
+>   Wraps in a `{ }` block for scoping. Parameters are substituted. Return values
+>   are NOT captured — agent must fix result assignments after inlining.
+> - **Everything else**: plain `edit`. Adding new code, modifying within a function,
+>   small text changes — xcav adds no value and introduces auto-indentation that
+>   can break follow-up edits. When in doubt, use plain `edit`.
 
 C++23 cross-platform application/game framework with custom engine core and multiple desktop apps. Cross-compiles Linux (clang++) + Windows (MSVC/clang-cl).
 
@@ -51,6 +84,7 @@ nyla/commons/      ← Core engine (~140 files). Everything depends on this.
 ### Key patterns in commons
 
 - **`region_alloc`** — `{ at, begin, end, commitedEnd }`. Arena allocator. All frame data allocated here, valid for one frame. See `engine.h`: `Engine::FrameBegin(alloc)` returns `engine_frame` with frame-scoped data.
+- **Region lifetimes** — mempool chunks are reserved virtual memory and commit on demand. For CLI tools, freely create separate `RegionAlloc::Create(...)` arenas for distinct lifetimes instead of over-sharing one scratch arena.
 - **`handle { gen, index }`** — Resource handles with generation-based invalidation. `is_handle` concept. Compare by value, never dereference.
 - **`span<T>`** — `{ T* data, uint64_t size }`. Non-owning view. `byteview = span<const uint8_t>`.
 - **`inline_vec<T, Capacity>`** — Fixed-capacity inline vector (no heap). `InlineVec::Append/Find/Erase/Insert`.

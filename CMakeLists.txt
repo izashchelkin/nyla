@@ -57,9 +57,6 @@ file(GLOB_RECURSE NYLA_ALL_CXX_FILES
         "${PROJECT_SOURCE_DIR}/wm/*.h"
         "${PROJECT_SOURCE_DIR}/wm/*.hlsl"
 
-        "${PROJECT_SOURCE_DIR}/wm_overlay/*.cc"
-        "${PROJECT_SOURCE_DIR}/wm_overlay/*.h"
-        "${PROJECT_SOURCE_DIR}/wm_overlay/*.hlsl"
 
         "${PROJECT_SOURCE_DIR}/screen_inhibitor/*.cc"
         "${PROJECT_SOURCE_DIR}/screen_inhibitor/*.h"
@@ -80,6 +77,9 @@ file(GLOB_RECURSE NYLA_ALL_CXX_FILES
         "${PROJECT_SOURCE_DIR}/git_ui/*.cc"
         "${PROJECT_SOURCE_DIR}/git_ui/*.h"
         "${PROJECT_SOURCE_DIR}/git_ui/*.hlsl"
+
+        "${PROJECT_SOURCE_DIR}/xcav/*.cc"
+        "${PROJECT_SOURCE_DIR}/xcav/*.h"
 )
 
 add_custom_target(format
@@ -98,8 +98,8 @@ add_subdirectory(breakout)
 add_subdirectory(shipgame)
 add_subdirectory(terminal)
 add_subdirectory(wm)
-add_subdirectory(wm_overlay)
 add_subdirectory(screen_inhibitor)
 add_subdirectory(psf2_glsl)
 add_subdirectory(git_ui)
+add_subdirectory(xcav)
 add_subdirectory(tests/wm)

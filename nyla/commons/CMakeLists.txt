@@ -66,3 +66,21 @@ target_link_libraries(${TARGET}
 endif()
 
 include(CMakeListsGenerated.txt)
+
+# ─── Headless static library (no X11/Vulkan/ALSA) ───
+# CLI tools link against this to avoid pulling in graphical dependencies.
+# Compiled with -DNYLA_HEADLESS; platform_linux.cc skips all X11 code paths.
+
+set(TARGET_HEADLESS nyla_commons_headless)
+add_library(${TARGET_HEADLESS} STATIC)
+add_library(nyla::commons_headless ALIAS ${TARGET_HEADLESS})
+target_compile_definitions(${TARGET_HEADLESS} PRIVATE NYLA_HEADLESS)
+target_link_libraries(${TARGET_HEADLESS} PUBLIC Threads::Threads)
+target_sources(${TARGET_HEADLESS} PRIVATE
+    libmain.cc
+    mempage_pool.cc
+    region_alloc.cc
+    fmt.cc
+    platform_linux.cc
+    time_linux.cc
+)

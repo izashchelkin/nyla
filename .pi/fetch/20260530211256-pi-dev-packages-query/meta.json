@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "id": "20260530211256-pi-dev-packages-query",
+  "url": "https://pi.dev/packages?search=tools",
+  "requestedFormat": "markdown",
+  "fetchedAt": "2026-05-30T19:12:56.518Z",
+  "contentType": "text/html; charset=UTF-8",
+  "responseBytes": 199731,
+  "paths": {
+    "artifactDir": "/home/izashchelkin/nyla/.pi/fetch/20260530211256-pi-dev-packages-query",
+    "rawPath": "/home/izashchelkin/nyla/.pi/fetch/20260530211256-pi-dev-packages-query/response.html"
+  },
+  "recommendedRead": {
+    "path": "/home/izashchelkin/nyla/.pi/fetch/20260530211256-pi-dev-packages-query/response.html",
+    "pathDisplay": ".pi/fetch/20260530211256-pi-dev-packages-query/response.html",
+    "kind": "raw-text",
+    "lineCount": 26,
+    "tokenEstimate": 49885
+  },
+  "converter": {
+    "name": "markitdown",
+    "success": false,
+    "error": "MarkItDown conversion failed or is unavailable on this machine.",
+    "attempts": [
+      {
+        "command": "/home/izashchelkin/.local/bin/markitdown",
+        "args": [
+          "/home/izashchelkin/nyla/.pi/fetch/20260530211256-pi-dev-packages-query/response.html",
+          "-o",
+          "/home/izashchelkin/nyla/.pi/fetch/20260530211256-pi-dev-packages-query/content.md"
+        ],
+        "code": 1,
+        "killed": false,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "command": "markitdown",
+        "args": [
+          "/home/izashchelkin/nyla/.pi/fetch/20260530211256-pi-dev-packages-query/response.html",
+          "-o",
+          "/home/izashchelkin/nyla/.pi/fetch/20260530211256-pi-dev-packages-query/content.md"
+        ],
+        "code": 1,
+        "killed": false,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "command": "python3",
+        "args": [
+          "-m",
+          "markitdown",
+          "/home/izashchelkin/nyla/.pi/fetch/20260530211256-pi-dev-packages-query/response.html",
+          "-o",
+          "/home/izashchelkin/nyla/.pi/fetch/20260530211256-pi-dev-packages-query/content.md"
+        ],
+        "code": 1,
+        "killed": false,
+        "stdout": "",
+        "stderr": "/usr/bin/python3: No module named markitdown"
+      },
+      {
+        "command": "python",
+        "args": [
+          "-m",
+          "markitdown",
+          "/home/izashchelkin/nyla/.pi/fetch/20260530211256-pi-dev-packages-query/response.html",
+          "-o",
+          "/home/izashchelkin/nyla/.pi/fetch/20260530211256-pi-dev-packages-query/content.md"
+        ],
+        "code": 1,
+        "killed": false,
+        "stdout": "",
+        "stderr": "/usr/bin/python: No module named markitdown"
+      }
+    ]
+  }
+}

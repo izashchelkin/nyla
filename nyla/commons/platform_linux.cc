@@ -18,6 +18,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#ifndef NYLA_HEADLESS
 #include <xcb/xcb.h>
 #include <xcb/xcb_aux.h>
 #include <xcb/xcb_errors.h>
@@ -38,6 +39,7 @@
 #include <xcb/xkb.h>
 
 #undef explicit
+#endif // NYLA_HEADLESS
 
 #include "nyla/commons/fmt.h"
 #include "nyla/commons/region_alloc.h"
@@ -307,6 +309,7 @@ void API DecommitMemPages(void *page, uint64_t size)
     madvise(page, size, MADV_DONTNEED);
 }
 
+#ifndef NYLA_HEADLESS
 void API WinSetTitle(byteview title)
 {
     xcb_window_t win = X11WinGetHandle();
@@ -320,7 +323,9 @@ void API WinSetTitle(byteview title)
                         title.data);
     X11Flush();
 }
+#endif // NYLA_HEADLESS
 
+#ifndef NYLA_HEADLESS
 void API HandleXSelectionRequest(xcb_selection_request_event_t *ev)
 {
     const x11_atoms &atoms = X11GetAtoms();
@@ -352,7 +357,9 @@ void API HandleXSelectionRequest(xcb_selection_request_event_t *ev)
     xcb_send_event(X11GetConn(), false, ev->requestor, XCB_EVENT_MASK_PROPERTY_CHANGE, (const char *)&notify);
     X11Flush();
 }
+#endif // NYLA_HEADLESS
 
+#ifndef NYLA_HEADLESS
 auto API WinGetSize() -> PlatformWindowSize
 {
     return PlatformWindowSize{
@@ -360,7 +367,9 @@ auto API WinGetSize() -> PlatformWindowSize
         .height = platform->x11.winGeom.height,
     };
 }
+#endif // NYLA_HEADLESS
 
+#ifndef NYLA_HEADLESS
 void API WinOpen()
 {
     if (X11WinGetHandle())
@@ -381,7 +390,9 @@ void API WinOpen()
     platform->x11.winGeom = *windowGeometry;
     free(windowGeometry);
 }
+#endif // NYLA_HEADLESS
 
+#ifndef NYLA_HEADLESS
 namespace
 {
 
@@ -532,6 +543,7 @@ auto API WinPollEvent(PlatformEvent &outEvent) -> bool
             return true;
     }
 }
+#endif // NYLA_HEADLESS
 
 static auto EnsureSigchldReaper() -> bool
 {
@@ -683,6 +695,7 @@ void PlatformInit0()
 
 void PlatformInit1()
 {
+#ifndef NYLA_HEADLESS
     platform = &RegionAlloc::Alloc<platform_state>(RegionAlloc::g_BootstrapAlloc);
 
     {
@@ -773,6 +786,7 @@ void PlatformInit1()
     }
 
     X11RandRInit();
+#endif // NYLA_HEADLESS
 }
 
 void PlatformTearDown()

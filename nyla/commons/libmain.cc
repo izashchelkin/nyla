@@ -26,7 +26,9 @@ void API LibMain(void (*userMain)())
 
     MemPagePool::Bootstrap();
 
+#ifndef NYLA_HEADLESS
     PlatformInit1();
+#endif
     userMain();
     PlatformTearDown();
 }

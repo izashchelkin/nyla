@@ -1,0 +1,7 @@
+xcav/tests/fixtures/calculator.java (6 blocks)
+    15-  17 func add
+    19-  21 func subtract
+    23-  25 func multiply
+    27-  32 func divide
+    34-  36 func getBaseValue
+     7-  37 class Calculator

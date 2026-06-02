@@ -1,0 +1,3 @@
+xcav/tests/fixtures/raw_string.cpp (2 blocks)
+     2-   4 decl
+     6-   8 func get_value

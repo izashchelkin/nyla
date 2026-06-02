@@ -1,0 +1,3 @@
+xcav/tests/fixtures/header.hpp (2 blocks)
+     5-   5 decl sqrt
+     6-   6 decl pow

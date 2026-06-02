@@ -1,9 +1,0 @@
-if (NOT WIN32)
-    set(TARGET wm_overlay)
-
-    add_executable(${TARGET})
-
-    target_link_libraries(${TARGET} PRIVATE nyla::commons)
-
-    include(CMakeListsGenerated.txt)
-endif()

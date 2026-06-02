@@ -1,0 +1,6 @@
+xcav/tests/fixtures/javascript.js (5 blocks)
+     2-   2 import
+     4-   6 export
+     8-   8 var
+    10-  18 class Calculator
+    20-  20 export greet
