@@ -112,7 +112,8 @@ static auto NormalizeForEdit(byteview text, region_alloc &alloc, bool keepPositi
 
     return normalized_edit_text{byteview{out.data, outSize},
                                 keepPositionMap ? span<uint32_t>{posMap.data, outSize} : span<uint32_t>{}};
-}auto EditSafe(byteview filePath, byteview oldFile, byteview newFile, region_alloc &alloc, bool dryRun) -> bool
+}
+auto EditSafe(byteview filePath, byteview oldFile, byteview newFile, region_alloc &alloc, bool dryRun) -> bool
 {
     // ── Read old and new text from temp files ──
     file_handle oldFh = FileOpen(oldFile, FileOpenMode::Read);
@@ -159,10 +160,10 @@ static auto NormalizeForEdit(byteview text, region_alloc &alloc, bool keepPositi
     // ── Split oldText into lines, extract content ──
     struct line_info
     {
-        uint32_t start;   // byte offset in oldText
-        uint32_t end;     // byte past last char (before \n)
-        uint32_t cstart;  // content start (after leading whitespace)
-        uint32_t cend;    // content end (before trailing whitespace)
+        uint32_t start;  // byte offset in oldText
+        uint32_t end;    // byte past last char (before \n)
+        uint32_t cstart; // content start (after leading whitespace)
+        uint32_t cend;   // content end (before trailing whitespace)
         bool blank;
     };
     span<line_info> oldLines = RegionAlloc::AllocArray<line_info>(alloc, oldText.size);
@@ -234,7 +235,7 @@ static auto NormalizeForEdit(byteview text, region_alloc &alloc, bool keepPositi
                 indent += (normSource.data[p] == '\t') ? 4 : 1;
                 ++p;
             }
-            uint32_t cs = p;  // byte offset of first content character
+            uint32_t cs = p; // byte offset of first content character
             while (p < normSource.size && normSource.data[p] != '\n')
                 ++p;
             uint32_t le = p;
@@ -282,7 +283,9 @@ static auto NormalizeForEdit(byteview text, region_alloc &alloc, bool keepPositi
                 if (sl.end > sl.start && normSource.data[sl.end - 1] == '\n')
                     srcContentLen = sl.end - sl.start - 1;
                 uint32_t srcCS = sl.contentStart;
-                uint32_t srcCE = sl.contentStart + (srcContentLen > (sl.contentStart - sl.start) ? srcContentLen - (sl.contentStart - sl.start) : 0);
+                uint32_t srcCE =
+                    sl.contentStart +
+                    (srcContentLen > (sl.contentStart - sl.start) ? srcContentLen - (sl.contentStart - sl.start) : 0);
                 // Strip trailing whitespace from source line content
                 while (srcCE > srcCS && (normSource.data[srcCE - 1] == ' ' || normSource.data[srcCE - 1] == '\t'))
                     --srcCE;
@@ -366,7 +369,8 @@ static auto NormalizeForEdit(byteview text, region_alloc &alloc, bool keepPositi
                         {
                             diverged = true;
                             FileWriteFmt(GetStderr(), "  At source line %u: expected blank, found '%.*s'\n"_s,
-                                         checkSi + 1, (int)(csl.end - csl.start > 40 ? 40 : csl.end - csl.start), normSource.data + csl.start);
+                                         checkSi + 1, (int)(csl.end - csl.start > 40 ? 40 : csl.end - csl.start),
+                                         normSource.data + csl.start);
                             break;
                         }
                     }
@@ -377,7 +381,9 @@ static auto NormalizeForEdit(byteview text, region_alloc &alloc, bool keepPositi
                         if (csl.end > csl.start && normSource.data[csl.end - 1] == '\n')
                             cslContentLen = csl.end - csl.start - 1;
                         uint32_t cCS = csl.contentStart;
-                        uint32_t cCE = csl.contentStart + (cslContentLen > (csl.contentStart - csl.start) ? cslContentLen - (csl.contentStart - csl.start) : 0);
+                        uint32_t cCE = csl.contentStart + (cslContentLen > (csl.contentStart - csl.start)
+                                                               ? cslContentLen - (csl.contentStart - csl.start)
+                                                               : 0);
                         while (cCE > cCS && (normSource.data[cCE - 1] == ' ' || normSource.data[cCE - 1] == '\t'))
                             --cCE;
                         uint32_t cslLen = cCE - cCS;
@@ -386,8 +392,8 @@ static auto NormalizeForEdit(byteview text, region_alloc &alloc, bool keepPositi
                             diverged = true;
                             FileWriteFmt(GetStderr(), "  At source line %u:"_s, checkSi + 1);
                             FileWriteFmt(GetStderr(), " expected '%.*s'"_s, (int)oldLen, oldText.data + ol.cstart);
-                            FileWriteFmt(GetStderr(), " but file has '%.*s'\n"_s,
-                                         (int)(cslLen > 40 ? 40 : cslLen), normSource.data + cCS);
+                            FileWriteFmt(GetStderr(), " but file has '%.*s'\n"_s, (int)(cslLen > 40 ? 40 : cslLen),
+                                         normSource.data + cCS);
                             break;
                         }
                     }
@@ -396,7 +402,9 @@ static auto NormalizeForEdit(byteview text, region_alloc &alloc, bool keepPositi
                 }
                 if (!diverged)
                 {
-                    FileWriteFmt(GetStderr(), "  At source line %u: first line matches but block is shorter than oldText\n"_s, si + 1);
+                    FileWriteFmt(GetStderr(),
+                                 "  At source line %u: first line matches but block is shorter than oldText\n"_s,
+                                 si + 1);
                 }
                 ++shownDivergences;
             }
@@ -435,7 +443,7 @@ static auto NormalizeForEdit(byteview text, region_alloc &alloc, bool keepPositi
     struct new_line_info
     {
         uint32_t start;
-        uint32_t end;     // byte past \n or EOF
+        uint32_t end; // byte past \n or EOF
         uint32_t cstart;
         uint32_t cend;
         bool blank;
@@ -544,8 +552,8 @@ static auto NormalizeForEdit(byteview text, region_alloc &alloc, bool keepPositi
     // ── Dry run ──
     if (dryRun)
     {
-        LOG("OK: --dry-run: would replace %u bytes at byte %u with %u bytes",
-            origMatchEnd - origMatchStart, origMatchStart, (uint32_t)indentedNew.size);
+        LOG("OK: --dry-run: would replace %u bytes at byte %u with %u bytes", origMatchEnd - origMatchStart,
+            origMatchStart, (uint32_t)indentedNew.size);
         return true;
     }
 
@@ -554,8 +562,7 @@ static auto NormalizeForEdit(byteview text, region_alloc &alloc, bool keepPositi
     span<uint8_t> output = RegionAlloc::AllocArray<uint8_t>(alloc, totalSize);
     MemCpy(output.data, source.data, origMatchStart);
     MemCpy(output.data + origMatchStart, indentedNew.data.data, indentedNew.size);
-    MemCpy(output.data + origMatchStart + indentedNew.size, source.data + origMatchEnd,
-           source.size - origMatchEnd);
+    MemCpy(output.data + origMatchStart + indentedNew.size, source.data + origMatchEnd, source.size - origMatchEnd);
 
     // ── Write ──
     SaveBackup(filePath, alloc);

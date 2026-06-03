@@ -7,7 +7,7 @@ errors.
 
 Build: `cmake --build build/linux-debug --target xcav`
 Install: `./scripts/install_xcav.sh`
-Test: `./xcav/tests/run_tests.sh` (or `XC_BIN=/usr/local/bin/xcav ./xcav/tests/run_tests.sh`)
+Test: `XC_BIN=/usr/local/bin/xcav ./xcav/tests/run_tests.sh` (136 tests, 5 phases)
 
 ## ⚠️ Pi extension MUST match CLI binary
 
@@ -35,6 +35,14 @@ Verify: `grep 'name: "xcav_' .pi/extensions/xcav/index.ts` vs `xcav help` output
   indentation), copies indentation from matched lines to replacement. Unicode
   normalization handles LLM-produced smart quotes/em-dashes. No tree-sitter
   validation — `xcav edit` works on any text file.
+- **Java signature display.** `blocks` shows return type, modifiers,
+  parameter types+names, and `throws` clause for Java methods. Annotations
+  like `@Override` are displayed inline. Pure CST parsing — no semantic
+  analysis.
+- **Large-file prevention.** `read` auto-truncates files >500 lines or
+  >50KB with a clear message. Use `--offset`/`--limit` to navigate.
+- **Languages: C, C++, Java, JavaScript, TypeScript, TSX.** Detected by
+  file extension. Tree-sitter parsers tolerate syntax errors.
 
 ## Out of scope
 
@@ -144,6 +152,29 @@ No guessing about line numbers, no hoping the block boundaries were right.
 
 ## Changelog
 
+### 2026-06-02 — Java method signatures, test coverage
+
+- **Java method signatures in `blocks`**: return type, modifiers (`static`,
+  `final`, `abstract`), parameter types+names, `throws` clause. Pure CST
+  parsing — no semantic analysis (doesn't distinguish checked vs unchecked).
+  Constructor signatures also shown (e.g. `public DataService(String
+  configPath) throws IOException`).
+- **Annotation display**: `@Override`, `@Deprecated @SuppressWarnings(...)`,
+  etc. shown inline in `blocks` output. Both same-line and new-line styles
+  supported. Multi-annotation works.
+- **`--name` resolution**: when a class and its constructor share the same
+  name, container types (class/struct/enum/interface) are preferred over
+  methods/constructors.
+- **Full test suite**: 136 tests across 5 phases covering Java survey/read,
+  single-file mutations (move, delete, edit, replace), cross-file copy/
+  move-into (with `--copy-includes`), edge cases (empty files, interface-only,
+  abstract-only, enum-only), plus C cross-file and TSX backfill.
+- **Pre-existing `set -e` bug fixed in test runner**: standalone `set -e`
+  lines in error-path test sections were silently enabling `errexit`
+  globally, causing `diff | sed` in `fail()` to kill the script. Fixed by
+  commenting them out (they were never correct — `errexit` was off at
+  script startup).
+
 ### 2026-06-02 — Simplified `xcav_read` + large-file prevention
 
 `--all` and default mode no longer iterate blocks. They simply print the
@@ -158,11 +189,6 @@ Large files (>500 lines or >50KB) are auto-truncated to first 500 lines with:
 - `read` no longer outputs `// name (type, lines N-M)` headers
 - `ReadBlock` rounds tree-sitter byte ranges to line boundaries (no missing `;`)
 - `edit` error diagnostics show what was looked for + partial match hints
-
-### 2026-06-02 — xcav_edit fallback message fixes (partial)
-
-- Fallback success now says "applied via plain text" instead of "tree-sitter skipped"
-- Both paths use consistent `Edit N/M:` / `Edit N/M FAILED:` format
 
 ### 2026-06-02 — Pi integration: show tool arguments
 

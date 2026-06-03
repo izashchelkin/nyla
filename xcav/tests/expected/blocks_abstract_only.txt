@@ -1,0 +1,5 @@
+abstract_only.java (4 blocks)
+     4-   4 func public abstract void init()
+     5-   5 func public abstract String process(byte[] input)
+     6-   6 func public abstract void shutdown()
+     3-   7 class AbstractService

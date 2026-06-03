@@ -6,7 +6,10 @@
 > Test: `./scripts/test_wm.sh`. Test on live hardware too — not all bugs reproduce in Xvfb.
 > xcav changes: run `./scripts/install_xcav.sh` before `./xcav/tests/run_tests.sh`;
 > use `XC_BIN=/usr/local/bin/xcav ./xcav/tests/run_tests.sh` to test the installed binary.
+> xcav skill: keep `skills/xcav/SKILL.md` in sync — regenerate from `xcav onboard` output.
 > Be honest about changes. Ask before implementing. Call out hallucinations.
+> **Skills**: procedural agent knowledge lives in `skills/` — versioned alongside code.
+> When xcav changes, update both `xcav/onboard.inl` and `skills/xcav/SKILL.md`.
 > **Tools**:
 > - **Default**: use plain `read` and `edit` for most operations.
 > - **xcav_edit**: use for ALL file edits. It replaces the regular edit tool.
@@ -24,17 +27,24 @@
 >   Large files (>500 lines, >50KB) auto-truncated with a warning.
 >   `--raw` flag preserves exact indentation, `--numbers` includes line numbers.
 > - **xcav_move**: use instead of manual cut-paste when moving a block within a file.
+> - **xcav_move_into**: cross-file block move. Supports --copy-includes. The
+>   `static` keyword is auto-stripped from moved functions.
 > - **xcav_delete**: use to safely delete a whole function/struct/class/include block.
 >   Cleans up surrounding blank lines and preceding `//` doc comments.
 >   **NEVER batch multiple xcav_delete calls on the same file** — line numbers shift
 >   after each delete. Always run `xcav_blocks` between sequential deletes.
 > - **xcav_replace**: use to replace an entire function/struct/class with new code.
 >   Atomic C++ implementation — no delete/insert race, safe for last-block-in-namespace.
+> - **xcav_replace_scoped**: scoped text replacement — oldText only needs to be unique
+>   within the structural block at `<line>`. Use when the same oldText appears in
+>   multiple blocks. Prefer xcav_edit for file-unique text.
 > - **xcav_undo**: undo the last xcav operation on a file. Multi-level (up to 20).
 >   Reports remaining undo levels on each restore.
 > - **xcav_blocks**: survey file structure before a move/delete. Now supports
 >   directory paths to list blocks across all files in a directory.
 >   **Does not show include/import lines** (filtered as noise).
+> - **xcav_copy**: copy a block cross-file. Source is unaffected. Supports
+>   --copy-includes and --show-returns. Combine with xcav_delete for extract-to-new-file.
 > - **Everything else**: plain `edit`. Adding new code, modifying within a function,
 >   small text changes — xcav adds no value and introduces auto-indentation that
 >   can break follow-up edits. When in doubt, use plain `edit`.

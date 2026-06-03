@@ -87,7 +87,8 @@ $ xcav delete src.cc 45                # remove from source
 
 ```
 $ xcav replace file.cc 32 old.txt new.txt          # scoped within block
-$ xcav replace-block file.cc 32 /tmp/new_block.txt  # replace entire block
+$ xcav replace-block file.cc 32                        # replace entire block (stdin)
+$ xcav replace-block file.cc 32 /tmp/new_block.txt     # legacy file mode
 ```
 
 ## Commands
@@ -98,9 +99,10 @@ Lists structural blocks (functions, structs, classes, enums) with 1-indexed
 line ranges, block types, and names. Always run this first to survey a file.
 Directory mode lists blocks for all source files (non-recursive).
 
-Block types: `func`, `struct`, `class`, `enum`, `decl`, `namespace`, `template`,
+Block types: `func`, `struct`, `class`, `enum`, `constructor`, `namespace`, `template`,
 `interface`, `export`, `var`, and more. Java annotations are shown inline
-(e.g. `@Override add`).
+(e.g. `@Override add`), and method signatures include return type, modifiers,
+param types+names, and throws clause.
 
 ```
 $ xcav blocks src/foo.c
@@ -136,6 +138,7 @@ auto GetX() const -> int {
 - `--name <path>` — find by structural name (e.g. `--name GetX` matches `Point::GetX`)
 - `--all` — dump all blocks
 - `--offset N --limit M` — line range within a block, un-indented
+- `--offset N` — from line N to end of file, un-indented
 
 ### `xcav edit <file> <old-file> <new-file> [--dry-run]`
 
@@ -181,9 +184,10 @@ orphaned comments, and trailing semicolons from type declarations.
 Scoped replace — oldText only needs to be unique within the block containing
 `<line>`. No tree-sitter validation.
 
-### `xcav replace-block <file> <line> <new-file>`
+### `xcav replace-block <file> <line> [<new-file>]`
 
-Replaces the entire structural block with content from `<new-file>`. Atomic.
+Replaces the entire structural block with new content. Without `<new-file>`,
+reads replacement block body from stdin. Atomic.
 
 ### `xcav copy <src> <src-line> <dst> <dst-line> [--copy-includes] [--show-returns]`
 

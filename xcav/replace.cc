@@ -118,8 +118,7 @@ auto ReplaceBlock(byteview filePath, uint32_t blockLine, byteview newFilePath, r
 
     // Eat leading whitespace+newlines before the block
     while (cutStart > 0 &&
-           (source.data[cutStart - 1] == ' ' || source.data[cutStart - 1] == '\t' ||
-            source.data[cutStart - 1] == '\n'))
+           (source.data[cutStart - 1] == ' ' || source.data[cutStart - 1] == '\t' || source.data[cutStart - 1] == '\n'))
     {
         --cutStart;
         if (source.data[cutStart] == '\n')
@@ -135,17 +134,15 @@ auto ReplaceBlock(byteview filePath, uint32_t blockLine, byteview newFilePath, r
             while (lineStart > 0 && source.data[lineStart - 1] != '\n')
                 --lineStart;
             uint32_t contentStart = lineStart;
-            while (contentStart < commentCut &&
-                   (source.data[contentStart] == ' ' || source.data[contentStart] == '\t'))
+            while (contentStart < commentCut && (source.data[contentStart] == ' ' || source.data[contentStart] == '\t'))
                 ++contentStart;
             bool isComment = (contentStart + 1 < commentCut && source.data[contentStart] == '/' &&
                               source.data[contentStart + 1] == '/');
             if (!isComment)
                 break;
             commentCut = lineStart;
-            while (commentCut > 0 &&
-                   (source.data[commentCut - 1] == ' ' || source.data[commentCut - 1] == '\t' ||
-                    source.data[commentCut - 1] == '\n'))
+            while (commentCut > 0 && (source.data[commentCut - 1] == ' ' || source.data[commentCut - 1] == '\t' ||
+                                      source.data[commentCut - 1] == '\n'))
             {
                 --commentCut;
                 if (source.data[commentCut] == '\n')

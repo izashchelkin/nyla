@@ -1,0 +1,5 @@
+interface_only.java (4 blocks)
+     6-   6 func void start() throws IOException
+     7-   7 func String getName()
+     8-   9 func default void shutdown()
+     5-  10 interface ServiceInterface

@@ -22,7 +22,6 @@ auto MoveBlock(byteview filePath, uint32_t blockLine, uint32_t destLine, region_
 
     byteview source = bl.source;
 
-
     // ── Extend deletion range to full line boundaries ──
     // Tree-sitter node ranges may start after the line indent and end before
     // the trailing newline. Extending prevents orphaned whitespace and blank lines.
@@ -107,8 +106,7 @@ auto MoveBlock(byteview filePath, uint32_t blockLine, uint32_t destLine, region_
 
     if (bl.range.endByte <= destOffset)
     {
-        totalSize = delStart + (destOffset - delEnd) + reindented.size +
-                    (source.size - destOffset);
+        totalSize = delStart + (destOffset - delEnd) + reindented.size + (source.size - destOffset);
         output = RegionAlloc::AllocArray<uint8_t>(alloc, totalSize);
 
         uint64_t outPos = 0;
@@ -124,8 +122,7 @@ auto MoveBlock(byteview filePath, uint32_t blockLine, uint32_t destLine, region_
     }
     else if (bl.range.startByte >= destOffset)
     {
-        totalSize = destOffset + reindented.size + (delStart - destOffset) +
-                    (source.size - delEnd);
+        totalSize = destOffset + reindented.size + (delStart - destOffset) + (source.size - delEnd);
         output = RegionAlloc::AllocArray<uint8_t>(alloc, totalSize);
 
         uint64_t outPos = 0;
@@ -165,7 +162,8 @@ auto MoveBlock(byteview filePath, uint32_t blockLine, uint32_t destLine, region_
         return false;
     }
 
-    LOG("OK: moved %s block (lines %u-%u) to after line %u", bl.type, bl.range.startRow + 1, bl.range.endRow + 1, destLine + 1);
+    LOG("OK: moved %s block (lines %u-%u) to after line %u", bl.type, bl.range.startRow + 1, bl.range.endRow + 1,
+        destLine + 1);
     return true;
 }
 

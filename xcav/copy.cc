@@ -308,7 +308,8 @@ auto CopyBlock(byteview srcFilePath, uint32_t srcLine, byteview dstFilePath, uin
         return {false, "short write"};
     }
 
-    LOG("OK: copied %s block (lines %u-%u) to after line %u", bl.type, bl.range.startRow + 1, bl.range.endRow + 1, dstLine + 1);
+    LOG("OK: copied %s block (lines %u-%u) to after line %u", bl.type, bl.range.startRow + 1, bl.range.endRow + 1,
+        dstLine + 1);
 
     CopyResult result{true, nullptr};
     if (showReturns)

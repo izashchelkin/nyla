@@ -20,10 +20,12 @@
 #include "nyla/commons/stringparser.h"
 
 #include <sys/stat.h>
+#include <time.h>
 
 #include "xcav/backup.h"
 #include "xcav/editor.h"
 #include "xcav/text_util.h"
+#include "xcav/usage_log.h"
 
 #include <unistd.h> // _exit
 
@@ -32,15 +34,11 @@ namespace nyla
 
 // Exit code set by commands on failure.
 static int s_exitCode = 0;
+// Error tag for usage tracking — set by commands on failure.
+static const char *s_errorTag = nullptr;
 
 namespace
 {
-
-struct cli_args
-{
-    inline_vec<byteview, 16> positional;
-    byteview command;
-};
 
 // ─── Argument parsing ───────────────────────────────────────────────────────
 
@@ -198,6 +196,8 @@ void CmdMove(region_alloc &alloc, const cli_args &args)
 
     if (lineVal < 1 || destVal < 1)
     {
+        s_exitCode = 1;
+        s_errorTag = "bad_args";
         LOG("ERROR: line numbers must be >= 1 — use 'xcav blocks' to see line numbers");
         return;
     }
@@ -213,6 +213,7 @@ void CmdMove(region_alloc &alloc, const cli_args &args)
     bool ok = MoveBlock(byteview{pathBuf.data, filePath.size}, blockLine, destLine, alloc);
     if (!ok)
     {
+        s_errorTag = "operation_failed";
         s_exitCode = 1;
         // MoveBlock already logged specific error
     }
@@ -247,6 +248,8 @@ void CmdMoveInto(region_alloc &alloc, const cli_args &args)
 
     if (srcLineVal < 1 || dstLineVal < 1)
     {
+        s_exitCode = 1;
+        s_errorTag = "bad_args";
         LOG("ERROR: line numbers must be >= 1 — use 'xcav blocks' to see line numbers");
         return;
     }
@@ -265,6 +268,7 @@ void CmdMoveInto(region_alloc &alloc, const cli_args &args)
                             copyIncludes, alloc);
     if (!ok)
     {
+        s_errorTag = "operation_failed";
         s_exitCode = 1;
         // MoveBlockInto already logged specific error
     }
@@ -293,6 +297,8 @@ void CmdDelete(region_alloc &alloc, const cli_args &args)
 
     if (lineVal < 1)
     {
+        s_exitCode = 1;
+        s_errorTag = "bad_args";
         LOG("ERROR: line number must be >= 1 — use 'xcav blocks' to see line numbers");
         return;
     }
@@ -307,6 +313,7 @@ void CmdDelete(region_alloc &alloc, const cli_args &args)
     bool ok = DeleteBlock(byteview{pathBuf.data, filePath.size}, blockLine, alloc);
     if (!ok)
     {
+        s_errorTag = "operation_failed";
         s_exitCode = 1;
         // DeleteBlock already logged specific error
     }
@@ -361,12 +368,18 @@ void CmdEdit(region_alloc &alloc, const cli_args &args)
 
     if (filePath.size == 0)
     {
-        LOG("ERROR: missing file path — provide a file to edit");
+        s_exitCode = 1;
+        s_errorTag = "bad_args";
+        s_exitCode = 1;
+        LOG("ERROR: missing file path -- provide a file to edit");
         return;
     }
 
     if (!stdinMode && (oldFile.size == 0 || newFile.size == 0))
     {
+        s_exitCode = 1;
+        s_errorTag = "bad_args";
+        s_exitCode = 1;
         LOG("ERROR: expected <old-file> <new-file> or --stdin");
         return;
     }
@@ -393,6 +406,9 @@ void CmdEdit(region_alloc &alloc, const cli_args &args)
         file_handle stdinOut = FileOpen(stdinFile, FileOpenMode::Write);
         if (!FileValid(stdinOut))
         {
+            s_exitCode = 1;
+            s_errorTag = "file_error";
+            s_exitCode = 1;
             LOG("ERROR: cannot create stdin temp file");
             return;
         }
@@ -406,6 +422,8 @@ void CmdEdit(region_alloc &alloc, const cli_args &args)
             if (written != n)
             {
                 FileClose(stdinOut);
+                s_exitCode = 1;
+                s_errorTag = "short_write";
                 LOG("ERROR: short write while buffering stdin");
                 return;
             }
@@ -415,6 +433,9 @@ void CmdEdit(region_alloc &alloc, const cli_args &args)
         file_handle stdinIn = FileOpen(stdinFile, FileOpenMode::Read);
         if (!FileValid(stdinIn))
         {
+            s_exitCode = 1;
+            s_errorTag = "file_error";
+            s_exitCode = 1;
             LOG("ERROR: cannot read stdin temp file");
             return;
         }
@@ -441,7 +462,10 @@ void CmdEdit(region_alloc &alloc, const cli_args &args)
 
         if (!found)
         {
-            LOG("ERROR: separator line not found in stdin — expected '---XCAV_EDIT_SEPARATOR---'");
+            s_exitCode = 1;
+            s_errorTag = "bad_args";
+            s_exitCode = 1;
+            LOG("ERROR: separator line not found in stdin -- expected '---XCAV_EDIT_SEPARATOR---'");
             return;
         }
 
@@ -480,6 +504,7 @@ void CmdEdit(region_alloc &alloc, const cli_args &args)
     }
     if (!ok)
     {
+        s_errorTag = "operation_failed";
         s_exitCode = 1;
         // EditSafe already logged a specific error
     }
@@ -519,16 +544,17 @@ void CmdHelp()
     LOG("");
     LOG("  Replace a block");
     LOG("    xcav replace <file> <ln> <old> <new>     # scoped within block");
-    LOG("    xcav replace-block <file> <ln> <new>     # replace entire block");
+    LOG("    xcav replace-block <file> <ln> [<new>]  # replace entire block (stdin by default)");
     LOG("");
     LOG("COMMANDS");
     LOG("");
     LOG("  xcav blocks <file|directory>");
-    LOG("    List structural blocks with 1-indexed line ranges and names.");
+    LOG("    List structural blocks with 1-indexed line ranges, types, and names.");
     LOG("    Directory mode: lists blocks for all source files (non-recursive).");
-    LOG("    Block types: func, struct, class, enum, decl, namespace, template,");
+    LOG("    Block types: func, struct, class, enum, constructor, decl, namespace, template,");
     LOG("    interface, export, var, and more.");
-    LOG("    Java annotations are shown inline (e.g. '@Override add').");
+    LOG("    Java: annotations (@Override) shown inline, method signatures include");
+    LOG("    return type, modifiers, param types+names, and throws clause.");
     LOG("    Examples:");
     LOG("      xcav blocks file.cc");
     LOG("      xcav blocks .                    # current directory");
@@ -540,7 +566,8 @@ void CmdHelp()
     LOG("      xcav read <file> <line> --numbers  — with line numbers");
     LOG("      xcav read <file> --name <path>     — find by structural name");
     LOG("      xcav read <file> --all             — dump all blocks");
-    LOG("      xcav read <file> --offset N --limit M — line range, un-indented");
+    LOG("      xcav read <file> --offset N --limit M -- line range, un-indented");
+    LOG("      xcav read <file> --offset N -- from line N to end of file");
     LOG("    --name supports suffix matching: 'GetX' matches 'Point::GetX'.");
     LOG("    --raw: output exact text with original indentation.");
     LOG("    Non-code files default to printing the whole file.");
@@ -571,12 +598,15 @@ void CmdHelp()
     LOG("    Scoped replace — oldText only needs to be unique within the block");
     LOG("    containing <line>. No tree-sitter validation.");
     LOG("");
-    LOG("  xcav replace-block <file> <line> <new-file>");
-    LOG("    Replace the entire structural block containing <line> with content");
-    LOG("    from <new-file>. Atomic — no risk of content outside namespaces.");
+    LOG("  xcav replace-block <file> <line> [<new-file>]");
+    LOG("    Replace the entire structural block at <line> with new content.");
+    LOG("    Without <new-file>, reads replacement block body from stdin.");
+    LOG("    The new content is re-indented to match the old block's indentation.");
+    LOG("    Atomic -- safe for last block in a namespace (no trailing-brace issues).");
     LOG("");
     LOG("  xcav copy <src> <src-line> <dst> <dst-line> [--copy-includes] [--show-returns]");
     LOG("    Copy a block cross-file. Source is unaffected.");
+    LOG("    --copy-includes: copy #include/import lines from source to destination.");
     LOG("    --show-returns: print line numbers of return statements in the copy.");
     LOG("");
     LOG("  xcav undo <file>");
@@ -585,14 +615,17 @@ void CmdHelp()
     LOG("");
     LOG("  xcav help / xcav onboard");
     LOG("    Print help text or agent onboarding guide.");
+    LOG("    'help' is for human consumption; 'onboard' is agent-optimized.");
     LOG("");
     LOG("UNICODE NORMALIZATION");
     LOG("  xcav edit normalizes Unicode: em-dash→'--', arrows→'->'/'<-',");
     LOG("  smart quotes→ASCII. Prevents 'oldText not found' from LLM output.");
     LOG("");
     LOG("LANGUAGES");
-    LOG("  C, C++, Java, JavaScript, TypeScript, TSX. Detected by file extension.");
-    LOG("  Uses tree-sitter for structural parsing (tolerant of syntax errors).");
+    LOG("  C (.c, .h), C++ (.cc, .cpp, .cxx, .hpp, .hxx, .hh), Java (.java),");
+    LOG("  JavaScript (.js, .mjs, .cjs), TypeScript (.ts, .mts, .cts),");
+    LOG("  TSX (.tsx, .jsx). Detected by file extension. Tree-sitter parsers");
+    LOG("  are tolerant of syntax errors.");
 }
 void CmdUndo(region_alloc &alloc, const cli_args &args)
 {
@@ -672,6 +705,7 @@ void CmdRead(region_alloc &alloc, const cli_args &args)
                 nameFilter = args.positional.data.data[i];
             else
             {
+                s_errorTag = "bad_args";
                 s_exitCode = 1;
                 LOG("ERROR: --name requires a value — provide a structural name to find");
                 return;
@@ -741,6 +775,8 @@ void CmdRead(region_alloc &alloc, const cli_args &args)
         file_handle fh = FileOpen(safePath, FileOpenMode::Read);
         if (!FileValid(fh))
         {
+            s_exitCode = 1;
+            s_errorTag = "file_error";
             LOG("ERROR: cannot open file");
             return;
         }
@@ -748,10 +784,11 @@ void CmdRead(region_alloc &alloc, const cli_args &args)
         FileClose(fh);
         if (text.size == 0)
         {
+            s_exitCode = 1;
+            s_errorTag = "file_error";
             LOG("ERROR: empty file");
             return;
         }
-
         // Split into lines
         inline_vec<byteview, 4096> lines{};
         {
@@ -898,6 +935,7 @@ void CmdRead(region_alloc &alloc, const cli_args &args)
         }
         if (matchCount == 0)
         {
+            s_errorTag = "block_not_found";
             s_exitCode = 1;
             LOG("ERROR: no block matching '%.*s'", (int)nameFilter.size, nameFilter.data);
             return;
@@ -914,6 +952,8 @@ void CmdRead(region_alloc &alloc, const cli_args &args)
         file_handle fh = FileOpen(safePath, FileOpenMode::Read);
         if (!FileValid(fh))
         {
+            s_exitCode = 1;
+            s_errorTag = "file_error";
             LOG("ERROR: cannot open file");
             return;
         }
@@ -921,6 +961,8 @@ void CmdRead(region_alloc &alloc, const cli_args &args)
         FileClose(fh);
         if (text.size == 0)
         {
+            s_exitCode = 1;
+            s_errorTag = "file_error";
             LOG("ERROR: empty file");
             return;
         }
@@ -941,14 +983,15 @@ void CmdRead(region_alloc &alloc, const cli_args &args)
         }
 
         uint32_t endLine = startLine + maxLines;
-        if (endLine > lines.size)
+        if (endLine > lines.size || endLine < startLine)
             endLine = lines.size;
         if (startLine >= lines.size)
         {
+            s_exitCode = 1;
+            s_errorTag = "bad_args";
             LOG("ERROR: offset %u exceeds file length (%llu lines)", startLine + 1, (unsigned long long)lines.size);
             return;
         }
-
         if (raw)
         {
             // --raw: output exact text, no un-indentation
@@ -1011,6 +1054,7 @@ void CmdRead(region_alloc &alloc, const cli_args &args)
     {
         if (offsetVal < 1)
         {
+            s_errorTag = "bad_args";
             s_exitCode = 1;
             LOG("ERROR: --offset must be >= 1");
             return;
@@ -1019,7 +1063,7 @@ void CmdRead(region_alloc &alloc, const cli_args &args)
         source_language offsetLang = DetectLanguage(safePath);
         if (offsetLang == source_language::Unknown)
         {
-            printPlainFile(offsetVal - 1, hasLimit ? limitVal : 0xFFFFFFFFu, rawMode);
+            printPlainFile(offsetVal - 1, hasLimit ? limitVal : 0x100000u, rawMode);
             return;
         }
 
@@ -1029,7 +1073,7 @@ void CmdRead(region_alloc &alloc, const cli_args &args)
             // No structural block at this offset — fall back to plain line reading.
             // This handles regions between blocks (e.g. includes area, namespace-level
             // types/helpers before the first function).
-            printPlainFile(offsetVal - 1, hasLimit ? limitVal : 0xFFFFFFFFu, rawMode);
+            printPlainFile(offsetVal - 1, hasLimit ? limitVal : 0x100000u, rawMode);
             return;
         }
 
@@ -1037,8 +1081,7 @@ void CmdRead(region_alloc &alloc, const cli_args &args)
         // info.text is already un-indented relative to the block's baseline.
         // startLine is 0-indexed.
         uint32_t sliceStart = offsetVal - 1 - info.startLine;
-        uint32_t sliceEnd = sliceStart + (hasLimit ? limitVal : 0xFFFFFFFFu);
-
+        uint32_t sliceEnd = sliceStart + (hasLimit ? limitVal : 0x100000u);
         inline_vec<byteview, 256> sliceLines{};
         {
             uint32_t pos = 0;
@@ -1103,6 +1146,7 @@ void CmdRead(region_alloc &alloc, const cli_args &args)
         file_handle fh2 = FileOpen(safePath, FileOpenMode::Read);
         if (!FileValid(fh2))
         {
+            s_errorTag = "file_error";
             s_exitCode = 1;
             LOG("ERROR: cannot open file for reading (--fix mode)");
             return;
@@ -1138,6 +1182,7 @@ void CmdRead(region_alloc &alloc, const cli_args &args)
         file_handle fh3 = FileOpen(safePath, FileOpenMode::Write);
         if (!FileValid(fh3))
         {
+            s_errorTag = "file_error";
             s_exitCode = 1;
             LOG("ERROR: cannot open file for writing (--fix mode)");
             return;
@@ -1154,6 +1199,7 @@ void CmdRead(region_alloc &alloc, const cli_args &args)
     // Should not be reached without a line -- defaults are handled above.
     if (!hasLine)
     {
+        s_errorTag = "bad_args";
         s_exitCode = 1;
         LOG("ERROR: expected a line number, --name, --all, or --offset");
         return;
@@ -1169,6 +1215,7 @@ void CmdRead(region_alloc &alloc, const cli_args &args)
     read_block_info info = ReadBlock(safePath, (uint32_t)(lineVal - 1), alloc, fixMode ? false : rawMode);
     if (info.text.size == 0)
     {
+        s_errorTag = "block_not_found";
         s_exitCode = 1;
         LOG("ERROR: no block found at line %lld — use xcav blocks to browse", (long long)lineVal);
         return;
@@ -1200,6 +1247,8 @@ void CmdReplace(region_alloc &alloc, const cli_args &args)
 
     if (lineVal < 1)
     {
+        s_errorTag = "bad_args";
+        s_exitCode = 1;
         LOG("ERROR: line number must be >= 1 — use 'xcav blocks' to see line numbers");
         return;
     }
@@ -1208,6 +1257,8 @@ void CmdReplace(region_alloc &alloc, const cli_args &args)
     file_handle oldFh = FileOpen(oldFile, FileOpenMode::Read);
     if (!FileValid(oldFh))
     {
+        s_errorTag = "file_error";
+        s_exitCode = 1;
         LOG("ERROR: cannot read old-text file");
         return;
     }
@@ -1217,6 +1268,8 @@ void CmdReplace(region_alloc &alloc, const cli_args &args)
     file_handle newFh = FileOpen(newFile, FileOpenMode::Read);
     if (!FileValid(newFh))
     {
+        s_errorTag = "file_error";
+        s_exitCode = 1;
         LOG("ERROR: cannot read new-text file");
         return;
     }
@@ -1231,6 +1284,7 @@ void CmdReplace(region_alloc &alloc, const cli_args &args)
     bool ok = ReplaceInBlock(byteview{pathBuf.data, filePath.size}, (uint32_t)(lineVal - 1), oldText, newText, alloc);
     if (!ok)
     {
+        s_errorTag = "operation_failed";
         s_exitCode = 1;
         // ReplaceInBlock already logged a specific error
     }
@@ -1239,20 +1293,19 @@ void CmdReplace(region_alloc &alloc, const cli_args &args)
         ShowFileBlocks(filePath, alloc);
     }
 }
-
 void CmdReplaceBlock(region_alloc &alloc, const cli_args &args)
 {
-    if (args.positional.size < 4)
+    if (args.positional.size < 3)
     {
-        LOG("Usage: xcav replace-block <file> <line> <new-file>");
-        LOG("  Replaces the structural block containing <line> with content from <new-file>.");
+        LOG("Usage: xcav replace-block <file> <line> [<new-file>]");
+        LOG("  Replaces the structural block containing <line> with new content.");
+        LOG("  Without <new-file>, reads replacement block body from stdin.");
         LOG("  The new content is re-indented to match the old block's indentation.");
         LOG("  Lines are 1-indexed.");
         return;
     }
 
     byteview filePath = args.positional.data.data[1];
-    byteview newFile = args.positional.data.data[3];
 
     byte_parser lineParser{};
     ByteParser::Init(lineParser, args.positional.data.data[2].data, args.positional.data.data[2].size);
@@ -1260,8 +1313,65 @@ void CmdReplaceBlock(region_alloc &alloc, const cli_args &args)
 
     if (lineVal < 1)
     {
+        s_errorTag = "bad_args";
+        s_exitCode = 1;
         LOG("ERROR: line number must be >= 1 — use 'xcav blocks' to see line numbers");
         return;
+    }
+
+    bool stdinMode = (args.positional.size < 4);
+    byteview newFile{};
+    uint8_t tmpPathBuf[128]{};
+    if (stdinMode)
+    {
+        // Write stdin to a temp file
+        uint32_t pid = (uint32_t)getpid();
+        newFile.size =
+            StringWriteFmt(span<uint8_t>{tmpPathBuf, sizeof(tmpPathBuf) - 1}, "/tmp/xcav_replace_%u.txt"_s, pid);
+        tmpPathBuf[newFile.size] = 0;
+        newFile.data = tmpPathBuf;
+
+        file_handle tmpFh = FileOpen(newFile, FileOpenMode::Write);
+        if (!FileValid(tmpFh))
+        {
+            s_exitCode = 1;
+            s_errorTag = "file_error";
+            LOG("ERROR: cannot create stdin temp file");
+            return;
+        }
+
+        uint8_t chunk[4096];
+        uint32_t n;
+        bool hasContent = false;
+        file_handle stdinFh = GetStdin();
+        while ((n = FileRead(stdinFh, sizeof(chunk), chunk)) > 0)
+        {
+            hasContent = true;
+            uint32_t written = FileWrite(tmpFh, n, chunk);
+            if (written != n)
+            {
+                FileClose(tmpFh);
+                unlink(Span::CStr(newFile));
+                s_exitCode = 1;
+                s_errorTag = "short_write";
+                LOG("ERROR: short write while buffering stdin");
+                return;
+            }
+        }
+        FileClose(tmpFh);
+
+        if (!hasContent)
+        {
+            unlink(Span::CStr(newFile));
+            s_exitCode = 1;
+            s_errorTag = "bad_args";
+            LOG("ERROR: stdin is empty — provide replacement block content");
+            return;
+        }
+    }
+    else
+    {
+        newFile = args.positional.data.data[3];
     }
 
     // Null-terminate the file path for FileOpen
@@ -1274,6 +1384,7 @@ void CmdReplaceBlock(region_alloc &alloc, const cli_args &args)
     bool ok = ReplaceBlock(byteview{pathBuf.data, filePath.size}, blockLine, newFile, alloc);
     if (!ok)
     {
+        s_errorTag = "operation_failed";
         s_exitCode = 1;
         // ReplaceBlock already logged a specific error
     }
@@ -1281,6 +1392,9 @@ void CmdReplaceBlock(region_alloc &alloc, const cli_args &args)
     {
         ShowFileBlocks(filePath, alloc);
     }
+
+    if (stdinMode)
+        unlink(Span::CStr(newFile));
 }
 
 void CmdOnboard()
@@ -1315,8 +1429,9 @@ void CmdCopy(region_alloc &alloc, const cli_args &args)
 
     if (srcLineVal < 1 || dstLineVal < 1)
     {
-        LOG("ERROR: line numbers must be >= 1");
         s_exitCode = 1;
+        s_errorTag = "bad_args";
+        LOG("ERROR: line numbers must be >= 1");
         return;
     }
 
@@ -1335,8 +1450,9 @@ void CmdCopy(region_alloc &alloc, const cli_args &args)
                   (uint32_t)(dstLineVal - 1), showReturns, copyIncludes, alloc);
     if (!result.ok)
     {
-        LOG("ERROR: copy failed -- %s", result.error);
         s_exitCode = 1;
+        s_errorTag = "operation_failed";
+        LOG("ERROR: copy failed -- %s", result.error);
     }
     else
     {
@@ -1347,6 +1463,10 @@ void CmdCopy(region_alloc &alloc, const cli_args &args)
 void Run(region_alloc &alloc)
 {
     cli_args args = ParseArgs(alloc);
+    s_errorTag = nullptr;
+
+    struct timespec t_start;
+    clock_gettime(CLOCK_MONOTONIC, &t_start);
 
     if (args.command.size == 0)
     {
@@ -1375,11 +1495,12 @@ void Run(region_alloc &alloc)
         LOG("  delete <file> <line>       Delete a block");
         LOG("  edit <file> <old> <new>    Line-based replacement (ignores indent)");
         LOG("  replace <file> <ln> <o> <n> Scoped replace within a block");
-        LOG("  replace-block <file> <ln> <new> Replace entire block");
+        LOG("  replace-block <file> <ln> [<new>] Replace entire block (stdin if no file)");
         LOG("  copy <src> <ln> <dst> <ln> Copy block between files");
         LOG("  undo <file>                Restore from backup");
         LOG("  help                      Print detailed help");
         LOG("  onboard                   Print agent onboarding guide");
+        LogUsage(&alloc, args, t_start, s_exitCode, s_errorTag);
         return;
     }
 
@@ -1407,6 +1528,8 @@ void Run(region_alloc &alloc)
         CmdHelp();
     else if (ByteviewEq(args.command, "onboard"))
         CmdOnboard();
+
+    LogUsage(&alloc, args, t_start, s_exitCode, s_errorTag);
 }
 
 } // namespace

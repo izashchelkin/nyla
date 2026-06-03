@@ -1,0 +1,16 @@
+realistic.java (15 blocks)
+    10-  11 func public DataService(String configPath) throws IOException
+    14-  16 func public int compute(int a, int b)
+    19-  21 func public double divide(double a, double b) throws ArithmeticException
+    24-  25 func public static void initialize()
+    28-  31 @Override func public final String toString()
+    34-  37 @Deprecated @SuppressWarnings("unchecked") func public List<String> legacyMethod()
+    40-  42 func public T firstOrNull(List<T> items)
+    45-  46 func public void log(String format, Object... args)
+    49-  49 func public abstract void validate()
+     7-  50 class DataService
+    53-  53 func void process(byte[] data) throws IOException
+    56-  58 func default String name()
+    52-  59 interface DataProcessor
+    65-  67 func public boolean isActive()
+    61-  68 enum Status

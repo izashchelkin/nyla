@@ -10,9 +10,11 @@
  *   xcav_move       — move a block within a file
  *   xcav_move_into  — move a block across files
  *   xcav_delete     — delete a block
- *   xcav_replace    — replace a block with new content
+ *   xcav_replace    — replace an entire block with new content (replace-block)
+ *   xcav_replace_scoped — scoped replace within a block (oldText unique in block only)
  *   xcav_undo       — restore from backup (up to 20 levels)
  *   xcav_edit       — safe edit (tree-sitter validated for C/C++/Java/TS/JS, plain for others)
+ *   xcav_copy       — copy a block across files (with --copy-includes, --show-returns)
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -79,6 +81,14 @@ function tmpPath(): string {
 // ─── Tools ─────────────────────────────────────────────────────────────────
 
 export default function (pi: ExtensionAPI) {
+
+  // ── Skill auto-discovery ──────────────────────────────────────────────
+
+  pi.on("resources_discover", async (_event, _ctx) => {
+    return {
+      skillPaths: [resolve(__dirname, "skills")],
+    };
+  });
 
   // ── xcav_blocks ─────────────────────────────────────────────────────────
 
@@ -297,6 +307,45 @@ export default function (pi: ExtensionAPI) {
     },
   });
 
+  // ── xcav_replace_scoped ─────────────────────────────────────────────
+
+  pi.registerTool({
+    name: "xcav_replace_scoped",
+    label: "xcav replace-scoped",
+    description:
+      "Scoped text replacement — oldText only needs to be unique within the structural block " +
+      "containing <line>. Unlike xcav_edit (which requires file-wide uniqueness) and xcav_replace " +
+      "(which replaces the entire block), this replaces specific text within a known block. " +
+      "Supports C, C++, Java, TypeScript, and JavaScript.",
+    promptSnippet: "xcav_replace_scoped(file, line, oldText, newText) — replace text scoped to a block",
+    promptGuidelines: [
+      "Use xcav_replace_scoped when oldText appears in multiple blocks but you only want to change one instance.",
+      "Prefer xcav_edit when oldText is file-unique; prefer xcav_replace when replacing an entire block.",
+    ],
+    parameters: Type.Object({
+      file: Type.String({ description: "Path to the source file" }),
+      line: Type.Number({ description: "Line number within the block to scope matching (1-indexed)" }),
+      oldText: Type.String({ description: "Text to find within the block (only needs uniqueness within the block)" }),
+      newText: Type.String({ description: "Replacement text" }),
+    }),
+    async execute(_toolCallId, params) {
+      const absPath = resolve(params.file);
+      if (!existsSync(absPath)) {
+        return { content: [{ type: "text", text: `File not found: ${params.file}` }] };
+      }
+      const tmpDir = join("/tmp", "xcav_tmp");
+      mkdirSync(tmpDir, { recursive: true });
+      const ts = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      const oldFile = join(tmpDir, `scoped_old_${ts}.txt`);
+      const newFile = join(tmpDir, `scoped_new_${ts}.txt`);
+      writeFileSync(oldFile, params.oldText, "utf-8");
+      writeFileSync(newFile, params.newText, "utf-8");
+      const r = xcav(["replace", absPath, String(params.line), oldFile, newFile]);
+      try { unlinkSync(oldFile); unlinkSync(newFile); } catch {}
+      return { content: [{ type: "text", text: wrapOutput("xcav_replace_scoped", params, r.output || "Replace succeeded.") }] };
+    },
+  });
+
   // ── xcav_undo ───────────────────────────────────────────────────────────
 
   pi.registerTool({
@@ -493,6 +542,47 @@ export default function (pi: ExtensionAPI) {
         isError: !allOk,
         details: {},
       };
+    },
+  });
+
+  // ── xcav_copy ─────────────────────────────────────────────────────────
+
+  pi.registerTool({
+    name: "xcav_copy",
+    label: "xcav copy",
+    description:
+      "Copy a structural code block from one file to another. Source is unaffected. " +
+      "Uses tree-sitter for safe block detection. Automatically re-indents. " +
+      "Supports --copy-includes to copy #include/import lines and --show-returns to " +
+      "print return statement locations. Supports C, C++, Java, TypeScript, and JavaScript.",
+    promptSnippet: "xcav_copy(srcFile, srcLine, dstFile, dstLine, copyIncludes?, showReturns?) — copy a block across files",
+    promptGuidelines: [
+      "Use xcav_copy to duplicate code blocks across files without cutting the source.",
+      "Combine with xcav_delete after copying to achieve an extract-to-new-file pattern.",
+      "The destination must be a block boundary (closing brace, file start/end).",
+    ],
+    parameters: Type.Object({
+      srcFile:      Type.String({ description: "Path to the source file" }),
+      srcLine:      Type.Number({ description: "Line number of the block to copy (1-indexed)" }),
+      dstFile:      Type.String({ description: "Path to the destination file" }),
+      dstLine:      Type.Number({ description: "Destination line (block copied after this line, 1-indexed)" }),
+      copyIncludes: Type.Optional(Type.Boolean({ description: "Copy #include/import lines from source to dest", default: false })),
+      showReturns:  Type.Optional(Type.Boolean({ description: "Print line numbers of return statements in the copied block", default: false })),
+    }),
+    async execute(_toolCallId, params) {
+      const srcAbs = resolve(params.srcFile);
+      const dstAbs = resolve(params.dstFile);
+      if (!existsSync(srcAbs)) {
+        return { content: [{ type: "text", text: `Source file not found: ${params.srcFile}` }] };
+      }
+      if (!existsSync(dstAbs)) {
+        return { content: [{ type: "text", text: `Destination file not found: ${params.dstFile}` }] };
+      }
+      const args = ["copy", srcAbs, String(params.srcLine), dstAbs, String(params.dstLine)];
+      if (params.copyIncludes) args.push("--copy-includes");
+      if (params.showReturns) args.push("--show-returns");
+      const r = xcav(args);
+      return { content: [{ type: "text", text: wrapOutput("xcav_copy", params, r.output || "Copy succeeded.") }] };
     },
   });
 }

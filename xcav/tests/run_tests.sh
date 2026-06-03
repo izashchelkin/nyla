@@ -559,7 +559,7 @@ echo -e "\n${YELLOW}─── blocks (error paths) ───${NC}"
 set +e
 unknown_out="$("$XC" blocks "$FIXTURES/unknown.xyz" 2>&1)"
 unknown_rc=$?
-set -e
+# set -e (removed: errexit was not enabled at script startup)
 if echo "$unknown_out" | grep -q "unsupported file type"; then
     pass "blocks (unknown extension)"
 else
@@ -570,7 +570,7 @@ fi
 set +e
 noext_out="$("$XC" blocks "$FIXTURES/noext" 2>&1)"
 noext_rc=$?
-set -e
+# set -e (removed: errexit was not enabled at script startup)
 if echo "$noext_out" | grep -q "unsupported file type"; then
     pass "blocks (no extension)"
 else
@@ -580,7 +580,7 @@ fi
 # File not found
 set +e
 notfound_out="$("$XC" blocks "$FIXTURES/nonexistent.c" 2>&1)"
-set -e
+# set -e (removed: errexit was not enabled at script startup)
 if echo "$notfound_out" | grep -q "cannot open"; then
     pass "blocks (file not found)"
 else
@@ -594,6 +594,9 @@ if echo "$empty_out" | grep -q "(0 blocks)"; then
 else
     fail "blocks (empty file)" "unexpected: $empty_out"
 fi
+
+# Restore errexit state (was disabled by set +e blocks above)
+set +e
 
 # ─── move (nested C++) ───────────────────────────────────────────────────
 
@@ -640,7 +643,7 @@ cp "$FIXTURES/funcs.c" "$TMPDIR/move_err1.c"
 set +e
 move_err1="$("$XC" move "$TMPDIR/move_err1.c" 7 3 2>&1)"
 move_rc1=$?
-set -e
+# set -e (removed: errexit was not enabled at script startup)
 if echo "$move_err1" | grep -q "no structural block found"; then
     pass "move (no block at line)"
 else
@@ -652,7 +655,7 @@ cp "$FIXTURES/funcs.c" "$TMPDIR/move_err2.c"
 set +e
 move_err2="$("$XC" move "$TMPDIR/move_err2.c" 4 5 2>&1)"
 move_rc2=$?
-set -e
+# set -e (removed: errexit was not enabled at script startup)
 if echo "$move_err2" | grep -q "contains the destination line"; then
     pass "move (dest inside block)"
 else
@@ -662,7 +665,7 @@ fi
 # Move file not found
 set +e
 move_err3="$("$XC" move "$FIXTURES/nonexistent.c" 1 2 2>&1)"
-set -e
+# set -e (removed: errexit was not enabled at script startup)
 if echo "$move_err3" | grep -q "cannot open"; then
     pass "move (file not found)"
 else
@@ -713,7 +716,7 @@ echo -e "\n${YELLOW}─── delete (error paths) ───${NC}"
 cp "$FIXTURES/funcs.c" "$TMPDIR/del_err1.c"
 set +e
 del_err1="$("$XC" delete "$TMPDIR/del_err1.c" 7 2>&1)"
-set -e
+# set -e (removed: errexit was not enabled at script startup)
 if echo "$del_err1" | grep -q "no structural block found"; then
     pass "delete (no block at line)"
 else
@@ -723,7 +726,7 @@ fi
 # Delete file not found
 set +e
 del_err2="$("$XC" delete "$FIXTURES/nonexistent.c" 1 2>&1)"
-set -e
+# set -e (removed: errexit was not enabled at script startup)
 if echo "$del_err2" | grep -q "cannot open"; then
     pass "delete (file not found)"
 else
@@ -763,7 +766,7 @@ echo -e "\n${YELLOW}─── edit (error paths) ───${NC}"
 # File not found
 set +e
 edit_err1="$("$XC" edit "$FIXTURES/nonexistent.c" "$TMPDIR/x.txt" "$TMPDIR/y.txt" 2>&1)"
-set -e
+# set -e (removed: errexit was not enabled at script startup)
 if echo "$edit_err1" | grep -q "cannot open"; then
     pass "edit (file not found)"
 else
@@ -776,7 +779,7 @@ echo -n 'nonexistent_text_xyz' > "$TMPDIR/edit_notfound_old.txt"
 echo -n 'replacement' > "$TMPDIR/edit_notfound_new.txt"
 set +e
 edit_err2="$("$XC" edit "$TMPDIR/edit_notfound.c" "$TMPDIR/edit_notfound_old.txt" "$TMPDIR/edit_notfound_new.txt" 2>&1)"
-set -e
+# set -e (removed: errexit was not enabled at script startup)
 if echo "$edit_err2" | grep -q "oldText not found"; then
     pass "edit (oldText not found)"
 else
@@ -789,7 +792,7 @@ printf '}\n' > "$TMPDIR/edit_ambig_old.txt"
 printf '}\n' > "$TMPDIR/edit_ambig_new.txt"
 set +e
 edit_err3="$("$XC" edit "$TMPDIR/edit_ambig.c" "$TMPDIR/edit_ambig_old.txt" "$TMPDIR/edit_ambig_new.txt" 2>&1)"
-set -e
+# set -e (removed: errexit was not enabled at script startup)
 # Should succeed since full-line oldText matches exactly one occurrence
 if echo "$edit_err3" | grep -qE "ambiguous|not unique"; then
     pass "edit (ambiguous oldText)"
@@ -803,7 +806,7 @@ echo -n '' > "$TMPDIR/edit_empty_old.txt"
 echo -n 'x' > "$TMPDIR/edit_empty_new.txt"
 set +e
 edit_err4="$("$XC" edit "$TMPDIR/edit_empty.c" "$TMPDIR/edit_empty_old.txt" "$TMPDIR/edit_empty_new.txt" 2>&1)"
-set -e
+# set -e (removed: errexit was not enabled at script startup)
 if echo "$edit_err4" | grep -q "oldText cannot be empty"; then
     pass "edit (empty oldText)"
 else
@@ -827,7 +830,7 @@ fi
 cp "$FIXTURES/funcs.c" "$TMPDIR/edit_stdin2.c"
 set +e
 stdin_err="$(echo 'old text' | "$XC" edit "$TMPDIR/edit_stdin2.c" --stdin 2>&1)"
-set -e
+# set -e (removed: errexit was not enabled at script startup)
 if echo "$stdin_err" | grep -q "separator line not found"; then
     pass "edit (stdin no separator)"
 else
@@ -842,6 +845,14 @@ test_edit_stdin_large_source_dry_run "edit stdin dry-run large source"
 
 echo -e "\n${YELLOW}─── read (extended) ───${NC}"
 
+# --offset without --limit should work (regression for uint32 overflow bug)
+read_offset_only="$("$XC" read "$FIXTURES/funcs.c" --offset 3 2>&1)"
+if echo "$read_offset_only" | grep -q "int foo"; then
+    pass "read --offset (no --limit, regression)"
+else
+    fail "read --offset (no --limit, regression)" "expected 'int foo', got: $read_offset_only"
+fi
+
 # --name with struct name
 read_suffix="$("$XC" read "$FIXTURES/structs.cc" --name Point 2>&1)"
 if echo "$read_suffix" | grep -q "struct Point"; then
@@ -854,7 +865,7 @@ fi
 set +e
 read_nomatch="$("$XC" read "$FIXTURES/funcs.c" --name nonexistent_func 2>&1)"
 read_nomatch_rc=$?
-set -e
+# set -e (removed: errexit was not enabled at script startup)
 if echo "$read_nomatch" | grep -q "no block matching"; then
     pass "read --name no match"
 else
@@ -872,7 +883,7 @@ fi
 # read line with no structural block (line 7 is blank)
 set +e
 read_noblock="$("$XC" read "$FIXTURES/funcs.c" 7 2>&1)"
-set -e
+# set -e (removed: errexit was not enabled at script startup)
 if echo "$read_noblock" | grep -q "no block found"; then
     pass "read (no block at line)"
 else
@@ -882,7 +893,7 @@ fi
 # read file not found
 set +e
 read_nofile="$("$XC" read "$FIXTURES/nonexistent.c" 1 2>&1)"
-set -e
+# set -e (removed: errexit was not enabled at script startup)
 if echo "$read_nofile" | grep -q "no block found\|no blocks found"; then
     pass "read (file not found)"
 else
@@ -974,7 +985,7 @@ echo -e "\n${YELLOW}─── read (--name suffix) ───${NC}"
 # Partial (non-suffix) should NOT match
 set +e
 read_partial="$("$XC" read "$FIXTURES/funcs.c" --name oo 2>&1)"
-set -e
+# set -e (removed: errexit was not enabled at script startup)
 if echo "$read_partial" | grep -q "no block matching"; then
     pass "read --name partial (not suffix)"
 else
@@ -1021,7 +1032,7 @@ echo -n 'nonexistent_in_this_function' > "$TMPDIR/replace_nf_old.txt"
 echo -n 'replacement' > "$TMPDIR/replace_nf_new.txt"
 set +e
 replace_err="$("$XC" replace "$TMPDIR/replace_nf.c" 4 "$TMPDIR/replace_nf_old.txt" "$TMPDIR/replace_nf_new.txt" 2>&1)"
-set -e
+# set -e (removed: errexit was not enabled at script startup)
 if echo "$replace_err" | grep -q "oldText not found within block"; then
     pass "replace (oldText not found)"
 else
@@ -1034,7 +1045,7 @@ echo -n 'x' > "$TMPDIR/replace_ambig_old.txt"
 echo -n 'y' > "$TMPDIR/replace_ambig_new.txt"
 set +e
 replace_ambig="$("$XC" replace "$TMPDIR/replace_ambig.c" 4 "$TMPDIR/replace_ambig_old.txt" "$TMPDIR/replace_ambig_new.txt" 2>&1)"
-set -e
+# set -e (removed: errexit was not enabled at script startup)
 if echo "$replace_ambig" | grep -q "ambiguous"; then
     pass "replace (ambiguous in block)"
 else
@@ -1096,7 +1107,7 @@ fi
 cp "$FIXTURES/funcs.c" "$TMPDIR/undo_nobackup.c"
 set +e
 undo_err="$("$XC" undo "$TMPDIR/undo_nobackup.c" 2>&1)"
-set -e
+# set -e (removed: errexit was not enabled at script startup)
 if echo "$undo_err" | grep -q "no backup found"; then
     pass "undo (no backup)"
 else
@@ -1132,7 +1143,7 @@ fi
 set +e
 undo3_out="$("$XC" undo "$TMPDIR/undo_multi.c" 2>&1)"
 undo3_rc=$?
-set -e
+# set -e (removed: errexit was not enabled at script startup)
 if echo "$undo3_out" | grep -q "no backup found"; then
     pass "undo multi-level (third undo fails)"
 else
@@ -1163,6 +1174,334 @@ for cmd in blocks read move delete edit replace undo onboard help '--stdin' 'tre
         fail "help mentions '$cmd'" "missing from help output"
     fi
 done
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Phase 1 — Rich fixture survey + read (realistic.java)
+# ═══════════════════════════════════════════════════════════════════════════
+
+echo -e "\n${YELLOW}─── Phase 1: realistic.java survey + read ───${NC}"
+
+test_blocks "blocks (realistic.java — 15 blocks)" \
+    "$FIXTURES/realistic.java" \
+    "$EXPECTED/blocks_realistic_java.txt"
+
+# read --name DataService (class preference, warns about constructor ambiguity)
+read_ds="$("$XC" read "$FIXTURES/realistic.java" --name DataService 2>&1)"
+if echo "$read_ds" | grep -q "public class DataService"; then
+    pass "read realistic --name DataService (class)"
+else
+    fail "read realistic --name DataService (class)" "unexpected: $read_ds"
+fi
+
+# read --name toString (with @Override annotation)
+read_tostr="$("$XC" read "$FIXTURES/realistic.java" --name toString 2>&1)"
+if echo "$read_tostr" | grep -q "@Override"; then
+    pass "read realistic --name toString (@Override preserved)"
+else
+    fail "read realistic --name toString (@Override preserved)" "unexpected: $read_tostr"
+fi
+
+# read --name firstOrNull (generic method)
+read_forn="$("$XC" read "$FIXTURES/realistic.java" --name firstOrNull 2>&1)"
+if echo "$read_forn" | grep -q "<T> T firstOrNull"; then
+    pass "read realistic --name firstOrNull (generic)"
+else
+    fail "read realistic --name firstOrNull (generic)" "unexpected: $read_forn"
+fi
+
+# read --name process (interface method with throws)
+read_proc="$("$XC" read "$FIXTURES/realistic.java" --name process 2>&1)"
+if echo "$read_proc" | grep -q "throws IOException"; then
+    pass "read realistic --name process (interface, throws preserved)"
+else
+    fail "read realistic --name process (interface, throws preserved)" "unexpected: $read_proc"
+fi
+
+# read --name Status (enum)
+read_status="$("$XC" read "$FIXTURES/realistic.java" --name Status 2>&1)"
+if echo "$read_status" | grep -q "enum Status"; then
+    pass "read realistic --name Status (enum)"
+else
+    fail "read realistic --name Status (enum)" "unexpected: $read_status"
+fi
+
+# read --all on realistic.java
+read_rall="$("$XC" read "$FIXTURES/realistic.java" --all 2>&1)"
+if echo "$read_rall" | grep -q "DataService" && echo "$read_rall" | grep -q "DataProcessor" && echo "$read_rall" | grep -q "Status"; then
+    pass "read realistic --all (all types present)"
+else
+    fail "read realistic --all (all types present)" "unexpected: $read_rall"
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Phase 2 — Single-file mutations (realistic.java)
+# ═══════════════════════════════════════════════════════════════════════════
+
+echo -e "\n${YELLOW}─── Phase 2: realistic.java single-file mutations ───${NC}"
+
+test_move "move legacyMethod before toString (annotations preserved)" \
+    "$FIXTURES/realistic.java" 34 31 \
+    "$EXPECTED/java_move_legacy_before_toString.java"
+
+test_move "move DataService ctor after compute (throws preserved)" \
+    "$FIXTURES/realistic.java" 10 16 \
+    "$EXPECTED/java_move_ctor_after_compute.java"
+
+test_delete "delete validate (abstract method)" \
+    "$FIXTURES/realistic.java" 49 \
+    "$EXPECTED/java_delete_validate.java"
+
+test_delete "delete isActive (enum method, enum preserved)" \
+    "$FIXTURES/realistic.java" 65 \
+    "$EXPECTED/java_delete_isActive.java"
+
+test_edit "edit divide body (throws unchanged)" \
+    "$FIXTURES/realistic.java" \
+    "return a / b;" \
+    "return b != 0 ? a / b : 0;" \
+    "$EXPECTED/java_edit_divide_body.java"
+
+test_replace "replace compute body (signature unchanged)" \
+    "$FIXTURES/realistic.java" 14 \
+    "return a + b;" \
+    "return a + b + 1;" \
+    "$EXPECTED/java_replace_compute_body.java"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Phase 3 — Cross-file operations
+# ═══════════════════════════════════════════════════════════════════════════
+
+echo -e "\n${YELLOW}─── Phase 3: cross-file copy / move-into ───${NC}"
+
+# --- copy divide into target (throws preserved) ---
+cp "$FIXTURES/realistic_target.java" "$TMPDIR/copy_target.java"
+"$XC" copy "$FIXTURES/realistic.java" 19 "$TMPDIR/copy_target.java" 3 > /dev/null 2>&1
+if diff -q "$TMPDIR/copy_target.java" "$EXPECTED/java_copy_divide_into_target.java" > /dev/null 2>&1; then
+    pass "copy divide into target (throws preserved)"
+else
+    fail "copy divide into target (throws preserved)" "file mismatch"
+    diff "$EXPECTED/java_copy_divide_into_target.java" "$TMPDIR/copy_target.java" | sed 's/^/    /'
+fi
+
+# --- move-into legacyMethod into target (annotations preserved) ---
+cp "$FIXTURES/realistic.java" "$TMPDIR/mi_src.java"
+cp "$FIXTURES/realistic_target.java" "$TMPDIR/mi_target.java"
+"$XC" move-into "$TMPDIR/mi_src.java" 34 "$TMPDIR/mi_target.java" 3 > /dev/null 2>&1
+if diff -q "$TMPDIR/mi_target.java" "$EXPECTED/java_moveinto_legacy_target.java" > /dev/null 2>&1; then
+    pass "move-into legacyMethod (annotations preserved)"
+else
+    fail "move-into legacyMethod (annotations preserved)" "file mismatch"
+    diff "$EXPECTED/java_moveinto_legacy_target.java" "$TMPDIR/mi_target.java" | sed 's/^/    /'
+fi
+
+# --- move-into with --copy-includes (constructor, throws IOException → imports copied) ---
+cp "$FIXTURES/realistic_target.java" "$TMPDIR/mi_ci_target.java"
+"$XC" move-into "$FIXTURES/realistic.java" 10 "$TMPDIR/mi_ci_target.java" 3 --copy-includes > /dev/null 2>&1
+if diff -q "$TMPDIR/mi_ci_target.java" "$EXPECTED/java_moveinto_includes_target.java" > /dev/null 2>&1; then
+    pass "move-into --copy-includes (Java imports copied)"
+else
+    fail "move-into --copy-includes (Java imports copied)" "file mismatch"
+    diff "$EXPECTED/java_moveinto_includes_target.java" "$TMPDIR/mi_ci_target.java" | sed 's/^/    /'
+fi
+# Restore realistic.java after move-into mutated it
+"$XC" undo "$FIXTURES/realistic.java" > /dev/null 2>&1 || true
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Phase 4 — Edge cases
+# ═══════════════════════════════════════════════════════════════════════════
+
+echo -e "\n${YELLOW}─── Phase 4: edge cases ───${NC}"
+
+test_blocks "blocks (empty Java — 0 blocks)" \
+    "$FIXTURES/empty_java.java" \
+    "$EXPECTED/blocks_empty_java.txt"
+
+test_blocks "blocks (interface-only Java)" \
+    "$FIXTURES/interface_only.java" \
+    "$EXPECTED/blocks_interface_only.txt"
+
+test_blocks "blocks (enum-only Java)" \
+    "$FIXTURES/enum_only.java" \
+    "$EXPECTED/blocks_enum_only.txt"
+
+test_blocks "blocks (abstract-only Java)" \
+    "$FIXTURES/abstract_only.java" \
+    "$EXPECTED/blocks_abstract_only.txt"
+
+# Constructor name collision: --name DataService should prefer class, warn about ambiguity
+collision_out="$("$XC" read "$FIXTURES/realistic.java" --name DataService 2>&1)"
+if echo "$collision_out" | grep -q "WARNING.*matches 2 blocks"; then
+    pass "read --name DataService warns on collision"
+else
+    fail "read --name DataService warns on collision" "expected WARNING, got: $collision_out"
+fi
+
+# Method with type parameter <T> found by --name
+read_gen="$("$XC" read "$FIXTURES/realistic.java" --name firstOrNull 2>&1)"
+if echo "$read_gen" | grep -q "T firstOrNull"; then
+    pass "read --name firstOrNull (generic, found by name)"
+else
+    fail "read --name firstOrNull (generic, found by name)" "unexpected: $read_gen"
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Phase 5 — Non-Java backfill
+# ═══════════════════════════════════════════════════════════════════════════
+
+echo -e "\n${YELLOW}─── Phase 5: non-Java backfill ───${NC}"
+
+# --- TSX blocks ---
+test_blocks "blocks (TSX)" \
+    "$FIXTURES/react.tsx" \
+    "$EXPECTED/blocks_tsx.txt"
+
+# --- C cross-file copy ---
+cp "$FIXTURES/target.c" "$TMPDIR/c_copy_tgt.c"
+"$XC" copy "$FIXTURES/funcs.c" 4 "$TMPDIR/c_copy_tgt.c" 5 > /dev/null 2>&1
+if diff -q "$TMPDIR/c_copy_tgt.c" "$EXPECTED/c_copy_foo_into_target.c" > /dev/null 2>&1; then
+    pass "C cross-file copy"
+else
+    fail "C cross-file copy" "file mismatch"
+    diff "$EXPECTED/c_copy_foo_into_target.c" "$TMPDIR/c_copy_tgt.c" | sed 's/^/    /'
+fi
+
+# --- C cross-file move-into ---
+cp "$FIXTURES/funcs.c" "$TMPDIR/c_mi_src.c"
+cp "$FIXTURES/target.c" "$TMPDIR/c_mi_tgt.c"
+"$XC" move-into "$TMPDIR/c_mi_src.c" 8 "$TMPDIR/c_mi_tgt.c" 5 > /dev/null 2>&1
+if diff -q "$TMPDIR/c_mi_tgt.c" "$EXPECTED/c_moveinto_bar_target.c" > /dev/null 2>&1; then
+    pass "C cross-file move-into"
+else
+    fail "C cross-file move-into" "file mismatch"
+    diff "$EXPECTED/c_moveinto_bar_target.c" "$TMPDIR/c_mi_tgt.c" | sed 's/^/    /'
+fi
+
+# --- C cross-file move-into --copy-includes ---
+cp "$FIXTURES/with_includes.c" "$TMPDIR/c_mici_src.c"
+cp "$FIXTURES/target.c" "$TMPDIR/c_mici_tgt.c"
+"$XC" move-into "$TMPDIR/c_mici_src.c" 4 "$TMPDIR/c_mici_tgt.c" 5 --copy-includes > /dev/null 2>&1
+if diff -q "$TMPDIR/c_mici_tgt.c" "$EXPECTED/c_moveinto_includes_target.c" > /dev/null 2>&1; then
+    pass "C cross-file move-into --copy-includes"
+else
+    fail "C cross-file move-into --copy-includes" "file mismatch"
+    diff "$EXPECTED/c_moveinto_includes_target.c" "$TMPDIR/c_mici_tgt.c" | sed 's/^/    /'
+fi
+
+# --- JS read ---
+js_read2="$("$XC" read "$FIXTURES/javascript.js" 10 2>&1)"
+if echo "$js_read2" | grep -q "class Calculator"; then
+    pass "read JS class by line"
+else
+    fail "read JS class by line" "unexpected: $js_read2"
+fi
+
+# --- JS edit ---
+cp "$FIXTURES/javascript.js" "$TMPDIR/js_edit.js"
+echo -n 'return x * y;' > "$TMPDIR/js_edit_old.txt"
+echo -n 'return x + y;' > "$TMPDIR/js_edit_new.txt"
+"$XC" edit "$TMPDIR/js_edit.js" "$TMPDIR/js_edit_old.txt" "$TMPDIR/js_edit_new.txt" > /dev/null 2>&1
+if grep -q 'return x + y;' "$TMPDIR/js_edit.js"; then
+    pass "JS edit"
+else
+    fail "JS edit" "edit not applied"
+fi
+
+# --- JS cross-file ---
+cp "$FIXTURES/javascript.js" "$TMPDIR/js_cross_src.js"
+cp "$FIXTURES/javascript.js" "$TMPDIR/js_cross_tgt.js"
+"$XC" move-into "$TMPDIR/js_cross_src.js" 4 "$TMPDIR/js_cross_tgt.js" 18 > /dev/null 2>&1
+if "$XC" blocks "$TMPDIR/js_cross_tgt.js" 2>&1 | grep -q "greet"; then
+    pass "JS cross-file move-into"
+else
+    fail "JS cross-file move-into" "move-into failed"
+fi
+
+# --- TS cross-file ---
+cp "$FIXTURES/typescript.ts" "$TMPDIR/ts_cross_src.ts"
+cp "$FIXTURES/typescript.ts" "$TMPDIR/ts_cross_tgt.ts"
+"$XC" copy "$TMPDIR/ts_cross_src.ts" 23 "$TMPDIR/ts_cross_tgt.ts" 25 > /dev/null 2>&1
+if "$XC" blocks "$TMPDIR/ts_cross_tgt.ts" 2>&1 | grep -q "func distance"; then
+    pass "TS cross-file copy"
+else
+    fail "TS cross-file copy" "copy failed"
+fi
+
+# ─── replace-block ──────────────────────────────────────────────────────
+
+echo -e "\n${YELLOW}─── replace-block ───${NC}"
+
+# --- replace-block C bar (stdin mode) ---
+cp "$FIXTURES/funcs.c" "$TMPDIR/rb_c_stdin.c"
+cat <<'EOF' | "$XC" replace-block "$TMPDIR/rb_c_stdin.c" 8 > /dev/null 2>&1
+int bar(int x) {
+    return x * 3;
+}
+EOF
+if diff -q "$TMPDIR/rb_c_stdin.c" "$EXPECTED/c_replace_block_bar.c" > /dev/null 2>&1; then
+    pass "replace-block C bar (stdin)"
+else
+    fail "replace-block C bar (stdin)" "file mismatch"
+    diff "$EXPECTED/c_replace_block_bar.c" "$TMPDIR/rb_c_stdin.c" | sed 's/^/    /'
+fi
+
+# --- replace-block Java add (stdin mode) ---
+cp "$FIXTURES/calculator.java" "$TMPDIR/rb_java_add.c"
+cat <<'EOF' | "$XC" replace-block "$TMPDIR/rb_java_add.c" 15 > /dev/null 2>&1
+    public int add(int a, int b) {
+        return a + b + 100;
+    }
+EOF
+if diff -q "$TMPDIR/rb_java_add.c" "$EXPECTED/java_replace_block_add.java" > /dev/null 2>&1; then
+    pass "replace-block Java add (stdin)"
+else
+    fail "replace-block Java add (stdin)" "file mismatch"
+    diff "$EXPECTED/java_replace_block_add.java" "$TMPDIR/rb_java_add.c" | sed 's/^/    /'
+fi
+
+# --- replace-block Java class (stdin mode, no package/imports) ---
+cp "$FIXTURES/calculator.java" "$TMPDIR/rb_java_class.c"
+cat <<'EOF' | "$XC" replace-block "$TMPDIR/rb_java_class.c" 7 > /dev/null 2>&1
+public class Calculator {
+
+    private int baseValue;
+
+    public Calculator(int base) {
+        this.baseValue = base;
+    }
+
+    public int compute(int x) {
+        return x + baseValue;
+    }
+}
+EOF
+if diff -q "$TMPDIR/rb_java_class.c" "$EXPECTED/java_replace_block_class.java" > /dev/null 2>&1; then
+    pass "replace-block Java class (stdin)"
+else
+    fail "replace-block Java class (stdin)" "file mismatch"
+    diff "$EXPECTED/java_replace_block_class.java" "$TMPDIR/rb_java_class.c" | sed 's/^/    /'
+fi
+
+# --- replace-block C bar (file mode, backward compat) ---
+cp "$FIXTURES/funcs.c" "$TMPDIR/rb_c_file.c"
+printf 'int bar(int x) {\n    return x * 3;\n}\n' > "$TMPDIR/rb_c_new.txt"
+"$XC" replace-block "$TMPDIR/rb_c_file.c" 8 "$TMPDIR/rb_c_new.txt" > /dev/null 2>&1
+if diff -q "$TMPDIR/rb_c_file.c" "$EXPECTED/c_replace_block_bar.c" > /dev/null 2>&1; then
+    pass "replace-block C bar (file mode)"
+else
+    fail "replace-block C bar (file mode)" "file mismatch"
+    diff "$EXPECTED/c_replace_block_bar.c" "$TMPDIR/rb_c_file.c" | sed 's/^/    /'
+fi
+
+# --- replace-block stdin empty error ---
+cp "$FIXTURES/funcs.c" "$TMPDIR/rb_empty.c"
+set +e
+rb_empty_err="$(echo -n '' | "$XC" replace-block "$TMPDIR/rb_empty.c" 8 2>&1)"
+# set -e
+if echo "$rb_empty_err" | grep -q "stdin is empty"; then
+    pass "replace-block (stdin empty)"
+else
+    fail "replace-block (stdin empty)" "expected 'stdin is empty': $rb_empty_err"
+fi
 
 # ─── summary ───────────────────────────────────────────────────────────────
 

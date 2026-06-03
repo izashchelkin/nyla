@@ -13,6 +13,7 @@ target_sources(${TARGET} PRIVATE
     replace.cc
     text_util.cc
     tree_sitter_util.cc
+    usage_log.cc
 )
 target_sources(${TARGET} PUBLIC
 )

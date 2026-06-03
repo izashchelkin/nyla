@@ -1,0 +1,4 @@
+react.tsx (3 blocks)
+     3-   6 interface Props
+     8-  10 var Greeting
+    12-  12 export Greeting

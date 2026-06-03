@@ -39,8 +39,6 @@ auto NodeRange(const TSNode &node) -> node_range
     };
 }
 
-
-
 // ─── Descendant queries ─────────────────────────────────────────────────────
 
 auto NodeAtLine(const TSNode &root, uint32_t targetLine, byteview source) -> TSNode
@@ -93,7 +91,5 @@ auto NodeAtLine(const TSNode &root, uint32_t targetLine, byteview source) -> TSN
 
     return best;
 }
-
-
 
 } // namespace nyla

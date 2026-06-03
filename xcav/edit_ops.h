@@ -9,9 +9,9 @@
 //   xcav/replace.h    — ReplaceBlock, ReplaceInBlock
 //   xcav/edit_safe.h  -- EditSafe
 
-#include "xcav/move.h"
-#include "xcav/move_into.h"
 #include "xcav/copy.h"
 #include "xcav/delete.h"
-#include "xcav/replace.h"
 #include "xcav/edit_safe.h"
+#include "xcav/move.h"
+#include "xcav/move_into.h"
+#include "xcav/replace.h"

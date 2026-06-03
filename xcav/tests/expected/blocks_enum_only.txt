@@ -1,0 +1,3 @@
+enum_only.java (2 blocks)
+     8-  10 func public boolean isBright()
+     3-  11 enum Color

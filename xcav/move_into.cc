@@ -102,11 +102,10 @@ auto MoveBlockInto(byteview srcFilePath, uint32_t srcLine, byteview dstFilePath,
 
             // Strip 'static ' from the first line of the moved block --
             // the function is no longer file-local after a cross-file move.
-            if (pos == lineIndent && pos + 7 <= srcBlockText.size &&
-                srcBlockText.data[pos] == 's' && srcBlockText.data[pos + 1] == 't' &&
-                srcBlockText.data[pos + 2] == 'a' && srcBlockText.data[pos + 3] == 't' &&
-                srcBlockText.data[pos + 4] == 'i' && srcBlockText.data[pos + 5] == 'c' &&
-                srcBlockText.data[pos + 6] == ' ')
+            if (pos == lineIndent && pos + 7 <= srcBlockText.size && srcBlockText.data[pos] == 's' &&
+                srcBlockText.data[pos + 1] == 't' && srcBlockText.data[pos + 2] == 'a' &&
+                srcBlockText.data[pos + 3] == 't' && srcBlockText.data[pos + 4] == 'i' &&
+                srcBlockText.data[pos + 5] == 'c' && srcBlockText.data[pos + 6] == ' ')
                 pos += 7;
 
             while (pos < srcBlockText.size && srcBlockText.data[pos] != '\n')
@@ -307,9 +306,8 @@ auto MoveBlockInto(byteview srcFilePath, uint32_t srcLine, byteview dstFilePath,
             if (!isComment)
                 break;
             commentCut = lineStart;
-            while (commentCut > 0 &&
-                   (srcSource.data[commentCut - 1] == ' ' || srcSource.data[commentCut - 1] == '\t' ||
-                    srcSource.data[commentCut - 1] == '\n'))
+            while (commentCut > 0 && (srcSource.data[commentCut - 1] == ' ' || srcSource.data[commentCut - 1] == '\t' ||
+                                      srcSource.data[commentCut - 1] == '\n'))
             {
                 --commentCut;
                 if (srcSource.data[commentCut] == '\n')

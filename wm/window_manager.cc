@@ -455,7 +455,6 @@ void Activate(window_stack &stack, xcb_window_t clientWindow, xcb_timestamp_t ti
     {
         ApplyBorder(stack.activeWindow, Color::KNone);
         stack.activeWindow = clientWindow;
-        wm->layoutDirty = true;
         wm->barDirty = true;
     }
     Activate(stack, time);
@@ -623,12 +622,16 @@ void MoveLocal(xcb_timestamp_t time, auto computeIdx, bool clearZoom)
         else
         {
             Activate(stack, stack.windows[inew], time);
+            wm->layoutDirty = true;
         }
     }
     else
     {
         if (!wm->follow)
+        {
             Activate(stack, stack.windows[0], time);
+            wm->layoutDirty = true;
+        }
     }
 }
 

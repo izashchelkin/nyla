@@ -40,5 +40,4 @@ auto NodeAtLine(const TSNode &root, uint32_t line, byteview source) -> TSNode;
 // Collect all named descendant nodes matching `nodeType` (e.g. "function_definition").
 // Writes up to `maxCount` nodes into `out`; returns the count written.
 
-
 } // namespace nyla
