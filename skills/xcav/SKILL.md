@@ -1,9 +1,9 @@
 ---
 name: "xcav"
 description: "When reading or editing C, C++, Java, TypeScript, or JavaScript files: intercepts the default plain read/edit habit and redirects to xcav tools. Covers reading, editing, structural survey, block-level moves, deletes, cross-file restructuring, and usage analysis."
-version: 4
+version: 6
 created: "2026-06-02"
-updated: "2026-06-02"
+updated: "2026-06-03"
 ---
 ## When to Use
 Whenever you touch a C, C++, Java, TypeScript, or JavaScript file. Never use plain `read` or plain `edit` for these languages — xcav tools give you structural awareness that plain tools lack. The core rule: blocks first, then read, then edit. Always survey before cutting.
@@ -38,8 +38,10 @@ Reads the structural block containing `<line>` (1-indexed). Output is pure code 
 
 **Flags:** `--numbers` (line numbers), `--raw` (original indentation), `--name <path>` (structural name lookup), `--all` (dump all blocks), `--offset N --limit M` (line range), `--offset N` (from line N to end).
 
-### `xcav edit <file> <old-file> <new-file> [--dry-run]`
-Line-based replacement. Matches oldText to the file by comparing line content — leading/trailing whitespace is ignored per line. Copies the indentation from the matched file lines to the replacement text. Accepts `xcav read` output directly. Unicode normalization handles em-dashes, smart quotes, and arrows. `--stdin` mode reads oldText then newText from stdin separated by `---XCAV_EDIT_SEPARATOR---`.
+### `xcav edit <file> <old-file> <new-file> [<old-file2> <new-file2> ...] [--dry-run] [--no-blocks]`
+Line-based replacement. Matches oldText to the file by comparing line content — leading/trailing whitespace is ignored per line. Copies the indentation from the matched file lines to the replacement text. Accepts `xcav read` output directly. Unicode normalization handles em-dashes, smart quotes, and arrows.
+
+Multiple old/new pairs are processed sequentially in one invocation; only one `blocks` output is printed after all edits complete. Each edit creates its own backup, so multi-level `undo` steps through them one at a time. `--stdin` mode reads oldText then newText from stdin separated by `---XCAV_EDIT_SEPARATOR---`. `--no-blocks` suppresses the final block list.
 
 When matching fails, `edit` reports what it was looking for, whether the first line exists, and a hint ("wrong file or stale read?" vs "check rest of block").
 
@@ -55,11 +57,14 @@ Deletes the structural block containing `<line>`. Cleans up blank lines, orphane
 ### `xcav replace <file> <line> <old-file> <new-file>`
 Scoped replace — oldText only needs to be unique within the block containing `<line>`. No tree-sitter validation.
 
-### `xcav replace-block <file> <line> <new-file>`
-Replaces the entire structural block with content from `<new-file>`. Atomic.
+### `xcav replace-block <file> <line> [<new-file>]`
+Replaces the entire structural block with content from `<new-file>`. Without `<new-file>`, reads replacement from stdin. Atomic. Reports old vs new line count. For class-like blocks, includes a formatter reminder.
 
 ### `xcav copy <src> <src-line> <dst> <dst-line> [--copy-includes] [--show-returns]`
 Copies a block cross-file. Source is unaffected. `--show-returns` prints line numbers of return statements.
+
+### `xcav insert --before | before | --after | after <file> <line> <content-file>`
+Inserts code before or after a structural block. Content is read from `<content-file>` and re-indented to match.
 
 ### `xcav undo <file>`
 Restores from most recent backup. Multi-level (up to 20). Backups created automatically on every mutation.
@@ -75,18 +80,29 @@ xcav edit normalizes common Unicode characters: em dash→--, en dash→-, →�
 | `xcav_move` | `xcav move <file> <line> <dest>` |
 | `xcav_move_into` | `xcav move-into <src> <line> <dst> <line> [--copy-includes]` |
 | `xcav_delete` | `xcav delete <file> <line>` |
-| `xcav_replace` | `xcav replace-block <file> <line> <new-file>` |
+| `xcav_replace` | `xcav replace-block <file> <line> [<new-file>]` |
 | `xcav_replace_scoped` | `xcav replace <file> <line> <old> <new>` (scoped to block) |
-| `xcav_edit` | `xcav edit <file> <old> <new>` |
+| `xcav_edit` | `xcav edit <file> <old> <new> [<old2> <new2> ...]` |
 | `xcav_copy` | `xcav copy <src> <line> <dst> <line> [--copy-includes] [--show-returns]` |
+| `xcav_insert` | `xcav insert --before\|before\|--after\|after <file> <line> <content-file>` |
 | `xcav_undo` | `xcav undo <file>` |
 
 Each wrapper is a thin shim. All logic lives in the xcav C++ binary.
 
 ## When to use xcav vs plain tools
-**Use xcav when:** reading C/C++/Java/TS/JS files, surveying before edits, moving/deleting whole functions/classes/structs/enums, scoped-block replaces, validating edits with `--dry-run`, or the file is a directory.
 
-**Use plain edit only when:** making multiple consecutive edits within the same function body where xcav_edit's auto-indentation would break subsequent line matches. For single-method replacements, wrapper removals, or body rewrites, use xcav_edit — even if the change is one line. Also use plain tools when the file is not a supported language.
+| Change size | Use | Reason |
+|------------|-----|--------|
+| Single line (imports, field rename, one-line fix) | Plain `edit` | xcav overhead not justified. Text is unique and small. |
+| Few lines inside one method | `xcav_edit` or plain `edit` | Either works. xcav_edit if the text isn't globally unique. |
+| Entire method | `xcav_replace` | Structural safety, block map verification. |
+| Entire class/struct | `xcav_replace` | Same, but be deliberate — method-level edits may be cleaner. |
+| Moving code between files | `xcav_move_into` | Correct tool for the job. |
+| Deleting a block | `xcav_delete` | Cleaner than manual deletion. |
+| Inserting new code at block boundary | `xcav insert` | Structural targeting, correct indentation. |
+| Anything where you're not sure about scope | `xcav_blocks` first | Always survey before large edits. |
+
+After using plain `edit`, run `xcav_blocks` to verify structure if the edit was near block boundaries.
 
 ## Workflow Example
 

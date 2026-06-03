@@ -47,22 +47,7 @@ auto LineIndent(byteview source, uint32_t lineStart) -> uint32_t
     return count;
 }
 
-// ─── StrEq ──────────────────────────────────────────────────────────────────
-
-auto StrEq(const char *a, const char *b) -> bool
-{
-    while (*a && *b)
-    {
-        if (*a != *b)
-            return false;
-        ++a;
-        ++b;
-    }
-    return *a == 0 && *b == 0;
-}
-
 // ─── IncludePath ────────────────────────────────────────────────────────────
-
 // ─── NormalizeText ──────────────────────────────────────────────────────────
 
 void NormalizeText(inline_vec<uint8_t, 65536> &buf)
@@ -142,17 +127,5 @@ void NormalizeText(inline_vec<uint8_t, 65536> &buf)
     buf.size = 0;
     for (uint32_t i = 0; i < out.size; ++i)
         InlineVec::Append(buf, out.data[i]);
-}
-auto ByteviewEq(byteview a, const char *b) -> bool
-{
-    while (*b)
-    {
-        if (a.size == 0 || a.data[0] != (uint8_t)*b)
-            return false;
-        a.data++;
-        a.size--;
-        b++;
-    }
-    return a.size == 0;
 }
 } // namespace nyla

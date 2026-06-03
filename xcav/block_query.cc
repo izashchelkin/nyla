@@ -2,8 +2,6 @@
 #include "xcav/language.h"
 #include "xcav/text_util.h"
 
-#include <sys/stat.h>
-
 #include "nyla/commons/file.h"
 #include "nyla/commons/file_utils.h"
 #include "nyla/commons/fmt.h"
@@ -82,15 +80,10 @@ auto BlockTypeLabel(const char *t) -> const char *
 
 auto IsRegularFile(byteview filePath, region_alloc &alloc) -> bool
 {
-    span<uint8_t> pathBuf = RegionAlloc::AllocArray<uint8_t>(alloc, filePath.size + 1);
-    MemCpy(pathBuf.data, filePath.data, filePath.size);
-    pathBuf.data[filePath.size] = 0;
-    struct stat st;
-    if (stat((const char *)pathBuf.data, &st) != 0)
-        return true; // doesn't exist — let FileOpen handle it
-    return S_ISREG(st.st_mode);
+    if (!FileExists(filePath))
+        return true; // doesn't exist -- let FileOpen handle it
+    return !IsDirectory(filePath);
 }
-
 // ─── LocateBlock ────────────────────────────────────────────────────────────
 
 auto LocateBlock(byteview filePath, uint32_t line, region_alloc &alloc) -> block_loc
@@ -560,6 +553,12 @@ auto ReadBlock(byteview filePath, uint32_t line, region_alloc &alloc, bool raw) 
 
     byteview source = bl.source;
 
+    // Count total lines for offset footer
+    uint32_t totalLines = 0;
+    for (uint32_t i = 0; i < source.size; ++i)
+        if (source.data[i] == '\n')
+            ++totalLines;
+
     // Build the structural path by walking up through containers
     inline_string<256> path{};
     {
@@ -606,7 +605,7 @@ auto ReadBlock(byteview filePath, uint32_t line, region_alloc &alloc, bool raw) 
     result.endLine = bl.range.endRow;
     result.startByte = bl.range.startByte;
     result.endByte = bl.range.endByte;
-
+    result.totalLines = totalLines;
     // Round to line boundaries: read always outputs whole lines.
     uint32_t lineStartByte = bl.range.startByte;
     while (lineStartByte > 0 && source.data[lineStartByte - 1] != '\n')

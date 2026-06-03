@@ -56,6 +56,21 @@ void API Sleep(uint64_t millis)
     ::Sleep((DWORD)millis);
 }
 
+auto API TryReadEnvVar(byteview name, byteview &out) -> bool
+{
+    TRAP("not implemented");
+}
+
+auto API GetProcessId() -> uint32_t
+{
+    TRAP("not implemented");
+}
+
+auto API GetCurrentDirectory(region_alloc &alloc) -> byteview
+{
+    TRAP("not implemented");
+}
+
 namespace
 {
 

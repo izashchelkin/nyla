@@ -172,6 +172,21 @@ template <typename T> INLINE auto Erase(span<T> self, T *pos) -> span<T>
     return Erase(self, pos, pos + 1);
 }
 
+INLINE auto ByteviewEq(byteview a, const char *b) -> bool
+{
+    while (*b)
+    {
+        if (a.size == 0 || a.data[0] != (uint8_t)*b)
+            return false;
+        a.data++;
+        a.size--;
+        b++;
+    }
+    return a.size == 0;
+}
+
 } // namespace Span
+
+using Span::ByteviewEq;
 
 } // namespace nyla

@@ -77,10 +77,23 @@ file(GLOB_RECURSE NYLA_ALL_CXX_FILES
         "${PROJECT_SOURCE_DIR}/git_ui/*.cc"
         "${PROJECT_SOURCE_DIR}/git_ui/*.h"
         "${PROJECT_SOURCE_DIR}/git_ui/*.hlsl"
+)
 
+# xcav: non-recursive glob to avoid picking up tests/fixtures + tests/expected
+file(GLOB NYLA_XCAV_CXX_FILES
+    CONFIGURE_DEPENDS
         "${PROJECT_SOURCE_DIR}/xcav/*.cc"
         "${PROJECT_SOURCE_DIR}/xcav/*.h"
+        "${PROJECT_SOURCE_DIR}/xcav/*.inl"
 )
+list(APPEND NYLA_ALL_CXX_FILES ${NYLA_XCAV_CXX_FILES})
+
+file(GLOB NYLA_CODING_AGENT_CXX_FILES
+    CONFIGURE_DEPENDS
+        "${PROJECT_SOURCE_DIR}/coding_agent/*.cc"
+        "${PROJECT_SOURCE_DIR}/coding_agent/*.h"
+)
+list(APPEND NYLA_ALL_CXX_FILES ${NYLA_CODING_AGENT_CXX_FILES})
 
 add_custom_target(format
     COMMAND clang-format -i ${NYLA_ALL_CXX_FILES}
@@ -102,4 +115,6 @@ add_subdirectory(screen_inhibitor)
 add_subdirectory(psf2_glsl)
 add_subdirectory(git_ui)
 add_subdirectory(xcav)
+add_subdirectory(coding_agent)
 add_subdirectory(tests/wm)
+add_subdirectory(tests/json_parser)

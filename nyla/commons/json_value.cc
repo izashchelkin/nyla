@@ -12,7 +12,7 @@ namespace nyla
 namespace JsonValue
 {
 
-auto TryAny(json_value &self, span<byteview> path, json_value *&out) -> bool
+auto API TryAny(json_value &self, span<byteview> path, json_value *&out) -> bool
 {
     if (Span::IsEmpty(path))
     {
@@ -37,7 +37,7 @@ auto TryAny(json_value &self, span<byteview> path, json_value *&out) -> bool
     return false;
 }
 
-auto TryObject(json_value &self, span<byteview> path, json_value *&out) -> bool
+auto API TryObject(json_value &self, span<byteview> path, json_value *&out) -> bool
 {
     json_value *tmp;
     if (!TryAny(self, path, tmp))
@@ -49,7 +49,7 @@ auto TryObject(json_value &self, span<byteview> path, json_value *&out) -> bool
     return true;
 }
 
-auto TryArray(json_value &self, span<byteview> path, json_value *&out) -> bool
+auto API TryArray(json_value &self, span<byteview> path, json_value *&out) -> bool
 {
     json_value *tmp;
     if (!TryAny(self, path, tmp))
@@ -61,7 +61,7 @@ auto TryArray(json_value &self, span<byteview> path, json_value *&out) -> bool
     return true;
 }
 
-auto TryString(json_value &self, span<byteview> path, byteview &out) -> bool
+auto API TryString(json_value &self, span<byteview> path, byteview &out) -> bool
 {
     json_value *tmp;
     if (!TryAny(self, path, tmp))
@@ -73,7 +73,7 @@ auto TryString(json_value &self, span<byteview> path, byteview &out) -> bool
     return true;
 }
 
-auto TryQWord(json_value &self, span<byteview> path, uint64_t &out) -> bool
+auto API TryQWord(json_value &self, span<byteview> path, uint64_t &out) -> bool
 {
     json_value *tmp;
     if (!TryAny(self, path, tmp))
@@ -85,7 +85,7 @@ auto TryQWord(json_value &self, span<byteview> path, uint64_t &out) -> bool
     return true;
 }
 
-auto TryDWord(json_value &self, span<byteview> path, uint32_t &out) -> bool
+auto API TryDWord(json_value &self, span<byteview> path, uint32_t &out) -> bool
 {
     json_value *tmp;
     if (!TryAny(self, path, tmp))
@@ -97,7 +97,7 @@ auto TryDWord(json_value &self, span<byteview> path, uint32_t &out) -> bool
     return true;
 }
 
-auto TryDouble(json_value &self, span<byteview> path, double &out) -> bool
+auto API TryDouble(json_value &self, span<byteview> path, double &out) -> bool
 {
     json_value *tmp;
     if (!TryAny(self, path, tmp))
@@ -109,7 +109,7 @@ auto TryDouble(json_value &self, span<byteview> path, double &out) -> bool
     return true;
 }
 
-auto TryBool(json_value &self, span<byteview> path, bool &out) -> bool
+auto API TryBool(json_value &self, span<byteview> path, bool &out) -> bool
 {
     json_value *tmp;
     if (!TryAny(self, path, tmp))
@@ -121,7 +121,7 @@ auto TryBool(json_value &self, span<byteview> path, bool &out) -> bool
     return true;
 }
 
-auto GetNext(json_value &self) -> json_value *
+auto API GetNext(json_value &self) -> json_value *
 {
     switch (self.tag)
     {

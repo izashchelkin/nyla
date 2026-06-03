@@ -36,10 +36,10 @@ struct read_block_info
     uint32_t endLine;        // 0-indexed
     uint32_t startByte;      // byte offset in source file
     uint32_t endByte;        // byte offset in source file
+    uint32_t totalLines;     // total lines in the source file
     // Un-indented block text, region-allocated.
     byteview text;
 };
-
 // Internal: located block with parsed tree and source.
 struct block_loc
 {

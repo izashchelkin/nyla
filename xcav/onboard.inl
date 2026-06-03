@@ -20,7 +20,7 @@ Use the sections below as source material. The philosophy to internalize:
 
 Create one skill:
 1. **`xcav`** — covers the full tool surface: blocks, read, edit, move,
-   delete, replace, copy, move-into, undo. Content: philosophy above plus
+   delete, replace, insert, copy, move-into, undo. Content: philosophy above plus
    "What it is", "Core workflows", "Commands", and "When to use xcav".
 
 If a global `xcav` skill already exists, skip creation — you're already
@@ -81,6 +81,15 @@ $ xcav copy src.cc 45 dst.cc 20              # cross-file copy
 ```
 $ xcav copy src.cc 45 new_feature.h 0  # copy to new file
 $ xcav delete src.cc 45                # remove from source
+```
+
+### Insert code at a block boundary
+
+```
+$ xcav insert after file.cc 32 /tmp/helper.cc   # insert after block at line 32
+$ xcav insert before file.cc 45 /tmp/helper.cc  # insert before block at line 45
+$ xcav insert --after file.cc 32 /tmp/helper.cc  # same with -- prefix
+$ xcav insert --before file.cc 45 /tmp/helper.cc # same with -- prefix
 ```
 
 ### Replace a block
@@ -194,6 +203,12 @@ reads replacement block body from stdin. Atomic.
 Copies a block cross-file. Source is unaffected. `--show-returns` prints
 line numbers of return statements in the copied block.
 
+### `xcav insert --before | before | --after | after <file> <line> <content-file>`
+
+Inserts code before or after a structural block. Content is read from
+`<content-file>` and re-indented to match the destination. Use `--before`/`before`
+to insert before the block, `--after`/`after` to insert after.
+
 ### `xcav undo <file>`
 
 Restores from most recent backup. Multi-level (up to 20). Backups created
@@ -229,6 +244,7 @@ xcav binary and returns output:
 | `xcav_replace` | `xcav replace <file> <line> <old> <new>` |
 | `xcav_edit` | `xcav edit <file> <old> <new>` |
 | `xcav_copy` | `xcav copy <src> <line> <dst> <line> [--copy-includes] [--show-returns]` |
+| `xcav_insert` | `xcav insert --before\|before\|--after\|after <file> <line> <content-file>` |
 | `xcav_undo` | `xcav undo <file>` |
 
 Each wrapper is a thin shim that parses CLI args and displays output. All logic

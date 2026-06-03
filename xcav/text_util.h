@@ -18,14 +18,6 @@ auto LineEndOffset(byteview source, uint32_t line) -> uint32_t;
 // Count of leading spaces/tabs at the given byte offset within source.
 auto LineIndent(byteview source, uint32_t lineStart) -> uint32_t;
 
-// C-string equality check.
-auto StrEq(const char *a, const char *b) -> bool;
-
-// byteview to C-string comparison (used for CLI flag matching).
-auto ByteviewEq(byteview a, const char *b) -> bool;
-
-// Extract the include path ("..." or <...>) from a #include / import block.
-
 // Normalize Unicode punctuation in-place:
 // em-dash → "--", en-dash → "-", arrows → "->"/"<-", smart quotes → ASCII.
 void NormalizeText(inline_vec<uint8_t, 65536> &buf);

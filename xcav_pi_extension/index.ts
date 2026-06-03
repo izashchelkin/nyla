@@ -469,69 +469,77 @@ export default function (pi: ExtensionAPI) {
       }
 
       // ── C/C++/Java/TS/JS: line-based matching via xcav binary ─────
-      // Falls back to plain text replacement if xcav line matching fails
-      // (e.g. grammar mismatch for .h files with C++ features, or raw string
-      // literals that confuse the C parser).
+      // Batches all edits into one xcav invocation so blocks are printed once.
+      // Falls back to per-edit plain text replacement on failure.
 
       const results: string[] = [];
       let allOk = true;
 
-      for (let i = 0; i < edits.length; i++) {
-        const { oldText, newText } = edits[i];
-
+      // Write all temp files
+      const tempFiles: { oldFile: string; newFile: string }[] = [];
+      const cmdArgs = ["edit", absPath];
+      for (const { oldText, newText } of edits) {
         const oldFile = tmpPath();
         const newFile = tmpPath();
+        writeFileSync(oldFile, oldText, "utf-8");
+        writeFileSync(newFile, newText, "utf-8");
+        cmdArgs.push(oldFile, newFile);
+        tempFiles.push({ oldFile, newFile });
+      }
 
-        try {
-          writeFileSync(oldFile, oldText, "utf-8");
-          writeFileSync(newFile, newText, "utf-8");
+      try {
+        const stdout = execSync(
+          [XCAV_BIN, ...cmdArgs].map((a) => `'${a.replace(/'/g, "\\'")}'`).join(" ") + " 2>&1",
+          { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"], timeout: 30000 }
+        );
+        const trimmed = stdout.trim();
+        if (trimmed) {
+          results.push(`${edits.length} edit(s) applied to ${params.file}:\n${trimmed}`);
+        } else {
+          results.push(`${edits.length} edit(s) applied to ${params.file}.`);
+        }
+      } catch (err: any) {
+        // ── Fallback: batch failed, retry each edit individually with plain text
+        const stderr = err.stderr?.toString() || err.message;
+        allOk = false;
+        const source = readFileSync(absPath, "utf-8");
+        let currentSource = source;
 
-          const stdout = execSync(
-            `${XCAV_BIN} edit "${absPath}" "${oldFile}" "${newFile}"`,
-            {
-              encoding: "utf-8",
-              stdio: ["pipe", "pipe", "pipe"],
-              timeout: 30000,
-            }
-          );
-
-          results.push(`Edit ${i + 1}/${edits.length}: ${stdout.trim()}`);
-        } catch (err: any) {
-          const stderr = err.stderr?.toString() || err.message;
-
-          // ── Fallback: xcav line matching failed, retry with plain string match
-          const source = readFileSync(absPath, "utf-8");
+        for (let i = 0; i < edits.length; i++) {
+          const { oldText, newText } = edits[i];
           let count = 0;
           let matchPos = -1;
           let idx = 0;
-          while ((idx = source.indexOf(oldText, idx)) !== -1) {
+          while ((idx = currentSource.indexOf(oldText, idx)) !== -1) {
             matchPos = idx;
             count++;
             idx += oldText.length;
           }
 
           if (count === 0) {
-            allOk = false;
             results.push(
               `Edit ${i + 1}/${edits.length} FAILED: oldText not found in file (both xcav and plain text)`
             );
           } else if (count > 1) {
-            allOk = false;
             results.push(
               `Edit ${i + 1}/${edits.length} FAILED: oldText found ${count} times in file (both xcav and plain text) -- ambiguous`
             );
           } else {
-            const newSource =
-              source.slice(0, matchPos) +
+            currentSource =
+              currentSource.slice(0, matchPos) +
               newText +
-              source.slice(matchPos + oldText.length);
-            writeFileSync(absPath, newSource, "utf-8");
-            const xcavMsg = stderr.trim().split("\n")[0];
+              currentSource.slice(matchPos + oldText.length);
             results.push(
-              `Edit ${i + 1}/${edits.length}: applied via plain text (xcav edit: ${xcavMsg})`
+              `Edit ${i + 1}/${edits.length}: applied via plain text (xcav batch: ${stderr.trim().split("\n")[0]})`
             );
           }
-        } finally {
+        }
+
+        if (currentSource !== source) {
+          writeFileSync(absPath, currentSource, "utf-8");
+        }
+      } finally {
+        for (const { oldFile, newFile } of tempFiles) {
           try { unlinkSync(oldFile); } catch {}
           try { unlinkSync(newFile); } catch {}
         }
@@ -584,5 +592,39 @@ export default function (pi: ExtensionAPI) {
       const r = xcav(args);
       return { content: [{ type: "text", text: wrapOutput("xcav_copy", params, r.output || "Copy succeeded.") }] };
     },
-  });
-}
+    });
+
+    // ── xcav_insert ─────────────────────────────────────────────────────────
+
+    pi.registerTool({
+      name: "xcav_insert",
+      label: "xcav insert",
+      description:
+        "Insert code before or after a structural code block in a C/C++/Java/TypeScript/JavaScript file. " +
+        "Uses tree-sitter for safe block detection. Content is read from a temp file and re-indented to match.",
+      promptSnippet: "xcav_insert(file, line, content, mode) -- insert code before/after a block",
+      promptGuidelines: [
+        "Use xcav_insert to add new code at a block boundary with correct indentation.",
+        "Mode is 'before' or 'after' (with or without -- prefix).",
+      ],
+      parameters: Type.Object({
+        file:    Type.String({ description: "Path to the source file" }),
+        line:    Type.Number({ description: "Line number of the block to insert near (1-indexed)" }),
+        content: Type.String({ description: "Code content to insert" }),
+        mode:    Type.String({ description: "'--before', 'before', '--after', or 'after'" }),
+      }),
+      async execute(_toolCallId, params) {
+        const absPath = resolve(params.file);
+        if (!existsSync(absPath)) {
+          return { content: [{ type: "text", text: `File not found: ${params.file}` }] };
+        }
+        const tmpDir = join("/tmp", "xcav_tmp");
+        mkdirSync(tmpDir, { recursive: true });
+        const tmpPath = join(tmpDir, `insert_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.txt`);
+        writeFileSync(tmpPath, params.content, "utf-8");
+        const r = xcav(["insert", params.mode, absPath, String(params.line), tmpPath]);
+        try { unlinkSync(tmpPath); } catch {}
+        return { content: [{ type: "text", text: wrapOutput("xcav_insert", params, r.output || "Insert succeeded.") }] };
+      },
+    });
+  }

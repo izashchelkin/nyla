@@ -59,6 +59,26 @@ target_include_directories(ts_tsx PUBLIC ${VENDOR}/tree-sitter-typescript/tsx/sr
 target_link_libraries(ts_tsx PUBLIC ts)
 set_target_properties(ts_tsx PROPERTIES LINKER_LANGUAGE C)
 
+# ─── xcav core library ──────────────────────────────────────────────────
+file(GLOB xcav_lib_sources
+    "${CMAKE_CURRENT_SOURCE_DIR}/*.cc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/*.inl"
+)
+list(REMOVE_ITEM xcav_lib_sources "${CMAKE_CURRENT_SOURCE_DIR}/main.cc")
+
+add_library(xcav_lib STATIC ${xcav_lib_sources})
+target_link_libraries(xcav_lib PUBLIC
+    nyla::commons_headless
+    ts
+    ts_c
+    ts_cpp
+    ts_java
+    ts_javascript
+    ts_typescript
+    ts_tsx
+)
+target_include_directories(xcav_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
 # ─── xcav executable ────────────────────────────────────────────────────────
 add_executable(${TARGET})
 target_link_libraries(${TARGET} PRIVATE

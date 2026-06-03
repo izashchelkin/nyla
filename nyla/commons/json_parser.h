@@ -24,7 +24,7 @@ INLINE auto Init(json_parser &self, byteview in, span<json_value> jsonStorage)
     self.outSize = jsonStorage.size;
 }
 
-auto ParseNext(json_parser &self) -> json_value *;
+auto API ParseNext(json_parser &self) -> json_value *;
 
 } // namespace JsonParser
 

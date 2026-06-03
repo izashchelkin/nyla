@@ -1187,6 +1187,12 @@ void WmProcess(bool &isRunning)
                 break;
             }
 
+            if (meta && key == KeyPhysical::C)
+            {
+                wm->layoutDirty = true;
+                break;
+            }
+
             if (meta && key == KeyPhysical::S)
             {
                 const char *const dmenu[] = {"dmenu_run", nullptr};
@@ -2076,6 +2082,7 @@ void UserMain()
         grabKey(0, 1, 0, 0, KeyPhysical::Tab);
         grabKey(1, 0, 0, 0, KeyPhysical::G);
         grabKey(1, 0, 0, 0, KeyPhysical::V);
+        grabKey(1, 0, 0, 0, KeyPhysical::C);
         grabKey(1, 0, 0, 0, KeyPhysical::T);
         grabKey(1, 0, 1, 0, KeyPhysical::ArrowLeft);
         grabKey(1, 0, 1, 0, KeyPhysical::ArrowRight);

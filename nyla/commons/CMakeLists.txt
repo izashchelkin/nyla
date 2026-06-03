@@ -83,4 +83,8 @@ target_sources(${TARGET_HEADLESS} PRIVATE
     fmt.cc
     platform_linux.cc
     time_linux.cc
+    json_parser.cc
+    json_value.cc
+    subprocess_linux.cc
+    http_client_linux.cc
 )

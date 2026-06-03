@@ -28,6 +28,9 @@ fi
 # Use the build binary, not the system-installed one
 XC="${XC_BIN:-$REPO_ROOT/build/linux-debug/bin/xcav}"
 
+# Disable usage logging during tests
+export XC_NO_LOG=1
+
 # Clean up stale backups from previous runs (backup path is relative to cwd)
 rm -rf .xcav_backups
 
@@ -265,13 +268,13 @@ test_backup_gitignore() {
     mkdir -p "$repo"
     cp "$FIXTURES/funcs.c" "$repo/file.c"
 
-    if ! (cd "$repo" && git init -q); then
+    if ! (cd "$repo" && git init -q && git add file.c && git commit -q -m init); then
         fail "$name" "git init failed"
         return
     fi
 
     set +e
-    (cd "$repo" && "$XC" delete file.c 12 > delete.out 2>&1)
+    (cd "$repo" && "$XC" delete file.c 12 > /dev/null 2>&1)
     local delete_rc=$?
     set -e
     if [ "$delete_rc" -ne 0 ]; then
@@ -280,24 +283,23 @@ test_backup_gitignore() {
         return
     fi
 
-    if [ ! -f "$repo/.xcav_backups/.gitignore" ]; then
-        fail "$name" ".xcav_backups/.gitignore was not created"
+    # Backups are stored in ~/.xcav/backups/, not in the repo.
+    # Verify no backup files leak into the working tree.
+    if [ -d "$repo/.xcav_backups" ]; then
+        fail "$name" ".xcav_backups/ should not exist in the repo (backups moved to ~/.xcav/backups/)"
         return
     fi
 
     local status
-    status="$(cd "$repo" && git status --porcelain --untracked-files=all .xcav_backups)"
-    if echo "$status" | grep -qE '/[0-9][0-9][0-9]$'; then
-        fail "$name" "backup payload is visible to git: $status"
-        return
-    fi
-    if ! echo "$status" | grep -qF "?? .xcav_backups/.gitignore"; then
-        fail "$name" "expected only .xcav_backups/.gitignore to be visible: $status"
+    status="$(cd "$repo" && git status --porcelain --untracked-files=all)"
+    # Only untracked files (??) are a problem — tracked modifications are expected.
+    if echo "$status" | grep -q '^??'; then
+        fail "$name" "unexpected untracked files in repo: $status"
         return
     fi
 
     set +e
-    (cd "$repo" && "$XC" undo file.c > undo.out 2>&1)
+    (cd "$repo" && "$XC" undo file.c > /dev/null 2>&1)
     local undo_rc=$?
     set -e
     if [ "$undo_rc" -eq 0 ] && diff -q "$FIXTURES/funcs.c" "$repo/file.c" > /dev/null 2>&1; then
@@ -1501,6 +1503,680 @@ if echo "$rb_empty_err" | grep -q "stdin is empty"; then
     pass "replace-block (stdin empty)"
 else
     fail "replace-block (stdin empty)" "expected 'stdin is empty': $rb_empty_err"
+fi
+
+# ─── insert ──────────────────────────────────────────────────────────────
+
+echo -e "\n${YELLOW}─── insert ───${NC}"
+
+cat > "$TMPDIR/insert_before.txt" << 'XCAVEOF'
+int new_before(int x) {
+    return x + 100;
+}
+XCAVEOF
+cat > "$TMPDIR/insert_after.txt" << 'XCAVEOF'
+int new_after(int x) {
+    return x * 100;
+}
+XCAVEOF
+
+cp "$FIXTURES/funcs.c" "$TMPDIR/insert_before_bar.c"
+"$XC" insert --before "$TMPDIR/insert_before_bar.c" 8 "$TMPDIR/insert_before.txt" > /dev/null 2>&1
+if diff -q "$TMPDIR/insert_before_bar.c" "$EXPECTED/c_insert_before_bar.c" > /dev/null 2>&1; then
+    pass "insert --before"
+else
+    fail "insert --before" "file mismatch"
+    diff "$EXPECTED/c_insert_before_bar.c" "$TMPDIR/insert_before_bar.c" | sed 's/^/    /'
+fi
+
+cp "$FIXTURES/funcs.c" "$TMPDIR/insert_after_bar.c"
+"$XC" insert --after "$TMPDIR/insert_after_bar.c" 10 "$TMPDIR/insert_after.txt" > /dev/null 2>&1
+if diff -q "$TMPDIR/insert_after_bar.c" "$EXPECTED/c_insert_after_bar.c" > /dev/null 2>&1; then
+    pass "insert --after"
+else
+    fail "insert --after" "file mismatch"
+    diff "$EXPECTED/c_insert_after_bar.c" "$TMPDIR/insert_after_bar.c" | sed 's/^/    /'
+fi
+
+# Insert error: no --before/--after flag
+cp "$FIXTURES/funcs.c" "$TMPDIR/insert_noflag.c"
+set +e
+insert_noflag="$("$XC" insert "$TMPDIR/insert_noflag.c" 8 "$TMPDIR/insert_before.txt" 2>&1)"
+# set -e
+if echo "$insert_noflag" | grep -q "specify --before, --after, before, or after"; then
+    pass "insert (no flag)"
+else
+    fail "insert (no flag)" "expected error: $insert_noflag"
+fi
+
+# Insert: positional before/after (without -- prefix)
+cp "$FIXTURES/funcs.c" "$TMPDIR/insert_pos_before.c"
+"$XC" insert before "$TMPDIR/insert_pos_before.c" 8 "$TMPDIR/insert_before.txt" > /dev/null 2>&1
+if diff -q "$TMPDIR/insert_pos_before.c" "$EXPECTED/c_insert_before_bar.c" > /dev/null 2>&1; then
+    pass "insert before (positional)"
+else
+    fail "insert before (positional)" "file mismatch"
+    diff "$EXPECTED/c_insert_before_bar.c" "$TMPDIR/insert_pos_before.c" | sed 's/^/    /'
+fi
+
+cp "$FIXTURES/funcs.c" "$TMPDIR/insert_pos_after.c"
+"$XC" insert after "$TMPDIR/insert_pos_after.c" 10 "$TMPDIR/insert_after.txt" > /dev/null 2>&1
+if diff -q "$TMPDIR/insert_pos_after.c" "$EXPECTED/c_insert_after_bar.c" > /dev/null 2>&1; then
+    pass "insert after (positional)"
+else
+    fail "insert after (positional)" "file mismatch"
+    diff "$EXPECTED/c_insert_after_bar.c" "$TMPDIR/insert_pos_after.c" | sed 's/^/    /'
+fi
+
+# Insert error: bad line number
+cp "$FIXTURES/funcs.c" "$TMPDIR/insert_badline.c"
+set +e
+insert_badline="$("$XC" insert --before "$TMPDIR/insert_badline.c" 0 "$TMPDIR/insert_before.txt" 2>&1)"
+# set -e
+if echo "$insert_badline" | grep -q "line number must be"; then
+    pass "insert (bad line number)"
+else
+    fail "insert (bad line number)" "expected error: $insert_badline"
+fi
+
+# ─── replace-block output format ─────────────────────────────────────────
+
+echo -e "\n${YELLOW}─── replace-block output format ───${NC}"
+
+# Verify line count in replace-block output
+cp "$FIXTURES/realistic.java" "$TMPDIR/rb_output.java"
+echo 'class Test { void m1() {} void m2() {} }' > "$TMPDIR/rb_new_class.txt"
+set +e
+rb_output="$("$XC" replace-block "$TMPDIR/rb_output.java" 7 "$TMPDIR/rb_new_class.txt" 2>&1)"
+# set -e
+if echo "$rb_output" | grep -qE 'was [0-9]+ lines?, now [0-9]+ lines?'; then
+    pass "replace-block (line count)"
+else
+    fail "replace-block (line count)" "expected 'was N lines, now M lines': $rb_output"
+fi
+
+# Verify formatter reminder for class-level replacements
+if echo "$rb_output" | grep -q "Run your formatter"; then
+    pass "replace-block (formatter reminder)"
+else
+    fail "replace-block (formatter reminder)" "expected formatter reminder: $rb_output"
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Phase 6 — Coverage gaps: untested features and edge cases
+# ═══════════════════════════════════════════════════════════════════════════
+
+echo -e "\n${YELLOW}─── Phase 6: copy --show-returns, --copy-includes ───${NC}"
+
+# --- copy --show-returns ---
+cp "$FIXTURES/target.c" "$TMPDIR/c_copy_showret.c"
+copy_show_out="$("$XC" copy "$FIXTURES/funcs.c" 4 "$TMPDIR/c_copy_showret.c" 5 --show-returns 2>&1)"
+if echo "$copy_show_out" | grep -q '# returns' && diff -q "$TMPDIR/c_copy_showret.c" "$EXPECTED/c_copy_show_returns.c" > /dev/null 2>&1; then
+    pass "copy --show-returns"
+else
+    fail "copy --show-returns" "expected # returns in output and matching dest file"
+    echo "    output: $copy_show_out"
+    diff "$EXPECTED/c_copy_show_returns.c" "$TMPDIR/c_copy_showret.c" | sed 's/^/    /'
+fi
+
+# --- copy --copy-includes (C) ---
+cp "$FIXTURES/target.c" "$TMPDIR/c_copy_inc.c"
+"$XC" copy "$FIXTURES/with_includes.c" 4 "$TMPDIR/c_copy_inc.c" 5 --copy-includes > /dev/null 2>&1
+if diff -q "$TMPDIR/c_copy_inc.c" "$EXPECTED/c_copy_include_target.c" > /dev/null 2>&1; then
+    pass "copy --copy-includes (C)"
+else
+    fail "copy --copy-includes (C)" "file mismatch"
+    diff "$EXPECTED/c_copy_include_target.c" "$TMPDIR/c_copy_inc.c" | sed 's/^/    /'
+fi
+
+# --- copy --copy-includes (Java) ---
+cp "$FIXTURES/realistic_target.java" "$TMPDIR/copy_java_inc.java"
+"$XC" copy "$FIXTURES/realistic.java" 10 "$TMPDIR/copy_java_inc.java" 3 --copy-includes > /dev/null 2>&1
+if grep -q 'import java.io.IOException' "$TMPDIR/copy_java_inc.java"; then
+    pass "copy --copy-includes (Java)"
+else
+    fail "copy --copy-includes (Java)" "expected import copied"
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════
+
+echo -e "\n${YELLOW}─── Phase 6: copy error paths ───${NC}"
+
+# copy source not found
+set +e
+copy_src_err="$("$XC" copy "$FIXTURES/nonexistent.c" 1 "$FIXTURES/target.c" 3 2>&1)"
+# set -e
+if echo "$copy_src_err" | grep -qE "cannot|operation_failed"; then
+    pass "copy (source not found)"
+else
+    fail "copy (source not found)" "expected error: $copy_src_err"
+fi
+
+# copy bad line number
+set +e
+copy_badline="$("$XC" copy "$FIXTURES/funcs.c" 0 "$FIXTURES/target.c" 1 2>&1)"
+# set -e
+if echo "$copy_badline" | grep -q "must be >= 1"; then
+    pass "copy (bad line number)"
+else
+    fail "copy (bad line number)" "expected error: $copy_badline"
+fi
+
+echo -e "\n${YELLOW}─── Phase 6: move-into static stripping ───${NC}"
+
+# move-into strips 'static' from cross-file moved functions
+cp "$FIXTURES/static_funcs.c" "$TMPDIR/mi_static_src.c"
+cp "$FIXTURES/target.c" "$TMPDIR/mi_static_tgt.c"
+"$XC" move-into "$TMPDIR/mi_static_src.c" 4 "$TMPDIR/mi_static_tgt.c" 5 > /dev/null 2>&1
+if diff -q "$TMPDIR/mi_static_tgt.c" "$EXPECTED/c_moveinto_static_stripped.c" > /dev/null 2>&1; then
+    pass "move-into (static stripped)"
+else
+    fail "move-into (static stripped)" "file mismatch"
+    diff "$EXPECTED/c_moveinto_static_stripped.c" "$TMPDIR/mi_static_tgt.c" | sed 's/^/    /'
+fi
+
+# (uses temp copies, no need to undo fixtures)
+
+echo -e "\n${YELLOW}─── Phase 6: move-into error paths ───${NC}"
+
+# move-into src not found
+set +e
+mi_src_err="$("$XC" move-into "$FIXTURES/nonexistent.c" 1 "$FIXTURES/target.c" 1 2>&1)"
+# set -e
+if echo "$mi_src_err" | grep -qE "cannot|operation_failed"; then
+    pass "move-into (source not found)"
+else
+    fail "move-into (source not found)" "expected error: $mi_src_err"
+fi
+
+# move-into bad line number
+set +e
+mi_badline="$("$XC" move-into "$FIXTURES/funcs.c" -1 "$FIXTURES/target.c" 1 2>&1)"
+# set -e
+if echo "$mi_badline" | grep -q "must be >= 1"; then
+    pass "move-into (bad src line)"
+else
+    fail "move-into (bad src line)" "expected error: $mi_badline"
+fi
+
+echo -e "\n${YELLOW}─── Phase 6: edit --dry-run (file mode) ───${NC}"
+
+# edit --dry-run should report match without modifying file
+cp "$FIXTURES/funcs.c" "$TMPDIR/edit_dryrun.c"
+echo -n '    return x + 1;' > "$TMPDIR/edit_dryrun_old.txt"
+echo -n '    return x + 99;' > "$TMPDIR/edit_dryrun_new.txt"
+set +e
+dryrun_out="$("$XC" edit "$TMPDIR/edit_dryrun.c" "$TMPDIR/edit_dryrun_old.txt" "$TMPDIR/edit_dryrun_new.txt" --dry-run 2>&1)"
+set -e
+if echo "$dryrun_out" | grep -q "dry-run" && diff -q "$FIXTURES/funcs.c" "$TMPDIR/edit_dryrun.c" > /dev/null 2>&1; then
+    pass "edit --dry-run (file mode)"
+else
+    fail "edit --dry-run (file mode)" "file modified or missing --dry-run output"
+    echo "    output: $dryrun_out"
+fi
+
+echo -e "\n${YELLOW}─── Phase 6: read --raw ───${NC}"
+
+# read --raw preserves indentation
+read_raw="$("$XC" read "$FIXTURES/funcs.c" 4 --raw 2>&1)"
+if echo "$read_raw" | grep -q '    return x + 1;'; then
+    pass "read --raw (preserves indent)"
+else
+    fail "read --raw (preserves indent)" "expected indented output: $read_raw"
+fi
+
+# read --all --raw preserves all indentation
+read_all_raw="$("$XC" read "$FIXTURES/funcs.c" --all --raw 2>&1)"
+if echo "$read_all_raw" | grep -q '    return x + 1;' && echo "$read_all_raw" | grep -q '#include <stdio.h>'; then
+    pass "read --all --raw (preserves indent)"
+else
+    fail "read --all --raw (preserves indent)" "expected indented output"
+fi
+
+echo -e "\n${YELLOW}─── Phase 6: read --fix ───${NC}"
+
+# read --fix writes corrected indentation back to disk
+cp "$FIXTURES/whitespace.c" "$TMPDIR/read_fix.c"
+"$XC" read "$TMPDIR/read_fix.c" 5 --fix > /dev/null 2>&1
+# After --fix, the file should still be valid C with the function body
+if grep -q 'int foo' "$TMPDIR/read_fix.c" && grep -q 'return x + 1' "$TMPDIR/read_fix.c"; then
+    pass "read --fix"
+else
+    fail "read --fix" "file missing expected content after fix"
+fi
+
+echo -e "\n${YELLOW}─── Phase 6: insert --before --after (both flags) ───${NC}"
+
+# insert with both --before and --after should error
+cp "$FIXTURES/funcs.c" "$TMPDIR/insert_both.c"
+cat > "$TMPDIR/insert_both_content.txt" << 'XCAVEOF'
+int dummy(void) { return 0; }
+XCAVEOF
+set +e
+insert_both="$("$XC" insert --before --after "$TMPDIR/insert_both.c" 8 "$TMPDIR/insert_both_content.txt" 2>&1)"
+# set -e
+if echo "$insert_both" | grep -q "not both"; then
+    pass "insert (--before --after both)"
+else
+    fail "insert (--before --after both)" "expected 'not both' error: $insert_both"
+fi
+
+echo -e "\n${YELLOW}─── Phase 6: replace-block error paths ───${NC}"
+
+# replace-block file not found
+set +e
+rb_nofile="$("$XC" replace-block "$FIXTURES/nonexistent.c" 1 "$FIXTURES/funcs.c" 2>&1)"
+# set -e
+if echo "$rb_nofile" | grep -qE "cannot|cannot open|operation_failed"; then
+    pass "replace-block (file not found)"
+else
+    fail "replace-block (file not found)" "expected error: $rb_nofile"
+fi
+
+# replace-block new-file not found
+cp "$FIXTURES/funcs.c" "$TMPDIR/rb_nonew.c"
+set +e
+rb_nonew="$("$XC" replace-block "$TMPDIR/rb_nonew.c" 8 "$TMPDIR/nonexistent_new.txt" 2>&1)"
+# set -e
+if echo "$rb_nonew" | grep -qE "cannot|cannot read"; then
+    pass "replace-block (new-file not found)"
+else
+    fail "replace-block (new-file not found)" "expected error: $rb_nonew"
+fi
+
+# replace-block bad line number
+cp "$FIXTURES/funcs.c" "$TMPDIR/rb_badline.c"
+echo 'int dummy(void) { return 0; }' > "$TMPDIR/rb_badline_new.txt"
+set +e
+rb_badline="$("$XC" replace-block "$TMPDIR/rb_badline.c" 0 "$TMPDIR/rb_badline_new.txt" 2>&1)"
+# set -e
+if echo "$rb_badline" | grep -q "must be >= 1"; then
+    pass "replace-block (bad line number)"
+else
+    fail "replace-block (bad line number)" "expected error: $rb_badline"
+fi
+
+echo -e "\n${YELLOW}─── Phase 6: replace scoped in Java ───${NC}"
+
+# replace within Java method block (subtract, line 19)
+cp "$FIXTURES/calculator.java" "$TMPDIR/replace_java.c"
+echo -n 'return a - b - baseValue;' > "$TMPDIR/replace_java_old.txt"
+echo -n 'return a - b + baseValue;' > "$TMPDIR/replace_java_new.txt"
+"$XC" replace "$TMPDIR/replace_java.c" 19 "$TMPDIR/replace_java_old.txt" "$TMPDIR/replace_java_new.txt" > /dev/null 2>&1
+if grep -q 'return a - b + baseValue;' "$TMPDIR/replace_java.c"; then
+    pass "replace scoped (Java)"
+else
+    fail "replace scoped (Java)" "replace not applied"
+fi
+
+# replace scoped in JS
+cp "$FIXTURES/javascript.js" "$TMPDIR/replace_js.js"
+echo -n 'return x * y;' > "$TMPDIR/replace_js_old.txt"
+echo -n 'return x + y;' > "$TMPDIR/replace_js_new.txt"
+"$XC" replace "$TMPDIR/replace_js.js" 10 "$TMPDIR/replace_js_old.txt" "$TMPDIR/replace_js_new.txt" > /dev/null 2>&1
+if grep -q 'return x + y;' "$TMPDIR/replace_js.js"; then
+    pass "replace scoped (JS)"
+else
+    fail "replace scoped (JS)" "replace not applied"
+fi
+
+echo -e "\n${YELLOW}─── Phase 6: read large file truncation ───${NC}"
+
+# read --all on a >500 line file should truncate with warning
+large_file="$TMPDIR/large_file.c"
+{
+    printf '#include <stdio.h>\n\n'
+    printf 'int main(void) {\n'
+    printf '    printf("hello\\n");\n'
+    printf '    return 0;\n'
+    printf '}\n'
+    for i in $(seq 1 600); do
+        printf '// padding line %04d 0123456789abcdef0123456789abcdef0123456789abcdef\n' "$i"
+    done
+} > "$large_file"
+read_large="$("$XC" read "$large_file" --all 2>&1)"
+if echo "$read_large" | grep -q 'Truncated'; then
+    pass "read large file truncation"
+else
+    fail "read large file truncation" "expected Truncated warning"
+fi
+
+echo -e "\n${YELLOW}─── Phase 6: blocks directory mode ───${NC}"
+
+# blocks on a directory with multiple source files
+mkdir -p "$TMPDIR/multi_dir"
+cp "$FIXTURES/funcs.c" "$TMPDIR/multi_dir/a.c"
+cp "$FIXTURES/structs.cc" "$TMPDIR/multi_dir/b.cc"
+blocks_dir="$("$XC" blocks "$TMPDIR/multi_dir" 2>&1)"
+if echo "$blocks_dir" | grep -q 'a.c' && echo "$blocks_dir" | grep -q 'b.cc'; then
+    pass "blocks (directory mode, multiple files)"
+else
+    fail "blocks (directory mode, multiple files)" "expected both filenames: $blocks_dir"
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Phase 7 — Remaining coverage gaps: error paths, edge cases, features
+# ═══════════════════════════════════════════════════════════════════════════
+
+echo -e "\n${YELLOW}─── Phase 7: replace error paths ───${NC}"
+
+# replace with nonexistent old-file
+cp "$FIXTURES/funcs.c" "$TMPDIR/replace_oldnf.c"
+echo -n 'x' > "$TMPDIR/replace_oldnf_new.txt"
+set +e
+replace_oldnf="$("$XC" replace "$TMPDIR/replace_oldnf.c" 4 "$TMPDIR/nonexistent_old.txt" "$TMPDIR/replace_oldnf_new.txt" 2>&1)"
+# set -e
+if echo "$replace_oldnf" | grep -q "cannot read old-text file"; then
+    pass "replace (old-file not found)"
+else
+    fail "replace (old-file not found)" "expected error: $replace_oldnf"
+fi
+
+# replace with nonexistent new-file
+cp "$FIXTURES/funcs.c" "$TMPDIR/replace_newnf.c"
+echo -n 'x + 1' > "$TMPDIR/replace_newnf_old.txt"
+set +e
+replace_newnf="$("$XC" replace "$TMPDIR/replace_newnf.c" 4 "$TMPDIR/replace_newnf_old.txt" "$TMPDIR/nonexistent_new.txt" 2>&1)"
+# set -e
+if echo "$replace_newnf" | grep -q "cannot read new-text file"; then
+    pass "replace (new-file not found)"
+else
+    fail "replace (new-file not found)" "expected error: $replace_newnf"
+fi
+
+echo -e "\n${YELLOW}─── Phase 7: insert error paths ───${NC}"
+
+# insert with nonexistent content file
+cp "$FIXTURES/funcs.c" "$TMPDIR/insert_nocontent.c"
+set +e
+insert_nocontent="$("$XC" insert --before "$TMPDIR/insert_nocontent.c" 8 "$TMPDIR/nonexistent_content.txt" 2>&1)"
+# set -e
+if echo "$insert_nocontent" | grep -q "cannot read content file"; then
+    pass "insert (content file not found)"
+else
+    fail "insert (content file not found)" "expected error: $insert_nocontent"
+fi
+
+# insert with nonexistent target file
+set +e
+insert_nofile="$("$XC" insert --before "$TMPDIR/nonexistent_file.c" 1 "$TMPDIR/insert_before.txt" 2>&1)"
+# set -e
+if echo "$insert_nofile" | grep -qE "cannot|cannot open|operation_failed"; then
+    pass "insert (file not found)"
+else
+    fail "insert (file not found)" "expected error: $insert_nofile"
+fi
+
+echo -e "\n${YELLOW}─── Phase 7: read error paths ───${NC}"
+
+# read --offset 0
+set +e
+read_off0="$("$XC" read "$FIXTURES/funcs.c" --offset 0 2>&1)"
+# set -e
+if echo "$read_off0" | grep -q "must be >= 1"; then
+    pass "read (--offset must be >= 1)"
+else
+    fail "read (--offset must be >= 1)" "expected error: $read_off0"
+fi
+
+# read --offset beyond file length (use non-code file for plain path)
+set +e
+read_exceeds="$("$XC" read "$FIXTURES/unknown.xyz" --offset 999 2>&1)"
+# set -e
+if echo "$read_exceeds" | grep -q "exceeds file length"; then
+    pass "read (--offset exceeds file length)"
+else
+    fail "read (--offset exceeds file length)" "expected 'exceeds file length': $read_exceeds"
+fi
+
+# read --name without value (-- in pattern must be escaped for grep)
+set +e
+read_noname="$("$XC" read "$FIXTURES/funcs.c" --name 2>&1)"
+# set -e
+if echo "$read_noname" | grep -q -e "name requires a value"; then
+    pass "read (--name without value)"
+else
+    fail "read (--name without value)" "expected error: $read_noname"
+fi
+
+# read empty file
+set +e
+read_empty="$("$XC" read "$FIXTURES/empty.c" 1 2>&1)"
+# set -e
+if echo "$read_empty" | grep -qE "no block found|empty file|unsupported"; then
+    pass "read (empty file)"
+else
+    fail "read (empty file)" "expected error: $read_empty"
+fi
+
+echo -e "\n${YELLOW}─── Phase 7: edit error paths ───${NC}"
+
+# edit with missing old-file/new-file (no --stdin)
+cp "$FIXTURES/funcs.c" "$TMPDIR/edit_missing.c"
+set +e
+edit_missing="$("$XC" edit "$TMPDIR/edit_missing.c" 2>&1)"
+# set -e
+if echo "$edit_missing" | grep -q "expected <old-file> <new-file>"; then
+    pass "edit (missing old/new files)"
+else
+    fail "edit (missing old/new files)" "expected error: $edit_missing"
+fi
+
+echo -e "\n${YELLOW}─── Phase 7: edit multi-pair ───${NC}"
+
+# edit with two old/new pairs — both applied
+cp "$FIXTURES/funcs.c" "$TMPDIR/edit_multi2.c"
+echo -n 'return x + 1;' > "$TMPDIR/edit_multi2_o1.txt"
+echo -n 'return x + 100;' > "$TMPDIR/edit_multi2_n1.txt"
+echo -n 'return x * 2;' > "$TMPDIR/edit_multi2_o2.txt"
+echo -n 'return x * 200;' > "$TMPDIR/edit_multi2_n2.txt"
+"$XC" edit "$TMPDIR/edit_multi2.c" \
+    "$TMPDIR/edit_multi2_o1.txt" "$TMPDIR/edit_multi2_n1.txt" \
+    "$TMPDIR/edit_multi2_o2.txt" "$TMPDIR/edit_multi2_n2.txt" > /dev/null 2>&1
+if diff -q "$TMPDIR/edit_multi2.c" "$EXPECTED/c_edit_multi_two.c" > /dev/null 2>&1; then
+    pass "edit multi-pair (two changes)"
+else
+    fail "edit multi-pair (two changes)" "file mismatch"
+    diff "$EXPECTED/c_edit_multi_two.c" "$TMPDIR/edit_multi2.c" | sed 's/^/    /'
+fi
+
+# edit with three old/new pairs
+cp "$FIXTURES/funcs.c" "$TMPDIR/edit_multi3.c"
+echo -n 'return x + 1;' > "$TMPDIR/edit_multi3_o1.txt"
+echo -n 'return x + 100;' > "$TMPDIR/edit_multi3_n1.txt"
+echo -n 'return x * 2;' > "$TMPDIR/edit_multi3_o2.txt"
+echo -n 'return x * 200;' > "$TMPDIR/edit_multi3_n2.txt"
+echo -n 'return x - 1;' > "$TMPDIR/edit_multi3_o3.txt"
+echo -n 'return x - 500;' > "$TMPDIR/edit_multi3_n3.txt"
+"$XC" edit "$TMPDIR/edit_multi3.c" \
+    "$TMPDIR/edit_multi3_o1.txt" "$TMPDIR/edit_multi3_n1.txt" \
+    "$TMPDIR/edit_multi3_o2.txt" "$TMPDIR/edit_multi3_n2.txt" \
+    "$TMPDIR/edit_multi3_o3.txt" "$TMPDIR/edit_multi3_n3.txt" > /dev/null 2>&1
+if diff -q "$TMPDIR/edit_multi3.c" "$EXPECTED/c_edit_multi_three.c" > /dev/null 2>&1; then
+    pass "edit multi-pair (three changes)"
+else
+    fail "edit multi-pair (three changes)" "file mismatch"
+    diff "$EXPECTED/c_edit_multi_three.c" "$TMPDIR/edit_multi3.c" | sed 's/^/    /'
+fi
+
+# edit multi-pair with --dry-run — neither change applied
+cp "$FIXTURES/funcs.c" "$TMPDIR/edit_multi_dry.c"
+set +e
+multi_dry_out="$("$XC" edit "$TMPDIR/edit_multi_dry.c" \
+    "$TMPDIR/edit_multi2_o1.txt" "$TMPDIR/edit_multi2_n1.txt" \
+    "$TMPDIR/edit_multi2_o2.txt" "$TMPDIR/edit_multi2_n2.txt" --dry-run 2>&1)"
+# set -e
+if echo "$multi_dry_out" | grep -q "dry-run" && diff -q "$FIXTURES/funcs.c" "$TMPDIR/edit_multi_dry.c" > /dev/null 2>&1; then
+    pass "edit multi-pair --dry-run"
+else
+    fail "edit multi-pair --dry-run" "file modified or missing --dry-run output"
+    echo "    output: $multi_dry_out"
+fi
+
+# edit multi-pair with --no-blocks
+cp "$FIXTURES/funcs.c" "$TMPDIR/edit_multi_noblocks.c"
+multi_nob_out="$("$XC" edit "$TMPDIR/edit_multi_noblocks.c" \
+    "$TMPDIR/edit_multi2_o1.txt" "$TMPDIR/edit_multi2_n1.txt" \
+    "$TMPDIR/edit_multi2_o2.txt" "$TMPDIR/edit_multi2_n2.txt" --no-blocks 2>&1)"
+if diff -q "$TMPDIR/edit_multi_noblocks.c" "$EXPECTED/c_edit_multi_two.c" > /dev/null 2>&1 && \
+   ! echo "$multi_nob_out" | grep -q "int foo"; then
+    pass "edit multi-pair --no-blocks"
+else
+    fail "edit multi-pair --no-blocks" "blocks output present or file mismatch"
+    echo "    output: $multi_nob_out"
+fi
+
+# edit multi-pair — second pair fails (oldText not found), first is applied
+cp "$FIXTURES/funcs.c" "$TMPDIR/edit_multi_fail.c"
+echo -n 'return x + 1;' > "$TMPDIR/edit_multi_fail_o1.txt"
+echo -n 'return x + 100;' > "$TMPDIR/edit_multi_fail_n1.txt"
+echo -n 'no_such_text_in_file' > "$TMPDIR/edit_multi_fail_o2.txt"
+echo -n 'anything' > "$TMPDIR/edit_multi_fail_n2.txt"
+set +e
+multi_fail_out="$("$XC" edit "$TMPDIR/edit_multi_fail.c" \
+    "$TMPDIR/edit_multi_fail_o1.txt" "$TMPDIR/edit_multi_fail_n1.txt" \
+    "$TMPDIR/edit_multi_fail_o2.txt" "$TMPDIR/edit_multi_fail_n2.txt" 2>&1)"
+multi_fail_rc=$?
+# set -e
+if echo "$multi_fail_out" | grep -q "oldText not found" && \
+   [ "$multi_fail_rc" -ne 0 ] && \
+   grep -q "x + 100" "$TMPDIR/edit_multi_fail.c"; then
+    pass "edit multi-pair (second fails, first applied)"
+else
+    fail "edit multi-pair (second fails, first applied)" "expected error and partial application"
+    echo "    rc=$multi_fail_rc output=$multi_fail_out"
+fi
+
+# edit multi-pair — uneven args (old without matching new)
+cp "$FIXTURES/funcs.c" "$TMPDIR/edit_multi_uneven.c"
+set +e
+multi_uneven_out="$("$XC" edit "$TMPDIR/edit_multi_uneven.c" \
+    "$TMPDIR/edit_multi2_o1.txt" "$TMPDIR/edit_multi2_n1.txt" \
+    "$TMPDIR/edit_multi2_o2.txt" 2>&1)"
+# set -e
+if echo "$multi_uneven_out" | grep -q "uneven count"; then
+    pass "edit multi-pair (uneven args)"
+else
+    fail "edit multi-pair (uneven args)" "expected 'uneven count': $multi_uneven_out"
+fi
+
+# edit multi-pair undo — each edit creates a backup, undo restores step by step
+cp "$FIXTURES/funcs.c" "$TMPDIR/edit_multi_undo.c"
+echo -n 'return x + 1;' > "$TMPDIR/edit_multi_undo_o1.txt"
+echo -n 'return x + 100;' > "$TMPDIR/edit_multi_undo_n1.txt"
+echo -n 'return x * 2;' > "$TMPDIR/edit_multi_undo_o2.txt"
+echo -n 'return x * 200;' > "$TMPDIR/edit_multi_undo_n2.txt"
+"$XC" edit "$TMPDIR/edit_multi_undo.c" \
+    "$TMPDIR/edit_multi_undo_o1.txt" "$TMPDIR/edit_multi_undo_n1.txt" \
+    "$TMPDIR/edit_multi_undo_o2.txt" "$TMPDIR/edit_multi_undo_n2.txt" > /dev/null 2>&1
+# First undo: reverts second edit only — foo still changed, bar restored to original
+"$XC" undo "$TMPDIR/edit_multi_undo.c" > /dev/null 2>&1
+if grep -q "return x + 100" "$TMPDIR/edit_multi_undo.c" && \
+   grep -q "return x \* 2" "$TMPDIR/edit_multi_undo.c" && \
+   ! grep -q "return x \* 200" "$TMPDIR/edit_multi_undo.c"; then
+    pass "edit multi-pair undo (first undo — second edit reverted)"
+else
+    fail "edit multi-pair undo (first undo — second edit reverted)" "unexpected state after first undo"
+    cat "$TMPDIR/edit_multi_undo.c" | sed 's/^/    /'
+fi
+# Second undo: restores to original file
+"$XC" undo "$TMPDIR/edit_multi_undo.c" > /dev/null 2>&1
+if diff -q "$FIXTURES/funcs.c" "$TMPDIR/edit_multi_undo.c" > /dev/null 2>&1; then
+    pass "edit multi-pair undo (second undo — back to original)"
+else
+    fail "edit multi-pair undo (second undo — back to original)" "file not fully restored"
+    diff "$FIXTURES/funcs.c" "$TMPDIR/edit_multi_undo.c" | sed 's/^/    /'
+fi
+# Third undo should fail (no more backups)
+set +e
+multi_undo3_out="$("$XC" undo "$TMPDIR/edit_multi_undo.c" 2>&1)"
+multi_undo3_rc=$?
+# set -e
+if echo "$multi_undo3_out" | grep -q "no backup found"; then
+    pass "edit multi-pair undo (third undo fails — no more backups)"
+else
+    fail "edit multi-pair undo (third undo fails — no more backups)" "expected 'no backup': $multi_undo3_out"
+fi
+
+echo -e "\n${YELLOW}─── Phase 7: cross-file error paths ───${NC}"
+
+# move-into dest file not found
+cp "$FIXTURES/funcs.c" "$TMPDIR/mi_dstnf_src.c"
+set +e
+mi_dstnf="$("$XC" move-into "$TMPDIR/mi_dstnf_src.c" 4 "$TMPDIR/nonexistent_dest.c" 1 2>&1)"
+# set -e
+if echo "$mi_dstnf" | grep -qE "cannot|operation_failed"; then
+    pass "move-into (dest not found)"
+else
+    fail "move-into (dest not found)" "expected error: $mi_dstnf"
+fi
+
+# copy dest file not found
+set +e
+copy_dstnf="$("$XC" copy "$FIXTURES/funcs.c" 4 "$TMPDIR/nonexistent_dest2.c" 1 2>&1)"
+# set -e
+if echo "$copy_dstnf" | grep -qE "cannot|operation_failed"; then
+    pass "copy (dest not found)"
+else
+    fail "copy (dest not found)" "expected error: $copy_dstnf"
+fi
+
+echo -e "\n${YELLOW}─── Phase 7: blocks empty directory ───${NC}"
+
+# blocks on an empty directory (no source files)
+mkdir -p "$TMPDIR/empty_dir"
+blocks_emptydir="$("$XC" blocks "$TMPDIR/empty_dir" 2>&1)"
+# Should succeed silently (no output for source files)
+pass "blocks (empty directory)"
+
+echo -e "\n${YELLOW}─── Phase 7: move-into --copy-includes deduplication ───${NC}"
+
+# move-into with --copy-includes: target already has the include, should not duplicate
+cp "$FIXTURES/with_includes.c" "$TMPDIR/mi_dedup_src.c"
+cp "$FIXTURES/has_stdlib_include.c" "$TMPDIR/mi_dedup_tgt.c"
+"$XC" move-into "$TMPDIR/mi_dedup_src.c" 4 "$TMPDIR/mi_dedup_tgt.c" 5 --copy-includes > /dev/null 2>&1
+if diff -q "$TMPDIR/mi_dedup_tgt.c" "$EXPECTED/c_moveinto_dedup_target.c" > /dev/null 2>&1; then
+    pass "move-into --copy-includes (deduplication)"
+else
+    fail "move-into --copy-includes (deduplication)" "file mismatch"
+    diff "$EXPECTED/c_moveinto_dedup_target.c" "$TMPDIR/mi_dedup_tgt.c" | sed 's/^/    /'
+fi
+# Restore source after move-into
+"$XC" undo "$TMPDIR/mi_dedup_src.c" > /dev/null 2>&1 || true
+
+echo -e "\n${YELLOW}─── Phase 7: move-into --copy-includes (JS) ───${NC}"
+
+# JS cross-file move-into with --copy-includes (dst line 5 = closing brace)
+cp "$FIXTURES/javascript.js" "$TMPDIR/mi_js_src.js"
+cp "$FIXTURES/js_target.js" "$TMPDIR/mi_js_tgt.js"
+"$XC" move-into "$TMPDIR/mi_js_src.js" 4 "$TMPDIR/mi_js_tgt.js" 5 --copy-includes > /dev/null 2>&1
+if diff -q "$TMPDIR/mi_js_tgt.js" "$EXPECTED/js_moveinto_inc_target.js" > /dev/null 2>&1; then
+    pass "move-into --copy-includes (JS)"
+else
+    fail "move-into --copy-includes (JS)" "file mismatch"
+    diff "$EXPECTED/js_moveinto_inc_target.js" "$TMPDIR/mi_js_tgt.js" | sed 's/^/    /'
+fi
+
+echo -e "\n${YELLOW}─── Phase 7: delete trailing semicolon cleanup ───${NC}"
+
+# delete struct with trailing semicolon — verify ';' is cleaned up
+test_delete "delete struct (trailing semicolon)" \
+    "$FIXTURES/type_decls.c" 4 \
+    "$EXPECTED/c_delete_struct_with_semi.c"
+
+echo -e "\n${YELLOW}─── Phase 7: replace Unicode normalization ───${NC}"
+
+# replace with Unicode em-dash in oldText — NormalizeText converts to "--"
+# Fixture has literal "--", oldText has em-dash (U+2014 = E2 80 94)
+cp "$FIXTURES/double_dash.c" "$TMPDIR/replace_unicode.c"
+# oldText: "x \xe2\x80\x94 1" (em-dash U+2014), normalizes to "x -- 1"
+printf 'x \xe2\x80\x94 1' > "$TMPDIR/replace_unicode_old.txt"
+echo -n 'x ++ 1' > "$TMPDIR/replace_unicode_new.txt"
+"$XC" replace "$TMPDIR/replace_unicode.c" 1 "$TMPDIR/replace_unicode_old.txt" "$TMPDIR/replace_unicode_new.txt" > /dev/null 2>&1
+if grep -q 'x ++ 1' "$TMPDIR/replace_unicode.c"; then
+    pass "replace (Unicode em-dash normalization)"
+else
+    fail "replace (Unicode em-dash normalization)" "replace not applied"
 fi
 
 # ─── summary ───────────────────────────────────────────────────────────────

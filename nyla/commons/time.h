@@ -23,4 +23,34 @@ struct wall_clock_time
 
 auto API GetWallClockTime() -> wall_clock_time;
 
+struct deadline
+{
+    uint64_t target_ms; // 0 means never expires
+
+    static auto Never() -> deadline
+    {
+        return {0};
+    }
+    static auto FromMillis(uint64_t ms) -> deadline
+    {
+        return {GetMonotonicTimeMillis() + ms};
+    }
+
+    auto IsActive() const -> bool
+    {
+        return target_ms != 0;
+    }
+    auto IsExpired() const -> bool
+    {
+        return IsActive() && GetMonotonicTimeMillis() >= target_ms;
+    }
+    auto RemainingMs() const -> uint64_t
+    {
+        if (!IsActive())
+            return UINT64_MAX;
+        uint64_t now = GetMonotonicTimeMillis();
+        return (now >= target_ms) ? 0 : target_ms - now;
+    }
+};
+
 } // namespace nyla

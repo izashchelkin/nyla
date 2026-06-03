@@ -71,6 +71,9 @@ struct PlatformEvent
 
 auto API GenRandom64() -> uint64_t;
 void API Sleep(uint64_t millis);
+auto API TryReadEnvVar(byteview name, byteview &out) -> bool;
+auto API GetProcessId() -> uint32_t;
+auto API GetCurrentDirectory(region_alloc &alloc) -> byteview;
 auto API Spawn(span<const char *const> cmd) -> bool;
 auto API RunSync(span<const char *const> cmd, region_alloc &alloc, byteview &outLog) -> int32_t;
 void API WinOpen();

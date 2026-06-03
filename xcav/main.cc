@@ -19,15 +19,13 @@
 #include "nyla/commons/span.h"
 #include "nyla/commons/stringparser.h"
 
-#include <sys/stat.h>
 #include <time.h>
 
 #include "xcav/backup.h"
 #include "xcav/editor.h"
+#include "xcav/insert.h"
 #include "xcav/text_util.h"
 #include "xcav/usage_log.h"
-
-#include <unistd.h> // _exit
 
 namespace nyla
 {
@@ -131,8 +129,7 @@ void CmdBlocks(region_alloc &alloc, const cli_args &args)
 
     byteview safePath = MakeCStringPath(filePath, alloc);
 
-    struct stat st;
-    if (stat((char const *)safePath.data, &st) == 0 && S_ISDIR(st.st_mode))
+    if (IsDirectory(safePath))
     {
         dir_iter *iter = DirIter::Create(alloc, safePath);
         if (!iter)
@@ -213,9 +210,7 @@ void CmdMove(region_alloc &alloc, const cli_args &args)
     bool ok = MoveBlock(byteview{pathBuf.data, filePath.size}, blockLine, destLine, alloc);
     if (!ok)
     {
-        s_errorTag = "operation_failed";
-        s_exitCode = 1;
-        // MoveBlock already logged specific error
+        s_errorTag = "move_failed";
     }
     else
     {
@@ -268,9 +263,7 @@ void CmdMoveInto(region_alloc &alloc, const cli_args &args)
                             copyIncludes, alloc);
     if (!ok)
     {
-        s_errorTag = "operation_failed";
-        s_exitCode = 1;
-        // MoveBlockInto already logged specific error
+        s_errorTag = "move_into_failed";
     }
     else
     {
@@ -313,39 +306,40 @@ void CmdDelete(region_alloc &alloc, const cli_args &args)
     bool ok = DeleteBlock(byteview{pathBuf.data, filePath.size}, blockLine, alloc);
     if (!ok)
     {
-        s_errorTag = "operation_failed";
-        s_exitCode = 1;
-        // DeleteBlock already logged specific error
+        s_errorTag = "delete_failed";
     }
     else
     {
         ShowFileBlocks(filePath, alloc);
     }
 }
-
 void CmdEdit(region_alloc &alloc, const cli_args &args)
 {
     if (args.positional.size < 2)
     {
-        LOG("Usage: xcav edit <file> <old-file> <new-file> [--dry-run]");
-        LOG("       xcav edit <file> --stdin [--dry-run]");
+        LOG("Usage: xcav edit <file> <old-file> <new-file> [<old-file2> <new-file2> ...] [--dry-run] [--no-blocks]");
+        LOG("       xcav edit <file> --stdin [--dry-run] [--no-blocks]");
         LOG("  Replaces oldText with newText using line-based matching.");
+        LOG("  Multiple old/new pairs are processed sequentially in one invocation;");
+        LOG("  the block list is printed only once after all edits complete.");
         LOG("  Lines are matched by content (whitespace ignored). The indentation");
         LOG("  from the matched lines is copied to the replacement text.");
         LOG("  Use 'xcav read <file> <line>' to get oldText -- the un-indented");
         LOG("  output works directly as oldText input.");
         LOG("  --stdin mode reads oldText then newText from stdin, separated by");
-        LOG("  a line containing only '---XCAV_EDIT_SEPARATOR---'.");
+        LOG("  a line containing only '---XCAV_EDIT_SEPARATOR---' (single pair only).");
         LOG("  --dry-run shows what would match without modifying the file.");
+        LOG("  --no-blocks suppresses the final block list (for multi-edit callers).");
         return;
     }
 
-    // Scan for flags first, then collect file path and text file args.
+    // Scan for flags first, then collect file path and old/new file pairs.
     bool stdinMode = false;
     bool dryRun = false;
+    bool noBlocks = false;
     byteview filePath{};
-    byteview oldFile{};
-    byteview newFile{};
+    inline_vec<byteview, 16> oldFiles{};
+    inline_vec<byteview, 16> newFiles{};
     byteview stdinFile{};
     uint8_t stdinPathBuf[128]{};
     uint8_t oldPathBuf[128]{};
@@ -358,40 +352,42 @@ void CmdEdit(region_alloc &alloc, const cli_args &args)
             stdinMode = true;
         else if (ByteviewEq(arg, "--dry-run"))
             dryRun = true;
+        else if (ByteviewEq(arg, "--no-blocks"))
+            noBlocks = true;
         else if (filePath.size == 0)
             filePath = arg;
-        else if (oldFile.size == 0)
-            oldFile = arg;
-        else if (newFile.size == 0)
-            newFile = arg;
+        else if (oldFiles.size == newFiles.size)
+            InlineVec::Append(oldFiles, arg);
+        else
+            InlineVec::Append(newFiles, arg);
     }
 
     if (filePath.size == 0)
     {
         s_exitCode = 1;
         s_errorTag = "bad_args";
-        s_exitCode = 1;
         LOG("ERROR: missing file path -- provide a file to edit");
-        return;
-    }
-
-    if (!stdinMode && (oldFile.size == 0 || newFile.size == 0))
-    {
-        s_exitCode = 1;
-        s_errorTag = "bad_args";
-        s_exitCode = 1;
-        LOG("ERROR: expected <old-file> <new-file> or --stdin");
         return;
     }
 
     if (stdinMode)
     {
+        if (oldFiles.size > 0)
+        {
+            s_exitCode = 1;
+            s_errorTag = "bad_args";
+            LOG("ERROR: --stdin does not support multiple pairs");
+            return;
+        }
+
         const char *separator = "---XCAV_EDIT_SEPARATOR---";
         uint32_t sepLen = 25;
 
-        uint32_t pid = (uint32_t)getpid();
+        uint32_t pid = GetProcessId();
         stdinFile.size =
             StringWriteFmt(span<uint8_t>{stdinPathBuf, sizeof(stdinPathBuf) - 1}, "/tmp/xcav_edit_%u_stdin.txt"_s, pid);
+        byteview oldFile;
+        byteview newFile;
         oldFile.size =
             StringWriteFmt(span<uint8_t>{oldPathBuf, sizeof(oldPathBuf) - 1}, "/tmp/xcav_edit_%u_old.txt"_s, pid);
         newFile.size =
@@ -408,7 +404,6 @@ void CmdEdit(region_alloc &alloc, const cli_args &args)
         {
             s_exitCode = 1;
             s_errorTag = "file_error";
-            s_exitCode = 1;
             LOG("ERROR: cannot create stdin temp file");
             return;
         }
@@ -435,7 +430,6 @@ void CmdEdit(region_alloc &alloc, const cli_args &args)
         {
             s_exitCode = 1;
             s_errorTag = "file_error";
-            s_exitCode = 1;
             LOG("ERROR: cannot read stdin temp file");
             return;
         }
@@ -464,7 +458,6 @@ void CmdEdit(region_alloc &alloc, const cli_args &args)
         {
             s_exitCode = 1;
             s_errorTag = "bad_args";
-            s_exitCode = 1;
             LOG("ERROR: separator line not found in stdin -- expected '---XCAV_EDIT_SEPARATOR---'");
             return;
         }
@@ -492,26 +485,51 @@ void CmdEdit(region_alloc &alloc, const cli_args &args)
             FileWrite(tmpFh, (uint32_t)(stdinBuf.size - newStart), stdinBuf.data + newStart);
             FileClose(tmpFh);
         }
+
+        InlineVec::Append(oldFiles, oldFile);
+        InlineVec::Append(newFiles, newFile);
     }
 
-    bool ok = EditSafe(MakeCStringPath(filePath, alloc), MakeCStringPath(oldFile, alloc),
-                       MakeCStringPath(newFile, alloc), alloc, dryRun);
-    if (stdinMode)
+    if (oldFiles.size == 0)
     {
-        unlink(Span::CStr(stdinFile));
-        unlink(Span::CStr(oldFile));
-        unlink(Span::CStr(newFile));
-    }
-    if (!ok)
-    {
-        s_errorTag = "operation_failed";
         s_exitCode = 1;
-        // EditSafe already logged a specific error
+        s_errorTag = "bad_args";
+        LOG("ERROR: expected <old-file> <new-file> pairs or --stdin");
+        return;
     }
-    else
+
+    if (oldFiles.size != newFiles.size)
     {
-        ShowFileBlocks(filePath, alloc);
+        s_exitCode = 1;
+        s_errorTag = "bad_args";
+        LOG("ERROR: expected <old-file> <new-file> pairs — uneven count (got %zu old, %zu new)", (size_t)oldFiles.size,
+            (size_t)newFiles.size);
+        return;
     }
+
+    // Process each old/new pair sequentially.
+    uint32_t okCount = 0;
+    for (uint64_t i = 0; i < oldFiles.size; ++i)
+    {
+        bool ok = EditSafe(MakeCStringPath(filePath, alloc), MakeCStringPath(oldFiles.data.data[i], alloc),
+                           MakeCStringPath(newFiles.data.data[i], alloc), alloc, dryRun);
+        if (stdinMode)
+        {
+            FileDelete(stdinFile);
+            FileDelete(oldFiles.data.data[i]);
+            FileDelete(newFiles.data.data[i]);
+        }
+        if (!ok)
+        {
+            s_errorTag = "edit_failed";
+            s_exitCode = 1;
+            return;
+        }
+        ++okCount;
+    }
+
+    if (!noBlocks)
+        ShowFileBlocks(filePath, alloc);
 }
 void CmdHelp()
 {
@@ -609,6 +627,13 @@ void CmdHelp()
     LOG("    --copy-includes: copy #include/import lines from source to destination.");
     LOG("    --show-returns: print line numbers of return statements in the copy.");
     LOG("");
+    LOG("  xcav insert --before <file> <line> <content-file>");
+    LOG("  xcav insert --after  <file> <line> <content-file>");
+    LOG("  xcav insert before   <file> <line> <content-file>");
+    LOG("  xcav insert after    <file> <line> <content-file>");
+    LOG("    Insert code before or after the structural block at <line>.");
+    LOG("    Content is read from <content-file> and re-indented to match.");
+    LOG("");
     LOG("  xcav undo <file>");
     LOG("    Restore from most recent backup. Multi-level (up to 20).");
     LOG("    Backups created automatically on every mutation.");
@@ -643,7 +668,11 @@ void CmdUndo(region_alloc &alloc, const cli_args &args)
     MemCpy(pathBuf.data, filePath.data, filePath.size);
     pathBuf.data[filePath.size] = 0;
 
-    RestoreBackup(byteview{pathBuf.data, filePath.size}, alloc);
+    if (!RestoreBackup(byteview{pathBuf.data, filePath.size}, alloc))
+    {
+        s_exitCode = 1;
+        s_errorTag = "undo_failed";
+    }
     ShowFileBlocks(filePath, alloc);
 }
 
@@ -1047,8 +1076,10 @@ void CmdRead(region_alloc &alloc, const cli_args &args)
         if (truncated)
             FileWriteFmt(GetStdout(), "\n[Truncated: %u lines. Use --offset/--limit to narrow.]\n"_s,
                          endLine - startLine);
+        else if (!raw)
+            FileWriteFmt(GetStdout(), "\n[Lines %u-%u of %llu. Next: --offset %u]\n"_s, startLine + 1, endLine,
+                         (unsigned long long)totalLines, endLine + 1);
     };
-
     // ── offset mode (slice with re-unindent) ──
     if (hasOffset)
     {
@@ -1068,11 +1099,10 @@ void CmdRead(region_alloc &alloc, const cli_args &args)
         }
 
         read_block_info info = ReadBlock(safePath, offsetVal - 1, alloc, rawMode);
-        if (info.text.size == 0)
+        if (info.text.size == 0 || offsetVal - 1 < info.startLine || offsetVal - 1 > info.endLine)
         {
-            // No structural block at this offset — fall back to plain line reading.
-            // This handles regions between blocks (e.g. includes area, namespace-level
-            // types/helpers before the first function).
+            // No structural block at this offset, or offset is between blocks —
+            // fall back to plain line reading.
             printPlainFile(offsetVal - 1, hasLimit ? limitVal : 0x100000u, rawMode);
             return;
         }
@@ -1137,9 +1167,12 @@ void CmdRead(region_alloc &alloc, const cli_args &args)
                 FileWriteFmt(GetStdout(), "%4u: "_s, offsetVal + (uint32_t)li);
             FileWriteFmt(GetStdout(), "%.*s\n"_s, (int)(line.size - p), line.data + p);
         }
+        if (sliceLines.size > 0 && !rawMode)
+            FileWriteFmt(GetStdout(), "\n[Lines %u-%u of %u. Next: --offset %u]\n"_s, offsetVal,
+                         offsetVal + (uint32_t)sliceLines.size - 1, info.totalLines,
+                         offsetVal + (uint32_t)sliceLines.size);
         return;
     }
-
     // ── Helper: write corrected indentation back to disk ──
     auto fixIndent = [&](read_block_info &info) {
         // Read the current file
@@ -1284,9 +1317,7 @@ void CmdReplace(region_alloc &alloc, const cli_args &args)
     bool ok = ReplaceInBlock(byteview{pathBuf.data, filePath.size}, (uint32_t)(lineVal - 1), oldText, newText, alloc);
     if (!ok)
     {
-        s_errorTag = "operation_failed";
-        s_exitCode = 1;
-        // ReplaceInBlock already logged a specific error
+        s_errorTag = "replace_scoped_failed";
     }
     else
     {
@@ -1325,7 +1356,7 @@ void CmdReplaceBlock(region_alloc &alloc, const cli_args &args)
     if (stdinMode)
     {
         // Write stdin to a temp file
-        uint32_t pid = (uint32_t)getpid();
+        uint32_t pid = GetProcessId();
         newFile.size =
             StringWriteFmt(span<uint8_t>{tmpPathBuf, sizeof(tmpPathBuf) - 1}, "/tmp/xcav_replace_%u.txt"_s, pid);
         tmpPathBuf[newFile.size] = 0;
@@ -1351,7 +1382,7 @@ void CmdReplaceBlock(region_alloc &alloc, const cli_args &args)
             if (written != n)
             {
                 FileClose(tmpFh);
-                unlink(Span::CStr(newFile));
+                FileDelete(newFile);
                 s_exitCode = 1;
                 s_errorTag = "short_write";
                 LOG("ERROR: short write while buffering stdin");
@@ -1362,7 +1393,7 @@ void CmdReplaceBlock(region_alloc &alloc, const cli_args &args)
 
         if (!hasContent)
         {
-            unlink(Span::CStr(newFile));
+            FileDelete(newFile);
             s_exitCode = 1;
             s_errorTag = "bad_args";
             LOG("ERROR: stdin is empty — provide replacement block content");
@@ -1384,9 +1415,7 @@ void CmdReplaceBlock(region_alloc &alloc, const cli_args &args)
     bool ok = ReplaceBlock(byteview{pathBuf.data, filePath.size}, blockLine, newFile, alloc);
     if (!ok)
     {
-        s_errorTag = "operation_failed";
-        s_exitCode = 1;
-        // ReplaceBlock already logged a specific error
+        s_errorTag = "replace_block_failed";
     }
     else
     {
@@ -1394,9 +1423,91 @@ void CmdReplaceBlock(region_alloc &alloc, const cli_args &args)
     }
 
     if (stdinMode)
-        unlink(Span::CStr(newFile));
+        FileDelete(newFile);
 }
+void CmdInsert(region_alloc &alloc, const cli_args &args)
+{
+    // Parse flags and positional args.
+    // Supports: insert --before <file> <line> <content>
+    //           insert before  <file> <line> <content>
+    //           insert --after  <file> <line> <content>
+    //           insert after   <file> <line> <content>
+    bool before = false;
+    bool after = false;
+    uint64_t fileIdx = 0;
+    uint64_t lineIdx = 0;
+    uint64_t contentIdx = 0;
 
+    for (uint64_t i = 1; i < args.positional.size; ++i)
+    {
+        byteview arg = args.positional.data.data[i];
+        if (ByteviewEq(arg, "--before") || ByteviewEq(arg, "before"))
+            before = true;
+        else if (ByteviewEq(arg, "--after") || ByteviewEq(arg, "after"))
+            after = true;
+        else if (fileIdx == 0)
+            fileIdx = i;
+        else if (lineIdx == 0)
+            lineIdx = i;
+        else if (contentIdx == 0)
+            contentIdx = i;
+    }
+
+    if (!before && !after)
+    {
+        s_errorTag = "bad_args";
+        s_exitCode = 1;
+        LOG("ERROR: specify --before, --after, before, or after");
+        LOG("Usage: xcav insert --before|before|--after|after <file> <line> <content-file>");
+        return;
+    }
+    if (before && after)
+    {
+        s_errorTag = "bad_args";
+        s_exitCode = 1;
+        LOG("ERROR: specify --before/before or --after/after, not both");
+        return;
+    }
+    if (fileIdx == 0 || lineIdx == 0 || contentIdx == 0)
+    {
+        s_errorTag = "bad_args";
+        s_exitCode = 1;
+        LOG("ERROR: expected <file> <line> <content-file>");
+        LOG("Usage: xcav insert --before|before|--after|after <file> <line> <content-file>");
+        return;
+    }
+
+    byteview filePath = args.positional.data.data[fileIdx];
+    byteview contentFile = args.positional.data.data[contentIdx];
+
+    byte_parser lineParser{};
+    ByteParser::Init(lineParser, args.positional.data.data[lineIdx].data, args.positional.data.data[lineIdx].size);
+    int64_t lineVal = StringParser::ParseLong(lineParser);
+
+    if (lineVal < 1)
+    {
+        s_errorTag = "bad_args";
+        s_exitCode = 1;
+        LOG("ERROR: line number must be >= 1");
+        return;
+    }
+
+    uint32_t blockLine = (uint32_t)(lineVal - 1);
+
+    bool ok =
+        before
+            ? InsertBeforeBlock(MakeCStringPath(filePath, alloc), blockLine, MakeCStringPath(contentFile, alloc), alloc)
+            : InsertAfterBlock(MakeCStringPath(filePath, alloc), blockLine, MakeCStringPath(contentFile, alloc), alloc);
+    if (!ok)
+    {
+        s_errorTag = "insert_failed";
+        s_exitCode = 1;
+    }
+    else
+    {
+        ShowFileBlocks(filePath, alloc);
+    }
+}
 void CmdOnboard()
 {
     FileWriteFmt(GetStdout(),
@@ -1451,8 +1562,7 @@ void CmdCopy(region_alloc &alloc, const cli_args &args)
     if (!result.ok)
     {
         s_exitCode = 1;
-        s_errorTag = "operation_failed";
-        LOG("ERROR: copy failed -- %s", result.error);
+        s_errorTag = "copy_failed";
     }
     else
     {
@@ -1497,6 +1607,7 @@ void Run(region_alloc &alloc)
         LOG("  replace <file> <ln> <o> <n> Scoped replace within a block");
         LOG("  replace-block <file> <ln> [<new>] Replace entire block (stdin if no file)");
         LOG("  copy <src> <ln> <dst> <ln> Copy block between files");
+        LOG("  insert --before|before|--after|after <file> <ln> <content> Insert code at a block boundary");
         LOG("  undo <file>                Restore from backup");
         LOG("  help                      Print detailed help");
         LOG("  onboard                   Print agent onboarding guide");
@@ -1524,6 +1635,8 @@ void Run(region_alloc &alloc)
         CmdUndo(alloc, args);
     else if (ByteviewEq(args.command, "copy"))
         CmdCopy(alloc, args);
+    else if (ByteviewEq(args.command, "insert"))
+        CmdInsert(alloc, args);
     else if (ByteviewEq(args.command, "help"))
         CmdHelp();
     else if (ByteviewEq(args.command, "onboard"))
@@ -1540,7 +1653,7 @@ void UserMain()
     Run(alloc);
 
     if (s_exitCode != 0)
-        _exit(s_exitCode);
+        Exit(s_exitCode);
 }
 
 } // namespace nyla

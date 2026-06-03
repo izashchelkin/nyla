@@ -582,7 +582,7 @@ auto EditSafe(byteview filePath, byteview oldFile, byteview newFile, region_allo
         return false;
     }
 
-    LOG("OK: replaced %u lines at line %u", contentLineCount, matchLine + 1);
+    LOG("OK: replaced %u line%s at line %u", contentLineCount, contentLineCount == 1 ? "" : "s", matchLine + 1);
     return true;
 }
 

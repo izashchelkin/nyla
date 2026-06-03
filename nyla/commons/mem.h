@@ -125,6 +125,18 @@ INLINE auto CStrLen(const void *str, uint64_t maxLen) -> uint64_t
     return p - (uint8_t *)str;
 }
 
+INLINE auto StrEq(const char *a, const char *b) -> bool
+{
+    while (*a && *b)
+    {
+        if (*a != *b)
+            return false;
+        ++a;
+        ++b;
+    }
+    return *a == 0 && *b == 0;
+}
+
 template <is_plain T> INLINE void Swap(T &lhs, T &rhs)
 {
     T tmp = lhs;

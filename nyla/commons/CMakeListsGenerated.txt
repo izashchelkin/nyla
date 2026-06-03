@@ -116,6 +116,8 @@ target_sources(${TARGET} PUBLIC
     spv_shader_enums.h
     stb_image.h
     stringparser.h
+    subprocess.h
+    http_client.h
     sync.h
     terminal_screen.h
     texture_manager.h
@@ -138,6 +140,8 @@ if (WIN32)
         platform_dir_watch_windows.cc
         platform_pty_windows.cc
         platform_windows.cc
+        subprocess_windows.cc
+        http_client_windows.cc
         renderdoc_windows.cc
         sync_windows.cc
         thread_windows.cc
@@ -156,6 +160,8 @@ else()
         platform_dir_watch_linux.cc
         platform_linux.cc
         platform_pty_linux.cc
+        subprocess_linux.cc
+        http_client_linux.cc
         platform_x11_linux.cc
         renderdoc_linux.cc
         sync_linux.cc

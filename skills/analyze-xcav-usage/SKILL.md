@@ -10,7 +10,15 @@ Use when reviewing xcav effectiveness, debugging agent behavior, investigating f
 ## Procedure
 1. Check log health: `wc -l ~/.xcav/usage/events.jsonl` and verify JSON validity.
 2. Run the analysis queries below for a comprehensive report.
-3. Check survey-before-mutation pattern: for each mutation, is prev_cmd in {blocks, read}? Missing survey before mutation means the agent acted without understanding the file structure.
+3. Check survey-before-mutation pattern. There are three survey states:
+
+   | State | prev_cmd | Meaning |
+   |-------|----------|---------|
+   | **explicit survey** | `blocks` or `read` | Agent ran a dedicated survey command before mutating. |
+   | **implicit survey** | `replace-block`, `replace`, `move`, `move-into`, `delete`, `edit`, `insert` | Mutation that emits a block map on stdout after completion. Acceptable if the agent inspected the output. Logs can't distinguish "output inspected" from "output ignored," so flag as a soft note, not a hard anti-pattern. |
+   | **no survey** | `copy`, `undo`, `help`, or first command in session | No structural context available. Flag as hard anti-pattern. |
+
+   Note: implicit survey via mutation output is structurally equivalent to an explicit `blocks` call — the agent has current line numbers either way. The distinction is inherently unknowable from JSONL alone.
 4. Check read-before-edit pattern: for edit commands, is prev_cmd=read? Edit without read means the agent used oldText from memory rather than from xcav_read output.
 5. Check redundant blocks: count ctx.redundant_blocks=true. High rate means agents call blocks after every mutation even when unnecessary.
 6. Analyze error distribution: group by outcome.error to find top failure reasons (bad_args, block_not_found, text_not_found, operation_failed).

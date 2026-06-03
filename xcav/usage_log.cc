@@ -11,14 +11,10 @@
 #include "nyla/commons/file_utils.h"
 #include "nyla/commons/fmt.h"
 #include "nyla/commons/mem.h"
+#include "nyla/commons/platform.h"
 #include "nyla/commons/region_alloc.h"
-
-#include <stdio.h>    // snprintf
-#include <stdlib.h>   // getenv
-#include <sys/stat.h> // mkdir
-#include <time.h>     // clock_gettime, gmtime_r
-#include <unistd.h>   // getpid
-
+#include <stdio.h> // snprintf
+#include <time.h>  // clock_gettime, gmtime_r
 namespace nyla
 {
 
@@ -36,16 +32,16 @@ static auto CStrView(const char *s) -> byteview
 // E.g. HomePath(alloc, ".xcav/usage") -> "$HOME/.xcav/usage\0"
 static auto HomePath(region_alloc *alloc, const char *subpath) -> byteview
 {
-    const char *home = getenv("HOME");
-    uint64_t homeLen = home ? strlen(home) : 0;
+    byteview home;
+    TryReadEnvVar("HOME"_s, home);
     uint64_t subLen = strlen(subpath);
-    uint64_t totalLen = homeLen + 1 + subLen;
+    uint64_t totalLen = home.size + 1 + subLen;
     span<uint8_t> buf = RegionAlloc::AllocArray<uint8_t>(*alloc, totalLen + 1);
-    if (homeLen > 0)
+    if (home.size > 0)
     {
-        MemCpy(buf.data, home, homeLen);
-        buf.data[homeLen] = '/';
-        MemCpy(buf.data + homeLen + 1, subpath, subLen);
+        MemCpy(buf.data, home.data, home.size);
+        buf.data[home.size] = '/';
+        MemCpy(buf.data + home.size + 1, subpath, subLen);
     }
     else
     {
@@ -55,7 +51,6 @@ static auto HomePath(region_alloc *alloc, const char *subpath) -> byteview
     buf.data[totalLen] = 0;
     return byteview{buf.data, totalLen};
 }
-
 // ─── Boot ID (cached, read once from /proc) ────────────────────────────────
 
 static bool s_bootIdCached = false;
@@ -288,11 +283,16 @@ static auto FormatTimestamp(char *out, uint32_t outSize) -> uint32_t
 
 void LogUsage(region_alloc *alloc, const cli_args &args, struct timespec t_start, int exit_code, const char *error_tag)
 {
+    // Skip logging when running tests or when explicitly disabled
+    byteview noLog;
+    if (TryReadEnvVar("XC_NO_LOG"_s, noLog))
+        return;
+
     // ── Ensure ~/.xcav/usage/ exists ──
     byteview xcavDir = HomePath(alloc, ".xcav");
-    mkdir(Span::CStr(xcavDir), 0755);
+    CreateDirectory(xcavDir);
     byteview usageDir = HomePath(alloc, ".xcav/usage");
-    mkdir(Span::CStr(usageDir), 0755);
+    CreateDirectory(usageDir);
     byteview jsonlPath = HomePath(alloc, ".xcav/usage/events.jsonl");
 
     // ── Compute duration ──
@@ -319,7 +319,7 @@ void LogUsage(region_alloc *alloc, const cli_args &args, struct timespec t_start
     const char *cat = CmdToCategory(cmd);
 
     // ── Session ID ──
-    uint32_t pid = (uint32_t)getpid();
+    uint32_t pid = GetProcessId();
     const char *bootId = GetBootId();
 
     // ── Timestamp ──

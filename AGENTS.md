@@ -45,6 +45,8 @@
 >   **Does not show include/import lines** (filtered as noise).
 > - **xcav_copy**: copy a block cross-file. Source is unaffected. Supports
 >   --copy-includes and --show-returns. Combine with xcav_delete for extract-to-new-file.
+> - **xcav_insert**: insert code before or after a structural block. Content is
+>   read from a temp file and re-indented. Supports `--before|before|--after|after` syntax.
 > - **Everything else**: plain `edit`. Adding new code, modifying within a function,
 >   small text changes — xcav adds no value and introduces auto-indentation that
 >   can break follow-up edits. When in doubt, use plain `edit`.

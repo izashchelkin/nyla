@@ -1,0 +1,8 @@
+target_sources(${TARGET} PRIVATE
+    agent_loop.cc
+    main.cc
+    provider_deepseek.cc
+    provider_ollama.cc
+    system_prompt.cc
+    tool_registry.cc
+)

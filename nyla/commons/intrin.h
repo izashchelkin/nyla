@@ -169,9 +169,8 @@ INLINE auto Pow(float x, float y) -> float
 
 INLINE auto Exit(int code)
 {
-    ::quick_exit(code);
+    ::_Exit(code);
 }
-
 INLINE auto AtomicLoad32(const uint32_t *p) -> uint32_t
 {
 #if defined(__clang__) || defined(__GNUC__)

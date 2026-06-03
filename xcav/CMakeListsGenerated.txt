@@ -5,6 +5,7 @@ target_sources(${TARGET} PRIVATE
     delete.cc
     edit_ops.cc
     edit_safe.cc
+    insert.cc
     language.cc
     main.cc
     move.cc

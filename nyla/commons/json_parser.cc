@@ -17,7 +17,8 @@ namespace
 
 auto PushOut(json_parser &self, const json_value &value) -> json_value *
 {
-    ASSERT(self.outSize > 0);
+    if (self.outSize == 0)
+        return nullptr;
 
     json_value *ret = self.out;
     *ret = value;
@@ -33,17 +34,19 @@ auto ParseLiteral(json_parser &self) -> json_value *
     switch (ByteParser::Read(self))
     {
     case 'n': {
-        ASSERT(ByteParser::Read(self) == 'u');
-        ASSERT(ByteParser::Read(self) == 'l');
-        ASSERT(ByteParser::Read(self) == 'l');
+        if (!ByteParser::HasNext(self) || ByteParser::Read(self) != 'u' || !ByteParser::HasNext(self) ||
+            ByteParser::Read(self) != 'l' || !ByteParser::HasNext(self) || ByteParser::Read(self) != 'l')
+            return nullptr;
 
-        return PushOut(self, json_value{});
+        json_value val;
+        JsonValue::SetValue(val, json_tag::Null);
+        return PushOut(self, val);
     }
 
     case 't': {
-        ASSERT(ByteParser::Read(self) == 'r');
-        ASSERT(ByteParser::Read(self) == 'u');
-        ASSERT(ByteParser::Read(self) == 'e');
+        if (!ByteParser::HasNext(self) || ByteParser::Read(self) != 'r' || !ByteParser::HasNext(self) ||
+            ByteParser::Read(self) != 'u' || !ByteParser::HasNext(self) || ByteParser::Read(self) != 'e')
+            return nullptr;
 
         json_value val;
         JsonValue::SetValue(val, true);
@@ -52,10 +55,10 @@ auto ParseLiteral(json_parser &self) -> json_value *
     }
 
     case 'f': {
-        ASSERT(ByteParser::Read(self) == 'a');
-        ASSERT(ByteParser::Read(self) == 'l');
-        ASSERT(ByteParser::Read(self) == 's');
-        ASSERT(ByteParser::Read(self) == 'e');
+        if (!ByteParser::HasNext(self) || ByteParser::Read(self) != 'a' || !ByteParser::HasNext(self) ||
+            ByteParser::Read(self) != 'l' || !ByteParser::HasNext(self) || ByteParser::Read(self) != 's' ||
+            !ByteParser::HasNext(self) || ByteParser::Read(self) != 'e')
+            return nullptr;
 
         json_value val;
         JsonValue::SetValue(val, false);
@@ -64,7 +67,6 @@ auto ParseLiteral(json_parser &self) -> json_value *
     }
 
     default: {
-        ASSERT(false);
         return nullptr;
     }
     }
@@ -95,18 +97,29 @@ auto ParseString(json_parser &self) -> json_value *
 {
     const uint8_t *base = self.at;
     uint64_t count = 0;
+    bool closed = false;
 
-    uint8_t prevch = 0;
     while (ByteParser::HasNext(self))
     {
         const uint8_t ch = ByteParser::Read(self);
-        if (ch == '"' /*  && prevch != '\\' */)
+        if (ch == '"')
+        {
+            closed = true;
             break;
-
-        prevch = ch;
+        }
 
         ++count;
+
+        // Skip escaped character — backslash escapes the next char
+        if (ch == '\\' && ByteParser::HasNext(self))
+        {
+            ByteParser::Read(self);
+            ++count;
+        }
     }
+
+    if (!closed)
+        return nullptr;
 
     json_value val;
     JsonValue::SetValue(val, byteview{base, count});
@@ -117,10 +130,15 @@ auto ParseString(json_parser &self) -> json_value *
 auto ParseArray(json_parser &self) -> json_value *
 {
     json_value *begin = PushOut(self, json_value());
+    if (!begin)
+        return nullptr;
+
     int32_t count = 0;
 
     for (;;)
     {
+        if (!ByteParser::HasNext(self))
+            return nullptr;
         if (ByteParser::Peek(self) == ']')
         {
             ByteParser::Advance(self);
@@ -130,16 +148,23 @@ auto ParseArray(json_parser &self) -> json_value *
         ++count;
 
         json_value *elem = ParseNext(self);
+        if (!elem)
+            return nullptr;
 
         StringParser::SkipWhitespace(self);
+        if (!ByteParser::HasNext(self))
+            return nullptr;
         const uint8_t ch = ByteParser::Read(self);
         if (ch == ']')
             break;
 
-        ASSERT(ch == ',');
+        if (ch != ',')
+            return nullptr;
     }
 
     json_value *end = PushOut(self, json_value());
+    if (!end)
+        return nullptr;
 
     JsonValue::SetValue(*begin, json_tag::ArrayBegin, count, end);
     JsonValue::SetValue(*end, json_tag::ArrayEnd);
@@ -150,10 +175,15 @@ auto ParseArray(json_parser &self) -> json_value *
 auto ParseObject(json_parser &self) -> json_value *
 {
     auto *begin = PushOut(self, json_value{});
+    if (!begin)
+        return nullptr;
+
     uint32_t count = 0;
 
     for (;;)
     {
+        if (!ByteParser::HasNext(self))
+            return nullptr;
         if (ByteParser::Peek(self) == '}')
         {
             ByteParser::Advance(self);
@@ -163,22 +193,31 @@ auto ParseObject(json_parser &self) -> json_value *
         ++count;
 
         json_value *key = ParseNext(self);
-        ASSERT(key->tag == json_tag::String);
+        if (!key || key->tag != json_tag::String)
+            return nullptr;
 
         StringParser::SkipWhitespace(self);
-        ASSERT(ByteParser::Read(self) == ':');
+        if (!ByteParser::HasNext(self) || ByteParser::Read(self) != ':')
+            return nullptr;
 
         json_value *val = ParseNext(self);
+        if (!val)
+            return nullptr;
 
         StringParser::SkipWhitespace(self);
+        if (!ByteParser::HasNext(self))
+            return nullptr;
         const uint8_t ch = ByteParser::Read(self);
         if (ch == '}')
             break;
 
-        ASSERT(ch == ',');
+        if (ch != ',')
+            return nullptr;
     }
 
     json_value *end = PushOut(self, json_value());
+    if (!end)
+        return nullptr;
 
     JsonValue::SetValue(*begin, json_tag::ObjectBegin, count, end);
     JsonValue::SetValue(*end, json_tag::ObjectEnd);
@@ -188,9 +227,12 @@ auto ParseObject(json_parser &self) -> json_value *
 
 } // namespace
 
-auto ParseNext(json_parser &self) -> json_value *
+auto API ParseNext(json_parser &self) -> json_value *
 {
     StringParser::SkipWhitespace(self);
+
+    if (!ByteParser::HasNext(self))
+        return nullptr;
 
     uint8_t ch = ByteParser::Peek(self);
     if (IsNumber(ch) || ch == '-')
@@ -198,6 +240,8 @@ auto ParseNext(json_parser &self) -> json_value *
     if (IsAlpha(ch))
         return ParseLiteral(self);
 
+    if (!ByteParser::HasNext(self))
+        return nullptr;
     ByteParser::Advance(self);
     if (ch == '"')
         return ParseString(self);
@@ -206,7 +250,6 @@ auto ParseNext(json_parser &self) -> json_value *
     if (ch == '{')
         return ParseObject(self);
 
-    ASSERT(false);
     return nullptr;
 }
 

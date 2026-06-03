@@ -110,8 +110,11 @@ auto ReplaceBlock(byteview filePath, uint32_t blockLine, byteview newFilePath, r
     if (indentedNew.size > 0 && indentedNew.data.data[indentedNew.size - 1] != '\n')
         InlineVec::Append(indentedNew, (uint8_t)'\n');
 
-    TreeDelete(bl.tree);
+    // Save old line count and block type before freeing the tree
+    uint32_t oldLineCount = bl.range.endRow - bl.range.startRow + 1;
+    const char *blockType = bl.type;
 
+    TreeDelete(bl.tree);
     // Compute cutStart/cutEnd with same cleanup as DeleteBlock
     uint32_t cutStart = bl.range.startByte;
     uint32_t cutEnd = bl.range.endByte;
@@ -193,7 +196,19 @@ auto ReplaceBlock(byteview filePath, uint32_t blockLine, byteview newFilePath, r
         return false;
     }
 
-    LOG("OK: replaced %s block (was lines %u-%u)", bl.type, bl.range.startRow + 1, bl.range.endRow + 1);
+    // Compute new line count from the re-indented content
+    uint32_t newLineCount = 0;
+    for (uint32_t i = 0; i < indentedNew.size; ++i)
+        if (indentedNew.data.data[i] == '\n')
+            ++newLineCount;
+
+    LOG("OK: replaced %s block (was %u line%s, now %u line%s)", blockType, oldLineCount, oldLineCount == 1 ? "" : "s",
+        newLineCount, newLineCount == 1 ? "" : "s");
+    bool isClassLike = StrEq(blockType, "class_declaration") || StrEq(blockType, "class_specifier") ||
+                       StrEq(blockType, "struct_specifier") || StrEq(blockType, "interface_declaration") ||
+                       StrEq(blockType, "abstract_class_declaration");
+    if (isClassLike)
+        LOG("Class replacement complete. Run your formatter before reviewing indentation-sensitive diffs.");
     return true;
 }
 
@@ -287,7 +302,18 @@ auto ReplaceInBlock(byteview filePath, uint32_t blockLine, byteview oldText, byt
         return false;
     }
 
-    LOG("OK: replaced in block at line %u", blockLine + 1);
+    // Preview the replaced text (first line or first 40 chars)
+    uint32_t previewLen = oldText.size;
+    for (uint32_t i = 0; i < previewLen; ++i)
+        if (oldText.data[i] == '\n')
+        {
+            previewLen = i;
+            break;
+        }
+    if (previewLen > 40)
+        previewLen = 40;
+    LOG("OK: replaced '%.*s%s' in block at line %u", (int)previewLen, oldText.data,
+        previewLen < oldText.size ? "..." : "", blockLine + 1);
     return true;
 }
 

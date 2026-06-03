@@ -137,6 +137,31 @@ void API FileSetEnd(file_handle file)
     ASSERT(SetEndOfFile(file));
 }
 
+auto API FileExists(byteview path) -> bool
+{
+    TRAP("not implemented");
+}
+
+auto API IsDirectory(byteview path) -> bool
+{
+    TRAP("not implemented");
+}
+
+auto API FileDelete(byteview path) -> bool
+{
+    TRAP("not implemented");
+}
+
+auto API CreateDirectory(byteview path) -> bool
+{
+    TRAP("not implemented");
+}
+
+auto API RemoveDirectory(byteview path) -> bool
+{
+    TRAP("not implemented");
+}
+
 struct dir_iter
 {
     HANDLE hDir;

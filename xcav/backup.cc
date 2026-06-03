@@ -3,26 +3,99 @@
 #include "nyla/commons/file.h"
 #include "nyla/commons/file_utils.h"
 #include "nyla/commons/hash.h"
+#include "nyla/commons/platform.h"
 #include "nyla/commons/region_alloc.h"
 
-#include <sys/stat.h>
-#include <unistd.h>
-
+#include <string.h>
 namespace nyla
 {
 
 // ─── Backup ─────────────────────────────────────────────────────────────────
 
-static const char *kBackupDir = ".xcav_backups";
-
-static auto EnsureBackupRoot() -> bool
+// Get the XCAV backup base directory: $HOME/.xcav/backups
+static auto XcavBackupsDir(region_alloc &alloc) -> byteview
 {
-    mkdir(kBackupDir, 0755);
+    byteview home;
+    if (!TryReadEnvVar("HOME"_s, home))
+        home = "/tmp"_s;
+    byteview rel = "/.xcav/backups"_s;
+    uint64_t totalLen = home.size + rel.size;
+    span<uint8_t> buf = RegionAlloc::AllocArray<uint8_t>(alloc, totalLen + 1);
+    MemCpy(buf.data, home.data, home.size);
+    MemCpy(buf.data + home.size, rel.data, rel.size);
+    buf.data[totalLen] = 0;
+    return byteview{buf.data, totalLen};
+}
+// Find the project root (git repo root or CWD) for stable hashing.
+static auto ProjectRoot(region_alloc &alloc) -> byteview
+{
+    byteview cwd = GetCurrentDirectory(alloc);
 
-    file_handle ignoreFile = FileOpen(".xcav_backups/.gitignore"_s, FileOpenMode::Write);
+    // Walk up from CWD to find .git
+    int64_t p = (int64_t)cwd.size;
+    while (p > 0)
+    {
+        uint64_t dirLen = (uint64_t)p;
+
+        // Build "/.git" path
+        span<uint8_t> gitPath = RegionAlloc::AllocArray<uint8_t>(alloc, dirLen + 6);
+        MemCpy(gitPath.data, cwd.data, dirLen);
+        gitPath.data[dirLen] = '/';
+        gitPath.data[dirLen + 1] = '.';
+        gitPath.data[dirLen + 2] = 'g';
+        gitPath.data[dirLen + 3] = 'i';
+        gitPath.data[dirLen + 4] = 't';
+        gitPath.data[dirLen + 5] = 0;
+
+        if (IsDirectory(byteview{gitPath.data, dirLen + 5}))
+        {
+            span<uint8_t> buf = RegionAlloc::AllocArray<uint8_t>(alloc, dirLen + 1);
+            MemCpy(buf.data, cwd.data, dirLen);
+            buf.data[dirLen] = 0;
+            return byteview{buf.data, dirLen};
+        }
+
+        // Go up one directory
+        while (p > 0 && cwd.data[p - 1] != '/')
+            --p;
+        if (p > 0)
+            --p; // skip the '/'
+    }
+
+    // No git repo found, use CWD
+    span<uint8_t> buf = RegionAlloc::AllocArray<uint8_t>(alloc, cwd.size + 1);
+    MemCpy(buf.data, cwd.data, cwd.size);
+    buf.data[cwd.size] = 0;
+    return byteview{buf.data, cwd.size};
+}
+static auto EnsureBackupRoot(region_alloc &alloc) -> bool
+{
+    byteview home;
+    if (!TryReadEnvVar("HOME"_s, home))
+        home = "/tmp"_s;
+
+    // Create ~/.xcav/
+    uint64_t xcavLen = home.size + 6; // "/.xcav"
+    span<uint8_t> xcavPath = RegionAlloc::AllocArray<uint8_t>(alloc, xcavLen + 1);
+    MemCpy(xcavPath.data, home.data, home.size);
+    MemCpy(xcavPath.data + home.size, "/.xcav", 6);
+    xcavPath.data[xcavLen] = 0;
+    CreateDirectory(byteview{xcavPath.data, xcavLen});
+
+    // Create ~/.xcav/backups/
+    byteview baseDir = XcavBackupsDir(alloc);
+    CreateDirectory(baseDir);
+    // Write .gitignore in backup base dir
+    uint64_t ignoreLen = baseDir.size + 11; // "/.gitignore"
+    span<uint8_t> ignorePath = RegionAlloc::AllocArray<uint8_t>(alloc, ignoreLen + 1);
+    MemCpy(ignorePath.data, baseDir.data, baseDir.size);
+    MemCpy(ignorePath.data + baseDir.size, "/.gitignore", 11);
+    ignorePath.data[ignoreLen] = 0;
+
+    file_handle ignoreFile = FileOpen(byteview{ignorePath.data, ignoreLen}, FileOpenMode::Write);
     if (!FileValid(ignoreFile))
     {
-        LOG("ERROR: cannot write .xcav_backups/.gitignore");
+        LOG("ERROR: cannot write .gitignore in backup dir");
         return false;
     }
 
@@ -31,30 +104,37 @@ static auto EnsureBackupRoot() -> bool
     FileClose(ignoreFile);
     return true;
 }
-
 // Build the hash-subfolder byteview for a given source path.
-// Returns a null-terminated path like ".xcav_backups/a1b2c3d4".
+// Result: <XcavBackupsDir>/<project-hash>/<file-hash>
+// Project hash isolates repos; file hash isolates individual files within a repo.
 static auto BackupHashDir(byteview filePath, region_alloc &alloc) -> byteview
 {
-    uint32_t hash = HashBytes32(filePath);
-    char hashStr[9];
+    byteview baseDir = XcavBackupsDir(alloc);
+    byteview projectRoot = ProjectRoot(alloc);
+    uint32_t projHash = HashBytes32(projectRoot);
+    uint32_t fileHash = HashBytes32(filePath);
+    char projStr[9], fileStr[9];
     for (int i = 7; i >= 0; --i)
     {
-        hashStr[i] = "0123456789abcdef"[hash & 0xF];
-        hash >>= 4;
+        projStr[i] = "0123456789abcdef"[projHash & 0xF];
+        projHash >>= 4;
+        fileStr[i] = "0123456789abcdef"[fileHash & 0xF];
+        fileHash >>= 4;
     }
-    hashStr[8] = 0;
+    projStr[8] = 0;
+    fileStr[8] = 0;
 
-    uint64_t dirLen = strlen(kBackupDir);
-    uint64_t totalLen = dirLen + 1 + 8;
+    // <baseDir>/<projStr>/<fileStr>
+    uint64_t totalLen = baseDir.size + 1 + 8 + 1 + 8;
     span<uint8_t> buf = RegionAlloc::AllocArray<uint8_t>(alloc, totalLen + 1);
-    MemCpy(buf.data, kBackupDir, dirLen);
-    buf.data[dirLen] = '/';
-    MemCpy(buf.data + dirLen + 1, hashStr, 8);
+    MemCpy(buf.data, baseDir.data, baseDir.size);
+    buf.data[baseDir.size] = '/';
+    MemCpy(buf.data + baseDir.size + 1, projStr, 8);
+    buf.data[baseDir.size + 1 + 8] = '/';
+    MemCpy(buf.data + baseDir.size + 1 + 8 + 1, fileStr, 8);
     buf.data[totalLen] = 0;
     return byteview{buf.data, totalLen};
 }
-
 // Find the highest version number in the hash directory.
 // Returns -1 if no backups exist.
 static auto BackupLatestVersion(byteview hashDir, region_alloc &alloc) -> int32_t
@@ -100,13 +180,31 @@ static const int32_t kMaxBackups = 20;
 
 auto SaveBackup(byteview filePath, region_alloc &alloc) -> bool
 {
-    if (!EnsureBackupRoot())
+    if (!EnsureBackupRoot(alloc))
         return false;
-
-    // Build hash subfolder and ensure it exists
+    // Build hash subfolder and ensure it exists.
+    // Hash path is <base>/<proj-hash>/<file-hash> -- create intermediate proj-hash dir too.
     byteview hashDir = BackupHashDir(filePath, alloc);
-    mkdir(Span::CStr(hashDir), 0755);
 
+    // Extract the parent directory (proj-hash level): hashDir minus "/<file-hash>"
+    uint32_t lastSlash = 0;
+    for (uint32_t i = (uint32_t)hashDir.size - 1; i > 0; --i)
+    {
+        if (hashDir.data[i] == '/')
+        {
+            lastSlash = i;
+            break;
+        }
+    }
+    if (lastSlash > 0)
+    {
+        span<uint8_t> parentPath = RegionAlloc::AllocArray<uint8_t>(alloc, lastSlash + 1);
+        MemCpy(parentPath.data, hashDir.data, lastSlash);
+        parentPath.data[lastSlash] = 0;
+        CreateDirectory(byteview{parentPath.data, lastSlash});
+    }
+
+    CreateDirectory(hashDir);
     // Find next version number
     int32_t latest = BackupLatestVersion(hashDir, alloc);
     int32_t nextVersion = latest + 1;
@@ -118,7 +216,7 @@ auto SaveBackup(byteview filePath, region_alloc &alloc) -> bool
         for (int32_t v = 0; v <= pruneBelow; ++v)
         {
             byteview oldPath = BackupVersionPath(hashDir, v, alloc);
-            unlink(Span::CStr(oldPath));
+            FileDelete(oldPath);
         }
     }
 
@@ -191,11 +289,10 @@ auto RestoreBackup(byteview filePath, region_alloc &alloc) -> bool
     FileClose(dst);
 
     // Delete the backup version file
-    unlink(Span::CStr(backupPath));
+    FileDelete(backupPath);
 
     // Try to remove the hash subfolder (succeeds only if empty)
-    rmdir(Span::CStr(hashDir));
-
+    RemoveDirectory(hashDir);
     int32_t remaining = BackupLatestVersion(hashDir, alloc) + 1;
     LOG("OK: restored from backup (%d undo levels remaining)", remaining > 0 ? remaining : 0);
     return true;

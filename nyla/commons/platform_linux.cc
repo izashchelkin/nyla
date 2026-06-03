@@ -57,8 +57,35 @@ void API Sleep(uint64_t millis)
     usleep(millis * 1000L);
 }
 
-//
+auto API TryReadEnvVar(byteview name, byteview &out) -> bool
+{
+    // getenv expects a null-terminated C string. Build one on the stack.
+    char buf[256];
+    uint32_t copyLen = name.size < sizeof(buf) - 1 ? name.size : sizeof(buf) - 1;
+    MemCpy(buf, name.data, copyLen);
+    buf[copyLen] = 0;
+    const char *val = getenv(buf);
+    if (!val)
+        return false;
+    out = byteview{(const uint8_t *)val, (uint64_t)strlen(val)};
+    return true;
+}
 
+auto API GetProcessId() -> uint32_t
+{
+    return (uint32_t)getpid();
+}
+
+auto API GetCurrentDirectory(region_alloc &alloc) -> byteview
+{
+    char buf[4096];
+    if (!getcwd(buf, sizeof(buf)))
+        return "/"_s;
+    uint64_t len = strlen(buf);
+    return RegionAlloc::CopyByteView(alloc, byteview{(const uint8_t *)buf, len});
+}
+
+//
 auto API FileValid(file_handle file) -> bool
 {
     int fd = (int)(int64_t)file;
@@ -166,8 +193,54 @@ auto API GetStderr() -> file_handle
     return (void *)2;
 }
 
-//
+auto API FileExists(byteview path) -> bool
+{
+    uint8_t pathBuf[4096];
+    uint32_t copyLen = path.size < sizeof(pathBuf) - 1 ? path.size : sizeof(pathBuf) - 1;
+    MemCpy(pathBuf, path.data, copyLen);
+    pathBuf[copyLen] = 0;
+    struct stat st;
+    return stat((const char *)pathBuf, &st) == 0;
+}
 
+auto API IsDirectory(byteview path) -> bool
+{
+    uint8_t pathBuf[4096];
+    uint32_t copyLen = path.size < sizeof(pathBuf) - 1 ? path.size : sizeof(pathBuf) - 1;
+    MemCpy(pathBuf, path.data, copyLen);
+    pathBuf[copyLen] = 0;
+    struct stat st;
+    return stat((const char *)pathBuf, &st) == 0 && S_ISDIR(st.st_mode);
+}
+
+auto API FileDelete(byteview path) -> bool
+{
+    uint8_t pathBuf[4096];
+    uint32_t copyLen = path.size < sizeof(pathBuf) - 1 ? path.size : sizeof(pathBuf) - 1;
+    MemCpy(pathBuf, path.data, copyLen);
+    pathBuf[copyLen] = 0;
+    return unlink((const char *)pathBuf) == 0;
+}
+
+auto API CreateDirectory(byteview path) -> bool
+{
+    uint8_t pathBuf[4096];
+    uint32_t copyLen = path.size < sizeof(pathBuf) - 1 ? path.size : sizeof(pathBuf) - 1;
+    MemCpy(pathBuf, path.data, copyLen);
+    pathBuf[copyLen] = 0;
+    return mkdir((const char *)pathBuf, 0755) == 0;
+}
+
+auto API RemoveDirectory(byteview path) -> bool
+{
+    uint8_t pathBuf[4096];
+    uint32_t copyLen = path.size < sizeof(pathBuf) - 1 ? path.size : sizeof(pathBuf) - 1;
+    MemCpy(pathBuf, path.data, copyLen);
+    pathBuf[copyLen] = 0;
+    return rmdir((const char *)pathBuf) == 0;
+}
+
+//
 struct dir_iter
 {
     DIR *handle;
