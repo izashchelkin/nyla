@@ -276,9 +276,11 @@ static auto ParseChatResponse(byteview body, region_alloc &alloc) -> ProviderRes
         byteview errorMsg;
         if (JsonValue::TryString(*root, "error"_s, errorMsg))
         {
+            span<uint8_t> unesc = RegionAlloc::AllocArray<uint8_t>(alloc, errorMsg.size);
+            byteview unescaped = UnescapeJsonString(errorMsg, unesc);
             uint8_t errBuf[256];
             uint64_t errLen =
-                StringWriteFmt(span<uint8_t>{errBuf, sizeof(errBuf)}, "Provider error: %.*s"_s, SV_ARG(errorMsg));
+                StringWriteFmt(span<uint8_t>{errBuf, sizeof(errBuf)}, "Provider error: %.*s"_s, SV_ARG(unescaped));
             result.content = AllocAndCopy(alloc, byteview{errBuf, errLen});
             return result;
         }
@@ -323,7 +325,11 @@ static auto ParseChatResponse(byteview body, region_alloc &alloc) -> ProviderRes
     {
         byteview content;
         if (JsonValue::TryString(*message, "content"_s, content) && content.size > 0)
-            result.content = AllocAndCopy(alloc, content);
+        {
+            span<uint8_t> unesc = RegionAlloc::AllocArray<uint8_t>(alloc, content.size);
+            byteview unescaped = UnescapeJsonString(content, unesc);
+            result.content = AllocAndCopy(alloc, unescaped);
+        }
     }
 
     // Serialize tool_calls

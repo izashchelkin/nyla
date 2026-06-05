@@ -34,111 +34,7 @@ static constexpr uint32_t kBaseWindowWidth = 1280;
 static constexpr const char *kStateFilePath = "/tmp/nyla_wm_state";
 static constexpr uint32_t kStateMagic = DWordBE("NYLA");
 
-// ─── Font data ───
-// 8x16 monospace glyphs, 96 chars (0x20-0x7F).
-// clang-format off
-static constexpr uint32_t kFontData[96][4] = {
-    {0x00000000, 0x00000000, 0x00000000, 0x00000000},
-    {0x00001010, 0x10101010, 0x10001010, 0x00000000},
-    {0x00242424, 0x00000000, 0x00000000, 0x00000000},
-    {0x00002424, 0x247E2424, 0x7E242424, 0x00000000},
-    {0x0010107C, 0x9290907C, 0x1212927C, 0x10100000},
-    {0x00006494, 0x68081010, 0x202C524C, 0x00000000},
-    {0x00001824, 0x2418304A, 0x4444443A, 0x00000000},
-    {0x00101010, 0x00000000, 0x00000000, 0x00000000},
-    {0x00000810, 0x20202020, 0x20201008, 0x00000000},
-    {0x00002010, 0x08080808, 0x08081020, 0x00000000},
-    {0x00000000, 0x0024187E, 0x18240000, 0x00000000},
-    {0x00000000, 0x0010107C, 0x10100000, 0x00000000},
-    {0x00000000, 0x00000000, 0x00001010, 0x20000000},
-    {0x00000000, 0x0000007E, 0x00000000, 0x00000000},
-    {0x00000000, 0x00000000, 0x00001010, 0x00000000},
-    {0x00000404, 0x08081010, 0x20204040, 0x00000000},
-    {0x00003C42, 0x42464A52, 0x6242423C, 0x00000000},
-    {0x00000818, 0x28080808, 0x0808083E, 0x00000000},
-    {0x00003C42, 0x42020408, 0x1020407E, 0x00000000},
-    {0x00003C42, 0x42021C02, 0x0242423C, 0x00000000},
-    {0x00000206, 0x0A122242, 0x7E020202, 0x00000000},
-    {0x00007E40, 0x40407C02, 0x0202423C, 0x00000000},
-    {0x00001C20, 0x40407C42, 0x4242423C, 0x00000000},
-    {0x00007E02, 0x02040408, 0x08101010, 0x00000000},
-    {0x00003C42, 0x42423C42, 0x4242423C, 0x00000000},
-    {0x00003C42, 0x4242423E, 0x02020438, 0x00000000},
-    {0x00000000, 0x00101000, 0x00001010, 0x00000000},
-    {0x00000000, 0x00101000, 0x00001010, 0x20000000},
-    {0x00000004, 0x08102040, 0x20100804, 0x00000000},
-    {0x00000000, 0x007E0000, 0x7E000000, 0x00000000},
-    {0x00000040, 0x20100804, 0x08102040, 0x00000000},
-    {0x00003C42, 0x42420408, 0x08000808, 0x00000000},
-    {0x00007C82, 0x9EA2A2A2, 0xA69A807E, 0x00000000},
-    {0x00003C42, 0x4242427E, 0x42424242, 0x00000000},
-    {0x00007C42, 0x42427C42, 0x4242427C, 0x00000000},
-    {0x00003C42, 0x42404040, 0x4042423C, 0x00000000},
-    {0x00007844, 0x42424242, 0x42424478, 0x00000000},
-    {0x00007E40, 0x40407840, 0x4040407E, 0x00000000},
-    {0x00007E40, 0x40407840, 0x40404040, 0x00000000},
-    {0x00003C42, 0x4240404E, 0x4242423C, 0x00000000},
-    {0x00004242, 0x42427E42, 0x42424242, 0x00000000},
-    {0x00003810, 0x10101010, 0x10101038, 0x00000000},
-    {0x00000E04, 0x04040404, 0x04444438, 0x00000000},
-    {0x00004244, 0x48506060, 0x50484442, 0x00000000},
-    {0x00004040, 0x40404040, 0x4040407E, 0x00000000},
-    {0x000082C6, 0xAA928282, 0x82828282, 0x00000000},
-    {0x00004242, 0x4262524A, 0x46424242, 0x00000000},
-    {0x00003C42, 0x42424242, 0x4242423C, 0x00000000},
-    {0x00007C42, 0x4242427C, 0x40404040, 0x00000000},
-    {0x00003C42, 0x42424242, 0x42424A3C, 0x02000000},
-    {0x00007C42, 0x4242427C, 0x50484442, 0x00000000},
-    {0x00003C42, 0x40403C02, 0x0242423C, 0x00000000},
-    {0x0000FE10, 0x10101010, 0x10101010, 0x00000000},
-    {0x00004242, 0x42424242, 0x4242423C, 0x00000000},
-    {0x00004242, 0x42424224, 0x24241818, 0x00000000},
-    {0x00008282, 0x82828282, 0x92AAC682, 0x00000000},
-    {0x00004242, 0x24241818, 0x24244242, 0x00000000},
-    {0x00008282, 0x44442810, 0x10101010, 0x00000000},
-    {0x00007E02, 0x02040810, 0x2040407E, 0x00000000},
-    {0x00003820, 0x20202020, 0x20202038, 0x00000000},
-    {0x00004040, 0x20201010, 0x08080404, 0x00000000},
-    {0x00003808, 0x08080808, 0x08080838, 0x00000000},
-    {0x00102844, 0x00000000, 0x00000000, 0x00000000},
-    {0x00000000, 0x00000000, 0x00000000, 0x007E0000},
-    {0x10080000, 0x00000000, 0x00000000, 0x00000000},
-    {0x00000000, 0x003C023E, 0x4242423E, 0x00000000},
-    {0x00004040, 0x407C4242, 0x4242427C, 0x00000000},
-    {0x00000000, 0x003C4240, 0x4040423C, 0x00000000},
-    {0x00000202, 0x023E4242, 0x4242423E, 0x00000000},
-    {0x00000000, 0x003C4242, 0x7E40403C, 0x00000000},
-    {0x00000E10, 0x107C1010, 0x10101010, 0x00000000},
-    {0x00000000, 0x003E4242, 0x4242423E, 0x02023C00},
-    {0x00004040, 0x407C4242, 0x42424242, 0x00000000},
-    {0x00001010, 0x00301010, 0x10101038, 0x00000000},
-    {0x00000404, 0x000C0404, 0x04040404, 0x44443800},
-    {0x00004040, 0x40424448, 0x70484442, 0x00000000},
-    {0x00003010, 0x10101010, 0x10101038, 0x00000000},
-    {0x00000000, 0x00FC9292, 0x92929292, 0x00000000},
-    {0x00000000, 0x007C4242, 0x42424242, 0x00000000},
-    {0x00000000, 0x003C4242, 0x4242423C, 0x00000000},
-    {0x00000000, 0x007C4242, 0x4242427C, 0x40404000},
-    {0x00000000, 0x003E4242, 0x4242423E, 0x02020200},
-    {0x00000000, 0x005E6040, 0x40404040, 0x00000000},
-    {0x00000000, 0x003E4040, 0x3C02027C, 0x00000000},
-    {0x00001010, 0x107C1010, 0x1010100E, 0x00000000},
-    {0x00000000, 0x00424242, 0x4242423E, 0x00000000},
-    {0x00000000, 0x00424242, 0x24241818, 0x00000000},
-    {0x00000000, 0x00828292, 0x9292927C, 0x00000000},
-    {0x00000000, 0x00424224, 0x18244242, 0x00000000},
-    {0x00000000, 0x00424242, 0x4242423E, 0x02023C00},
-    {0x00000000, 0x007E0408, 0x1020407E, 0x00000000},
-    {0x00000C10, 0x10102010, 0x1010100C, 0x00000000},
-    {0x00001010, 0x10101010, 0x10101010, 0x00000000},
-    {0x00003008, 0x08080408, 0x08080830, 0x00000000},
-    {0x0062928C, 0x00000000, 0x00000000, 0x00000000},
-    {0x08100000, 0x00000000, 0x00000000, 0x00000000},
-};
-// clang-format on
-
-static constexpr uint32_t kGlyphWidth = 8;
-static constexpr uint32_t kGlyphHeight = 16;
+#include "wm/bar_font_data.h"
 
 struct Rect
 {
@@ -170,6 +66,8 @@ struct window_stack
 static constexpr uint32_t kMoveresizeSizeRight = 3;
 static constexpr uint32_t kMoveresizeSizeLeft = 7;
 static constexpr uint32_t kMoveresizeCancel = 11;
+static constexpr uint32_t kWmEventMask = XCB_EVENT_MASK_PROPERTY_CHANGE | XCB_EVENT_MASK_FOCUS_CHANGE |
+                                         XCB_EVENT_MASK_ENTER_WINDOW | XCB_EVENT_MASK_LEAVE_WINDOW;
 
 auto IsHorizontalResize(uint32_t direction) -> bool
 {
@@ -350,6 +248,8 @@ void FetchClientProperty(xcb_window_t clientWindow, window_data_entry &data, xcb
     case XCB_ATOM_WM_TRANSIENT_FOR:
         break;
     default:
+        if (property == X11GetAtoms().net_wm_name)
+            break;
         if (property == X11GetAtoms().wm_protocols)
             break;
         return;
@@ -399,14 +299,13 @@ void ManageClient(xcb_window_t clientWindow)
     wm->index[pos].window = clientWindow;
     wm->index[pos].dataEntry = &wm->data[i];
 
-    uint32_t wmEventMask = XCB_EVENT_MASK_PROPERTY_CHANGE | XCB_EVENT_MASK_FOCUS_CHANGE | XCB_EVENT_MASK_ENTER_WINDOW |
-                           XCB_EVENT_MASK_LEAVE_WINDOW;
-    xcb_change_window_attributes(X11GetConn(), clientWindow, XCB_CW_EVENT_MASK, &wmEventMask);
+    xcb_change_window_attributes(X11GetConn(), clientWindow, XCB_CW_EVENT_MASK, &kWmEventMask);
 
     window_data_entry &data = wm->data[i];
     FetchClientProperty(clientWindow, data, XCB_ATOM_WM_HINTS);
     FetchClientProperty(clientWindow, data, XCB_ATOM_WM_NORMAL_HINTS);
     FetchClientProperty(clientWindow, data, XCB_ATOM_WM_NAME);
+    FetchClientProperty(clientWindow, data, X11GetAtoms().net_wm_name);
     FetchClientProperty(clientWindow, data, XCB_ATOM_WM_TRANSIENT_FOR);
     FetchClientProperty(clientWindow, data, X11GetAtoms().wm_protocols);
 
@@ -1003,29 +902,33 @@ auto BarRedraw() -> void
             pointCount = 0;
         };
 
-        uint32_t startX = 4;
-        for (int ci = 0; ci < textLen; ++ci)
+        int32_t cursorX = 4;
+        const uint8_t *p = lineBuf;
+        uint64_t remaining = (uint64_t)textLen;
+        while (remaining > 0)
         {
-            uint8_t ch = (uint8_t)lineBuf[ci];
-            if (ch < 0x20 || ch > 0x7F)
+            uint32_t cp = Utf8Decode(p, remaining);
+            if (cp == 0)
                 continue;
-            uint32_t glyphIdx = ch - 0x20;
-            uint32_t baseX = startX + (uint32_t)ci * kGlyphWidth;
-            for (uint32_t gy = 0; gy < kGlyphHeight && gy < barH; ++gy)
+            uint16_t glyphIdx = BarFontLookup(cp);
+            if (glyphIdx >= kBarFontGlyphCount)
+                continue;
+            for (uint32_t gy = 0; gy < kBarFontGlyphHeight && gy < barH; ++gy)
             {
                 uint32_t rowGroup = gy / 4;
                 uint32_t rowIdx = 3 - (gy % 4);
-                uint32_t rowByte = (kFontData[glyphIdx][rowGroup] >> (8 * rowIdx)) & 0xFF;
-                for (uint32_t gx = 0; gx < kGlyphWidth; ++gx)
+                uint32_t rowByte = (kBarFontBitmaps[glyphIdx][rowGroup] >> (8 * rowIdx)) & 0xFF;
+                for (uint32_t gx = 0; gx < kBarFontGlyphWidth; ++gx)
                 {
                     if ((rowByte >> (7 - gx)) & 1)
                     {
-                        points[pointCount++] = {(int16_t)(baseX + gx), (int16_t)(gy + 2)};
+                        points[pointCount++] = {(int16_t)(cursorX + (int32_t)gx), (int16_t)(gy + 2)};
                         if (pointCount == 256)
                             flush();
                     }
                 }
             }
+            cursorX += (int32_t)kBarFontGlyphWidth;
         }
         flush();
     }
@@ -1279,14 +1182,28 @@ void WmProcess(bool &isRunning)
         }
 
         case XCB_MAP_REQUEST: {
-            xcb_map_window(X11GetConn(), reinterpret_cast<xcb_map_request_event_t *>(event)->window);
+            xcb_window_t mapWin = reinterpret_cast<xcb_map_request_event_t *>(event)->window;
+            xcb_change_window_attributes(X11GetConn(), mapWin, XCB_CW_EVENT_MASK, &kWmEventMask);
+            xcb_map_window(X11GetConn(), mapWin);
             break;
         }
 
         case XCB_MAP_NOTIFY: {
             auto *mn = reinterpret_cast<xcb_map_notify_event_t *>(event);
-            if (!mn->override_redirect)
+            if (mn->override_redirect)
+                break;
+            window_index_entry *idx = FindIndex(mn->window);
+            if (idx)
+            {
+                // Already managed — refetch title in case properties
+                // were set after the initial ManageClient call.
+                FetchClientProperty(mn->window, *idx->dataEntry, XCB_ATOM_WM_NAME);
+                FetchClientProperty(mn->window, *idx->dataEntry, X11GetAtoms().net_wm_name);
+            }
+            else
+            {
                 ManageClient(mn->window);
+            }
             break;
         }
 
@@ -1531,6 +1448,20 @@ void WmProcess(bool &isRunning)
             }
 
             default: {
+                if (property == X11GetAtoms().net_wm_name)
+                {
+                    if (!reply)
+                        break;
+                    int len = xcb_get_property_value_length(reply);
+                    if (len <= 0)
+                        break;
+                    uint64_t copyLen = Min((uint64_t)len, (uint64_t)63);
+                    InlineString::Assign(data.name,
+                                         byteview{static_cast<uint8_t *>(xcb_get_property_value(reply)), copyLen});
+                    if (idx.window == GetActiveStack().activeWindow)
+                        wm->barDirty = true;
+                    break;
+                }
                 if (property != X11GetAtoms().wm_protocols)
                     break;
                 if (!reply)

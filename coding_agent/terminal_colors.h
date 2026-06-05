@@ -21,5 +21,9 @@ constexpr const char *kWhite = "\033[37m";
 // Bold
 constexpr const char *kBold = "\033[1m";
 
+// Background colors
+constexpr const char *kBgBlue = "\033[44m";
+constexpr const char *kBgCyan = "\033[46m";
+
 } // namespace Term
 } // namespace nyla

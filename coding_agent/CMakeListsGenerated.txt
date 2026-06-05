@@ -3,6 +3,8 @@ target_sources(${TARGET} PRIVATE
     main.cc
     provider_deepseek.cc
     provider_ollama.cc
+    provider_openai_codex.cc
     system_prompt.cc
+    tool_failure_repair.cc
     tool_registry.cc
 )

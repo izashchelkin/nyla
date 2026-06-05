@@ -1,6 +1,6 @@
 # Native Coding Agent — TODO
 
-Roadmap for a C++23 coding agent harness that talks to DeepSeek/OpenAI/Ollama
+Roadmap for a C++23 coding agent harness that talks to ChatGPT Codex / Ollama
 and uses xcav for structural code editing. No pi runtime dependency, no JavaScript,
 no STL.
 
@@ -31,12 +31,14 @@ no STL.
 ## Current shape / review notes
 
 - Phases 1 and 2 are complete and well documented.
-- Phase 3 has reached MVP shape: REPL, providers, tools, prompt, display, and context
-  management are implemented.
-- The remaining immediate gap is confidence: Ollama integration tests and scripted
-  end-to-end checks via `@scripts/test_ca.sh`.
-- After 3.12, the TODO should shift from "build the MVP" to "make it dependable
-  enough to use as the default coding harness".
+- Phase 3 is complete: REPL, three providers (ChatGPT Codex, DeepSeek, Ollama),
+  runtime model switching via `/model`, tool dispatch for 11 xcav + 3 system tools,
+  prompt construction, context management, SSE streaming for Codex, ANSI escape
+  filtering, and 11 e2e integration tests.
+- Credentials auto-loaded from `~/.pi/agent/auth.json` — ChatGPT Codex available
+  out of the box if pi is authenticated.
+- Phase 4 (hardening) is the next step: pi parity audit, tool-call repair,
+  configuration polish, regression harness.
 
 ---
 
@@ -65,150 +67,56 @@ Some may be thin wrappers, some may be new. Windows compatibility can be stubbed
 
 **Completed (2026-06-03)**: All tasks done. System wrappers, subprocess runner,
 HTTP client (curl-based), JSON parser fixes, API key support, Deadline wrapper.
-All 195 xcav tests pass. String helpers and temp file helper deferred to Phase 3
-when concrete needs emerge from JSON serialization and harness tool implementations.
+All 195 xcav tests pass.
 
 ### Tasks
 
 - [x] 2.0a Escape hatch cleanup (unplanned — emerged from audit)
-  - xcav was using raw `getenv`, `stat`, `mkdir`, `unlink`, `rmdir`, `getpid`, `getcwd`, `_exit`
-  - Added wrappers: `file.h` (5 functions), `platform.h` (3 functions), `span.h` (`ByteviewEq`), `mem.h` (`StrEq`)
-  - Updated xcav to use all wrappers, dropped `<stdlib.h>`, `<sys/stat.h>`, `<unistd.h>`
-  - All 184 xcav tests pass
-
-- [x] 2.0b `Exit()` semantics — changed from `quick_exit` to `_Exit` (no atexit handlers)
-
+- [x] 2.0b `Exit()` semantics — changed from `quick_exit` to `_Exit`
 - [x] 2.0c xcav improvements (2026-06-03)
-  - Fixed `undo` error reporting — `CmdUndo` now checks `RestoreBackup` return value
-  - Improved `insert` UX — accepts positional `before`/`after` in addition to `--before`/`--after`
-  - Disabled usage logging in tests via `XC_NO_LOG=1` env var
-  - Split `operation_failed` into 9 specific error tags (move_failed, edit_failed, etc.)
-
 - [x] 2.1 Subprocess runner
-  - `SubprocessRun(command, alloc, stdin_data, timeout_ms) -> subprocess_result`
-  - Linux: fork+pipe (separate stdout/stderr pipes, poll-based I/O with timeout)
-  - Windows: CreateProcess stub
-  - Timeout support via SIGKILL after deadline
-  - Environment inherited from parent via execvp
-  - 64 KB per-stream output cap
-  - Location: `nyla/commons/subprocess.h` + `subprocess_linux.cc` + `subprocess_windows.cc`
-
 - [x] 2.2 HTTP client
-  - `HttpPostJson(url, json_body, api_key, alloc) -> http_response`
-  - Linux: curl subprocess via `SubprocessRun` (`curl -s -D /dev/stderr -o -`)
-    separates headers (stderr) from body (stdout), parse status from HTTP line
-  - Windows: stub
-  - 30s timeout, API key passed as Bearer token
-  - Location: `nyla/commons/http_client.h` + `http_client_linux.cc` + `http_client_windows.cc`
-
-- [x] 2.3 JSON parser fixes (replaced extractor approach)
-  - Fixed escape handling: `ParseString` now skips escaped chars (`\"`, `\\`, etc.)
-  - Error recovery: replaced all `ASSERT`s with `nullptr` returns — safe for network input
-  - Fixed null literal: now properly sets `json_tag::Null` (was `Invalid`)
-  - Added `HasNext` guards before all `Read`/`Peek` calls for EOF safety
-  - Exported symbols: added `API` to `ParseNext`, `GetNext`, `TryXxx` functions
-  - Tests: 53 tests covering basic types, arrays, objects, navigation, whitespace,
-    escape sequences, gltf-style parsing, and error recovery
-  - Location: tests in `tests/json_parser/`, ctest-registered
-
-- [x] 2.4 String helpers — **DEFERRED to Phase 3** (add when JSON serialization needs them)
-
+- [x] 2.3 JSON parser fixes
+- [x] 2.4 String helpers — **DEFERRED to Phase 3**
 - [x] 2.5 API key / secrets
-  - `TryReadEnvVar(name, out) -> bool` — added to `platform.h`
-  - `FileReadFully` already exists in `file_utils.h` for file slurping
-
 - [x] 2.6 Simple timer / deadline
-  - `deadline` struct in `time.h`: `FromMillis()`, `Never()`, `IsExpired()`, `RemainingMs()`
-  - `SubprocessRun` updated to use `deadline` internally
-
-- [x] 2.7 Temp file helper — **DEFERRED to Phase 3** (CmdEdit handles temp files internally; no current need)
-
-- [x] 2.8 Build integration — all new files already in CMakeListsGenerated.txt
+- [x] 2.7 Temp file helper — **DEFERRED to Phase 3**
+- [x] 2.8 Build integration
 
 ---
 
-## Phase 3: Harness
+## Phase 3: Harness ✅ DONE
 
 **Goal**: Build the agent loop in a new `coding_agent/` directory.
-Uses xcav CmdXxx functions directly (no shelling out). Talks to DeepSeek/OpenAI.
+Uses xcav CmdXxx functions directly. Talks to ChatGPT Codex / DeepSeek / Ollama.
 
 ### Tasks
 
 - [x] 3.1 Project skeleton ✅
-  - `coding_agent/main.cc` — UserMain entry point
-  - `coding_agent/CMakeLists.txt` + `CMakeListsGenerated.txt`
-  - Root `CMakeLists.txt`: add `coding_agent/` glob + `add_subdirectory`
-  - Builds and runs (`cmake --build build/linux-debug --target coding_agent`)
-
-- [x] 3.2 Agent loop ✅
-  - `agent_loop.h` — Message types, Conversation, AgentConfig, ProviderResponse, ToolResult, DispatchToolFn
-  - `agent_loop.cc` — ReadLine, StubProvider, StubDispatchTool, RunAgentLoop
-  - REPL: prompt → read line → append user msg → stub provider → display response → repeat
-  - Tool-call loop with max iterations (25 cap), exit/quit commands, Ctrl-D to quit
-  - Provider and dispatch are stubbed (real impl in 3.6 + 3.3/3.4)
-
-- [x] 3.3 Tool dispatcher (`tool_registry.h` / `tool_registry.cc`) ✅
-  - Registry: `inline_vec<ToolDef, 32>` — name, description, parameters JSON, handler fn ptr
-  - Dispatch by name: look up tool, parse arguments JSON, call handler
-  - Tool result: `{ content: string, isError: bool }`
-
-- [x] 3.4 Tool definitions (xcav tools) ✅
-  - Registered: xcav_blocks, xcav_read, xcav_move, xcav_move_into, xcav_delete,
-    xcav_replace, xcav_replace_block, xcav_undo, xcav_edit, xcav_copy, xcav_insert
-  - Each calls the corresponding CmdXxx function from xcav directly
-  - xcav core split into `xcav_lib` static library for reuse
-
-- [x] 3.5 Tool definitions (system tools) ✅
-  - `bash` — Subprocess::Run("bash", "-c", command), 30s timeout
-  - `read_file` — FileReadFully(path), return content
-  - `write_file` — write content to path, create dirs as needed
-
-- [x] 3.6 Provider abstraction (`provider.h`)
-  - Single header: `provider.h` declares DeepSeekProvider, OpenAIProvider, OllamaProvider, StubProvider
-  - Shared OpenAI-compatible implementation in `provider_deepseek.cc` (DeepSeek + OpenAI)
-  - Request includes `tools` field from tool registry
-  - Response parsed from OpenAI `choices[0].message` format (content + tool_calls + finish_reason)
-  - Auth: Bearer token from `DEEPSEEK_API_KEY` / `OPENAI_API_KEY` env vars
-
-- [x] 3.7 JSON serialization (request body) ✅
-  - BuildChatRequestBody in provider_deepseek.cc and provider_ollama.cc
-  - Conversation array → JSON messages[], tools[] from GetToolDefs(), stream=false
-  - All raw BufferBuilder-based, no external JSON library needed
-
-- [x] 3.8 JSON parsing (response) ✅
-  - ParseChatResponse in provider_deepseek.cc and provider_ollama.cc
-  - JsonValue::TryString/TryBool/Object/Array for navigating OpenAI/Ollama responses
-  - Error responses (4xx, 5xx) handled with readable messages
-  - Malformed JSON → returns ProviderFinishReason::Error (no crash)
-
-- [x] 3.9 System prompt and configuration ✅
-  - Load system prompt from `~/.config/coding_agent/prompt.md` or embedded default
-  - Include xcav tool descriptions dynamically from GetToolDefs()
-  - Include project context (cwd + `find .` file tree summary)
-  - Config expanded: modelName, maxToolIterations, maxTokens, temperature, apiBaseUrl override
-  - system_prompt.h/cc module; apiBaseUrl wired into providers
-
-- [x] 3.10 Display and UX ✅
-  - Streaming deferred (non-streaming works fine for now)
-  - Color output: green prompt, cyan tool names, green OK/red ERROR, dim token count
-  - Tool calls shown as `[tool_name] OK` or `[tool_name] ERROR` with color
-  - Token usage displayed per turn: `[N tokens]` (parsed from usage.total_tokens)
-  - terminal_colors.h with ANSI escape constants
-
-- [x] 3.11 Context window management ✅
-  - Track approximate conversation tokens (bytes / 4) plus provider-reported `totalTokens`
-  - Warn when approaching the configured context limit
-  - Local auto-compaction: summarize early conversation into a system message, keep recent messages
-
-- [ ] 3.12 Integration tests against Ollama (requires local ollama serve)
-  - Basic text: "Hello" → model replies with text
-  - Tool trigger: "List blocks in agent_loop.cc" → model calls `xcav_blocks`
-  - Bash tool: "What files are in coding_agent/?" → model calls `bash ls`
-  - Read file: "Show me the TODO" → model calls `read_file`
-  - Multi-turn: tool call → result → model uses result in final response
-  - Ollama not running → graceful error, no crash
-  - Malformed/empty response → no crash
-  - Location: `tests/coding_agent/` + `scripts/test_ca.sh` (run via `@scripts/test_ca.sh`)
+- [x] 3.2 Agent loop ✅ — REPL, tool-call loop (25 iterations), exit/quit/Ctrl-D
+- [x] 3.3 Tool dispatcher ✅ — `tool_registry.h/cc`, 11 xcav + 3 system tools
+- [x] 3.4 Tool definitions (xcav tools) ✅ — blocks, read, move, move_into, delete, replace, replace_block, undo, edit, copy, insert
+- [x] 3.5 Tool definitions (system tools) ✅ — bash, read_file, write_file
+- [x] 3.6 Provider abstraction ✅ — DeepSeekProvider, OpenAIProvider, OllamaProvider, StubProvider (shared OpenAI-compatible format)
+- [x] 3.7 JSON serialization ✅ — BufferBuilder-based request bodies
+- [x] 3.8 JSON parsing ✅ — OpenAI/Ollama response parsing, error handling
+- [x] 3.9 System prompt ✅ — `~/.config/coding_agent/prompt.md` or embedded default, tool descriptions, project context
+- [x] 3.10 Display and UX ✅ — colored output, tool status, token counts
+- [x] 3.11 Context window management ✅ — token estimation, warnings, auto-compaction
+- [x] 3.12 Integration tests ✅ — 11 e2e tests via `scripts/test_ca.sh` (5 error-handling + 5 integration + /model)
+- [x] 3.13 ChatGPT Codex provider ✅
+  - `provider_openai_codex.h/cc` — Codex Responses API (SSE streaming)
+  - OAuth token + JWT account ID extraction
+  - `chatgpt.com/backend-api/codex/responses` endpoint
+  - SSE event parsing: text deltas, function call arguments, completion events
+  - Fallback: extracts text from `response.output_item.done` when deltas are skipped
+  - Model: `gpt-5.4-mini`
+- [x] 3.14 Runtime model switching ✅
+  - `/model` command — lists available models, switches with `/model <name>`
+  - `ModelDef` struct in `agent_loop.h`
+  - Auto-detection: ChatGPT if pi's auth.json has OAuth token, Ollama always available
+  - Credentials auto-loaded from `~/.pi/agent/auth.json` — no env vars needed
+  - ANSI escape sequence filtering (arrow keys don't corrupt input)
 
 ---
 
@@ -225,17 +133,41 @@ harness, comparable to default `pi` without extensions.
     display UX, and error handling
   - Capture findings in `coding_agent/pi_parity.md`
 
-- [ ] 4.2 Robust tool-call repair
-  - Detect malformed tool-call JSON / bad arguments before dispatch
-  - Try deterministic repair first (JSON unescape, missing braces, arguments object vs string)
-  - Optional local-LLM repair path: produce valid tool name + arguments or a concise failure
-  - Never silently execute repaired calls without logging what changed
+- [ ] 4.2 Tool-call failure interceptor (three-layer design)
+  - **Problem**: When a tool fails, the raw error is fed back to the main model as a
+    `MessageRole::Tool` message. The main model goes into fix-it mode — re-reading files,
+    re-trying with tweaked args, debugging — burning tokens and iterations.
+  - **Solution**: Intercept failures before they reach the main model. Route through a
+    three-layer pipeline:
+    - **Layer 0 — Deterministic mechanical fix** (no LLM, zero latency): JSON unescape
+      (already done in agent_loop.cc), missing braces, arg type coercion, known typo
+      fixes. If fix works, retry the tool call and feed the successful result to the
+      main model with an `[auto-repaired: ...]` annotation.
+    - **Layer 1 — Local LLM repair or summarize**: For semantic failures a regex can't
+      fix ("oldText not found", "destLine is inside a function body", "file doesn't
+      exist"). Send a compact context blob to a cheap local model (qwen3:4b via Ollama):
+      tool name, original args, error message, and the last assistant message for intent
+      context. Model responds with `{"action": "retry", "fixedArgs": {...}}` or
+      `{"action": "summarize", "summary": "..."}`. Retry on success; feed summary on
+      failure. Always annotate what was changed.
+    - **Layer 2 — Legitimate pass-through**: Some errors the main model SHOULD see
+      (test failures, build errors, user-visible problems). Classified by tool name +
+      error pattern.
+  - **Helper model context**: Minimal — only last assistant message (intent), tool name,
+    original args, error message, and optionally a 10-line file snippet if relevant. Do
+    NOT send the full conversation — defeats the purpose.
+  - **Latency budget**: ~0.6–2.5s (Ollama 0.5–2s + tool retry 0.1–0.5s). Compare to
+    2–4 wasted main-model iterations at 2–10s each.
+  - **Configuration**: Gated behind `AgentConfig::enableToolFailureRepair`;
+    `helperModel` selects which Ollama model to use.
 
-- [ ] 4.3 Tool failure summarization
-  - When a tool fails or returns huge output, optionally ask a local model to summarize:
-    what was attempted, what failed, important output snippets, and next suggested action
-  - Feed the summary to the main model instead of forcing it to re-run many tools
-  - Preserve raw output when it is small; summarize only when useful
+- [ ] 4.3 Tool output compression
+  - When a tool *succeeds* but returns huge output (>2000 bytes), send to the helper
+    model for structured compression before feeding to the main model.
+  - Input: tool name + raw output. Output: key facts, file structure, error locations.
+  - Gated behind `AgentConfig::enableToolOutputCompression` and
+    `toolOutputCompressThreshold`.
+  - Preserve raw output when small; compress only when useful.
 
 - [ ] 4.4 Safer edit workflow
   - Require clearer user-facing summaries before destructive edits
@@ -258,44 +190,71 @@ harness, comparable to default `pi` without extensions.
   - Investigate whether xcav should expose structural Markdown blocks (headings/sections/code fences)
   - Decide if this belongs in xcav core or remains plain text editing
 
+- [x] 4.8 Fix JSON string unescaping (2026-06-05)
+  - JSON parser stores strings with raw escape sequences (\n → literal backslash-n)
+  - Added `UnescapeJsonString` helper in `provider.h`
+  - Applied to all content/delta/error extraction points in DeepSeek, Codex, and Ollama providers
+  - Response text now renders with proper newlines instead of literal `\n` characters
+
+- [x] 4.9 Thinking/reasoning token support (2026-06-05)
+
+- [x] 4.10 Fork memory-pool isolation (2026-06-05)
+  - Each tool-failure fork now gets its own `region_alloc` chunk instead of
+    sharing the main loop's arena. The system message is allocated directly
+    in forkAlloc (no 4096-byte stack buffer). After the fork, results are
+    copied back to main alloc before forkAlloc is destroyed.
+  - Fixes `ASSERT(written + dataSize <= out.size)` crash when `fnArgs` or
+    `result.content` is large enough to overflow the 4096-byte stack buffer.
+  - Added `thinkingContent` field to `ProviderResponse`
+  - Codex SSE parser handles `response.reasoning_text.delta` events
+  - Agent loop displays thinking text with dimmed `[thinking]`/`[/thinking]` brackets
+  - Thinking content is NOT included in conversation history (keeps context clean)
+
 ---
 
 ## Deliverables
 
 ```
 coding_agent/
-├── TODO.md                 ← this file
-├── audit.md                ← Phase 1 findings
-├── pi_parity.md            ← Phase 4 findings (future)
-├── main.cc                 ← UserMain entry point
-├── agent_loop.h
-├── agent_loop.cc
-├── tool_registry.h
-├── tool_registry.cc
-├── provider.h              ← shared provider declarations (DeepSeek, OpenAI, Ollama, Stub)
-├── provider_deepseek.cc    ← DeepSeek + OpenAI implementations (shared OpenAI format)
-├── provider_ollama.cc      ← Ollama local provider
-├── provider_ollama.h       ← re-exports provider.h
-├── system_prompt.h         ← BuildSystemPrompt — user prompt + tool descs + project context
-├── system_prompt.cc
-├── terminal_colors.h       ← ANSI terminal color constants
+├── TODO.md                      ← this file
+├── audit.md                     ← Phase 1 findings
+├── pi_parity.md                 ← Phase 4 findings (future)
+├── main.cc                      ← UserMain: model registry, credential auto-load
+├── agent_loop.h                 ← Message/Conversation/AgentConfig/ModelDef types
+├── agent_loop.cc                ← REPL, /model, tool-call loop, context compaction
+├── tool_registry.h              ← ToolDef, InitToolRegistry, dispatch
+├── tool_registry.cc             ← 11 xcav + 3 system tool handlers
+├── provider.h                   ← shared declarations (DeepSeek, OpenAI, Codex, Ollama, Stub)
+├── provider_deepseek.cc         ← DeepSeek + OpenAI (shared OpenAI format)
+├── provider_ollama.cc           ← Ollama local provider
+├── provider_ollama.h            ← re-exports provider.h
+├── provider_openai_codex.h      ← ChatGPT Codex provider declaration
+├── provider_openai_codex.cc     ← Codex Responses API (SSE streaming, OAuth, JWT)
+├── system_prompt.h              ← BuildSystemPrompt
+├── system_prompt.cc             ← prompt loading, tool descriptions, project context
+├── terminal_colors.h            ← ANSI terminal color constants
 └── CMakeListsGenerated.txt
 
-tests/coding_agent/ (tests — Phase 3.12):
-├── test_ca.cc              ← e2e integration tests (requires Ollama)
-└── CMakeLists.txt
-
-scripts/test_ca.sh          ← runs tests (skips if Ollama not running)
+scripts/test_ca.sh               ← 11 e2e tests (ChatGPT Codex, auto-loads creds from pi)
 ```
 
 ---
 
+## Decisions made
+
+- **Streaming**: Codex requires SSE streaming (curl -N); DeepSeek/Ollama use non-streaming.
+- **HTTP**: curl subprocess via `SubprocessRun` — no mbedtls/openssl dependency.
+- **JSON**: Hand-rolled `BufferBuilder` for serialization; `json_parser` for parsing.
+- **Windows**: Stub only.
+- **Tool iterations**: Cap at 25 before returning to user.
+- **Credentials**: Auto-loaded from `~/.pi/agent/auth.json` at startup.
+- **Model selection**: Runtime via `/model` command; ChatGPT Codex and Ollama supported.
+- **Tool failure routing**: Three-layer interceptor (mechanical fix → local LLM repair/summarize → pass-through).
+  Separates "architect" (main model plans) from "mechanic" (helper model fixes execution issues).
+  Layer 0 is free (deterministic); Layer 1 uses cheap local model; Layer 2 lets legitimate errors through.
+
 ## Decisions to make later
 
-- Streaming vs non-streaming responses (start non-streaming)
-- Raw TLS (mbedtls/openssl) vs curl subprocess for HTTP
-- General JSON parser vs hand-rolled extractor (hand-rolled is fine for now)
-- Windows support: stub or implement? (stub initially)
-- Multi-turn tool calling loop — how many iterations before forcing user input? (cap at 25)
 - How much pi parity is desirable vs keeping the native harness simpler
-- Which local model is reliable enough for repair/summarization helper duties
+- Whether to add config file support or keep env-var-only
+- Markdown block support in xcav — separate tool or xcav core?

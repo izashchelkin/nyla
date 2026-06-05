@@ -16,7 +16,7 @@
 namespace nyla
 {
 
-constexpr uint64_t kOutputCap = 0x10000; // 64 KB per stream
+constexpr uint64_t kOutputCap = 0x200000; // 2 MB per stream (SSE responses can be large)
 
 auto API SubprocessRun(span<const char *const> cmd, region_alloc &alloc, byteview stdin_data, uint32_t timeout_ms)
     -> subprocess_result

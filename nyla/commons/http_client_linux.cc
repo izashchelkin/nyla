@@ -58,7 +58,7 @@ auto API HttpPostJson(byteview url, byteview json_body, byteview api_key, region
     InlineVec::Append(args, nullptr); // sentinel
 
     auto proc = SubprocessRun(span<const char *const>{(const char *const *)args.begin(), args.size}, alloc, json_body,
-                              30'000); // 30 second timeout
+                              90'000); // 90 second timeout (needed for slow local models)
     if (proc.exit_code != 0)
         return result;
 
