@@ -586,14 +586,14 @@ void RunAgentLoop(region_alloc &alloc, AgentConfig &config, ProviderFn &provider
                             {
                                 uint32_t cap = 512 + fnName.size + fnArgs.size + result.content.size;
                                 span<uint8_t> buf = RegionAlloc::AllocArray<uint8_t>(forkAlloc, cap);
-                                uint32_t forkLen = StringWriteFmt(
-                                    buf,
-                                    "The last assistant attempted to call tool \"%.*s\" with "
-                                    "arguments %.*s but the tool failed: %.*s\n\n"
-                                    "Fix the tool call and try again, or respond appropriately "
-                                    "if the failure is not recoverable."_s,
-                                    (int)fnName.size, fnName.data, (int)fnArgs.size, fnArgs.data,
-                                    (int)result.content.size, result.content.data);
+                                uint32_t forkLen =
+                                    StringWriteFmt(buf,
+                                                   "The last assistant attempted to call tool \"%.*s\" with "
+                                                   "arguments %.*s but the tool failed: %.*s\n\n"
+                                                   "Fix the tool call and try again, or respond appropriately "
+                                                   "if the failure is not recoverable."_s,
+                                                   (int)fnName.size, fnName.data, (int)fnArgs.size, fnArgs.data,
+                                                   (int)result.content.size, result.content.data);
                                 Message sysMsg{};
                                 sysMsg.role = MessageRole::System;
                                 sysMsg.content = {buf.data, forkLen};
@@ -680,8 +680,8 @@ void RunAgentLoop(region_alloc &alloc, AgentConfig &config, ProviderFn &provider
                                                 FileWriteFmt(stdoutHandle, "%sERROR: %.*s%s\n"_s, kRed,
                                                              (int)fres.content.size, fres.content.data, kReset);
                                             else if (fres.content.size > 0)
-                                                FileWriteFmt(stdoutHandle, "%sOK%s\n%s%.*s%s\n"_s, kGreen, kReset,
-                                                             kDim, (int)fres.content.size, fres.content.data, kReset);
+                                                FileWriteFmt(stdoutHandle, "%sOK%s\n%s%.*s%s\n"_s, kGreen, kReset, kDim,
+                                                             (int)fres.content.size, fres.content.data, kReset);
                                             else
                                                 FileWriteFmt(stdoutHandle, "%sOK%s\n"_s, kGreen, kReset);
                                         }
@@ -754,8 +754,8 @@ void RunAgentLoop(region_alloc &alloc, AgentConfig &config, ProviderFn &provider
                         FileWriteFmt(stdoutHandle, "%sOK%s\n"_s, kGreen, kReset);
                 }
 
-                // Continue tool-call loop -- provider may call more tools
-                continueMainLoop:
+            // Continue tool-call loop -- provider may call more tools
+            continueMainLoop:
                 continue;
             }
 

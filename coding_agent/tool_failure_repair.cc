@@ -381,8 +381,7 @@ static auto ParseHelperText(byteview text, region_alloc &alloc, byteview &action
                 else if (v->tag == json_tag::Integer)
                 {
                     uint8_t nb[32];
-                    uint32_t nl =
-                        StringWriteFmt(span<uint8_t>{nb, sizeof(nb)}, "%lld"_s, (long long)v->val.valInt);
+                    uint32_t nl = StringWriteFmt(span<uint8_t>{nb, sizeof(nb)}, "%lld"_s, (long long)v->val.valInt);
                     if (ap + nl < kArgBuf)
                     {
                         MemCpy(ab.data + ap, nb, nl);
@@ -442,15 +441,14 @@ auto TryLLMRepair(byteview toolName, byteview originalArgs, byteview errorConten
 
     // ── Build user message with failure context ──────────────────────
     uint8_t userBuf[4096];
-    uint32_t userLen =
-        StringWriteFmt(span<uint8_t>{userBuf, sizeof(userBuf)},
-                       "Tool call failed:\n"
-                       "  Tool: %.*s\n"
-                       "  Arguments: %.*s\n"
-                       "  Error: %.*s\n"
-                       "\nFix the arguments or summarize this failure."_s,
-                       (int)toolName.size, toolName.data, (int)originalArgs.size, originalArgs.data,
-                       (int)errorContent.size, errorContent.data);
+    uint32_t userLen = StringWriteFmt(span<uint8_t>{userBuf, sizeof(userBuf)},
+                                      "Tool call failed:\n"
+                                      "  Tool: %.*s\n"
+                                      "  Arguments: %.*s\n"
+                                      "  Error: %.*s\n"
+                                      "\nFix the arguments or summarize this failure."_s,
+                                      (int)toolName.size, toolName.data, (int)originalArgs.size, originalArgs.data,
+                                      (int)errorContent.size, errorContent.data);
 
     // ── Build minimal conversation ────────────────────────────────────
     Conversation helperConv{};
@@ -489,11 +487,10 @@ auto TryLLMRepair(byteview toolName, byteview originalArgs, byteview errorConten
     if (ByteviewEq(action, Bv("summarize")))
     {
         uint8_t buf[4096];
-        uint32_t len =
-            StringWriteFmt(span<uint8_t>{buf, sizeof(buf)},
-                           "[helper model summary] %.*s\n"
-                           "(Original error: %.*s)"_s,
-                           (int)summary.size, summary.data, (int)errorContent.size, errorContent.data);
+        uint32_t len = StringWriteFmt(span<uint8_t>{buf, sizeof(buf)},
+                                      "[helper model summary] %.*s\n"
+                                      "(Original error: %.*s)"_s,
+                                      (int)summary.size, summary.data, (int)errorContent.size, errorContent.data);
         fallback.content = AllocCopy(alloc, {buf, len});
         return fallback;
     }
@@ -502,9 +499,8 @@ auto TryLLMRepair(byteview toolName, byteview originalArgs, byteview errorConten
     ToolResult repaired;
     repaired.isError = false;
     uint8_t resultBuf[8192];
-    uint32_t resultLen =
-        StringWriteFmt(span<uint8_t>{resultBuf, sizeof(resultBuf)}, "[REPAIR_RETRY]%.*s"_s, (int)fixedArgs.size,
-                       fixedArgs.data);
+    uint32_t resultLen = StringWriteFmt(span<uint8_t>{resultBuf, sizeof(resultBuf)}, "[REPAIR_RETRY]%.*s"_s,
+                                        (int)fixedArgs.size, fixedArgs.data);
     repaired.content = AllocCopy(alloc, {resultBuf, resultLen});
     return repaired;
 }

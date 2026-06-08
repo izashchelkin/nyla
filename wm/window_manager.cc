@@ -864,27 +864,17 @@ auto BarRedraw() -> void
     {
         wall_clock_time wc = GetWallClockTime();
         const window_stack &activeStack = GetActiveStack();
+
+        byteview activeName{};
         if (activeStack.activeWindow)
         {
             window_index_entry *activeIdx = FindIndex(activeStack.activeWindow);
-            if (activeIdx && activeIdx->dataEntry->name.size > 0)
-            {
-                textLen = (int)StringWriteFmt({lineBuf, sizeof(lineBuf)}, "%02d:%02d:%02d %02d.%02d.%04d  %.*s [%u]"_s,
-                                              wc.hour, wc.minute, wc.second, wc.day, wc.month, wc.year,
-                                              activeIdx->dataEntry->name.size, activeIdx->dataEntry->name.data.data,
-                                              (uint32_t)wm->activeStackIndex + 1);
-            }
-            else
-            {
-                textLen = (int)StringWriteFmt({lineBuf, sizeof(lineBuf)}, "%02d:%02d:%02d %02d.%02d.%04d"_s, wc.hour,
-                                              wc.minute, wc.second, wc.day, wc.month, wc.year);
-            }
+            activeName = activeIdx->dataEntry->name;
         }
-        else
-        {
-            textLen = (int)StringWriteFmt({lineBuf, sizeof(lineBuf)}, "%02d:%02d:%02d %02d.%02d.%04d"_s, wc.hour,
-                                          wc.minute, wc.second, wc.day, wc.month, wc.year);
-        }
+
+        textLen = (int)StringWriteFmt({lineBuf, sizeof(lineBuf)}, "%02d:%02d:%02d %02d.%02d.%04d  [%u]  %.*s"_s,
+                                      wc.hour, wc.minute, wc.second, wc.day, wc.month, wc.year,
+                                      (uint32_t)wm->activeStackIndex + 1, activeName.size, activeName.data);
     }
 
     // Set foreground color (light gray) and draw glyphs via batched points

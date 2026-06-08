@@ -51,7 +51,7 @@ struct AgentConfig
 
     // Tool failure repair -- uses a cheap local model to fix or summarize
     // failed tool calls before the main model sees them.
-    bool enableToolFailureRepair = true; // gate for Layer 0 + Layer 1
+    bool enableToolFailureRepair = true;      // gate for Layer 0 + Layer 1
     const char *helperModel = "gpt-5.4-mini"; // model for repair/summarize (Layer 1)
 };
 // ─── Provider response ──────────────────────────────────────────────────────
